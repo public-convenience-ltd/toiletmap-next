@@ -1,4 +1,4 @@
-import type { areas, record_version, toilets } from '../../generated/prisma/client';
+import type { areas, record_version, toilets } from "../../../prisma/src/generated/prisma/client";
 import {
   AdminGeo,
   Coordinates,

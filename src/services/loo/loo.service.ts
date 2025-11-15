@@ -2,7 +2,7 @@ import {
   Prisma,
   PrismaClient,
   toilets,
-} from '../../generated/prisma/client';
+} from  "../../../prisma/src/generated/prisma/client";
 import { prisma as defaultPrisma } from '../../prisma';
 import {
   areaSelection,

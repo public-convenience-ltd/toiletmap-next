@@ -1,4 +1,4 @@
-import type { Prisma, toilets } from '../../generated/prisma/client';
+import type { Prisma, toilets } from  "../../../prisma/src/generated/prisma/client";
 
 export type Coordinates = { lat: number; lng: number };
 
