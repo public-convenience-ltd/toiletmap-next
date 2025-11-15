@@ -154,10 +154,16 @@ describe.sequential('Loos API - audit history', () => {
     }
 
     const creationReport = reports.find(
-      (entry) => !entry.isSystemReport && entry.diff === null,
+      (entry) => !entry.isSystemReport && entry.diff?.accessible?.current === true,
     );
     expect(creationReport).toBeDefined();
-    expect(creationReport?.diff).toBeNull();
+    expect(creationReport?.diff).not.toBeNull();
+    expect(creationReport?.diff?.accessible?.previous).toBeNull();
+    expect(creationReport?.diff?.accessible?.current).toBe(true);
+    expect(creationReport?.diff?.notes?.previous).toBeNull();
+    expect(creationReport?.diff?.notes?.current).toBe(createPayload.notes);
+    expect(creationReport?.diff?.location?.previous).toBeNull();
+    expect(creationReport?.diff?.location?.current).toEqual(createPayload.location);
     if (creationReport) {
       expect(
         Object.prototype.hasOwnProperty.call(creationReport, 'notes'),
@@ -208,7 +214,9 @@ describe.sequential('Loos API - audit history', () => {
         !entry.isSystemReport && entry.notes === createPayload.notes,
     );
     expect(hydratedCreationReport).toBeDefined();
-    expect(hydratedCreationReport?.diff).toBeNull();
+    expect(hydratedCreationReport?.diff).not.toBeNull();
+    expect(hydratedCreationReport?.diff?.accessible?.previous).toBeNull();
+    expect(hydratedCreationReport?.diff?.accessible?.current).toBe(true);
 
     const saved = await prisma.toilets.findUnique({
       where: { id },

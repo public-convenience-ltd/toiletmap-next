@@ -164,6 +164,17 @@ export const mapAuditRecordToReport = ({
         };
       }
     }
+  } else {
+    // Genesis report - show all non-null current values
+    for (const key of Object.keys(currentSnapshot)) {
+      const currentValue = (currentSnapshot as Record<string, unknown>)[key];
+      if (currentValue !== null) {
+        diff[key] = {
+          previous: null,
+          current: currentValue,
+        };
+      }
+    }
   }
 
   return {
