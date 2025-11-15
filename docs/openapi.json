@@ -1,0 +1,1516 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Toilet Map API",
+    "version": "1.0.0",
+    "description": "Programmatic access to Toilet Map loos and administrative areas."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4001",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Meta",
+      "description": "General service endpoints."
+    },
+    {
+      "name": "Areas",
+      "description": "Administrative area operations."
+    },
+    {
+      "name": "Loos",
+      "description": "Operations relating to loos."
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Coordinates": {
+        "type": "object",
+        "description": "Geographic coordinates (WGS84).",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "example": 51.5074
+          },
+          "lng": {
+            "type": "number",
+            "example": -0.1278
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ]
+      },
+      "AdminArea": {
+        "type": "object",
+        "description": "Administrative subdivision associated with a loo.",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Route not found"
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "issues": {}
+            }
+          }
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "service",
+          "uptime"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "service": {
+            "type": "string",
+            "example": "toiletmap-hono-api"
+          },
+          "uptime": {
+            "type": "number",
+            "example": 42.17
+          }
+        }
+      },
+      "JsonValue": {
+        "description": "Arbitrary JSON value.",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "array",
+            "items": {}
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "LooMutation": {
+        "type": "object",
+        "description": "Attributes accepted when creating or updating a loo.",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "areaId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 24,
+            "minLength": 24,
+            "pattern": "^[a-f0-9]{24}$"
+          },
+          "accessible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "allGender": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "attended": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "automatic": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "babyChange": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "children": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "men": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "women": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "urinalOnly": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "radar": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "noPayment": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "paymentDetails": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "removalReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "openingTimes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Arbitrary JSON payload describing opening times."
+          },
+          "location": {
+            "description": "Optional location update. Null clears an existing location.",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coordinates"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "CreateLooRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/LooMutation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 24,
+                "maxLength": 24,
+                "pattern": "^[a-f0-9]{24}$",
+                "example": "0123456789abcdef01234567"
+              }
+            }
+          }
+        ]
+      },
+      "UpdateLooRequest": {
+        "$ref": "#/components/schemas/LooMutation"
+      },
+      "Loo": {
+        "type": "object",
+        "required": [
+          "id",
+          "area",
+          "reports"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "pattern": "^[a-f0-9]{24}$",
+            "example": "0123456789abcdef01234567"
+          },
+          "geohash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "area": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminArea"
+            },
+            "description": "Administrative areas linked to the loo."
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "verifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "accessible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "allGender": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "attended": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "automatic": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "babyChange": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "children": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "men": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "women": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "urinalOnly": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "noPayment": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "paymentDetails": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "removalReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "radar": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "openingTimes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opening hours metadata if known."
+          },
+          "reports": {
+            "type": "array",
+            "description": "Recent reports are populated on specific endpoints.",
+            "items": {}
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coordinates"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "NearbyLoo": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Loo"
+          },
+          {
+            "type": "object",
+            "required": [
+              "distance"
+            ],
+            "properties": {
+              "distance": {
+                "type": "number",
+                "description": "Distance from the requested point in meters.",
+                "example": 73.2
+              }
+            }
+          }
+        ]
+      },
+      "Report": {
+        "type": "object",
+        "required": [
+          "id",
+          "contributor",
+          "createdAt",
+          "isSystemReport"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "9234"
+          },
+          "contributor": {
+            "type": "string",
+            "example": "jane.doe"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "isSystemReport": {
+            "type": "boolean"
+          },
+          "accessible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "allGender": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "attended": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "automatic": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "babyChange": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "children": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "men": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "women": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "urinalOnly": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "noPayment": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "paymentDetails": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "removalReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "openingTimes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geohash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "radar": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coordinates"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AreaListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminArea"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 1
+          }
+        }
+      },
+      "LooListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Loo"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 2
+          }
+        }
+      },
+      "LooSearchResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count",
+          "total",
+          "page",
+          "pageSize",
+          "hasMore"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Loo"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 50
+          },
+          "total": {
+            "type": "number",
+            "example": 2500
+          },
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 50
+          },
+          "hasMore": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "NearbyLooListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NearbyLoo"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 2
+          }
+        }
+      },
+      "ReportListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Report"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 2
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "Meta"
+        ],
+        "summary": "Service health check",
+        "responses": {
+          "200": {
+            "description": "Service is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/areas": {
+      "get": {
+        "tags": [
+          "Areas"
+        ],
+        "summary": "List administrative areas",
+        "responses": {
+          "200": {
+            "description": "Areas available for association with loos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AreaListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loos": {
+      "get": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Fetch loos by ID",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "description": "Comma separated IDs (?ids=a,b) or repeat the parameter (?ids=a&ids=b).",
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([a-f0-9]{24})(,[a-f0-9]{24})*$",
+                  "example": "0123456789abcdef01234567,89abcdef0123456701234567"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 24,
+                    "maxLength": 24,
+                    "pattern": "^[a-f0-9]{24}$"
+                  },
+                  "example": [
+                    "0123456789abcdef01234567",
+                    "89abcdef0123456701234567"
+                  ]
+                }
+              ]
+            },
+            "style": "form",
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching loos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LooListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Create a loo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Attributes to set for the new loo.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLooRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Loo created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A loo with the supplied ID already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loos/{id}": {
+      "get": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Fetch a single loo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "24 character loo identifier.",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loo detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid loo identifier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Loo not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Create or replace a loo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "24 character loo identifier.",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Attributes to upsert.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLooRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing loo updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loo"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "New loo created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier or payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Delete a loo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "24 character loo identifier.",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Loo deleted."
+          },
+          "400": {
+            "description": "Invalid loo identifier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Loo not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loos/{id}/reports": {
+      "get": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "List reports for a loo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "24 character loo identifier.",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reports associated with the loo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid loo identifier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loos/geohash/{geohash}": {
+      "get": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "List loos by geohash prefix",
+        "parameters": [
+          {
+            "name": "geohash",
+            "in": "path",
+            "required": true,
+            "description": "Geohash prefix to match.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "gcpvj"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "description": "Filter loos by activity status. Use `any` to disable the filter.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "any",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loos matching the supplied geohash prefix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LooListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loos/proximity": {
+      "get": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Find loos near a location",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "description": "Latitude in decimal degrees.",
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90,
+              "example": 51.5074
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "description": "Longitude in decimal degrees.",
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180,
+              "example": -0.1278
+            }
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "required": false,
+            "description": "Search radius in meters (default 1000).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50000,
+              "default": 1000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loos ordered by distance from the supplied coordinates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearbyLooListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loos/search": {
+      "get": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Search loos with filters",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Keyword search across id, name, geohash, and notes.",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "areaName",
+            "in": "query",
+            "required": false,
+            "description": "Matches administrative area name (case-insensitive).",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "areaType",
+            "in": "query",
+            "required": false,
+            "description": "Matches administrative area type (case-insensitive).",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "description": "Active status. Use `any` to include all values or `null` for unknown.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false",
+                "null"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "accessible",
+            "in": "query",
+            "required": false,
+            "description": "Accessible flag. Use `any` to include all values or `null` for unknown.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false",
+                "null"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "allGender",
+            "in": "query",
+            "required": false,
+            "description": "All gender flag. Use `any` to include all values or `null` for unknown.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false",
+                "null"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "radar",
+            "in": "query",
+            "required": false,
+            "description": "RADAR key availability. Use `any` to include all values or `null` for unknown.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false",
+                "null"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "babyChange",
+            "in": "query",
+            "required": false,
+            "description": "Baby change facilities. Use `any` to include all values or `null` for unknown.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false",
+                "null"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "noPayment",
+            "in": "query",
+            "required": false,
+            "description": "Whether payment is required. Use `any` to include all values or `null` for unknown.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false",
+                "null"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "verified",
+            "in": "query",
+            "required": false,
+            "description": "Verification status. Use `any` to include all values.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "hasLocation",
+            "in": "query",
+            "required": false,
+            "description": "Filter by whether the record has a known location. Use `any` to include all values.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "true",
+                "false"
+              ],
+              "default": "any"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "description": "Sort order for results.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "updated-desc",
+                "updated-asc",
+                "created-desc",
+                "created-asc",
+                "verified-desc",
+                "verified-asc",
+                "name-asc",
+                "name-desc"
+              ],
+              "default": "updated-desc"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum results per page (1–200, default 50).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page number (1-indexed, default 1).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged search results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LooSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
