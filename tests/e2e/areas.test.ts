@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { prisma, testClient } from './context';
 
+/** Validates that the areas listing stays in sync with the backing table. */
 type Area = {
   name: string | null;
   type: string | null;

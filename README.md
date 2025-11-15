@@ -26,7 +26,7 @@ A standalone REST API for the Toilet Map project built on [Hono](https://hono.de
    ```bash
    cp .env.example .env.local
    ```
-   Update `POSTGRES_URI` to match your database. The example points at the local Supabase instance (`postgresql://postgres:postgres@localhost:54322/postgres`).
+   Update the values to match your environment. `src/env.ts` requires `POSTGRES_URI`, `AUTH0_ISSUER_BASE_URL`, and `AUTH0_AUDIENCE` to start successfully. The example file now includes sensible local defaults for the Auth0 test issuer that powers the E2E suite.
 3. Generate the Prisma client:
    ```bash
    pnpm prisma:generate
@@ -41,6 +41,18 @@ pnpm supabase:start
 ```
 
 The CLI will read `supabase/config.toml`, run the migrations in `supabase/migrations/`, and load `supabase/seed.sql`. When you are finished, use `pnpm supabase:stop` or `pnpm supabase:reset`.
+
+### Testing
+
+The Vitest-powered E2E suite boots Supabase for you (or connects to an already running instance) and exercises every public route, mutation path, and admin/doc endpoint:
+
+```bash
+pnpm test:e2e
+```
+
+- Set `KEEP_SUPABASE=1` if you want to keep the Docker stack running between test runs.
+- The suite exposes a deterministic auth server; issue additional tokens in tests via `tests/e2e/utils/auth`.
+- To focus on a single file, use `pnpm vitest run tests/e2e/<file>.test.ts`.
 
 ### Run the server
 
@@ -188,3 +200,7 @@ All responses are JSON. Errors follow the shape:
 1. Wire the UI (or other consumers) to the REST endpoints.
 2. Add structured logging and observability once deployed independently.
 3. Publish an OpenAPI/Swagger description if the API becomes public-facing.
+
+## Developer Onboarding
+
+`docs/ONBOARDING.md` walks through the architecture, Supabase fixtures, route layout, and common workflows (running seeds, issuing auth tokens, and reading audit trails). It is the recommended first stop for new contributors before diving into the source.

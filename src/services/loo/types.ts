@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Prisma, toilets } from "../../../prisma/src/generated/prisma/client";
+import type { Prisma, toilets } from '../../generated/prisma-client';
 
 const jsonPrimitive = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const jsonValueSchema: z.ZodType<Prisma.JsonValue> = z.lazy(() =>

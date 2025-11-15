@@ -1,3 +1,4 @@
+import { LOO_ID_LENGTH } from '../services/loo/constants';
 import type {
   MediaTypeObject,
   OpenAPIObject,
@@ -5,8 +6,6 @@ import type {
   ReferenceObject,
   SchemaObject,
 } from 'openapi3-ts/oas31';
-
-const LOO_ID_LENGTH = 24;
 
 const schemaRef = (name: string): ReferenceObject => ({
   $ref: `#/components/schemas/${name}`,

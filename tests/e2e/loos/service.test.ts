@@ -8,6 +8,7 @@ import {
   loadLooSeedData,
 } from './helpers';
 
+/** Verifies persistence helpers + search queries stay in lockstep. */
 type SearchResponse = {
   data: Array<{
     id: string;
@@ -31,6 +32,16 @@ describe.sequential('Loos Service - persistence & search', () => {
 
   afterAll(async () => {
     await deleteTestLoos(createdIds);
+  });
+
+  it('rejects malformed search parameters upfront', async () => {
+    const response = await testClient.fetch(
+      '/loos/search?limit=0&page=0&sort=totally-invalid',
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.message).toBe('Invalid search query');
   });
 
   it('upserts a missing loo via PUT and persists geography plus contributors', async () => {

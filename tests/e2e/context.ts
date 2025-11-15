@@ -5,6 +5,7 @@ const app = createApp();
 
 const baseUrl = 'http://localhost';
 
+/** Minimal HTTP client that talks to the in-memory Hono app. */
 export const testClient = {
   fetch: (path: string, init?: RequestInit) =>
     app.fetch(new Request(`${baseUrl}${path}`, init)),

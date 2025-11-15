@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Prisma } from  "../../../prisma/src/generated/prisma/client";
+import { Prisma } from '../../generated/prisma-client';
 import { AppVariables } from '../../types';
 import { requireAuth } from '../../middleware/require-auth';
 import {

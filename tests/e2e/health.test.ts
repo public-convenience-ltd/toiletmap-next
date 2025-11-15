@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testClient } from './context';
 
+/** Quick boot smoke test so we fail fast if the app cannot start. */
 type HealthResponse = {
   status: string;
   service: string;

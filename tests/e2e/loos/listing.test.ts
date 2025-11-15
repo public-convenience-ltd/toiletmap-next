@@ -3,6 +3,7 @@ import { LOO_ID_LENGTH } from '../../../src/services/loo';
 import { testClient } from '../context';
 import { REPORT_EXPECTATIONS, loadLooSeedData } from './helpers';
 
+/** Exercises every read-only loo surface (lists, lookups, history). */
 type ReportSummaryRow = {
   id: string;
   createdAt: string;

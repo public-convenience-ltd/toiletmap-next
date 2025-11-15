@@ -8,6 +8,7 @@ import {
   loadLooSeedData,
 } from './helpers';
 
+/** Ensures every mutation path emits consistent audit history. */
 type ReportSummaryRow = {
   id: string;
   contributor: string;

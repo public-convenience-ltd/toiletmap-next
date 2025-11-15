@@ -1,4 +1,4 @@
-import { Prisma, toilets } from "../../../prisma/src/generated/prisma/client";
+import { Prisma, toilets } from '../../generated/prisma-client';
 import type { LooSearchParams, LooSearchSort } from './types';
 
 // Centralised SQL fragments for read-heavy loo operations.

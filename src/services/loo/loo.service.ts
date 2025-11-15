@@ -1,5 +1,5 @@
-import type { Prisma } from "../../../prisma/src/generated/prisma/client";
-import { PrismaClient, toilets } from "../../../prisma/src/generated/prisma/client";
+import type { Prisma } from '../../generated/prisma-client';
+import { PrismaClient, toilets } from '../../generated/prisma-client';
 import { prisma as defaultPrisma } from '../../prisma';
 import {
   areaSelection,

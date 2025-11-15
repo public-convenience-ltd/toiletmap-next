@@ -9,6 +9,7 @@ import {
   loadLooSeedData,
 } from './helpers';
 
+/** Covers create/update/delete life cycles plus persistence side-effects. */
 type LooResponse = {
   id: string;
   name: string | null;
@@ -270,5 +271,26 @@ describe.sequential('Loos API - mutations', () => {
     const contributors = saved?.contributors ?? [];
     const latestContributor = contributors[contributors.length - 1] ?? '';
     expect(latestContributor).toBe('E2E Tester');
+  });
+
+  it('deletes loos and reports missing ids with 404', async () => {
+    const id = ensureCreated();
+
+    const deleteResponse = await testClient.fetch(`/loos/${id}`, {
+      method: 'DELETE',
+      headers: authedJsonHeaders(authToken),
+    });
+
+    expect(deleteResponse.status).toBe(204);
+
+    const fetchAfterDelete = await testClient.fetch(`/loos/${id}`);
+    expect(fetchAfterDelete.status).toBe(404);
+
+    const secondDelete = await testClient.fetch(`/loos/${id}`, {
+      method: 'DELETE',
+      headers: authedJsonHeaders(authToken),
+    });
+
+    expect(secondDelete.status).toBe(404);
   });
 });

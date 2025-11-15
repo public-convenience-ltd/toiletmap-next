@@ -1,4 +1,4 @@
-import { Prisma } from "../../../prisma/src/generated/prisma/client";
+import { Prisma } from '../../generated/prisma-client';
 import type { LooMutationAttributes } from './types';
 
 // Low-level helpers that keep insert/update logic consistent and auditable.
