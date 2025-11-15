@@ -85,6 +85,65 @@ adminRouter.get('/api/loos/map', requireAuth, requireAdminRole, (c) =>
   }),
 );
 
+/**
+ * GET /admin/api/suspicious-activity
+ * Returns suspicious activity across multiple categories
+ * Requires: Admin role (access:admin)
+ * Query params:
+ *   - hoursWindow: number (optional, default: 24) - time window to analyze
+ *   - minRapidUpdates: number (optional, default: 5) - minimum updates to flag as rapid
+ *   - minLocationChangeMeters: number (optional, default: 1000) - minimum distance to flag location change
+ *   - minMassDeactivations: number (optional, default: 5) - minimum deactivations to flag as mass
+ */
+adminRouter.get('/api/suspicious-activity', requireAuth, requireAdminRole, (c) =>
+  handleRoute(c, 'admin.suspicious-activity', async () => {
+    const hoursWindow = c.req.query('hoursWindow');
+    const minRapidUpdates = c.req.query('minRapidUpdates');
+    const minLocationChangeMeters = c.req.query('minLocationChangeMeters');
+    const minMassDeactivations = c.req.query('minMassDeactivations');
+
+    const options = {
+      ...(hoursWindow ? { hoursWindow: parseInt(hoursWindow, 10) } : {}),
+      ...(minRapidUpdates ? { minRapidUpdates: parseInt(minRapidUpdates, 10) } : {}),
+      ...(minLocationChangeMeters ? { minLocationChangeMeters: parseInt(minLocationChangeMeters, 10) } : {}),
+      ...(minMassDeactivations ? { minMassDeactivations: parseInt(minMassDeactivations, 10) } : {}),
+    };
+
+    const activity = await adminService.getSuspiciousActivity(options);
+    return c.json(activity);
+  }),
+);
+
+/**
+ * GET /admin/api/contributors/leaderboard
+ * Returns contributor leaderboard with rankings and stats
+ * Requires: Admin role (access:admin)
+ */
+adminRouter.get('/api/contributors/leaderboard', requireAuth, requireAdminRole, (c) =>
+  handleRoute(c, 'admin.contributors.leaderboard', async () => {
+    const leaderboard = await adminService.getContributorLeaderboard();
+    return c.json(leaderboard);
+  }),
+);
+
+/**
+ * GET /admin/api/contributors/:contributorId
+ * Returns detailed statistics for a specific contributor
+ * Requires: Admin role (access:admin)
+ */
+adminRouter.get('/api/contributors/:contributorId', requireAuth, requireAdminRole, (c) =>
+  handleRoute(c, 'admin.contributors.details', async () => {
+    const contributorId = c.req.param('contributorId');
+    const stats = await adminService.getContributorStats(contributorId);
+
+    if (!stats) {
+      return c.json({ error: 'Contributor not found or has no activity' }, 404);
+    }
+
+    return c.json(stats);
+  }),
+);
+
 // UI routes (no auth required for the HTML page itself, auth handled by frontend)
 adminRouter.get('/', (c) => c.html(adminPageHtml));
 adminRouter.get('/*', (c) => c.html(adminPageHtml));
