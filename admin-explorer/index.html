@@ -6,25 +6,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
-      --color-primary: #2563eb;
-      --color-primary-dark: #1d4ed8;
-      --color-success: #10b981;
-      --color-danger: #ef4444;
-      --color-warning: #f59e0b;
-      --color-bg: #ffffff;
-      --color-bg-secondary: #f9fafb;
-      --color-border: #e5e7eb;
-      --color-text: #111827;
-      --color-text-secondary: #6b7280;
+      /* Toilet Map Design Tokens */
+      --color-blue: #0a165e;
+      --color-turquoise: #92f9db;
+      --color-pink: #ed3d62;
+      --color-ice: #d2fff2;
+      --color-white: #fff;
+      --color-light-grey: #f4f4f4;
+      --color-grey: #807f7f;
+
+      /* Aliases for consistency */
+      --color-primary: var(--color-blue);
+      --color-primary-dark: #070f3d;
+      --color-success: var(--color-turquoise);
+      --color-danger: var(--color-pink);
+      --color-warning: var(--color-pink);
+      --color-bg: var(--color-white);
+      --color-bg-secondary: var(--color-light-grey);
+      --color-border: #e0e0e0;
+      --color-text: var(--color-blue);
+      --color-text-secondary: var(--color-grey);
+
+      /* Utopia Fluid Space Scale */
+      --space-3xs: clamp(0.25rem, calc(0.23rem + 0.11vw), 0.31rem);
+      --space-2xs: clamp(0.5rem, calc(0.48rem + 0.11vw), 0.56rem);
+      --space-xs: clamp(0.75rem, calc(0.71rem + 0.22vw), 0.88rem);
+      --space-s: clamp(1rem, calc(0.96rem + 0.22vw), 1.13rem);
+      --space-m: clamp(1.5rem, calc(1.43rem + 0.33vw), 1.69rem);
+      --space-l: clamp(2rem, calc(1.91rem + 0.43vw), 2.25rem);
+      --space-xl: clamp(3rem, calc(2.87rem + 0.65vw), 3.38rem);
+      --space-2xl: clamp(4rem, calc(3.83rem + 0.87vw), 4.5rem);
+      --space-3xl: clamp(6rem, calc(5.74rem + 1.3vw), 6.75rem);
+
+      /* Utopia Fluid Text Scale */
+      --text--2: clamp(0.69rem, calc(0.69rem + 0.04vw), 0.72rem);
+      --text--1: clamp(0.83rem, calc(0.81rem + 0.12vw), 0.9rem);
+      --text-0: clamp(1rem, calc(0.96rem + 0.22vw), 1.13rem);
+      --text-1: clamp(1.2rem, calc(1.13rem + 0.36vw), 1.41rem);
+      --text-2: clamp(1.44rem, calc(1.33rem + 0.55vw), 1.76rem);
+      --text-3: clamp(1.73rem, calc(1.56rem + 0.82vw), 2.2rem);
+      --text-4: clamp(2.07rem, calc(1.84rem + 1.17vw), 2.75rem);
+      --text-5: clamp(2.49rem, calc(2.16rem + 1.64vw), 3.43rem);
+
+      /* Shadows */
       --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
       --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
       --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+      /* Border Radius */
       --radius-sm: 0.375rem;
       --radius-md: 0.5rem;
       --radius-lg: 0.75rem;
+      --radius-full: 9999px;
     }
 
     * {
@@ -34,8 +71,8 @@
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
-      font-size: 14px;
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+      font-size: var(--text-0);
       line-height: 1.5;
       color: var(--color-text);
       background: var(--color-bg-secondary);
@@ -51,10 +88,10 @@
       font-family: inherit;
       cursor: pointer;
       border: none;
-      border-radius: var(--radius-md);
-      padding: 0.5rem 1rem;
-      font-size: 0.875rem;
-      font-weight: 500;
+      border-radius: var(--radius-full);
+      padding: var(--space-2xs) var(--space-s);
+      font-size: var(--text-0);
+      font-weight: 700;
       transition: all 0.15s ease;
     }
 
@@ -64,59 +101,63 @@
     }
 
     .btn-primary {
-      background: var(--color-primary);
-      color: white;
+      background: var(--color-turquoise);
+      color: var(--color-blue);
     }
 
     .btn-primary:hover:not(:disabled) {
-      background: var(--color-primary-dark);
+      background: var(--color-blue);
+      color: var(--color-turquoise);
     }
 
     .btn-secondary {
-      background: white;
-      color: var(--color-text);
-      border: 1px solid var(--color-border);
+      background: var(--color-white);
+      color: var(--color-blue);
+      border: 2px solid var(--color-blue);
     }
 
     .btn-secondary:hover:not(:disabled) {
-      background: var(--color-bg-secondary);
+      background: var(--color-blue);
+      color: var(--color-white);
     }
 
     .btn-danger {
-      background: var(--color-danger);
-      color: white;
+      background: var(--color-pink);
+      color: var(--color-white);
     }
 
     .btn-danger:hover:not(:disabled) {
-      background: #dc2626;
+      background: var(--color-blue);
+      color: var(--color-pink);
     }
 
     .btn-sm {
-      padding: 0.375rem 0.75rem;
-      font-size: 0.8125rem;
+      padding: var(--space-3xs) var(--space-xs);
+      font-size: var(--text--1);
     }
 
     input, select, textarea {
       font-family: inherit;
-      font-size: 0.875rem;
-      padding: 0.5rem;
-      border: 1px solid var(--color-border);
+      font-size: var(--text-0);
+      padding: var(--space-xs);
+      border: 2px solid var(--color-border);
       border-radius: var(--radius-md);
       background: white;
       width: 100%;
+      transition: all 0.15s ease;
     }
 
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      border-color: var(--color-blue);
+      box-shadow: 0 0 0 3px rgba(146, 249, 219, 0.2);
     }
 
     label {
       display: block;
-      font-size: 0.875rem;
-      font-weight: 500;
-      margin-bottom: 0.25rem;
+      font-size: var(--text-0);
+      font-weight: 600;
+      margin-bottom: var(--space-2xs);
       color: var(--color-text);
     }
 
@@ -187,84 +228,109 @@
       }
     }
 
-    /* Toggle Switch */
-    .toggle-switch {
+    /* Toggle Switch - Toilet Map Design System */
+    .switch {
       position: relative;
       display: inline-block;
-      width: 48px;
-      height: 24px;
+      width: 52px;
+      height: 28px;
     }
 
-    .toggle-switch input {
+    .switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
 
-    .toggle-slider {
+    .switch-slider {
       position: absolute;
       cursor: pointer;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: #cbd5e1;
-      transition: 0.3s;
-      border-radius: 24px;
+      background-color: var(--color-grey);
+      transition: all 0.3s ease;
+      border-radius: var(--radius-full);
+      border: 2px solid var(--color-grey);
     }
 
-    .toggle-slider:before {
+    .switch-slider:before {
       position: absolute;
       content: "";
-      height: 18px;
-      width: 18px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: 0.3s;
+      height: 20px;
+      width: 20px;
+      left: 2px;
+      bottom: 2px;
+      background-color: var(--color-white);
+      transition: all 0.3s ease;
       border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
-    .toggle-switch input:checked + .toggle-slider {
-      background-color: var(--color-primary);
+    .switch input:checked + .switch-slider {
+      background-color: var(--color-turquoise);
+      border-color: var(--color-turquoise);
     }
 
-    .toggle-switch input:checked + .toggle-slider:before {
+    .switch input:checked + .switch-slider:before {
       transform: translateX(24px);
     }
 
-    .toggle-switch input:disabled + .toggle-slider {
+    .switch input:disabled + .switch-slider {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    .switch input:focus + .switch-slider {
+      box-shadow: 0 0 0 3px rgba(146, 249, 219, 0.3);
     }
 
     /* Form Grid */
     .form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
+      gap: var(--space-m);
     }
 
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: var(--space-2xs);
+    }
+
+    .form-section {
+      margin-bottom: var(--space-m);
+    }
+
+    .form-section h3 {
+      margin-bottom: var(--space-s);
+      font-size: var(--text-1);
+      color: var(--color-blue);
+      font-weight: 700;
     }
 
     .form-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.75rem;
+      padding: var(--space-s);
       background: var(--color-bg-secondary);
       border-radius: var(--radius-md);
+      margin-bottom: var(--space-xs);
     }
 
     .form-row label {
       margin: 0;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--space-xs);
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .form-row:last-child {
+      margin-bottom: 0;
     }
 
     /* Stats Cards */
@@ -674,9 +740,11 @@
 
       render() {
         this.innerHTML = `
-          <aside style="width: 240px; background: white; border-right: 1px solid var(--color-border); padding: 1.5rem; height: 100vh; position: sticky; top: 0; display: flex; flex-direction: column;">
-            <h2 style="margin-bottom: 2rem; font-size: 1.25rem;">Admin Panel</h2>
-            <nav style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1;">
+          <aside style="width: 240px; background: white; border-right: 2px solid var(--color-border); padding: var(--space-m); height: 100vh; position: sticky; top: 0; display: flex; flex-direction: column;">
+            <h2 style="margin-bottom: var(--space-l); font-size: var(--text-2); color: var(--color-blue); font-weight: 700;">
+              <i class="fas fa-toilet"></i> Admin Panel
+            </h2>
+            <nav style="display: flex; flex-direction: column; gap: var(--space-xs); flex: 1;">
               <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('list')" style="justify-content: flex-start; text-align: left;">
                 <i class="fas fa-list" style="width: 1.25rem;"></i> Loo List
               </button>
@@ -686,11 +754,11 @@
               <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('stats')" style="justify-content: flex-start; text-align: left;">
                 <i class="fas fa-chart-bar" style="width: 1.25rem;"></i> Statistics
               </button>
-              <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('edit')" style="justify-content: flex-start; text-align: left;">
+              <button class="btn-primary" onclick="componentRegistry.get('${this.componentId}').navigate('edit')" style="justify-content: flex-start; text-align: left; margin-top: var(--space-s);">
                 <i class="fas fa-plus-circle" style="width: 1.25rem;"></i> Add New Loo
               </button>
             </nav>
-            <div style="padding-top: 1.5rem; border-top: 1px solid var(--color-border);">
+            <div style="padding-top: var(--space-m); border-top: 2px solid var(--color-border);">
               <button class="btn-secondary" onclick="authService.logout()" style="width: 100%;">
                 <i class="fas fa-sign-out-alt" style="width: 1.25rem;"></i> Sign Out
               </button>
@@ -1088,32 +1156,39 @@
 
         this.innerHTML = `
           <div style="max-width: 900px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-              <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-l);">
+              <div style="display: flex; align-items: center; gap: var(--space-s);">
                 <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').goBack()">
-                  ← Back
+                  <i class="fas fa-arrow-left"></i> Back
                 </button>
-                <h1 style="font-size: 1.5rem;">${this.isNew ? 'Add New Loo' : 'Edit Loo'}</h1>
+                <h1 style="font-size: var(--text-3); color: var(--color-blue);">${this.isNew ? 'Add New Loo' : 'Edit Loo'}</h1>
               </div>
               ${!this.isNew ? `
                 <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').toggleReports()">
+                  <i class="fas fa-${this.showReports ? 'eye-slash' : 'eye'}"></i>
                   ${this.showReports ? 'Hide' : 'Show'} History
                 </button>
               ` : ''}
             </div>
 
-            <div style="display: grid; gap: 2rem; grid-template-columns: ${this.showReports && !this.isNew ? '1fr 400px' : '1fr'};">
-              <div style="background: white; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm);">
+            <div style="display: grid; gap: var(--space-l); grid-template-columns: ${this.showReports && !this.isNew ? '1fr 400px' : '1fr'};">
+              <div style="background: white; border-radius: var(--radius-lg); padding: var(--space-l); box-shadow: var(--shadow-sm);">
                 <form onsubmit="componentRegistry.get('${this.componentId}').handleSubmit(event); return false;">
-                  <div style="display: grid; gap: 1.5rem;">
-                    <div>
-                      <label>Name</label>
-                      <input type="text" name="name" value="${loo.name || ''}" placeholder="Enter loo name">
+                  <div style="display: grid; gap: var(--space-m);">
+                    <div class="form-group">
+                      <label>
+                        <i class="fas fa-heading"></i>
+                        Name
+                      </label>
+                      <input type="text" name="name" value="${loo.name || ''}" placeholder="Enter loo name" required>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                      <div>
-                        <label>Latitude</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-s);">
+                      <div class="form-group">
+                        <label>
+                          <i class="fas fa-location-dot"></i>
+                          Latitude
+                        </label>
                         <input
                           type="number"
                           step="any"
@@ -1122,8 +1197,11 @@
                           placeholder="51.5074"
                         >
                       </div>
-                      <div>
-                        <label>Longitude</label>
+                      <div class="form-group">
+                        <label>
+                          <i class="fas fa-location-dot"></i>
+                          Longitude
+                        </label>
                         <input
                           type="number"
                           step="any"
@@ -1134,118 +1212,167 @@
                       </div>
                     </div>
 
-                    <div>
-                      <h3 style="margin-bottom: 1rem; font-size: 1rem;">Status</h3>
-                      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="active" value="true" ${loo.active ? 'checked' : ''}>
-                            Active
-                          </label>
-                        </div>
+                    <div class="form-section">
+                      <h3>Status</h3>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-check-circle" style="width: 1.25rem;"></i>
+                          Active
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="active" value="true" ${loo.active ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
                       </div>
                     </div>
 
-                    <div>
-                      <h3 style="margin-bottom: 1rem; font-size: 1rem;">Accessibility</h3>
-                      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="accessible" value="true" ${loo.accessible ? 'checked' : ''}>
-                            Accessible
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="radar" value="true" ${loo.radar ? 'checked' : ''}>
-                            RADAR Key
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="babyChange" value="true" ${loo.babyChange ? 'checked' : ''}>
-                            Baby Change
-                          </label>
-                        </div>
+                    <div class="form-section">
+                      <h3>Accessibility</h3>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-wheelchair" style="width: 1.25rem;"></i>
+                          Accessible
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="accessible" value="true" ${loo.accessible ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-key" style="width: 1.25rem;"></i>
+                          RADAR Key
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="radar" value="true" ${loo.radar ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-baby" style="width: 1.25rem;"></i>
+                          Baby Change
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="babyChange" value="true" ${loo.babyChange ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
                       </div>
                     </div>
 
-                    <div>
-                      <h3 style="margin-bottom: 1rem; font-size: 1rem;">Gender Facilities</h3>
-                      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="men" value="true" ${loo.men ? 'checked' : ''}>
-                            Men
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="women" value="true" ${loo.women ? 'checked' : ''}>
-                            Women
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="allGender" value="true" ${loo.allGender ? 'checked' : ''}>
-                            All Gender
-                          </label>
-                        </div>
+                    <div class="form-section">
+                      <h3>Gender Facilities</h3>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-person" style="width: 1.25rem;"></i>
+                          Men
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="men" value="true" ${loo.men ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-person-dress" style="width: 1.25rem;"></i>
+                          Women
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="women" value="true" ${loo.women ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-restroom" style="width: 1.25rem;"></i>
+                          All Gender
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="allGender" value="true" ${loo.allGender ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
                       </div>
                     </div>
 
-                    <div>
-                      <h3 style="margin-bottom: 1rem; font-size: 1rem;">Additional Features</h3>
-                      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="attended" value="true" ${loo.attended ? 'checked' : ''}>
-                            Attended
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="automatic" value="true" ${loo.automatic ? 'checked' : ''}>
-                            Automatic
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="children" value="true" ${loo.children ? 'checked' : ''}>
-                            Children
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="urinalOnly" value="true" ${loo.urinalOnly ? 'checked' : ''}>
-                            Urinal Only
-                          </label>
-                        </div>
-                        <div>
-                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" name="noPayment" value="true" ${loo.noPayment ? 'checked' : ''}>
-                            Free (No Payment)
-                          </label>
-                        </div>
+                    <div class="form-section">
+                      <h3>Additional Features</h3>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-user-tie" style="width: 1.25rem;"></i>
+                          Attended
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="attended" value="true" ${loo.attended ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-robot" style="width: 1.25rem;"></i>
+                          Automatic
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="automatic" value="true" ${loo.automatic ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-child" style="width: 1.25rem;"></i>
+                          Children
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="children" value="true" ${loo.children ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-toilet" style="width: 1.25rem;"></i>
+                          Urinal Only
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="urinalOnly" value="true" ${loo.urinalOnly ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+                      <div class="form-row">
+                        <label>
+                          <i class="fas fa-coins" style="width: 1.25rem;"></i>
+                          Free (No Payment)
+                        </label>
+                        <label class="switch">
+                          <input type="checkbox" name="noPayment" value="true" ${loo.noPayment ? 'checked' : ''}>
+                          <span class="switch-slider"></span>
+                        </label>
                       </div>
                     </div>
 
-                    <div>
-                      <label>Payment Details</label>
+                    <div class="form-group">
+                      <label>
+                        <i class="fas fa-credit-card"></i>
+                        Payment Details
+                      </label>
                       <input type="text" name="paymentDetails" value="${loo.paymentDetails || ''}" placeholder="e.g., 20p coin required">
                     </div>
 
-                    <div>
-                      <label>Notes</label>
+                    <div class="form-group">
+                      <label>
+                        <i class="fas fa-note-sticky"></i>
+                        Notes
+                      </label>
                       <textarea name="notes" rows="4" placeholder="Additional notes...">${loo.notes || ''}</textarea>
                     </div>
 
-                    <div>
-                      <label>Removal Reason</label>
+                    <div class="form-group">
+                      <label>
+                        <i class="fas fa-circle-info"></i>
+                        Removal Reason
+                      </label>
                       <input type="text" name="removalReason" value="${loo.removalReason || ''}" placeholder="Reason if marked inactive">
                     </div>
 
-                    <div style="display: flex; gap: 1rem; justify-content: flex-end; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+                    <div style="display: flex; gap: var(--space-s); justify-content: flex-end; padding-top: var(--space-m); border-top: 2px solid var(--color-border);">
                       <button type="button" class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').goBack()">
                         Cancel
                       </button>
