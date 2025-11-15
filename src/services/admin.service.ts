@@ -367,12 +367,14 @@ export class AdminService {
         (rv.record->>'id') as loo_id,
         (rv.record->>'name') as loo_name,
         COUNT(*) as update_count,
-        ARRAY_AGG(DISTINCT (rv.record->>'_contributor')) as contributors,
+        ARRAY_AGG(DISTINCT (
+          rv.record->'contributors'->>-1
+        )) FILTER (WHERE rv.record->'contributors'->>-1 IS NOT NULL) as contributors,
         MIN(rv.ts) as first_update,
         MAX(rv.ts) as last_update
       FROM audit.record_version rv
       WHERE rv.ts >= ${cutoffTime}
-        AND rv.op = 'UPDATE'
+        AND rv.op IN ('INSERT', 'UPDATE')
         AND rv.record->>'id' IS NOT NULL
         AND rv.table_name = 'toilets'
       GROUP BY (rv.record->>'id'), (rv.record->>'name')
@@ -418,14 +420,15 @@ export class AdminService {
         SELECT
           (rv.record->>'id') as loo_id,
           (rv.record->>'name') as loo_name,
-          (rv.record->>'_contributor') as contributor,
+          (rv.record->'contributors'->>-1) as contributor,
           rv.record,
           rv.ts
         FROM audit.record_version rv
         WHERE rv.ts >= ${cutoffTime}
-          AND rv.op = 'UPDATE'
+          AND rv.op IN ('INSERT', 'UPDATE')
           AND rv.record->>'id' IS NOT NULL
           AND rv.table_name = 'toilets'
+          AND rv.record->'contributors'->>-1 IS NOT NULL
       ),
       field_changes AS (
         SELECT
@@ -515,7 +518,7 @@ export class AdminService {
       SELECT
         (rv.record->>'id') as loo_id,
         (rv.record->>'name') as loo_name,
-        (rv.record->>'_contributor') as contributor,
+        (rv.record->'contributors'->>-1) as contributor,
         rv.ts,
         CAST(rv.old_record->'location'->>'lat' AS DOUBLE PRECISION) as old_lat,
         CAST(rv.old_record->'location'->>'lng' AS DOUBLE PRECISION) as old_lng,
@@ -541,6 +544,7 @@ export class AdminService {
         AND rv.record->'location' IS NOT NULL
         AND rv.old_record->'location' IS NOT NULL
         AND rv.record->'location' != rv.old_record->'location'
+        AND rv.record->'contributors'->>-1 IS NOT NULL
       ORDER BY distance_meters DESC
       LIMIT 100
     `;
@@ -580,7 +584,7 @@ export class AdminService {
       }>
     >`
       SELECT
-        (rv.record->>'_contributor') as contributor,
+        (rv.record->'contributors'->>-1) as contributor,
         COUNT(*) as deactivation_count,
         ARRAY_AGG(rv.record->>'id') as loo_ids,
         MIN(rv.ts) as first_deactivation,
@@ -591,7 +595,8 @@ export class AdminService {
         AND rv.table_name = 'toilets'
         AND (rv.record->>'active')::boolean = false
         AND (rv.old_record->>'active')::boolean = true
-      GROUP BY (rv.record->>'_contributor')
+        AND rv.record->'contributors'->>-1 IS NOT NULL
+      GROUP BY (rv.record->'contributors'->>-1)
       HAVING COUNT(*) >= ${minDeactivations}
       ORDER BY deactivation_count DESC
       LIMIT 100
@@ -640,7 +645,8 @@ export class AdminService {
           rv.op
         FROM audit.record_version rv
         WHERE rv.table_name = 'toilets'
-          AND rv.record->>'_contributor' = ${contributorId}
+          AND rv.op IN ('INSERT', 'UPDATE')
+          AND rv.record->'contributors'->>-1 = ${contributorId}
       )
       SELECT
         COUNT(*) as total_edits,
@@ -669,14 +675,14 @@ export class AdminService {
           jsonb_object_keys(rv.record) as field
         FROM audit.record_version rv
         WHERE rv.table_name = 'toilets'
-          AND rv.record->>'_contributor' = ${contributorId}
+          AND rv.record->'contributors'->>-1 = ${contributorId}
           AND rv.op = 'UPDATE'
       )
       SELECT
         field,
         COUNT(*) as count
       FROM field_edits
-      WHERE field NOT IN ('id', '_contributor', 'updatedAt', 'createdAt')
+      WHERE field NOT IN ('id', 'contributors', 'updated_at', 'created_at')
       GROUP BY field
       ORDER BY count DESC
       LIMIT 10
@@ -720,13 +726,14 @@ export class AdminService {
       }>
     >`
       SELECT
-        rv.record->>'_contributor' as contributor,
+        rv.record->'contributors'->>-1 as contributor,
         COUNT(*) as total_edits,
         COUNT(DISTINCT rv.record->>'id') as loos_edited
       FROM audit.record_version rv
       WHERE rv.table_name = 'toilets'
-        AND rv.record->>'_contributor' IS NOT NULL
-      GROUP BY rv.record->>'_contributor'
+        AND rv.op IN ('INSERT', 'UPDATE')
+        AND rv.record->'contributors'->>-1 IS NOT NULL
+      GROUP BY rv.record->'contributors'->>-1
       ORDER BY total_edits DESC
       LIMIT 20
     `;
@@ -740,14 +747,15 @@ export class AdminService {
       }>
     >`
       SELECT
-        rv.record->>'_contributor' as contributor,
+        rv.record->'contributors'->>-1 as contributor,
         COUNT(*) as edits,
         MIN(rv.ts) as first_edit
       FROM audit.record_version rv
       WHERE rv.table_name = 'toilets'
-        AND rv.record->>'_contributor' IS NOT NULL
+        AND rv.op IN ('INSERT', 'UPDATE')
+        AND rv.record->'contributors'->>-1 IS NOT NULL
         AND rv.ts >= ${sevenDaysAgo}
-      GROUP BY rv.record->>'_contributor'
+      GROUP BY rv.record->'contributors'->>-1
       ORDER BY edits DESC
       LIMIT 10
     `;
@@ -761,12 +769,13 @@ export class AdminService {
       }>
     >`
       SELECT
-        COUNT(DISTINCT rv.record->>'_contributor') as total_contributors,
-        COUNT(DISTINCT rv.record->>'_contributor') FILTER (WHERE rv.ts >= ${sevenDaysAgo}) as active_7d,
-        COUNT(DISTINCT rv.record->>'_contributor') FILTER (WHERE rv.ts >= ${thirtyDaysAgo}) as active_30d
+        COUNT(DISTINCT rv.record->'contributors'->>-1) as total_contributors,
+        COUNT(DISTINCT rv.record->'contributors'->>-1) FILTER (WHERE rv.ts >= ${sevenDaysAgo}) as active_7d,
+        COUNT(DISTINCT rv.record->'contributors'->>-1) FILTER (WHERE rv.ts >= ${thirtyDaysAgo}) as active_30d
       FROM audit.record_version rv
       WHERE rv.table_name = 'toilets'
-        AND rv.record->>'_contributor' IS NOT NULL
+        AND rv.op IN ('INSERT', 'UPDATE')
+        AND rv.record->'contributors'->>-1 IS NOT NULL
     `;
 
     const counts = contributorCounts[0];

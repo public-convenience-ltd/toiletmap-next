@@ -1329,6 +1329,9 @@
           if (coordsDisplay) {
             coordsDisplay.innerHTML = `<code>${center.lat.toFixed(6)}</code>, <code>${center.lng.toFixed(6)}</code>`;
           }
+
+          // Update changes summary when coordinates change
+          this.updateChangesSummary();
         };
 
         this.mapPicker.on('moveend', updateCoordinates);
