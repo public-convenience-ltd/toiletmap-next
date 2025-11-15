@@ -7,7 +7,6 @@ import {
   badRequest,
   notFound,
   parseJsonBody,
-  AppContext,
 } from '../shared/route-helpers';
 import { parseIds } from '../shared/query';
 import { requireIdParam } from '../shared/params';
@@ -18,6 +17,7 @@ import {
   looService,
   parseActiveFlag,
 } from '../../services/loo';
+import type { LooSearchParams } from '../../services/loo/types';
 
 import {
   baseMutationSchema,
@@ -27,12 +27,6 @@ import {
 } from './schemas';
 
 const loosRouter = new Hono<{ Variables: AppVariables }>();
-
-// Support both comma-separated and repeated `ids` query parameters (unchanged helper)
-const parseIdsFromContext = (c: AppContext) =>
-  parseIds(
-    c.req.queries('ids') ?? (c.req.query('ids') ? [c.req.query('ids')!] : []),
-  );
 
 /** GET /loos/geohash/:geohash */
 loosRouter.get('/geohash/:geohash', (c) =>
@@ -95,33 +89,19 @@ loosRouter.get('/search', (c) =>
         validation.error.format(),
       );
 
-    const filters = validation.data;
-    const { data, total } = await looService.search({
-      search: filters.search,
-      areaName: filters.areaName,
-      areaType: filters.areaType,
-      active: filters.active,
-      accessible: filters.accessible,
-      allGender: filters.allGender,
-      radar: filters.radar,
-      babyChange: filters.babyChange,
-      noPayment: filters.noPayment,
-      verified: filters.verified,
-      hasLocation: filters.hasLocation,
-      sort: filters.sort,
-      limit: filters.limit,
-      page: filters.page,
-    });
+    // Schema defaults guarantee required fields are present
+    const params = validation.data as LooSearchParams;
+    const { data, total } = await looService.search(params);
 
-    const offset = (filters.page - 1) * filters.limit;
+    const offset = (params.page - 1) * params.limit;
     const hasMore = offset + data.length < total;
 
     return c.json({
       data,
       count: data.length,
       total,
-      page: filters.page,
-      pageSize: filters.limit,
+      page: params.page,
+      pageSize: params.limit,
       hasMore,
     });
   }),
@@ -159,7 +139,9 @@ loosRouter.get('/:id', (c) =>
 /** GET /loos?ids= */
 loosRouter.get('/', (c) =>
   handleRoute(c, 'loos.byIds', async () => {
-    const ids = parseIdsFromContext(c);
+    const ids = parseIds(
+      c.req.queries('ids') ?? (c.req.query('ids') ? [c.req.query('ids')!] : []),
+    );
     if (ids.length === 0) {
       return badRequest(
         c,
