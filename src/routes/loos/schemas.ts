@@ -42,6 +42,22 @@ export const proximitySchema = z
   })
   .strict();
 
+// Strict schema for opening times
+// Each day is either ["HH:mm", "HH:mm"] (open) or [] (closed)
+// Array has 7 elements: Monday (0) through Sunday (6)
+// If all opening times are unknown, the field is null
+const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+
+const dayOpeningHoursSchema = z.union([
+  z.tuple([z.string().regex(timeRegex, 'Time must be in HH:mm format'), z.string().regex(timeRegex, 'Time must be in HH:mm format')])
+    .refine(([open, close]) => open < close, {
+      message: 'Opening time must be before closing time',
+    }),
+  z.array(z.never()).length(0), // Empty array for closed days
+]);
+
+export const openingTimesSchema = z.array(dayOpeningHoursSchema).length(7).nullable();
+
 const normalizeOptionalString = (value: unknown) => {
   if (typeof value !== 'string') return value;
   const trimmed = value.trim();
@@ -125,7 +141,7 @@ export const baseMutationSchema = z
     noPayment: booleanField,
     paymentDetails: nullableTrimmed(2000),
     removalReason: nullableTrimmed(2000),
-    openingTimes: jsonValueSchema.nullable().optional(),
+    openingTimes: openingTimesSchema.optional(),
     // allow clearing with null and omit with undefined
     location: CoordinatesSchema.nullable().optional(),
   })

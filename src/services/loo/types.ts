@@ -1,19 +1,18 @@
 import { z } from 'zod';
-import type { Prisma, toilets } from '../../generated/prisma-client';
 
-const jsonPrimitive = z.union([z.string(), z.number(), z.boolean(), z.null()]);
-const jsonValueSchema: z.ZodType<Prisma.JsonValue> = z.lazy(() =>
-  z.union([
-    jsonPrimitive,
-    z.array(jsonValueSchema),
-    z.record(z.string(), jsonValueSchema),
-  ]),
-);
+// Strict schema for opening times
+// Each day is either ["HH:mm", "HH:mm"] (open) or [] (closed)
+// Array has 7 elements: Monday (0) through Sunday (6)
+// If all opening times are unknown, the field is null
+const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
 
-const openingTimesSchema: z.ZodType<toilets['opening_times']> = z.union([
-  jsonValueSchema,
-  z.null(),
+const dayOpeningHoursSchema = z.union([
+  z.tuple([z.string().regex(timeRegex), z.string().regex(timeRegex)])
+    .refine(([open, close]) => open < close),
+  z.array(z.never()).length(0), // Empty array for closed days
 ]);
+
+const openingTimesSchema = z.array(dayOpeningHoursSchema).length(7).nullable();
 
 export const CoordinatesSchema = z
   .object({
@@ -142,6 +141,9 @@ export const ReportResponseSchema = z
   .merge(LooCommonSchema);
 export type ReportResponse = z.infer<typeof ReportResponseSchema>;
 
+export type OpeningTimes = z.infer<typeof openingTimesSchema>;
+export type DayOpeningHours = z.infer<typeof dayOpeningHoursSchema>;
+
 export type LooMutationAttributes = {
   name?: string | null;
   areaId?: string | null;
@@ -160,6 +162,6 @@ export type LooMutationAttributes = {
   noPayment?: boolean | null;
   paymentDetails?: string | null;
   removalReason?: string | null;
-  openingTimes?: Prisma.InputJsonValue | null;
+  openingTimes?: OpeningTimes;
   location?: Coordinates | null;
 };

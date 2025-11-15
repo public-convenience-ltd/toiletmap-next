@@ -52,7 +52,15 @@ describe.sequential('Loos API - audit history', () => {
       areaId,
       accessible: true,
       notes: 'Initial audit trail test',
-      openingTimes: { monday: ['09:00-17:00'] },
+      openingTimes: [
+        ['09:00', '17:00'], // Monday
+        [],                 // Tuesday
+        [],                 // Wednesday
+        [],                 // Thursday
+        [],                 // Friday
+        [],                 // Saturday
+        [],                 // Sunday
+      ],
       location: { lat: 51.498, lng: -0.128 },
     };
 
@@ -75,10 +83,15 @@ describe.sequential('Loos API - audit history', () => {
     const propertyUpdatePayload = {
       accessible: false,
       notes: 'Accessibility temporarily reduced',
-      openingTimes: {
-        monday: ['10:00-16:00'],
-        tuesday: ['10:00-16:00'],
-      },
+      openingTimes: [
+        ['10:00', '16:00'], // Monday
+        ['10:00', '16:00'], // Tuesday
+        [],                 // Wednesday
+        [],                 // Thursday
+        [],                 // Friday
+        [],                 // Saturday
+        [],                 // Sunday
+      ],
     };
 
     const propertyUpdate = await testClient.json(`/loos/${id}`, {

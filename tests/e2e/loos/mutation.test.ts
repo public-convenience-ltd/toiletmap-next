@@ -98,11 +98,15 @@ describe.sequential('Loos API - mutations', () => {
       noPayment: true,
       paymentDetails: 'Contactless card only',
       removalReason: 'Scheduled refurbishment',
-      openingTimes: {
-        monday: ['09:00-17:00'],
-        friday: ['10:00-20:00'],
-        metadata: { seasonal: true },
-      },
+      openingTimes: [
+        ['09:00', '17:00'], // Monday
+        ['09:00', '17:00'], // Tuesday
+        ['09:00', '17:00'], // Wednesday
+        ['09:00', '17:00'], // Thursday
+        ['10:00', '20:00'], // Friday
+        [],                 // Saturday (closed)
+        [],                 // Sunday (closed)
+      ],
       location: { lat: 51.5007, lng: -0.1246 },
     };
 
@@ -177,10 +181,15 @@ describe.sequential('Loos API - mutations', () => {
       noPayment: false,
       paymentDetails: 'Coins accepted',
       removalReason: 'Reopened after refurb',
-      openingTimes: {
-        saturday: ['08:30-22:00'],
-        metadata: { updated: true },
-      },
+      openingTimes: [
+        ['08:30', '22:00'], // Monday
+        ['08:30', '22:00'], // Tuesday
+        ['08:30', '22:00'], // Wednesday
+        ['08:30', '22:00'], // Thursday
+        ['08:30', '22:00'], // Friday
+        ['08:30', '22:00'], // Saturday
+        ['08:30', '22:00'], // Sunday
+      ],
       location: { lat: 51.5012, lng: -0.1419 },
     };
 

@@ -49,6 +49,41 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
     },
     required: ['lat', 'lng'],
   },
+  DayOpeningHours: {
+    anyOf: [
+      {
+        type: 'array',
+        description: 'A day with opening hours: [open, close] in HH:mm format',
+        items: { type: 'string', pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]$' },
+        minItems: 2,
+        maxItems: 2,
+        example: ['09:00', '17:00'],
+      },
+      {
+        type: 'array',
+        description: 'A closed day represented as an empty array',
+        maxItems: 0,
+        example: [],
+      },
+    ],
+  },
+  OpeningTimes: {
+    type: 'array',
+    description:
+      'Opening times for each day of the week. Array has 7 elements: Monday (0) through Sunday (6). Each element is either ["HH:mm", "HH:mm"] for open days, or [] for closed days. If all opening times are unknown, the entire field is null.',
+    items: schemaRef('DayOpeningHours'),
+    minItems: 7,
+    maxItems: 7,
+    example: [
+      ['09:00', '17:00'], // Monday
+      ['09:00', '17:00'], // Tuesday
+      ['09:00', '17:00'], // Wednesday
+      ['09:00', '17:00'], // Thursday
+      ['09:00', '17:00'], // Friday
+      [], // Saturday (closed)
+      [], // Sunday (closed)
+    ],
+  },
   AdminArea: {
     type: 'object',
     description: 'Administrative subdivision associated with a loo.',
@@ -141,8 +176,9 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       paymentDetails: nullableString(2000),
       removalReason: nullableString(2000),
       openingTimes: {
-        anyOf: [schemaRef('JsonValue'), { type: 'null' }],
-        description: 'Arbitrary JSON payload describing opening times.',
+        anyOf: [schemaRef('OpeningTimes'), { type: 'null' }],
+        description:
+          'Opening times for each day of the week. Array has 7 elements: Monday (0) through Sunday (6). Each element is either ["HH:mm", "HH:mm"] for open days, or [] for closed days. If all opening times are unknown, the entire field is null.',
       },
       location: {
         description:
@@ -206,8 +242,8 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       removalReason: nullableString(),
       radar: nullableBoolean,
       openingTimes: {
-        anyOf: [schemaRef('JsonValue'), { type: 'null' }],
-        description: 'Opening hours metadata if known.',
+        anyOf: [schemaRef('OpeningTimes'), { type: 'null' }],
+        description: 'Opening hours for each day of the week, or null if completely unknown.',
       },
       reports: {
         type: 'array',
@@ -263,7 +299,7 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       paymentDetails: nullableString(),
       removalReason: nullableString(),
       openingTimes: {
-        anyOf: [schemaRef('JsonValue'), { type: 'null' }],
+        anyOf: [schemaRef('OpeningTimes'), { type: 'null' }],
       },
       geohash: nullableString(),
       radar: nullableBoolean,

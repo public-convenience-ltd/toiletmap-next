@@ -34,19 +34,28 @@ export const REPORT_EXPECTATIONS = {
   property: {
     contributor: SEED_CONTRIBUTORS.propertyUpdate,
     notes: 'Seasonal hours updated after inspection',
-    openingTimes: {
-      monday: ['10:00-18:00'],
-      metadata: { source: 'seed' },
-    },
+    openingTimes: [
+      ['10:00', '18:00'], // Monday
+      [],                 // Tuesday (closed/unknown)
+      [],                 // Wednesday (closed/unknown)
+      [],                 // Thursday (closed/unknown)
+      [],                 // Friday (closed/unknown)
+      [],                 // Saturday (closed/unknown)
+      [],                 // Sunday (closed/unknown)
+    ],
   },
   seasonal: {
     contributor: SEED_CONTRIBUTORS.seasonalReview,
     notes: 'Seasonal hours restored for spring visitors',
-    openingTimes: {
-      monday: ['09:00-19:00'],
-      friday: ['09:00-21:00'],
-      metadata: { source: 'seed-2025' },
-    },
+    openingTimes: [
+      ['09:00', '19:00'], // Monday
+      ['09:00', '19:00'], // Tuesday
+      ['09:00', '19:00'], // Wednesday
+      ['09:00', '19:00'], // Thursday
+      ['09:00', '21:00'], // Friday
+      [],                 // Saturday (closed/unknown)
+      [],                 // Sunday (closed/unknown)
+    ],
   },
   system: {
     contributor: SEED_CONTRIBUTORS.survey,
