@@ -9,6 +9,7 @@ export type Auth0User = {
   name?: string;
   nickname?: string;
   email?: string;
+  permissions?: string[];
   [key: string]: unknown;
 };
 

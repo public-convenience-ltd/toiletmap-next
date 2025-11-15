@@ -5,9 +5,12 @@
   <title>Toilet Map Admin Explorer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <style>
     :root {
       /* Toilet Map Design Tokens */
@@ -624,6 +627,22 @@
       async getAreas() {
         return this.request('/areas');
       }
+
+      // Admin endpoints
+      async getAdminStats() {
+        return this.request('/admin/api/stats');
+      }
+
+      async getAdminMapData(params = {}) {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && value !== '' && value !== 'any') {
+            query.append(key, value);
+          }
+        });
+        const queryString = query.toString();
+        return this.request(`/admin/api/loos/map${queryString ? `?${queryString}` : ''}`);
+      }
     }
 
     const apiService = new ApiService();
@@ -1054,6 +1073,93 @@
         if (looId) {
           await this.loadLoo(looId);
         }
+
+        // Set up event listener for noPayment checkbox after render
+        setTimeout(() => this.setupPaymentDetailsToggle(), 100);
+      }
+
+      setupPaymentDetailsToggle() {
+        const noPaymentCheckbox = this.querySelector('input[name="noPayment"]');
+        const paymentDetailsGroup = this.querySelector('#payment-details-group');
+        const paymentDetailsInput = this.querySelector('input[name="paymentDetails"]');
+
+        if (noPaymentCheckbox && paymentDetailsGroup && paymentDetailsInput) {
+          const updateVisibility = () => {
+            const isFree = noPaymentCheckbox.checked;
+            paymentDetailsGroup.style.display = isFree ? 'none' : 'flex';
+            paymentDetailsInput.required = !isFree;
+            if (isFree) {
+              paymentDetailsInput.value = '';
+            }
+          };
+
+          noPaymentCheckbox.addEventListener('change', updateVisibility);
+          updateVisibility(); // Initial state
+        }
+      }
+
+      copyHoursToAll(sourceDay) {
+        const form = this.querySelector('form');
+        const openInput = form.querySelector(`input[name="openingHours.${sourceDay}.open"]`);
+        const closeInput = form.querySelector(`input[name="openingHours.${sourceDay}.close"]`);
+
+        if (!openInput || !closeInput) return;
+
+        const openValue = openInput.value;
+        const closeValue = closeInput.value;
+
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+          const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
+          const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
+          if (dayOpenInput) dayOpenInput.value = openValue;
+          if (dayCloseInput) dayCloseInput.value = closeValue;
+        });
+
+        Toast.show(`Copied ${sourceDay}'s hours to all days`, 'success', 2000);
+      }
+
+      clearAllHours() {
+        const form = this.querySelector('form');
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+          const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
+          const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
+          if (dayOpenInput) dayOpenInput.value = '';
+          if (dayCloseInput) dayCloseInput.value = '';
+        });
+
+        Toast.show('Cleared all opening hours', 'success', 2000);
+      }
+
+      setWeekdayHours() {
+        const form = this.querySelector('form');
+        const mondayOpen = form.querySelector('input[name="openingHours.monday.open"]');
+        const mondayClose = form.querySelector('input[name="openingHours.monday.close"]');
+
+        if (!mondayOpen || !mondayClose || !mondayOpen.value || !mondayClose.value) {
+          Toast.show('Please set Monday hours first', 'error', 2000);
+          return;
+        }
+
+        const openValue = mondayOpen.value;
+        const closeValue = mondayClose.value;
+
+        // Set weekdays (Monday-Friday)
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+          const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
+          const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
+          if (dayOpenInput) dayOpenInput.value = openValue;
+          if (dayCloseInput) dayCloseInput.value = closeValue;
+        });
+
+        // Clear weekends
+        ['saturday', 'sunday'].forEach(day => {
+          const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
+          const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
+          if (dayOpenInput) dayOpenInput.value = '';
+          if (dayCloseInput) dayCloseInput.value = '';
+        });
+
+        Toast.show('Set weekday hours (Mon-Fri)', 'success', 2000);
       }
 
       disconnectedCallback() {
@@ -1068,6 +1174,7 @@
           this.loo = await apiService.getLoo(id);
           this.loading = false;
           this.render();
+          setTimeout(() => this.setupPaymentDetailsToggle(), 100);
         } catch (error) {
           console.error('Failed to load loo:', error);
           Toast.show(error.message || 'Failed to load loo', 'error');
@@ -1109,6 +1216,21 @@
             lat: parseFloat(lat),
             lng: parseFloat(lng),
           };
+        }
+
+        // Collect opening hours
+        const openingHours = {};
+        let hasAnyHours = false;
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+          const open = form.elements[`openingHours.${day}.open`]?.value;
+          const close = form.elements[`openingHours.${day}.close`]?.value;
+          if (open && close) {
+            openingHours[day] = { open, close };
+            hasAnyHours = true;
+          }
+        });
+        if (hasAnyHours) {
+          data.openingHours = openingHours;
         }
 
         this.saving = true;
@@ -1348,12 +1470,69 @@
                       </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="payment-details-group" style="display: ${loo.noPayment === false ? 'flex' : 'none'};">
                       <label>
                         <i class="fas fa-credit-card"></i>
-                        Payment Details
+                        Payment Details <span style="color: var(--color-danger);">*</span>
                       </label>
-                      <input type="text" name="paymentDetails" value="${loo.paymentDetails || ''}" placeholder="e.g., 20p coin required">
+                      <input type="text" name="paymentDetails" value="${loo.paymentDetails || ''}" placeholder="e.g., 20p coin required" ${loo.noPayment === false ? 'required' : ''}>
+                    </div>
+
+                    <div class="form-section">
+                      <h3>Opening Hours</h3>
+                      <div style="font-size: var(--text--1); color: var(--color-text-secondary); margin-bottom: var(--space-s);">
+                        Leave blank if open 24/7. Format: HH:MM (24-hour)
+                      </div>
+                      ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => {
+                        const dayLower = day.toLowerCase();
+                        const hours = loo.openingHours?.[dayLower] || { open: '', close: '' };
+                        return `
+                          <div class="form-row" style="display: grid; grid-template-columns: 100px 1fr; gap: var(--space-s); align-items: center;">
+                            <label style="margin: 0; font-weight: 600;">${day}</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-xs); align-items: center;">
+                              <input
+                                type="time"
+                                name="openingHours.${dayLower}.open"
+                                value="${hours.open || ''}"
+                                placeholder="Open"
+                                style="padding: var(--space-2xs); font-size: var(--text--1);"
+                              >
+                              <input
+                                type="time"
+                                name="openingHours.${dayLower}.close"
+                                value="${hours.close || ''}"
+                                placeholder="Close"
+                                style="padding: var(--space-2xs); font-size: var(--text--1);"
+                              >
+                              <button
+                                type="button"
+                                class="btn-sm btn-secondary"
+                                onclick="componentRegistry.get('${this.componentId}').copyHoursToAll('${dayLower}')"
+                                title="Copy to all days"
+                                style="white-space: nowrap; padding: var(--space-3xs) var(--space-2xs);"
+                              >
+                                <i class="fas fa-copy"></i>
+                              </button>
+                            </div>
+                          </div>
+                        `;
+                      }).join('')}
+                      <div style="margin-top: var(--space-xs); display: flex; gap: var(--space-xs);">
+                        <button
+                          type="button"
+                          class="btn-sm btn-secondary"
+                          onclick="componentRegistry.get('${this.componentId}').clearAllHours()"
+                        >
+                          <i class="fas fa-eraser"></i> Clear All
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-sm btn-secondary"
+                          onclick="componentRegistry.get('${this.componentId}').setWeekdayHours()"
+                        >
+                          <i class="fas fa-business-time"></i> Set Weekdays Only
+                        </button>
+                      </div>
                     </div>
 
                     <div class="form-group">
@@ -1526,7 +1705,7 @@
         super();
         this.componentId = `map-${componentIdCounter++}`;
         this.map = null;
-        this.markers = [];
+        this.markerClusterGroup = null;
         this.loos = [];
         this.loading = false;
         this.filters = {
@@ -1554,10 +1733,7 @@
         this.loading = true;
 
         try {
-          const params = {
-            limit: 200,
-            sort: 'updated-desc',
-          };
+          const params = {};
 
           Object.entries(this.filters).forEach(([key, value]) => {
             if (value !== 'any') {
@@ -1565,8 +1741,19 @@
             }
           });
 
-          const response = await apiService.searchLoos(params);
-          this.loos = response.data.filter(loo => loo.location);
+          // Use the dedicated admin map endpoint for better performance
+          const response = await apiService.getAdminMapData(params);
+          this.loos = response.data.map(loo => ({
+            id: loo.id,
+            location: loo.location,
+            active: loo.active,
+            accessible: loo.accessible,
+            babyChange: loo.babyChange,
+            radar: loo.radar,
+            noPayment: loo.noPayment,
+            name: loo.name,
+            area: loo.areaName ? [{ name: loo.areaName }] : []
+          }));
           this.loading = false;
           this.updateMarkers();
         } catch (error) {
@@ -1594,9 +1781,36 @@
       updateMarkers() {
         if (!this.map) return;
 
-        // Clear existing markers
-        this.markers.forEach(marker => marker.remove());
-        this.markers = [];
+        // Clear existing marker cluster group
+        if (this.markerClusterGroup) {
+          this.map.removeLayer(this.markerClusterGroup);
+        }
+
+        // Create new marker cluster group
+        this.markerClusterGroup = L.markerClusterGroup({
+          // Customize cluster appearance
+          iconCreateFunction: function(cluster) {
+            const childCount = cluster.getChildCount();
+            let c = ' marker-cluster-';
+            if (childCount < 10) {
+              c += 'small';
+            } else if (childCount < 100) {
+              c += 'medium';
+            } else {
+              c += 'large';
+            }
+
+            return new L.DivIcon({
+              html: '<div><span>' + childCount + '</span></div>',
+              className: 'marker-cluster' + c,
+              iconSize: new L.Point(40, 40)
+            });
+          },
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          zoomToBoundsOnClick: true,
+          maxClusterRadius: 50
+        });
 
         if (this.loos.length === 0) return;
 
@@ -1620,7 +1834,6 @@
           });
 
           const marker = L.marker([loo.location.lat, loo.location.lng], { icon })
-            .addTo(this.map)
             .bindPopup(`
               <div style="min-width: 200px;">
                 <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600;">
@@ -1660,13 +1873,15 @@
               </div>
             `);
 
-          this.markers.push(marker);
+          this.markerClusterGroup.addLayer(marker);
         });
 
+        // Add the marker cluster group to the map
+        this.map.addLayer(this.markerClusterGroup);
+
         // Fit bounds to show all markers
-        if (this.markers.length > 0) {
-          const group = L.featureGroup(this.markers);
-          this.map.fitBounds(group.getBounds().pad(0.1));
+        if (this.loos.length > 0) {
+          this.map.fitBounds(this.markerClusterGroup.getBounds().pad(0.1));
         }
       }
 
@@ -1763,42 +1978,23 @@
         this.render();
 
         try {
-          // For now, we'll calculate stats from the search endpoint
-          // In production, you might want dedicated stats endpoints
-          const [allLoos, recentUpdates] = await Promise.all([
-            apiService.searchLoos({ limit: 200, sort: 'updated-desc' }),
-            apiService.searchLoos({ limit: 50, sort: 'updated-desc' })
-          ]);
-
-          // Calculate statistics
-          const loos = allLoos.data;
-          const contributors = new Map();
-          const updatesByDay = {};
-          const suspiciousUpdates = [];
-
-          // Process loos for stats
-          loos.forEach(loo => {
-            // Track contributors (from most recent update)
-            if (loo.updatedAt) {
-              const date = new Date(loo.updatedAt).toISOString().split('T')[0];
-              updatesByDay[date] = (updatesByDay[date] || 0) + 1;
-            }
-
-            // Load reports for each loo to get contributor data
-            // This would be done async in production
-          });
+          // Use the dedicated admin stats endpoint
+          const response = await apiService.getAdminStats();
 
           this.stats = {
-            totalLoos: loos.length,
-            activeLoos: loos.filter(l => l.active).length,
-            accessibleLoos: loos.filter(l => l.accessible).length,
-            verifiedLoos: loos.filter(l => l.verifiedAt).length,
-            uniqueContributors: contributors.size,
-            recentUpdates: Object.keys(updatesByDay).length,
-            avgUpdatesPerDay: Object.values(updatesByDay).reduce((a, b) => a + b, 0) / Object.keys(updatesByDay).length || 0
+            totalLoos: response.overview.totalLoos,
+            activeLoos: response.overview.activeLoos,
+            accessibleLoos: response.overview.accessibleLoos,
+            verifiedLoos: response.overview.verifiedLoos,
+            uniqueContributors: response.contributors.total,
+            topContributors: response.contributors.topContributors,
+            recentUpdates: response.activity.recentUpdates,
+            updatesLast7Days: response.activity.updatesLast7Days,
+            updatesLast30Days: response.activity.updatesLast30Days,
+            avgUpdatesPerDay: response.activity.updatesLast30Days / 30
           };
 
-          this.suspiciousReports = suspiciousUpdates;
+          this.suspiciousReports = [];
           this.loading = false;
           this.render();
         } catch (error) {
@@ -1899,7 +2095,7 @@
                 <i class="fas fa-users"></i> Contributor Statistics
               </h3>
               <div style="background: var(--color-bg-secondary); border-radius: var(--radius-md); padding: 1.5rem;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
                   <div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: var(--color-primary);">
                       ${this.stats.uniqueContributors || 'N/A'}
@@ -1910,9 +2106,27 @@
                     <div style="font-size: 1.5rem; font-weight: 600; color: var(--color-primary);">
                       ${this.stats.avgUpdatesPerDay.toFixed(1)}
                     </div>
-                    <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Avg Updates/Day</div>
+                    <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Avg Updates/Day (30d)</div>
                   </div>
                 </div>
+                ${this.stats.topContributors?.length > 0 ? `
+                  <div>
+                    <div style="font-weight: 600; margin-bottom: 0.75rem; font-size: 0.875rem; text-transform: uppercase; color: var(--color-text-secondary);">
+                      Top Contributors
+                    </div>
+                    <div style="display: grid; gap: 0.5rem;">
+                      ${this.stats.topContributors.slice(0, 5).map((contributor, index) => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: white; border-radius: var(--radius-sm);">
+                          <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-weight: 600; color: var(--color-text-secondary); min-width: 1.5rem;">${index + 1}.</span>
+                            <span style="font-size: 0.875rem;">${contributor.name}</span>
+                          </div>
+                          <span style="font-weight: 600; color: var(--color-primary);">${contributor.count}</span>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
               </div>
             </div>
 
@@ -1921,7 +2135,21 @@
                 <i class="fas fa-chart-line"></i> Update Activity
               </h3>
               <div style="background: var(--color-bg-secondary); border-radius: var(--radius-md); padding: 1.5rem;">
-                <p style="color: var(--color-text-secondary); margin: 0;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                  <div>
+                    <div style="font-size: 1.25rem; font-weight: 600; color: var(--color-primary);">
+                      ${this.stats.updatesLast7Days}
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Last 7 Days</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 1.25rem; font-weight: 600; color: var(--color-primary);">
+                      ${this.stats.updatesLast30Days}
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Last 30 Days</div>
+                  </div>
+                </div>
+                <p style="color: var(--color-text-secondary); margin: 0; padding-top: 1rem; border-top: 1px solid var(--color-border);">
                   Database contains ${this.stats.totalLoos} loos with ${this.stats.activeLoos} currently active.
                   ${this.stats.verifiedLoos} loos have been verified by administrators.
                 </p>

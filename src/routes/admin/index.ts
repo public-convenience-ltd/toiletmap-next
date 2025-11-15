@@ -3,6 +3,10 @@ import { join, resolve } from 'node:path';
 import { Hono } from 'hono';
 import type { AppVariables } from '../../types';
 import { env } from '../../env';
+import { requireAuth } from '../../middleware/require-auth';
+import { requireAdminRole } from '../../middleware/require-admin-role';
+import { adminService } from '../../services/admin.service';
+import { handleRoute } from '../shared/route-helpers';
 
 const projectRoot = resolve(__dirname, '../../..');
 const adminExplorerPath = join(projectRoot, 'admin-explorer', 'index.html');
@@ -40,5 +44,47 @@ const adminPageHtml = adminTemplate
 
 export const adminRouter = new Hono<{ Variables: AppVariables }>();
 
+/**
+ * GET /admin/api/stats
+ * Returns comprehensive statistics for the admin dashboard
+ * Requires: Admin role (access:admin)
+ */
+adminRouter.get('/api/stats', requireAuth, requireAdminRole, (c) =>
+  handleRoute(c, 'admin.stats', async () => {
+    const stats = await adminService.getStatistics();
+    return c.json(stats);
+  }),
+);
+
+/**
+ * GET /admin/api/loos/map
+ * Returns compressed loo data optimized for map visualization
+ * Requires: Admin role (access:admin)
+ * Query params:
+ *   - active: boolean (optional) - filter by active status
+ *   - accessible: boolean (optional) - filter by accessibility
+ */
+adminRouter.get('/api/loos/map', requireAuth, requireAdminRole, (c) =>
+  handleRoute(c, 'admin.loos.map', async () => {
+    const activeParam = c.req.query('active');
+    const accessibleParam = c.req.query('accessible');
+
+    const filters: { active?: boolean; accessible?: boolean } = {};
+
+    if (activeParam === 'true') filters.active = true;
+    if (activeParam === 'false') filters.active = false;
+    if (accessibleParam === 'true') filters.accessible = true;
+    if (accessibleParam === 'false') filters.accessible = false;
+
+    const loos = await adminService.getMapData(filters);
+
+    return c.json({
+      data: loos,
+      count: loos.length,
+    });
+  }),
+);
+
+// UI routes (no auth required for the HTML page itself, auth handled by frontend)
 adminRouter.get('/', (c) => c.html(adminPageHtml));
 adminRouter.get('/*', (c) => c.html(adminPageHtml));
