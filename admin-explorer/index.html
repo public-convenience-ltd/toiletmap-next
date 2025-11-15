@@ -5,6 +5,7 @@
   <title>Toilet Map Admin Explorer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
@@ -184,6 +185,106 @@
       th, td {
         padding: 0.5rem !important;
       }
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #cbd5e1;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: var(--color-primary);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+
+    .toggle-switch input:disabled + .toggle-slider {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Form Grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem;
+      background: var(--color-bg-secondary);
+      border-radius: var(--radius-md);
+    }
+
+    .form-row label {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Stats Cards */
+    .stat-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-top: 0.25rem;
     }
   </style>
 </head>
@@ -539,6 +640,8 @@
             return `<loo-editor loo-id="${this.selectedLooId || ''}"></loo-editor>`;
           case 'map':
             return '<loo-map></loo-map>';
+          case 'stats':
+            return '<admin-stats></admin-stats>';
           default:
             return '<loo-list></loo-list>';
         }
@@ -575,18 +678,21 @@
             <h2 style="margin-bottom: 2rem; font-size: 1.25rem;">Admin Panel</h2>
             <nav style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1;">
               <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('list')" style="justify-content: flex-start; text-align: left;">
-                📋 Loo List
+                <i class="fas fa-list" style="width: 1.25rem;"></i> Loo List
               </button>
               <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('map')" style="justify-content: flex-start; text-align: left;">
-                🗺️ Map View
+                <i class="fas fa-map-marked-alt" style="width: 1.25rem;"></i> Map View
+              </button>
+              <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('stats')" style="justify-content: flex-start; text-align: left;">
+                <i class="fas fa-chart-bar" style="width: 1.25rem;"></i> Statistics
               </button>
               <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('edit')" style="justify-content: flex-start; text-align: left;">
-                ➕ Add New Loo
+                <i class="fas fa-plus-circle" style="width: 1.25rem;"></i> Add New Loo
               </button>
             </nav>
             <div style="padding-top: 1.5rem; border-top: 1px solid var(--color-border);">
               <button class="btn-secondary" onclick="authService.logout()" style="width: 100%;">
-                🚪 Sign Out
+                <i class="fas fa-sign-out-alt" style="width: 1.25rem;"></i> Sign Out
               </button>
             </div>
           </aside>
@@ -682,17 +788,18 @@
         eventBus.emit('view-changed', { view: 'edit', looId: id });
       }
 
-      async deleteLoo(id) {
-        if (!confirm('Are you sure you want to delete this loo? This action cannot be undone.')) {
+      async toggleActive(id, currentState) {
+        const action = currentState ? 'deactivate' : 'activate';
+        if (!confirm(`Are you sure you want to ${action} this loo?`)) {
           return;
         }
 
         try {
-          await apiService.deleteLoo(id);
-          Toast.show('Loo deleted successfully', 'success');
+          await apiService.updateLoo(id, { active: !currentState });
+          Toast.show(`Loo ${action}d successfully`, 'success');
           await this.loadLoos();
         } catch (error) {
-          Toast.show(error.message || 'Failed to delete loo', 'error');
+          Toast.show(error.message || `Failed to ${action} loo`, 'error');
         }
       }
 
@@ -789,11 +896,11 @@
                           }
                         </td>
                         <td style="padding: 0.75rem; text-align: center;">
-                          <div style="display: flex; gap: 0.25rem; justify-content: center; flex-wrap: wrap;">
-                            ${loo.accessible ? '<span title="Accessible">♿</span>' : ''}
-                            ${loo.babyChange ? '<span title="Baby Change">🍼</span>' : ''}
-                            ${loo.radar ? '<span title="RADAR">🔑</span>' : ''}
-                            ${loo.noPayment ? '<span title="Free">💚</span>' : ''}
+                          <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                            ${loo.accessible ? '<i class="fas fa-wheelchair" title="Accessible" style="color: var(--color-primary);"></i>' : ''}
+                            ${loo.babyChange ? '<i class="fas fa-baby" title="Baby Change" style="color: var(--color-primary);"></i>' : ''}
+                            ${loo.radar ? '<i class="fas fa-key" title="RADAR" style="color: var(--color-primary);"></i>' : ''}
+                            ${loo.noPayment ? '<i class="fas fa-check-circle" title="Free" style="color: var(--color-success);"></i>' : ''}
                           </div>
                         </td>
                         <td style="padding: 0.75rem;">
@@ -804,14 +911,16 @@
                             <button
                               class="btn-sm btn-secondary"
                               onclick="componentRegistry.get('${this.componentId}').viewLoo('${loo.id}')"
+                              title="View details"
                             >
-                              View
+                              <i class="fas fa-edit"></i> Edit
                             </button>
                             <button
-                              class="btn-sm btn-danger"
-                              onclick="componentRegistry.get('${this.componentId}').deleteLoo('${loo.id}')"
+                              class="btn-sm ${loo.active ? 'btn-danger' : 'btn-primary'}"
+                              onclick="componentRegistry.get('${this.componentId}').toggleActive('${loo.id}', ${loo.active})"
+                              title="${loo.active ? 'Deactivate' : 'Activate'}"
                             >
-                              Delete
+                              <i class="fas fa-${loo.active ? 'ban' : 'check'}"></i> ${loo.active ? 'Deactivate' : 'Activate'}
                             </button>
                           </div>
                         </td>
