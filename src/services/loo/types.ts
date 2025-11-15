@@ -1,14 +1,12 @@
 import { z } from 'zod';
 import type { Prisma, toilets } from "../../../prisma/src/generated/prisma/client";
 
+const jsonPrimitive = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const jsonValueSchema: z.ZodType<Prisma.JsonValue> = z.lazy(() =>
   z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
+    jsonPrimitive,
     z.array(jsonValueSchema),
-    z.record(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
   ]),
 );
 
@@ -114,7 +112,7 @@ export const ReportDiffEntrySchema = z
   .strict();
 export type ReportDiffEntry = z.infer<typeof ReportDiffEntrySchema>;
 
-export const ReportDiffSchema = z.record(ReportDiffEntrySchema);
+export const ReportDiffSchema = z.record(z.string(), ReportDiffEntrySchema);
 export type ReportDiff = z.infer<typeof ReportDiffSchema>;
 
 export const ReportSummaryResponseSchema = z
