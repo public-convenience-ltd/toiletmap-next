@@ -201,7 +201,7 @@
     // ============================================================================
     // Constants
     // ============================================================================
-    const ADMIN_ROLE_ID = 'rol_aC7YZZenLUd5kh9X';
+    const ADMIN_ROLE_ID = 'access:admin';
     const API_BASE = '';
 
     // ============================================================================
@@ -333,7 +333,7 @@
           const payload = JSON.parse(atob(this.accessToken.split('.')[1]));
           this.user = {
             sub: payload.sub,
-            roles: payload['https://toiletmap.org.uk/roles'] || [],
+            permissions: payload['permissions'] || [],
           };
         } catch (e) {
           console.error('Failed to decode token:', e);
@@ -365,7 +365,7 @@
       }
 
       hasAdminRole() {
-        return this.user?.roles?.includes(ADMIN_ROLE_ID);
+        return this.user?.permissions?.includes(ADMIN_ROLE_ID);
       }
 
       getToken() {
