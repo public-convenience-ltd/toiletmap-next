@@ -752,6 +752,11 @@
         return response.json();
       }
 
+      // Generic GET method
+      async get(endpoint) {
+        return this.request(endpoint, { method: 'GET' });
+      }
+
       // Loos endpoints
       async searchLoos(params = {}) {
         const query = new URLSearchParams();
@@ -2662,9 +2667,7 @@
         super();
         this.componentId = `stats-${componentIdCounter++}`;
         this.stats = null;
-        this.suspiciousReports = [];
         this.loading = false;
-        this.selectedTab = 'overview';
       }
 
       async connectedCallback() {
@@ -2698,7 +2701,6 @@
             avgUpdatesPerDay: response.activity.updatesLast30Days / 30
           };
 
-          this.suspiciousReports = [];
           this.loading = false;
           this.render();
         } catch (error) {
@@ -2707,11 +2709,6 @@
           this.loading = false;
           this.render();
         }
-      }
-
-      selectTab(tab) {
-        this.selectedTab = tab;
-        this.render();
       }
 
       render() {
@@ -2765,28 +2762,7 @@
               </div>
             </div>
 
-            <div style="background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
-              <div style="border-bottom: 1px solid var(--color-border); padding: 1rem;">
-                <div style="display: flex; gap: 1rem;">
-                  <button
-                    class="btn-${this.selectedTab === 'overview' ? 'primary' : 'secondary'} btn-sm"
-                    onclick="componentRegistry.get('${this.componentId}').selectTab('overview')"
-                  >
-                    <i class="fas fa-chart-pie"></i> Overview
-                  </button>
-                  <button
-                    class="btn-${this.selectedTab === 'suspicious' ? 'primary' : 'secondary'} btn-sm"
-                    onclick="componentRegistry.get('${this.componentId}').selectTab('suspicious')"
-                  >
-                    <i class="fas fa-exclamation-triangle"></i> Suspicious Activity
-                  </button>
-                </div>
-              </div>
-
-              <div style="padding: 2rem;">
-                ${this.selectedTab === 'overview' ? this.renderOverview() : this.renderSuspicious()}
-              </div>
-            </div>
+            ${this.renderOverview()}
           </div>
         `;
       }
@@ -2859,59 +2835,6 @@
                 </p>
               </div>
             </div>
-          </div>
-        `;
-      }
-
-      renderSuspicious() {
-        return `
-          <div>
-            <p style="color: var(--color-text-secondary); margin-bottom: 1.5rem;">
-              This section would show suspicious updates for review based on patterns like:
-            </p>
-            <ul style="color: var(--color-text-secondary); margin-bottom: 2rem;">
-              <li>Multiple updates to the same loo in short time</li>
-              <li>Conflicting information from different contributors</li>
-              <li>Unexpected location changes</li>
-              <li>Mass deactivations by single contributor</li>
-            </ul>
-
-            ${this.suspiciousReports.length === 0 ? `
-              <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: var(--radius-md); padding: 1.5rem; text-align: center;">
-                <i class="fas fa-check-circle" style="color: var(--color-success); font-size: 2rem; margin-bottom: 0.5rem;"></i>
-                <div style="font-weight: 600; color: #065f46;">No Suspicious Activity Detected</div>
-                <div style="font-size: 0.875rem; color: #047857; margin-top: 0.25rem;">All recent updates appear normal</div>
-              </div>
-            ` : `
-              <div style="background: white; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm);">
-                <table style="width: 100%; border-collapse: collapse;">
-                  <thead style="background: var(--color-bg-secondary); border-bottom: 1px solid var(--color-border);">
-                    <tr>
-                      <th style="padding: 0.75rem; text-align: left;">Loo</th>
-                      <th style="padding: 0.75rem; text-align: left;">Issue</th>
-                      <th style="padding: 0.75rem; text-align: left;">Contributor</th>
-                      <th style="padding: 0.75rem; text-align: left;">Date</th>
-                      <th style="padding: 0.75rem; text-align: right;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${this.suspiciousReports.map(report => `
-                      <tr style="border-bottom: 1px solid var(--color-border);">
-                        <td style="padding: 0.75rem;">${report.looName}</td>
-                        <td style="padding: 0.75rem;">${report.issue}</td>
-                        <td style="padding: 0.75rem;">${report.contributor}</td>
-                        <td style="padding: 0.75rem;">${new Date(report.date).toLocaleDateString()}</td>
-                        <td style="padding: 0.75rem; text-align: right;">
-                          <button class="btn-sm btn-secondary">
-                            <i class="fas fa-eye"></i> Review
-                          </button>
-                        </td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            `}
           </div>
         `;
       }
