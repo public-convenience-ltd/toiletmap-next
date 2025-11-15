@@ -1,38 +1,83 @@
-import type { Prisma, toilets } from  "../../../prisma/src/generated/prisma/client";
+import { z } from 'zod';
+import type { Prisma, toilets } from "../../../prisma/src/generated/prisma/client";
 
-export type Coordinates = { lat: number; lng: number };
+const jsonValueSchema: z.ZodType<Prisma.JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(jsonValueSchema),
+  ]),
+);
 
-export type AdminGeo = { name: string | null; type: string | null };
+const openingTimesSchema: z.ZodType<toilets['opening_times']> = z.union([
+  jsonValueSchema,
+  z.null(),
+]);
 
-export type LooResponse = {
-  id: string;
-  geohash: string | null;
-  name: string | null;
-  area: AdminGeo[];
-  createdAt: string | null;
-  updatedAt: string | null;
-  verifiedAt: string | null;
-  accessible: boolean | null;
-  active: boolean | null;
-  allGender: boolean | null;
-  attended: boolean | null;
-  automatic: boolean | null;
-  babyChange: boolean | null;
-  children: boolean | null;
-  men: boolean | null;
-  women: boolean | null;
-  urinalOnly: boolean | null;
-  notes: string | null;
-  noPayment: boolean | null;
-  paymentDetails: string | null;
-  removalReason: string | null;
-  radar: boolean | null;
-  openingTimes: toilets['opening_times'];
-  reports: unknown[];
-  location: Coordinates | null;
-};
+export const CoordinatesSchema = z
+  .object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+  })
+  .strict();
+export type Coordinates = z.infer<typeof CoordinatesSchema>;
 
-export type NearbyLooResponse = LooResponse & { distance: number };
+export const AdminGeoSchema = z
+  .object({
+    name: z.string().nullable(),
+    type: z.string().nullable(),
+  })
+  .strict();
+export type AdminGeo = z.infer<typeof AdminGeoSchema>;
+
+const nullableBoolean = z.boolean().nullable();
+const nullableString = z.string().nullable();
+
+// Shared base for every outward-facing loo representation.
+export const LooCommonSchema = z
+  .object({
+    geohash: nullableString,
+    accessible: nullableBoolean,
+    active: nullableBoolean,
+    allGender: nullableBoolean,
+    attended: nullableBoolean,
+    automatic: nullableBoolean,
+    babyChange: nullableBoolean,
+    children: nullableBoolean,
+    men: nullableBoolean,
+    women: nullableBoolean,
+    urinalOnly: nullableBoolean,
+    notes: nullableString,
+    noPayment: nullableBoolean,
+    paymentDetails: nullableString,
+    removalReason: nullableString,
+    radar: nullableBoolean,
+    openingTimes: openingTimesSchema,
+    location: CoordinatesSchema.nullable(),
+  })
+  .strict();
+export type LooCommon = z.infer<typeof LooCommonSchema>;
+
+export const LooResponseSchema = z
+  .object({
+    id: z.string(),
+    name: nullableString,
+    area: z.array(AdminGeoSchema),
+    createdAt: nullableString,
+    updatedAt: nullableString,
+    verifiedAt: nullableString,
+    reports: z.array(z.unknown()),
+  })
+  .merge(LooCommonSchema);
+export type LooResponse = z.infer<typeof LooResponseSchema>;
+
+export const NearbyLooResponseSchema = LooResponseSchema.extend({
+  distance: z.number().nonnegative(),
+});
+export type NearbyLooResponse = z.infer<typeof NearbyLooResponseSchema>;
 
 export type LooSearchSort =
   | 'updated-desc'
@@ -61,47 +106,39 @@ export type LooSearchParams = {
   sort: LooSearchSort;
 };
 
-export type ReportDiffEntry = {
-  previous: unknown;
-  current: unknown;
-};
+export const ReportDiffEntrySchema = z
+  .object({
+    previous: z.unknown(),
+    current: z.unknown(),
+  })
+  .strict();
+export type ReportDiffEntry = z.infer<typeof ReportDiffEntrySchema>;
 
-export type ReportDiff = Record<string, ReportDiffEntry>;
+export const ReportDiffSchema = z.record(ReportDiffEntrySchema);
+export type ReportDiff = z.infer<typeof ReportDiffSchema>;
 
-export type ReportSummaryResponse = {
-  id: string;
-  contributor: string;
-  createdAt: string;
-  isSystemReport: boolean;
-  diff: ReportDiff | null;
-};
+export const ReportSummaryResponseSchema = z
+  .object({
+    id: z.string(),
+    contributor: z.string(),
+    createdAt: z.string(),
+    isSystemReport: z.boolean(),
+    diff: ReportDiffSchema.nullable(),
+  })
+  .strict();
+export type ReportSummaryResponse = z.infer<typeof ReportSummaryResponseSchema>;
 
-export type ReportResponse = {
-  id: string;
-  contributor: string;
-  createdAt: string;
-  verifiedAt: string | null;
-  isSystemReport: boolean;
-  diff: ReportDiff | null;
-  accessible: boolean | null;
-  active: boolean | null;
-  allGender: boolean | null;
-  attended: boolean | null;
-  automatic: boolean | null;
-  babyChange: boolean | null;
-  children: boolean | null;
-  men: boolean | null;
-  women: boolean | null;
-  urinalOnly: boolean | null;
-  notes: string | null;
-  noPayment: boolean | null;
-  paymentDetails: string | null;
-  removalReason: string | null;
-  openingTimes: toilets['opening_times'];
-  geohash: string | null;
-  radar: boolean | null;
-  location: Coordinates | null;
-};
+export const ReportResponseSchema = z
+  .object({
+    id: z.string(),
+    contributor: z.string(),
+    createdAt: z.string(),
+    verifiedAt: nullableString,
+    isSystemReport: z.boolean(),
+    diff: ReportDiffSchema.nullable(),
+  })
+  .merge(LooCommonSchema);
+export type ReportResponse = z.infer<typeof ReportResponseSchema>;
 
 export type LooMutationAttributes = {
   name?: string | null;

@@ -5,6 +5,17 @@ export const looService = new LooService();
 
 export { LOO_ID_LENGTH, generateLooId } from './constants';
 export { parseActiveFlag, extractContributor } from './helpers';
+export {
+  CoordinatesSchema,
+  AdminGeoSchema,
+  LooCommonSchema,
+  LooResponseSchema,
+  NearbyLooResponseSchema,
+  ReportResponseSchema,
+  ReportSummaryResponseSchema,
+  ReportDiffSchema,
+  ReportDiffEntrySchema,
+} from './types';
 export type {
   Coordinates,
   AdminGeo,

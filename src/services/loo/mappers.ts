@@ -1,7 +1,8 @@
 import type { areas, record_version, toilets } from "../../../prisma/src/generated/prisma/client";
-import {
+import type {
   AdminGeo,
   Coordinates,
+  LooCommon,
   LooResponse,
   NearbyLooResponse,
   ReportResponse,
@@ -50,7 +51,9 @@ const toDateISOString = (value: Date | string | null | undefined) => {
   return null;
 };
 
-const mapSharedLooFields = (source: Partial<toilets> | null | undefined) => ({
+const mapSharedLooFields = (
+  source: Partial<toilets> | null | undefined,
+): LooCommon => ({
   geohash: source?.geohash ?? null,
   accessible: source?.accessible ?? null,
   active: source?.active ?? null,
