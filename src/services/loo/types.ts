@@ -77,15 +77,19 @@ export const NearbyLooResponseSchema = LooResponseSchema.extend({
 });
 export type NearbyLooResponse = z.infer<typeof NearbyLooResponseSchema>;
 
-export type LooSearchSort =
-  | 'updated-desc'
-  | 'updated-asc'
-  | 'created-desc'
-  | 'created-asc'
-  | 'verified-desc'
-  | 'verified-asc'
-  | 'name-asc'
-  | 'name-desc';
+export const LooSearchSortOptions = [
+  'updated-desc',
+  'updated-asc',
+  'created-desc',
+  'created-asc',
+  'verified-desc',
+  'verified-asc',
+  'name-asc',
+  'name-desc',
+] as const;
+
+export const LooSearchSortSchema = z.enum(LooSearchSortOptions);
+export type LooSearchSort = z.infer<typeof LooSearchSortSchema>;
 
 export type LooSearchParams = {
   search?: string;

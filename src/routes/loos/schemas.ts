@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LOO_ID_LENGTH } from '../../services/loo';
+import { CoordinatesSchema, LooSearchSortOptions } from '../../services/loo/types';
 
 const nullableTrimmed = (max: number) =>
   z
@@ -40,11 +41,6 @@ export const proximitySchema = z
       .default(1000),
   })
   .strict();
-
-const locationSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-});
 
 const normalizeOptionalString = (value: unknown) => {
   if (typeof value !== 'string') return value;
@@ -104,17 +100,6 @@ const createNumberParam = (min: number, max: number | null, fallback: number) =>
       }),
   );
 
-const sortOptions = [
-  'updated-desc',
-  'updated-asc',
-  'created-desc',
-  'created-asc',
-  'verified-desc',
-  'verified-asc',
-  'name-asc',
-  'name-desc',
-] as const;
-
 export const baseMutationSchema = z
   .object({
     name: nullableTrimmed(200),
@@ -142,7 +127,7 @@ export const baseMutationSchema = z
     removalReason: nullableTrimmed(2000),
     openingTimes: jsonValueSchema.nullable().optional(),
     // allow clearing with null and omit with undefined
-    location: locationSchema.nullable().optional(),
+    location: CoordinatesSchema.nullable().optional(),
   })
   .strict();
 
@@ -163,7 +148,7 @@ export const searchQuerySchema = z.object({
   verified: booleanFilterSchema,
   hasLocation: booleanFilterSchema,
   sort: z
-    .preprocess(normalizeOptionalOption, z.enum(sortOptions).default('updated-desc')),
+    .preprocess(normalizeOptionalOption, z.enum(LooSearchSortOptions).default('updated-desc')),
   limit: createNumberParam(1, 200, 50),
   page: createNumberParam(1, null, 1),
 });
