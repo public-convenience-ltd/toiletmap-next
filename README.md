@@ -65,6 +65,8 @@ The server listens on `PORT` (defaults to `4001`) and exposes a health check at 
 
 ## API Overview
 
+The canonical response schemas live in `src/services/loo/types.ts` (see `LooResponseSchema`, `NearbyLooResponseSchema`, and friends) and are expressed with Zod so you can rely on them both at type-level and runtime if needed.
+
 All responses are JSON. Errors follow the shape:
 
 ```json
@@ -186,4 +188,3 @@ All responses are JSON. Errors follow the shape:
 1. Wire the UI (or other consumers) to the REST endpoints.
 2. Add structured logging and observability once deployed independently.
 3. Publish an OpenAPI/Swagger description if the API becomes public-facing.
-

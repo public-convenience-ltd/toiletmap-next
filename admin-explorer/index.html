@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Toilet Map Admin Explorer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at top, #f5f5f5, #dcdcdc);
+      }
+      main {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+        padding: 2.5rem;
+        max-width: 420px;
+        text-align: center;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.8rem;
+      }
+      p {
+        font-size: 1rem;
+        color: #333;
+        line-height: 1.5;
+      }
+      code {
+        display: inline-block;
+        margin-top: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.08);
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body
+    data-auth0-enabled="__AUTH0_ENABLED__"
+    data-auth0-client-id="__AUTH0_CLIENT_ID__"
+    data-auth0-authorize-url="__AUTH0_AUTHORIZE_URL__"
+    data-auth0-audience="__AUTH0_AUDIENCE__"
+    data-auth0-scope="__AUTH0_SCOPE__"
+    data-auth0-redirect-uri="__AUTH0_REDIRECT_URI__"
+  >
+    <main>
+      <h1>Admin Explorer Placeholder</h1>
+      <p>
+        This lightweight shell keeps the Admin Explorer route functional during
+        automated tests. Replace this file with your real explorer build when deploying the full UI.
+      </p>
+      <code>Auth0 enabled: __AUTH0_ENABLED__</code>
+    </main>
+  </body>
+</html>
