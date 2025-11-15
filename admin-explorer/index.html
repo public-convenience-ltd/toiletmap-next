@@ -233,6 +233,12 @@
     const eventBus = new EventBus();
 
     // ============================================================================
+    // Component Registry (for inline event handlers)
+    // ============================================================================
+    const componentRegistry = new Map();
+    let componentIdCounter = 0;
+
+    // ============================================================================
     // Toast Notifications
     // ============================================================================
     class Toast {
@@ -545,8 +551,18 @@
     // Sidebar Component
     // ============================================================================
     class AdminSidebar extends HTMLElement {
+      constructor() {
+        super();
+        this.componentId = `sidebar-${componentIdCounter++}`;
+      }
+
       connectedCallback() {
+        componentRegistry.set(this.componentId, this);
         this.render();
+      }
+
+      disconnectedCallback() {
+        componentRegistry.delete(this.componentId);
       }
 
       navigate(view) {
@@ -558,13 +574,13 @@
           <aside style="width: 240px; background: white; border-right: 1px solid var(--color-border); padding: 1.5rem; height: 100vh; position: sticky; top: 0; display: flex; flex-direction: column;">
             <h2 style="margin-bottom: 2rem; font-size: 1.25rem;">Admin Panel</h2>
             <nav style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1;">
-              <button class="btn-secondary" onclick="this.getRootNode().host.navigate('list')" style="justify-content: flex-start; text-align: left;">
+              <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('list')" style="justify-content: flex-start; text-align: left;">
                 📋 Loo List
               </button>
-              <button class="btn-secondary" onclick="this.getRootNode().host.navigate('map')" style="justify-content: flex-start; text-align: left;">
+              <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('map')" style="justify-content: flex-start; text-align: left;">
                 🗺️ Map View
               </button>
-              <button class="btn-secondary" onclick="this.getRootNode().host.navigate('edit')" style="justify-content: flex-start; text-align: left;">
+              <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').navigate('edit')" style="justify-content: flex-start; text-align: left;">
                 ➕ Add New Loo
               </button>
             </nav>
@@ -586,6 +602,7 @@
     class LooList extends HTMLElement {
       constructor() {
         super();
+        this.componentId = `list-${componentIdCounter++}`;
         this.loos = [];
         this.loading = false;
         this.page = 1;
@@ -600,8 +617,13 @@
       }
 
       async connectedCallback() {
+        componentRegistry.set(this.componentId, this);
         this.render();
         await this.loadLoos();
+      }
+
+      disconnectedCallback() {
+        componentRegistry.delete(this.componentId);
       }
 
       async loadLoos() {
@@ -681,13 +703,13 @@
           <div style="max-width: 1200px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
               <h1 style="font-size: 1.5rem;">Loos (${this.total})</h1>
-              <button class="btn-primary" onclick="this.getRootNode().host.viewLoo(null)">
+              <button class="btn-primary" onclick="componentRegistry.get('${this.componentId}').viewLoo(null)">
                 Add New Loo
               </button>
             </div>
 
             <div style="background: white; border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
-              <form onsubmit="this.getRootNode().host.handleSearch(event); return false;">
+              <form onsubmit="componentRegistry.get('${this.componentId}').handleSearch(event); return false;">
                 <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
                   <input
                     type="text"
@@ -701,7 +723,7 @@
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                   <div>
                     <label>Active</label>
-                    <select onchange="this.getRootNode().host.handleFilterChange('active', this.value)">
+                    <select onchange="componentRegistry.get('${this.componentId}').handleFilterChange('active', this.value)">
                       <option value="any" ${this.filters.active === 'any' ? 'selected' : ''}>Any</option>
                       <option value="true" ${this.filters.active === 'true' ? 'selected' : ''}>Yes</option>
                       <option value="false" ${this.filters.active === 'false' ? 'selected' : ''}>No</option>
@@ -709,7 +731,7 @@
                   </div>
                   <div>
                     <label>Accessible</label>
-                    <select onchange="this.getRootNode().host.handleFilterChange('accessible', this.value)">
+                    <select onchange="componentRegistry.get('${this.componentId}').handleFilterChange('accessible', this.value)">
                       <option value="any" ${this.filters.accessible === 'any' ? 'selected' : ''}>Any</option>
                       <option value="true" ${this.filters.accessible === 'true' ? 'selected' : ''}>Yes</option>
                       <option value="false" ${this.filters.accessible === 'false' ? 'selected' : ''}>No</option>
@@ -717,7 +739,7 @@
                   </div>
                   <div>
                     <label>Verified</label>
-                    <select onchange="this.getRootNode().host.handleFilterChange('verified', this.value)">
+                    <select onchange="componentRegistry.get('${this.componentId}').handleFilterChange('verified', this.value)">
                       <option value="any" ${this.filters.verified === 'any' ? 'selected' : ''}>Any</option>
                       <option value="true" ${this.filters.verified === 'true' ? 'selected' : ''}>Yes</option>
                       <option value="false" ${this.filters.verified === 'false' ? 'selected' : ''}>No</option>
@@ -781,13 +803,13 @@
                           <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                             <button
                               class="btn-sm btn-secondary"
-                              onclick="this.getRootNode().host.viewLoo('${loo.id}')"
+                              onclick="componentRegistry.get('${this.componentId}').viewLoo('${loo.id}')"
                             >
                               View
                             </button>
                             <button
                               class="btn-sm btn-danger"
-                              onclick="this.getRootNode().host.deleteLoo('${loo.id}')"
+                              onclick="componentRegistry.get('${this.componentId}').deleteLoo('${loo.id}')"
                             >
                               Delete
                             </button>
@@ -803,7 +825,7 @@
                 <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
                   <button
                     class="btn-secondary btn-sm"
-                    onclick="this.getRootNode().host.changePage(${this.page - 1})"
+                    onclick="componentRegistry.get('${this.componentId}').changePage(${this.page - 1})"
                     ${this.page === 1 ? 'disabled' : ''}
                   >
                     Previous
@@ -813,7 +835,7 @@
                   </span>
                   <button
                     class="btn-secondary btn-sm"
-                    onclick="this.getRootNode().host.changePage(${this.page + 1})"
+                    onclick="componentRegistry.get('${this.componentId}').changePage(${this.page + 1})"
                     ${this.page === totalPages ? 'disabled' : ''}
                   >
                     Next
@@ -834,6 +856,7 @@
     class LooEditor extends HTMLElement {
       constructor() {
         super();
+        this.componentId = `editor-${componentIdCounter++}`;
         this.loo = null;
         this.loading = false;
         this.saving = false;
@@ -846,6 +869,7 @@
       }
 
       async connectedCallback() {
+        componentRegistry.set(this.componentId, this);
         const looId = this.getAttribute('loo-id');
         this.isNew = !looId;
         this.render();
@@ -853,6 +877,10 @@
         if (looId) {
           await this.loadLoo(looId);
         }
+      }
+
+      disconnectedCallback() {
+        componentRegistry.delete(this.componentId);
       }
 
       async loadLoo(id) {
@@ -953,13 +981,13 @@
           <div style="max-width: 900px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
               <div style="display: flex; align-items: center; gap: 1rem;">
-                <button class="btn-secondary" onclick="this.getRootNode().host.goBack()">
+                <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').goBack()">
                   ← Back
                 </button>
                 <h1 style="font-size: 1.5rem;">${this.isNew ? 'Add New Loo' : 'Edit Loo'}</h1>
               </div>
               ${!this.isNew ? `
-                <button class="btn-secondary" onclick="this.getRootNode().host.toggleReports()">
+                <button class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').toggleReports()">
                   ${this.showReports ? 'Hide' : 'Show'} History
                 </button>
               ` : ''}
@@ -967,7 +995,7 @@
 
             <div style="display: grid; gap: 2rem; grid-template-columns: ${this.showReports && !this.isNew ? '1fr 400px' : '1fr'};">
               <div style="background: white; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm);">
-                <form onsubmit="this.getRootNode().host.handleSubmit(event); return false;">
+                <form onsubmit="componentRegistry.get('${this.componentId}').handleSubmit(event); return false;">
                   <div style="display: grid; gap: 1.5rem;">
                     <div>
                       <label>Name</label>
@@ -1109,7 +1137,7 @@
                     </div>
 
                     <div style="display: flex; gap: 1rem; justify-content: flex-end; padding-top: 1rem; border-top: 1px solid var(--color-border);">
-                      <button type="button" class="btn-secondary" onclick="this.getRootNode().host.goBack()">
+                      <button type="button" class="btn-secondary" onclick="componentRegistry.get('${this.componentId}').goBack()">
                         Cancel
                       </button>
                       <button type="submit" class="btn-primary" ${this.saving ? 'disabled' : ''}>
@@ -1260,6 +1288,7 @@
     class LooMap extends HTMLElement {
       constructor() {
         super();
+        this.componentId = `map-${componentIdCounter++}`;
         this.map = null;
         this.markers = [];
         this.loos = [];
@@ -1271,12 +1300,14 @@
       }
 
       async connectedCallback() {
+        componentRegistry.set(this.componentId, this);
         this.render();
         await this.loadLoos();
         this.initMap();
       }
 
       disconnectedCallback() {
+        componentRegistry.delete(this.componentId);
         if (this.map) {
           this.map.remove();
           this.map = null;
@@ -1416,7 +1447,7 @@
               <div style="display: flex; gap: 1rem;">
                 <div>
                   <label>Active</label>
-                  <select onchange="this.getRootNode().host.handleFilterChange('active', this.value)">
+                  <select onchange="componentRegistry.get('${this.componentId}').handleFilterChange('active', this.value)">
                     <option value="any" ${this.filters.active === 'any' ? 'selected' : ''}>Any</option>
                     <option value="true" ${this.filters.active === 'true' ? 'selected' : ''}>Yes</option>
                     <option value="false" ${this.filters.active === 'false' ? 'selected' : ''}>No</option>
@@ -1424,7 +1455,7 @@
                 </div>
                 <div>
                   <label>Accessible</label>
-                  <select onchange="this.getRootNode().host.handleFilterChange('accessible', this.value)">
+                  <select onchange="componentRegistry.get('${this.componentId}').handleFilterChange('accessible', this.value)">
                     <option value="any" ${this.filters.accessible === 'any' ? 'selected' : ''}>Any</option>
                     <option value="true" ${this.filters.accessible === 'true' ? 'selected' : ''}>Yes</option>
                     <option value="false" ${this.filters.accessible === 'false' ? 'selected' : ''}>No</option>
@@ -1468,10 +1499,11 @@
 
     customElements.define('loo-map', LooMap);
 
-    // Make services available globally for button handlers
+    // Make services and registry available globally for button handlers
     window.authService = authService;
     window.eventBus = eventBus;
     window.apiService = apiService;
+    window.componentRegistry = componentRegistry;
   </script>
 </body>
 </html>
