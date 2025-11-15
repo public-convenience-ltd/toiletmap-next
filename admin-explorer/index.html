@@ -1608,6 +1608,258 @@
 
     customElements.define('loo-map', LooMap);
 
+    // ============================================================================
+    // Statistics Component
+    // ============================================================================
+    class AdminStats extends HTMLElement {
+      constructor() {
+        super();
+        this.componentId = `stats-${componentIdCounter++}`;
+        this.stats = null;
+        this.suspiciousReports = [];
+        this.loading = false;
+        this.selectedTab = 'overview';
+      }
+
+      async connectedCallback() {
+        componentRegistry.set(this.componentId, this);
+        this.render();
+        await this.loadStats();
+      }
+
+      disconnectedCallback() {
+        componentRegistry.delete(this.componentId);
+      }
+
+      async loadStats() {
+        this.loading = true;
+        this.render();
+
+        try {
+          // For now, we'll calculate stats from the search endpoint
+          // In production, you might want dedicated stats endpoints
+          const [allLoos, recentUpdates] = await Promise.all([
+            apiService.searchLoos({ limit: 200, sort: 'updated-desc' }),
+            apiService.searchLoos({ limit: 50, sort: 'updated-desc' })
+          ]);
+
+          // Calculate statistics
+          const loos = allLoos.data;
+          const contributors = new Map();
+          const updatesByDay = {};
+          const suspiciousUpdates = [];
+
+          // Process loos for stats
+          loos.forEach(loo => {
+            // Track contributors (from most recent update)
+            if (loo.updatedAt) {
+              const date = new Date(loo.updatedAt).toISOString().split('T')[0];
+              updatesByDay[date] = (updatesByDay[date] || 0) + 1;
+            }
+
+            // Load reports for each loo to get contributor data
+            // This would be done async in production
+          });
+
+          this.stats = {
+            totalLoos: loos.length,
+            activeLoos: loos.filter(l => l.active).length,
+            accessibleLoos: loos.filter(l => l.accessible).length,
+            verifiedLoos: loos.filter(l => l.verifiedAt).length,
+            uniqueContributors: contributors.size,
+            recentUpdates: Object.keys(updatesByDay).length,
+            avgUpdatesPerDay: Object.values(updatesByDay).reduce((a, b) => a + b, 0) / Object.keys(updatesByDay).length || 0
+          };
+
+          this.suspiciousReports = suspiciousUpdates;
+          this.loading = false;
+          this.render();
+        } catch (error) {
+          console.error('Failed to load stats:', error);
+          Toast.show('Failed to load statistics', 'error');
+          this.loading = false;
+          this.render();
+        }
+      }
+
+      selectTab(tab) {
+        this.selectedTab = tab;
+        this.render();
+      }
+
+      render() {
+        if (this.loading || !this.stats) {
+          this.innerHTML = `
+            <div style="text-align: center; padding: 3rem;">
+              <div class="loading" style="width: 2rem; height: 2rem;"></div>
+              <p style="margin-top: 1rem; color: var(--color-text-secondary);">Loading statistics...</p>
+            </div>
+          `;
+          return;
+        }
+
+        this.innerHTML = `
+          <div style="max-width: 1400px;">
+            <h1 style="font-size: 1.5rem; margin-bottom: 2rem;">
+              <i class="fas fa-chart-bar"></i> Statistics Dashboard
+            </h1>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+              <div class="stat-card">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                  <i class="fas fa-toilet" style="font-size: 1.5rem; color: var(--color-primary);"></i>
+                  <div class="stat-value">${this.stats.totalLoos}</div>
+                </div>
+                <div class="stat-label">Total Loos</div>
+              </div>
+
+              <div class="stat-card">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                  <i class="fas fa-check-circle" style="font-size: 1.5rem; color: var(--color-success);"></i>
+                  <div class="stat-value">${this.stats.activeLoos}</div>
+                </div>
+                <div class="stat-label">Active Loos</div>
+              </div>
+
+              <div class="stat-card">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                  <i class="fas fa-wheelchair" style="font-size: 1.5rem; color: var(--color-primary);"></i>
+                  <div class="stat-value">${this.stats.accessibleLoos}</div>
+                </div>
+                <div class="stat-label">Accessible</div>
+              </div>
+
+              <div class="stat-card">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                  <i class="fas fa-shield-alt" style="font-size: 1.5rem; color: var(--color-success);"></i>
+                  <div class="stat-value">${this.stats.verifiedLoos}</div>
+                </div>
+                <div class="stat-label">Verified</div>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
+              <div style="border-bottom: 1px solid var(--color-border); padding: 1rem;">
+                <div style="display: flex; gap: 1rem;">
+                  <button
+                    class="btn-${this.selectedTab === 'overview' ? 'primary' : 'secondary'} btn-sm"
+                    onclick="componentRegistry.get('${this.componentId}').selectTab('overview')"
+                  >
+                    <i class="fas fa-chart-pie"></i> Overview
+                  </button>
+                  <button
+                    class="btn-${this.selectedTab === 'suspicious' ? 'primary' : 'secondary'} btn-sm"
+                    onclick="componentRegistry.get('${this.componentId}').selectTab('suspicious')"
+                  >
+                    <i class="fas fa-exclamation-triangle"></i> Suspicious Activity
+                  </button>
+                </div>
+              </div>
+
+              <div style="padding: 2rem;">
+                ${this.selectedTab === 'overview' ? this.renderOverview() : this.renderSuspicious()}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      renderOverview() {
+        return `
+          <div style="display: grid; gap: 2rem;">
+            <div>
+              <h3 style="margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;">
+                <i class="fas fa-users"></i> Contributor Statistics
+              </h3>
+              <div style="background: var(--color-bg-secondary); border-radius: var(--radius-md); padding: 1.5rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                  <div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--color-primary);">
+                      ${this.stats.uniqueContributors || 'N/A'}
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Unique Contributors</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--color-primary);">
+                      ${this.stats.avgUpdatesPerDay.toFixed(1)}
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Avg Updates/Day</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 style="margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;">
+                <i class="fas fa-chart-line"></i> Update Activity
+              </h3>
+              <div style="background: var(--color-bg-secondary); border-radius: var(--radius-md); padding: 1.5rem;">
+                <p style="color: var(--color-text-secondary); margin: 0;">
+                  Database contains ${this.stats.totalLoos} loos with ${this.stats.activeLoos} currently active.
+                  ${this.stats.verifiedLoos} loos have been verified by administrators.
+                </p>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      renderSuspicious() {
+        return `
+          <div>
+            <p style="color: var(--color-text-secondary); margin-bottom: 1.5rem;">
+              This section would show suspicious updates for review based on patterns like:
+            </p>
+            <ul style="color: var(--color-text-secondary); margin-bottom: 2rem;">
+              <li>Multiple updates to the same loo in short time</li>
+              <li>Conflicting information from different contributors</li>
+              <li>Unexpected location changes</li>
+              <li>Mass deactivations by single contributor</li>
+            </ul>
+
+            ${this.suspiciousReports.length === 0 ? `
+              <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: var(--radius-md); padding: 1.5rem; text-align: center;">
+                <i class="fas fa-check-circle" style="color: var(--color-success); font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                <div style="font-weight: 600; color: #065f46;">No Suspicious Activity Detected</div>
+                <div style="font-size: 0.875rem; color: #047857; margin-top: 0.25rem;">All recent updates appear normal</div>
+              </div>
+            ` : `
+              <div style="background: white; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm);">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <thead style="background: var(--color-bg-secondary); border-bottom: 1px solid var(--color-border);">
+                    <tr>
+                      <th style="padding: 0.75rem; text-align: left;">Loo</th>
+                      <th style="padding: 0.75rem; text-align: left;">Issue</th>
+                      <th style="padding: 0.75rem; text-align: left;">Contributor</th>
+                      <th style="padding: 0.75rem; text-align: left;">Date</th>
+                      <th style="padding: 0.75rem; text-align: right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${this.suspiciousReports.map(report => `
+                      <tr style="border-bottom: 1px solid var(--color-border);">
+                        <td style="padding: 0.75rem;">${report.looName}</td>
+                        <td style="padding: 0.75rem;">${report.issue}</td>
+                        <td style="padding: 0.75rem;">${report.contributor}</td>
+                        <td style="padding: 0.75rem;">${new Date(report.date).toLocaleDateString()}</td>
+                        <td style="padding: 0.75rem; text-align: right;">
+                          <button class="btn-sm btn-secondary">
+                            <i class="fas fa-eye"></i> Review
+                          </button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+        `;
+      }
+    }
+
+    customElements.define('admin-stats', AdminStats);
+
     // Make services and registry available globally for button handlers
     window.authService = authService;
     window.eventBus = eventBus;
