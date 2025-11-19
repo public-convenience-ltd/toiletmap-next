@@ -27,7 +27,14 @@ export class ContributorStats extends HTMLElement {
       this.render();
 
       const response = await apiService.get('/admin/api/contributors/leaderboard');
-      this.leaderboard = response;
+      // API returns { topContributors: [...], recentContributors: [...], stats: {...} }
+      // Extract topContributors and map to expected format
+      this.leaderboard = response.topContributors.map(contributor => ({
+        id: contributor.name,
+        name: contributor.name,
+        count: contributor.totalEdits,
+        lastActive: new Date() // API doesn't return this, so use current date
+      }));
       this.error = null;
     } catch (error) {
       console.error('Failed to load contributor leaderboard:', error);
@@ -154,7 +161,8 @@ export class ContributorStats extends HTMLElement {
   }
 
   renderContributorDetails() {
-    const { details, recentActivity } = this.contributorDetails;
+    // API returns ContributorStatsResponse directly
+    const stats = this.contributorDetails;
 
     this.innerHTML = `
       <div style="max-width: 1400px;">
@@ -163,73 +171,76 @@ export class ContributorStats extends HTMLElement {
         </button>
 
         <div style="background: white; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
-          <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">${details.name}</h1>
+          <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">${stats.contributorId}</h1>
           <div style="color: var(--color-text-secondary); margin-bottom: 2rem;">
-            Contributor since ${new Date(details.firstActive).toLocaleDateString()}
+            Contributor since ${new Date(stats.firstEdit).toLocaleDateString()}
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
             <div class="stat-card" style="background: var(--color-bg-secondary);">
-              <div style="font-size: 2rem; font-weight: 700; color: var(--color-primary);">${details.totalEdits}</div>
+              <div style="font-size: 2rem; font-weight: 700; color: var(--color-primary);">${stats.totalEdits}</div>
               <div class="stat-label">Total Edits</div>
             </div>
             <div class="stat-card" style="background: var(--color-bg-secondary);">
-              <div style="font-size: 2rem; font-weight: 700; color: var(--color-success);">${details.createdCount}</div>
+              <div style="font-size: 2rem; font-weight: 700; color: var(--color-success);">${stats.editTypes.creates}</div>
               <div class="stat-label">Loos Created</div>
             </div>
             <div class="stat-card" style="background: var(--color-bg-secondary);">
-              <div style="font-size: 2rem; font-weight: 700; color: var(--color-blue);">${details.updatedCount}</div>
+              <div style="font-size: 2rem; font-weight: 700; color: var(--color-blue);">${stats.editTypes.updates}</div>
               <div class="stat-label">Loos Updated</div>
+            </div>
+            <div class="stat-card" style="background: var(--color-bg-secondary);">
+              <div style="font-size: 2rem; font-weight: 700; color: var(--color-primary);">${stats.looseEdited}</div>
+              <div class="stat-label">Unique Loos Edited</div>
             </div>
           </div>
         </div>
 
-        <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem;">Recent Activity</h2>
-        <div style="background: white; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm);">
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead style="background: var(--color-bg-secondary);">
-              <tr>
-                <th style="padding: 1rem; text-align: left; font-size: var(--text--1); font-weight: 600;">Action</th>
-                <th style="padding: 1rem; text-align: left; font-size: var(--text--1); font-weight: 600;">Loo</th>
-                <th style="padding: 1rem; text-align: left; font-size: var(--text--1); font-weight: 600;">Date</th>
-                <th style="padding: 1rem; text-align: left; font-size: var(--text--1); font-weight: 600;">View</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${recentActivity.map(activity => `
-                <tr style="border-top: 1px solid var(--color-border);">
-                  <td style="padding: 1rem;">
-                    <span style="
-                      display: inline-block;
-                      padding: 0.25rem 0.5rem;
-                      border-radius: var(--radius-sm);
-                      font-size: var(--text--1);
-                      font-weight: 600;
-                      background: ${activity.type === 'create' ? 'var(--color-success)' : 'var(--color-blue)'};
-                      color: white;
-                    ">
-                      ${activity.type === 'create' ? 'Created' : 'Updated'}
-                    </span>
-                  </td>
-                  <td style="padding: 1rem;">
-                    <div style="font-weight: 600;">${activity.looName || 'Unnamed'}</div>
-                    <div style="font-size: var(--text--1); color: var(--color-text-secondary);">${activity.looId}</div>
-                  </td>
-                  <td style="padding: 1rem;">
-                    <div style="font-size: var(--text--1); color: var(--color-text-secondary);">
-                      ${new Date(activity.timestamp).toLocaleString()}
-                    </div>
-                  </td>
-                  <td style="padding: 1rem;">
-                    <button class="btn-sm btn-secondary" onclick="import('/admin/utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${activity.looId.replace(/'/g, "\\'")}' }))">
-                      <i class="fas fa-eye"></i> View
-                    </button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+        <div style="background: white; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
+          <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem;">Recent Activity</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+            <div class="stat-card" style="background: var(--color-bg-secondary);">
+              <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-primary);">${stats.recentActivity.last7Days}</div>
+              <div class="stat-label">Edits (Last 7 Days)</div>
+            </div>
+            <div class="stat-card" style="background: var(--color-bg-secondary);">
+              <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-blue);">${stats.recentActivity.last30Days}</div>
+              <div class="stat-label">Edits (Last 30 Days)</div>
+            </div>
+          </div>
         </div>
+
+        ${stats.topFields && stats.topFields.length > 0 ? `
+          <div style="background: white; border-radius: var(--radius-lg); padding: 2rem; box-shadow: var(--shadow-sm);">
+            <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem;">Most Edited Fields</h2>
+            <div style="background: white; border-radius: var(--radius-md); border: 2px solid var(--color-border); overflow: hidden;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: var(--color-bg-secondary);">
+                  <tr>
+                    <th style="padding: 1rem; text-align: left; font-size: var(--text--1); font-weight: 600;">Field</th>
+                    <th style="padding: 1rem; text-align: left; font-size: var(--text--1); font-weight: 600;">Edit Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${stats.topFields.map(field => `
+                    <tr style="border-top: 1px solid var(--color-border);">
+                      <td style="padding: 1rem;">
+                        <code style="background: var(--color-bg-secondary); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: var(--text--1);">
+                          ${field.field}
+                        </code>
+                      </td>
+                      <td style="padding: 1rem;">
+                        <span style="background: var(--color-primary); color: white; padding: 0.25rem 0.5rem; border-radius: var(--radius-full); font-size: var(--text--1); font-weight: 600;">
+                          ${field.count} edits
+                        </span>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
   }
