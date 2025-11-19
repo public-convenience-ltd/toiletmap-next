@@ -1,0 +1,510 @@
+:root {
+  /* Toilet Map Design Tokens */
+  --color-blue: #0a165e;
+  --color-turquoise: #92f9db;
+  --color-pink: #ed3d62;
+  --color-ice: #d2fff2;
+  --color-white: #fff;
+  --color-light-grey: #f4f4f4;
+  --color-grey: #807f7f;
+
+  /* Aliases for consistency */
+  --color-primary: var(--color-blue);
+  --color-primary-dark: #070f3d;
+  --color-success: var(--color-turquoise);
+  --color-danger: var(--color-pink);
+  --color-warning: var(--color-pink);
+  --color-bg: var(--color-white);
+  --color-bg-secondary: var(--color-light-grey);
+  --color-border: #e0e0e0;
+  --color-text: var(--color-blue);
+  --color-text-secondary: var(--color-grey);
+
+  /* Utopia Fluid Space Scale */
+  --space-3xs: clamp(0.25rem, calc(0.23rem + 0.11vw), 0.31rem);
+  --space-2xs: clamp(0.5rem, calc(0.48rem + 0.11vw), 0.56rem);
+  --space-xs: clamp(0.75rem, calc(0.71rem + 0.22vw), 0.88rem);
+  --space-s: clamp(1rem, calc(0.96rem + 0.22vw), 1.13rem);
+  --space-m: clamp(1.5rem, calc(1.43rem + 0.33vw), 1.69rem);
+  --space-l: clamp(2rem, calc(1.91rem + 0.43vw), 2.25rem);
+  --space-xl: clamp(3rem, calc(2.87rem + 0.65vw), 3.38rem);
+  --space-2xl: clamp(4rem, calc(3.83rem + 0.87vw), 4.5rem);
+  --space-3xl: clamp(6rem, calc(5.74rem + 1.3vw), 6.75rem);
+
+  /* Utopia Fluid Text Scale */
+  --text--2: clamp(0.69rem, calc(0.69rem + 0.04vw), 0.72rem);
+  --text--1: clamp(0.83rem, calc(0.81rem + 0.12vw), 0.9rem);
+  --text-0: clamp(1rem, calc(0.96rem + 0.22vw), 1.13rem);
+  --text-1: clamp(1.2rem, calc(1.13rem + 0.36vw), 1.41rem);
+  --text-2: clamp(1.44rem, calc(1.33rem + 0.55vw), 1.76rem);
+  --text-3: clamp(1.73rem, calc(1.56rem + 0.82vw), 2.2rem);
+  --text-4: clamp(2.07rem, calc(1.84rem + 1.17vw), 2.75rem);
+  --text-5: clamp(2.49rem, calc(2.16rem + 1.64vw), 3.43rem);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-full: 9999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+  font-size: var(--text-0);
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg-secondary);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: 600;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: var(--space-2xs) var(--space-s);
+  font-size: var(--text-0);
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-turquoise);
+  color: var(--color-blue);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-blue);
+  color: var(--color-turquoise);
+}
+
+.btn-secondary {
+  background: var(--color-white);
+  color: var(--color-blue);
+  border: 2px solid var(--color-blue);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-blue);
+  color: var(--color-white);
+}
+
+.btn-danger {
+  background: var(--color-pink);
+  color: var(--color-white);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-blue);
+  color: var(--color-pink);
+}
+
+.btn-sm {
+  padding: var(--space-3xs) var(--space-xs);
+  font-size: var(--text--1);
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: var(--text-0);
+  padding: var(--space-xs);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: white;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-blue);
+  box-shadow: 0 0 0 3px rgba(146, 249, 219, 0.2);
+}
+
+label {
+  display: block;
+  font-size: var(--text-0);
+  font-weight: 600;
+  margin-bottom: var(--space-2xs);
+  color: var(--color-text);
+}
+
+.loading {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.hidden {
+  display: none !important;
+}
+
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border-left: 4px solid var(--color-primary);
+  max-width: 400px;
+  animation: slideIn 0.3s ease;
+  z-index: 10000;
+}
+
+.toast.success {
+  border-left-color: var(--color-success);
+}
+
+.toast.error {
+  border-left-color: var(--color-danger);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+  }
+
+  table {
+    font-size: 0.75rem;
+  }
+
+  th, td {
+    padding: 0.5rem !important;
+  }
+}
+
+/* Toggle Switch - Toilet Map Design System */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-grey);
+  transition: all 0.3s ease;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-grey);
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--color-white);
+  transition: all 0.3s ease;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.switch input:checked + .switch-slider {
+  background-color: var(--color-turquoise);
+  border-color: var(--color-turquoise);
+}
+
+.switch input:checked + .switch-slider:before {
+  transform: translateX(24px);
+}
+
+.switch input:disabled + .switch-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.switch input:focus + .switch-slider {
+  box-shadow: 0 0 0 3px rgba(146, 249, 219, 0.3);
+}
+
+/* Tri-State Toggle - Accessible Yes/No/Unknown Control */
+.tri-state {
+  display: inline-flex;
+  background: white;
+  border-radius: var(--radius-full);
+  padding: 4px;
+  gap: 4px;
+  position: relative;
+  border: 2px solid var(--color-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tri-state input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.tri-state label {
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: var(--text--1);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 2px solid transparent;
+  white-space: nowrap;
+  min-width: 75px;
+  text-align: center;
+  margin: 0;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.tri-state label:hover {
+  background: var(--color-bg-secondary);
+}
+
+.tri-state input[type="radio"]:checked + label {
+  font-weight: 700;
+  color: var(--color-blue);
+  border: 2px solid currentColor;
+}
+
+.tri-state input[type="radio"]:focus + label {
+  box-shadow: 0 0 0 3px rgba(146, 249, 219, 0.3);
+  outline: none;
+}
+
+.tri-state input[type="radio"][value="true"]:checked + label {
+  background: var(--color-success);
+  color: var(--color-blue);
+  border-color: var(--color-blue);
+}
+
+.tri-state input[type="radio"][value="false"]:checked + label {
+  background: var(--color-danger);
+  color: white;
+  border-color: #b91c1c;
+}
+
+.tri-state input[type="radio"][value="null"]:checked + label {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: var(--color-blue);
+  border-color: var(--color-blue);
+  border-style: dashed;
+  font-style: italic;
+}
+
+/* Changes Summary */
+#changes-summary {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Map Picker */
+.map-picker {
+  position: relative;
+  height: 400px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+}
+
+.map-picker-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1000;
+  color: var(--color-danger);
+  font-size: 2rem;
+  filter: drop-shadow(0 0 2px white) drop-shadow(0 0 4px rgba(0,0,0,0.5));
+}
+
+.map-picker-info {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  font-size: var(--text--1);
+  font-weight: 500;
+  color: var(--color-text);
+  max-width: 90%;
+  text-align: center;
+}
+
+.map-picker-coords {
+  display: flex;
+  gap: var(--space-s);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.map-picker-coords code {
+  background: var(--color-bg-secondary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+}
+
+/* Form Grid */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-m);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.form-section {
+  margin-bottom: var(--space-m);
+}
+
+.form-section h3 {
+  margin-bottom: var(--space-s);
+  font-size: var(--text-1);
+  color: var(--color-blue);
+  font-weight: 700;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-s);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xs);
+}
+
+.form-row label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+/* Form Validation */
+.form-error {
+  color: var(--color-danger);
+  font-size: var(--text--1);
+  margin-top: var(--space-3xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
+}
+
+.form-group.has-error input,
+.form-group.has-error textarea,
+.form-group.has-error select {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.form-group.has-error input:focus,
+.form-group.has-error textarea:focus,
+.form-group.has-error select:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+/* Stats Cards */
+.stat-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.25rem;
+}
