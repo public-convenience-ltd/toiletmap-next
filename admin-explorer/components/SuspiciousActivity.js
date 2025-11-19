@@ -165,7 +165,7 @@ export class SuspiciousActivity extends HTMLElement {
                           </div>
                         </td>
                         <td style="padding: 1rem;">
-                          <button class="btn-sm btn-secondary" onclick="import('../utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${item.looId}' }))">
+                          <button class="btn-sm btn-secondary" onclick="import('/admin/utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${item.looId}' }))">
                             <i class="fas fa-eye"></i> View
                           </button>
                         </td>
@@ -217,7 +217,7 @@ export class SuspiciousActivity extends HTMLElement {
                           </div>
                         </td>
                         <td style="padding: 1rem;">
-                          <button class="btn-sm btn-secondary" onclick="import('../utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${item.looId}' }))">
+                          <button class="btn-sm btn-secondary" onclick="import('/admin/utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${item.looId}' }))">
                             <i class="fas fa-eye"></i> View
                           </button>
                         </td>
@@ -262,7 +262,7 @@ export class SuspiciousActivity extends HTMLElement {
                           <div style="font-size: var(--text--1);">${new Date(item.timestamp).toLocaleString()}</div>
                         </td>
                         <td style="padding: 1rem;">
-                          <button class="btn-sm btn-secondary" onclick="import('../utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${item.looId}' }))">
+                          <button class="btn-sm btn-secondary" onclick="import('/admin/utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${item.looId}' }))">
                             <i class="fas fa-eye"></i> View
                           </button>
                         </td>
