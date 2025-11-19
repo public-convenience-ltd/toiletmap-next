@@ -1,5 +1,5 @@
-import { test, expect } from '../fixtures/auth';
-import { isAuthenticated } from '../helpers/ui-helpers';
+import { test, expect } from './fixtures/auth';
+import { isAuthenticated } from './helpers/ui-helpers';
 
 test.describe('Authentication', () => {
   test('should successfully authenticate with valid credentials', async ({ authenticatedPage }) => {

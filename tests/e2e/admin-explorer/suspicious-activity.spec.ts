@@ -1,5 +1,5 @@
-import { test, expect } from '../fixtures/auth';
-import { navigateToView } from '../helpers/ui-helpers';
+import { test, expect } from './fixtures/auth';
+import { navigateToView } from './helpers/ui-helpers';
 
 test.describe('Suspicious Activity View', () => {
   test.beforeEach(async ({ authenticatedPage }) => {

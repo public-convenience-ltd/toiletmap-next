@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth';
+import { test, expect } from './fixtures/auth';
 import {
   clickAddNewLoo,
   submitLooForm,
@@ -7,7 +7,7 @@ import {
   setMapLocation,
   expectValidationError,
   expectNoValidationErrors,
-} from '../helpers/ui-helpers';
+} from './helpers/ui-helpers';
 
 test.describe('Loo Editor - Validation', () => {
   test.beforeEach(async ({ authenticatedPage }) => {

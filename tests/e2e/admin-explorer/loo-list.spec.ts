@@ -1,5 +1,5 @@
-import { test, expect } from '../fixtures/auth';
-import { navigateToView, searchLoo, applyFilters, clickEditLoo, waitForView } from '../helpers/ui-helpers';
+import { test, expect } from './fixtures/auth';
+import { navigateToView, searchLoo, applyFilters, clickEditLoo, waitForView } from './helpers/ui-helpers';
 
 test.describe('Loo List View', () => {
   test.beforeEach(async ({ authenticatedPage }) => {

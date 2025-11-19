@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth';
+import { test, expect } from './fixtures/auth';
 import {
   clickAddNewLoo,
   submitLooForm,
@@ -10,7 +10,7 @@ import {
   clickBackToList,
   expectValidationError,
   expectNoValidationErrors,
-} from '../helpers/ui-helpers';
+} from './helpers/ui-helpers';
 import {
   generateValidLoo,
   generateLooWithOpeningHours,
@@ -18,7 +18,7 @@ import {
   generateLooWithSpecialChars,
   generateLooAtDateLine,
   generateLooAtNorthPole,
-} from '../fixtures/test-data';
+} from './fixtures/test-data';
 
 test.describe('Loo Editor - Create New Loo', () => {
   test.beforeEach(async ({ authenticatedPage }) => {

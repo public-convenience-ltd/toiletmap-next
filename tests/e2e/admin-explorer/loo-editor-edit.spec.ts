@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth';
+import { test, expect } from './fixtures/auth';
 import {
   navigateToView,
   clickEditLoo,
@@ -9,7 +9,7 @@ import {
   waitForToast,
   clickBackToList,
   waitForView,
-} from '../helpers/ui-helpers';
+} from './helpers/ui-helpers';
 
 test.describe('Loo Editor - Edit Existing Loo', () => {
   test.beforeEach(async ({ authenticatedPage }) => {

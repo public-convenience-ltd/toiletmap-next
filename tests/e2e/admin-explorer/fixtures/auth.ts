@@ -26,18 +26,19 @@ export interface AdminExplorerFixtures {
 async function getAuth0Token(): Promise<AuthState> {
   const auth0Domain = process.env.AUTH0_ISSUER_BASE_URL?.replace(/\/$/, '');
   const audience = process.env.AUTH0_AUDIENCE;
-  const clientId = process.env.AUTH0_DATA_EXPLORER_CLIENT_ID;
+  const clientId = process.env.PLAYWRIGHT_AUTH0_CLIENT_ID;
+  const clientSecret = process.env.PLAYWRIGHT_AUTH0_CLIENT_SECRET;
   const username = process.env.PLAYWRIGHT_AUTH0_USERNAME;
   const password = process.env.PLAYWRIGHT_AUTH0_PASSWORD;
 
-  if (!auth0Domain || !audience || !clientId || !username || !password) {
+  if (!auth0Domain || !audience || !clientId || !clientSecret || !username || !password) {
     throw new Error(
-      'Missing required Auth0 environment variables. Please ensure PLAYWRIGHT_AUTH0_USERNAME and PLAYWRIGHT_AUTH0_PASSWORD are set in .env'
+      'Missing required Auth0 environment variables. Please ensure PLAYWRIGHT_AUTH0_CLIENT_ID, PLAYWRIGHT_AUTH0_CLIENT_SECRET, PLAYWRIGHT_AUTH0_USERNAME, and PLAYWRIGHT_AUTH0_PASSWORD are set in .env'
     );
   }
 
   try {
-    // Try programmatic authentication using Resource Owner Password Grant
+    // Use Resource Owner Password Grant with client credentials
     const response = await fetch(`${auth0Domain}/oauth/token`, {
       method: 'POST',
       headers: {
@@ -47,9 +48,10 @@ async function getAuth0Token(): Promise<AuthState> {
         grant_type: 'password',
         username,
         password,
-        audience,
         client_id: clientId,
-        scope: 'openid profile email offline_access',
+        client_secret: clientSecret,
+        audience,
+        scope: 'openid profile email offline_access roles access:admin',
       }),
     });
 
@@ -75,7 +77,7 @@ async function getAuth0Token(): Promise<AuthState> {
     };
   } catch (error) {
     throw new Error(
-      `Failed to obtain Auth0 token programmatically. ` +
+      `Failed to obtain Auth0 token using password grant. ` +
       `This may mean Resource Owner Password Grant is not enabled on your Auth0 tenant. ` +
       `Error: ${error instanceof Error ? error.message : String(error)}`
     );

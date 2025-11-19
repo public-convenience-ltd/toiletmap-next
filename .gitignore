@@ -5,3 +5,5 @@ dist
 .env.test
 .env.test.local
 prisma/src/generated
+test-results
+playwright-report

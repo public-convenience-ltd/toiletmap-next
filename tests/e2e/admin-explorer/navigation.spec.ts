@@ -1,5 +1,5 @@
-import { test, expect } from '../fixtures/auth';
-import { navigateToView, waitForView } from '../helpers/ui-helpers';
+import { test, expect } from './fixtures/auth';
+import { navigateToView, waitForView } from './helpers/ui-helpers';
 
 test.describe('Navigation and Routing', () => {
   test('should navigate to all main views from sidebar', async ({ authenticatedPage }) => {

@@ -1,5 +1,5 @@
-import { test, expect } from '../fixtures/auth';
-import { clickAddNewLoo, submitLooForm, waitForToast } from '../helpers/ui-helpers';
+import { test, expect } from './fixtures/auth';
+import { clickAddNewLoo, submitLooForm, waitForToast } from './helpers/ui-helpers';
 
 test.describe('Error Handling and Edge Cases', () => {
   test('should handle API errors gracefully when creating loo', async ({ authenticatedPage }) => {
