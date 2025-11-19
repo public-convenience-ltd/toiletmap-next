@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Hono } from 'hono';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { validate } from '../../common/validator';
 import { mapDataSchema, suspiciousActivitySchema } from './schemas';
 import type { AppVariables } from '../../types';
@@ -138,4 +139,12 @@ adminRouter.get('/api/contributors/:contributorId', requireAuth, requireAdminRol
 
 // UI routes (no auth required for the HTML page itself, auth handled by frontend)
 adminRouter.get('/', (c) => c.html(adminPageHtml));
+
+// Serve static files from admin-explorer
+adminRouter.use('/*', serveStatic({
+  root: './admin-explorer',
+  rewriteRequestPath: (path) => path.replace(/^\/admin/, ''),
+}));
+
+// Fallback for SPA routing (if needed, though currently we mostly rely on hash routing or simple navigation)
 adminRouter.get('/*', (c) => c.html(adminPageHtml));

@@ -137,9 +137,12 @@ export class ContributorStats extends HTMLElement {
                     </div>
                   </td>
                   <td style="padding: 1rem;">
-                    <button class="btn-sm btn-secondary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').viewContributor('${contributor.id}'))">
-                      <i class="fas fa-eye"></i> View Details
-                    </button>
+                    <button
+                    class="btn-secondary btn-sm"
+                    onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').viewContributor('${contributor.id.replace(/'/g, "\\'") }'))"
+                  >
+                    View Details
+                  </button>
                   </td>
                 </tr>
               `).join('')}
@@ -155,7 +158,7 @@ export class ContributorStats extends HTMLElement {
 
     this.innerHTML = `
       <div style="max-width: 1400px;">
-        <button class="btn-secondary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').backToLeaderboard())" style="margin-bottom: 2rem;">
+        <button class="btn-secondary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').backToLeaderboard())" style="margin-bottom: 2rem;">
           <i class="fas fa-arrow-left"></i> Back to Leaderboard
         </button>
 
@@ -218,7 +221,7 @@ export class ContributorStats extends HTMLElement {
                     </div>
                   </td>
                   <td style="padding: 1rem;">
-                    <button class="btn-sm btn-secondary" onclick="import('../utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${activity.looId}' }))">
+                    <button class="btn-sm btn-secondary" onclick="import('/admin/utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${activity.looId.replace(/'/g, "\\'")}' }))">
                       <i class="fas fa-eye"></i> View
                     </button>
                   </td>

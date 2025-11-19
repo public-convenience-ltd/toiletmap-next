@@ -108,13 +108,13 @@ export class LooList extends HTMLElement {
       <div style="max-width: 1200px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
           <h1 style="font-size: 1.5rem;">Loos (${this.total})</h1>
-          <button class="btn-primary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').viewLoo(null))">
+          <button class="btn-primary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').viewLoo(null))">
             Add New Loo
           </button>
         </div>
 
         <div style="background: white; border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
-          <form onsubmit="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleSearch(event)); return false;">
+          <form onsubmit="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleSearch(event)); return false;">
             <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
               <input
                 type="text"
@@ -128,7 +128,7 @@ export class LooList extends HTMLElement {
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
               <div>
                 <label>Active</label>
-                <select onchange="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('active', this.value))">
+                <select onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('active', this.value))">
                   <option value="any" ${this.filters.active === 'any' ? 'selected' : ''}>Any</option>
                   <option value="true" ${this.filters.active === 'true' ? 'selected' : ''}>Yes</option>
                   <option value="false" ${this.filters.active === 'false' ? 'selected' : ''}>No</option>
@@ -136,7 +136,7 @@ export class LooList extends HTMLElement {
               </div>
               <div>
                 <label>Accessible</label>
-                <select onchange="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('accessible', this.value))">
+                <select onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('accessible', this.value))">
                   <option value="any" ${this.filters.accessible === 'any' ? 'selected' : ''}>Any</option>
                   <option value="true" ${this.filters.accessible === 'true' ? 'selected' : ''}>Yes</option>
                   <option value="false" ${this.filters.accessible === 'false' ? 'selected' : ''}>No</option>
@@ -144,7 +144,7 @@ export class LooList extends HTMLElement {
               </div>
               <div>
                 <label>Verified</label>
-                <select onchange="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('verified', this.value))">
+                <select onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('verified', this.value))">
                   <option value="any" ${this.filters.verified === 'any' ? 'selected' : ''}>Any</option>
                   <option value="true" ${this.filters.verified === 'true' ? 'selected' : ''}>Yes</option>
                   <option value="false" ${this.filters.verified === 'false' ? 'selected' : ''}>No</option>
@@ -208,14 +208,14 @@ export class LooList extends HTMLElement {
                       <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                         <button
                           class="btn-sm btn-secondary"
-                          onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').viewLoo('${loo.id}'))"
+                          onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').viewLoo('${loo.id}'))"
                           title="View details"
                         >
                           <i class="fas fa-edit"></i> Edit
                         </button>
                         <button
                           class="btn-sm ${loo.active ? 'btn-danger' : 'btn-primary'}"
-                          onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').toggleActive('${loo.id}', ${loo.active}))"
+                          onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').toggleActive('${loo.id}', ${loo.active}))"
                           title="${loo.active ? 'Deactivate' : 'Activate'}"
                         >
                           <i class="fas fa-${loo.active ? 'ban' : 'check'}"></i> ${loo.active ? 'Deactivate' : 'Activate'}
@@ -232,7 +232,7 @@ export class LooList extends HTMLElement {
             <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
               <button
                 class="btn-secondary btn-sm"
-                onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').changePage(${this.page - 1}))"
+                onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').changePage(${this.page - 1}))"
                 ${this.page === 1 ? 'disabled' : ''}
               >
                 Previous
@@ -242,7 +242,7 @@ export class LooList extends HTMLElement {
               </span>
               <button
                 class="btn-secondary btn-sm"
-                onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').changePage(${this.page + 1}))"
+                onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').changePage(${this.page + 1}))"
                 ${this.page === totalPages ? 'disabled' : ''}
               >
                 Next

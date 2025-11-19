@@ -28,27 +28,27 @@ export class AdminSidebar extends HTMLElement {
           <i class="fas fa-toilet"></i> Admin Panel
         </h2>
         <nav style="display: flex; flex-direction: column; gap: var(--space-xs); flex: 1;">
-          <button class="btn-secondary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('list'))" style="justify-content: flex-start; text-align: left;">
+          <button class="btn-secondary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('list'))" style="justify-content: flex-start; text-align: left;">
             <i class="fas fa-list" style="width: 1.25rem;"></i> Loo List
           </button>
-          <button class="btn-secondary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('map'))" style="justify-content: flex-start; text-align: left;">
+          <button class="btn-secondary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('map'))" style="justify-content: flex-start; text-align: left;">
             <i class="fas fa-map-marked-alt" style="width: 1.25rem;"></i> Map View
           </button>
-          <button class="btn-secondary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('stats'))" style="justify-content: flex-start; text-align: left;">
+          <button class="btn-secondary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('stats'))" style="justify-content: flex-start; text-align: left;">
             <i class="fas fa-chart-bar" style="width: 1.25rem;"></i> Statistics
           </button>
-          <button class="btn-secondary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('suspicious'))" style="justify-content: flex-start; text-align: left;">
+          <button class="btn-secondary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('suspicious'))" style="justify-content: flex-start; text-align: left;">
             <i class="fas fa-shield-alt" style="width: 1.25rem;"></i> Suspicious Activity
           </button>
-          <button class="btn-secondary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('contributors')" style="justify-content: flex-start; text-align: left;">
+          <button class="btn-secondary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('contributors'))" style="justify-content: flex-start; text-align: left;">
             <i class="fas fa-users" style="width: 1.25rem;"></i> Contributors
           </button>
-          <button class="btn-primary" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('edit'))" style="justify-content: flex-start; text-align: left; margin-top: var(--space-s);">
+          <button class="btn-primary" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').navigate('edit'))" style="justify-content: flex-start; text-align: left; margin-top: var(--space-s);">
             <i class="fas fa-plus-circle" style="width: 1.25rem;"></i> Add New Loo
           </button>
         </nav>
         <div style="padding-top: var(--space-m); border-top: 2px solid var(--color-border);">
-          <button class="btn-secondary" onclick="import('../services/AuthService.js').then(m => m.authService.logout())" style="width: 100%;">
+          <button class="btn-secondary" onclick="import('/admin/services/AuthService.js').then(m => m.authService.logout())" style="width: 100%;">
             <i class="fas fa-sign-out-alt" style="width: 1.25rem;"></i> Sign Out
           </button>
         </div>

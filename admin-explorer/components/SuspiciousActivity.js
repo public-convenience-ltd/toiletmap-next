@@ -87,7 +87,7 @@ export class SuspiciousActivity extends HTMLElement {
           </h1>
           <div style="display: flex; gap: var(--space-s); align-items: center;">
             <label style="color: var(--color-text-secondary); font-size: var(--text--1);">Time Window:</label>
-            <select onchange="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').setTimeWindow(parseInt(this.value)))"
+            <select onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').setTimeWindow(parseInt(this.value)))"
                     style="padding: var(--space-2xs) var(--space-xs); border-radius: var(--radius-md); border: 2px solid var(--color-border);">
               <option value="6" ${this.hoursWindow === 6 ? 'selected' : ''}>Last 6 hours</option>
               <option value="12" ${this.hoursWindow === 12 ? 'selected' : ''}>Last 12 hours</option>
@@ -95,7 +95,7 @@ export class SuspiciousActivity extends HTMLElement {
               <option value="48" ${this.hoursWindow === 48 ? 'selected' : ''}>Last 48 hours</option>
               <option value="168" ${this.hoursWindow === 168 ? 'selected' : ''}>Last 7 days</option>
             </select>
-            <button class="btn-secondary btn-sm" onclick="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').loadData())">
+            <button class="btn-secondary btn-sm" onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').loadData())">
               <i class="fas fa-sync"></i> Refresh
             </button>
           </div>

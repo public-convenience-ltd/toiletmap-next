@@ -93,6 +93,8 @@ export class AuthService {
     this.user = null;
     localStorage.removeItem('auth_token');
     eventBus.emit('auth-changed', { authenticated: false });
+    // Redirect to login instead of just emitting event
+    this.login();
   }
 
   isAuthenticated() {

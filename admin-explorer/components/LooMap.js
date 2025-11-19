@@ -157,7 +157,7 @@ export class LooMap extends HTMLElement {
               ${loo.noPayment ? '💚' : ''}
             </div>
             <button
-              onclick="import('../utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${loo.id}' }))"
+              onclick="import('/admin/utils/EventBus.js').then(m => m.eventBus.emit('view-changed', { view: 'edit', looId: '${loo.id}' }))"
               style="
                 width: 100%;
                 padding: 0.5rem;
@@ -200,7 +200,7 @@ export class LooMap extends HTMLElement {
           <div style="display: flex; gap: 1rem;">
             <div>
               <label>Active</label>
-              <select onchange="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('active', this.value))">
+              <select onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('active', this.value))">
                 <option value="any" ${this.filters.active === 'any' ? 'selected' : ''}>Any</option>
                 <option value="true" ${this.filters.active === 'true' ? 'selected' : ''}>Yes</option>
                 <option value="false" ${this.filters.active === 'false' ? 'selected' : ''}>No</option>
@@ -208,7 +208,7 @@ export class LooMap extends HTMLElement {
             </div>
             <div>
               <label>Accessible</label>
-              <select onchange="import('../utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('accessible', this.value))">
+              <select onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleFilterChange('accessible', this.value))">
                 <option value="any" ${this.filters.accessible === 'any' ? 'selected' : ''}>Any</option>
                 <option value="true" ${this.filters.accessible === 'true' ? 'selected' : ''}>Yes</option>
                 <option value="false" ${this.filters.accessible === 'false' ? 'selected' : ''}>No</option>
