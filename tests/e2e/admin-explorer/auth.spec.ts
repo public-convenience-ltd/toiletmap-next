@@ -75,8 +75,8 @@ test.describe('Authentication', () => {
     
     // Verify can access different views
     const views = [
-      { button: 'Map', component: 'loo-map' },
-      { button: 'Stats', component: 'admin-stats' },
+      { button: 'Map View', component: 'loo-map' },
+      { button: 'Statistics', component: 'admin-stats' },
       { button: 'Suspicious Activity', component: 'suspicious-activity' },
       { button: 'Contributors', component: 'contributor-stats' },
       { button: 'Loo List', component: 'loo-list' },

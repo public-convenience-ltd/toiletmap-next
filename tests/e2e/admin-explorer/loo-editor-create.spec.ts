@@ -69,7 +69,7 @@ test.describe('Loo Editor - Create New Loo', () => {
     
     // Fill in basic info
     await page.fill('input[name="name"]', loo.name);
-    await page.fill('input[name="notes"]', loo.notes!);
+    await page.fill('textarea[name="notes"]', loo.notes!);
     
     // Set location
     await setMapLocation(page, loo.location!.lat, loo.location!.lng);
@@ -174,7 +174,7 @@ test.describe('Loo Editor - Create New Loo', () => {
     const loo = generateLooWithSpecialChars();
     
     await page.fill('input[name="name"]', loo.name);
-    await page.fill('input[name="notes"]', loo.notes!);
+    await page.fill('textarea[name="notes"]', loo.notes!);
     
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');

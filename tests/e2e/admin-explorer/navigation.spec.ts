@@ -8,8 +8,8 @@ test.describe('Navigation and Routing', () => {
     // Test navigation to each view
     const views = [
       { name: 'Loo List', button: 'Loo List', component: 'loo-list' },
-      { name: 'Map', button: 'Map', component: 'loo-map' },
-      { name: 'Stats', button: 'Stats', component: 'admin-stats' },
+      { name: 'Map', button: 'Map View', component: 'loo-map' },
+      { name: 'Stats', button: 'Statistics', component: 'admin-stats' },
       { name: 'Suspicious Activity', button: 'Suspicious Activity', component: 'suspicious-activity' },
       { name: 'Contributors', button: 'Contributors', component: 'contributor-stats' },
     ];
@@ -27,7 +27,7 @@ test.describe('Navigation and Routing', () => {
     const page = authenticatedPage;
     
     // Go to map view
-    await page.click('button:has-text("Map")');
+    await page.click('button:has-text("Map View")');
     await waitForView(page, 'loo-map');
     
     // Navigate back to list
@@ -40,7 +40,7 @@ test.describe('Navigation and Routing', () => {
     const sidebar = page.locator('admin-sidebar');
     
     // Sidebar should be visible on all views
-    const views = ['Map', 'Stats', 'Suspicious Activity', 'Contributors', 'Loo List'];
+    const views = ['Map View', 'Statistics', 'Suspicious Activity', 'Contributors', 'Loo List'];
     
     for (const view of views) {
       await page.click(`button:has-text("${view}")`);
@@ -82,10 +82,10 @@ test.describe('Navigation and Routing', () => {
     const page = authenticatedPage;
     
     // Navigate through views
-    await page.click('button:has-text("Map")');
+    await page.click('button:has-text("Map View")');
     await waitForView(page, 'loo-map');
     
-    await page.click('button:has-text("Stats")');
+    await page.click('button:has-text("Statistics")');
     await waitForView(page, 'admin-stats');
     
     // Use browser back button
@@ -100,10 +100,10 @@ test.describe('Navigation and Routing', () => {
     const page = authenticatedPage;
     
     // Navigate through views
-    await page.click('button:has-text("Map")');
+    await page.click('button:has-text("Map View")');
     await waitForView(page, 'loo-map');
     
-    await page.click('button:has-text("Stats")');
+    await page.click('button:has-text("Statistics")');
     await waitForView(page, 'admin-stats');
     
     // Go back twice

@@ -10,8 +10,8 @@ import { Page, expect } from '@playwright/test';
 export async function navigateToView(page: Page, view: 'list' | 'map' | 'stats' | 'suspicious' | 'contributors'): Promise<void> {
   const buttonSelectors = {
     list: 'button:has-text("Loo List")',
-    map: 'button:has-text("Map")',
-    stats: 'button:has-text("Stats")',
+    map: 'button:has-text("Map View")',
+    stats: 'button:has-text("Statistics")',
     suspicious: 'button:has-text("Suspicious Activity")',
     contributors: 'button:has-text("Contributors")',
   };
@@ -65,12 +65,20 @@ export async function setDayClosed(
  * Set map location by entering coordinates
  */
 export async function setMapLocation(page: Page, lat: number, lng: number): Promise<void> {
-  await page.fill('input[name="lat"]', lat.toString());
-  await page.fill('input[name="lng"]', lng.toString());
+  // The lat/lng inputs are readonly, so we need to move the map instead
+  // Execute JavaScript to pan the Leaflet map to the desired coordinates
+  await page.evaluate(([lat, lng]) => {
+    const mapContainer = document.querySelector('#location-map-picker') as any;
+    if (mapContainer && mapContainer._leaflet_id) {
+      // Get the Leaflet map instance
+      const map = (window as any).L.Map._instances[mapContainer._leaflet_id];
+      if (map) {
+        map.setView([lat, lng], map.getZoom());
+      }
+    }
+  }, [lat, lng]);
   
-  // Trigger map update by focusing and blurring
-  await page.locator('input[name="lat"]').blur();
-  await page.waitForTimeout(500); // Wait for map to update
+  await page.waitForTimeout(500); // Wait for map to update and trigger moveend event
 }
 
 /**

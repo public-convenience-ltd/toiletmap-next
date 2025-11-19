@@ -39,7 +39,7 @@ test.describe('Error Handling and Edge Cases', () => {
     });
     
     // Try to navigate to stats view
-    await page.click('button:has-text("Stats")');
+    await page.click('button:has-text("Statistics")');
     await page.waitForTimeout(1000);
     
     // Component should still render even if API fails
@@ -77,7 +77,7 @@ test.describe('Error Handling and Edge Cases', () => {
       });
     });
     
-    await page.click('button:has-text("Stats")');
+    await page.click('button:has-text("Statistics")');
     await page.waitForTimeout(1000);
     
     // Should not crash the application
@@ -113,7 +113,7 @@ test.describe('Error Handling and Edge Cases', () => {
       route.continue();
     });
     
-    await page.click('button:has-text("Map")');
+    await page.click('button:has-text("Map View")');
     
     // Should show loading state
     await page.waitForTimeout(500);
@@ -178,9 +178,9 @@ test.describe('Error Handling and Edge Cases', () => {
     const page = authenticatedPage;
     
     // Rapidly click through views
-    await page.click('button:has-text("Map")');
+    await page.click('button:has-text("Map View")');
     await page.waitForTimeout(100);
-    await page.click('button:has-text("Stats")');
+    await page.click('button:has-text("Statistics")');
     await page.waitForTimeout(100);
     await page.click('button:has-text("Loo List")');
     await page.waitForTimeout(100);

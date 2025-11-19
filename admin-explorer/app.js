@@ -40,11 +40,8 @@ class AdminApp extends HTMLElement {
     await authService.init();
     this.isAuthenticated = authService.isAuthenticated();
     
-    if (!this.isAuthenticated) {
-      authService.login();
-    } else {
-      this.render();
-    }
+    // Always render (will show login page if not authenticated)
+    this.render();
   }
 
   disconnectedCallback() {
@@ -55,9 +52,14 @@ class AdminApp extends HTMLElement {
     if (!this.isAuthenticated) {
       this.innerHTML = `
         <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--color-bg);">
-          <div style="text-align: center;">
-            <div class="loading" style="width: 3rem; height: 3rem; margin: 0 auto 1rem;"></div>
-            <p>Redirecting to login...</p>
+          <div style="text-align: center; padding: 3rem; background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); max-width: 400px;">
+            <i class="fas fa-shield-alt" style="font-size: 4rem; color: var(--color-primary); margin-bottom: 1.5rem;"></i>
+            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--color-text);">Admin Panel</h1>
+            <p style="color: var(--color-text-secondary); margin-bottom: 2rem;">Sign in to access the toilet map administration tools</p>
+            <button class="btn-primary" onclick="import('./services/AuthService.js').then(m => m.authService.login())" style="width: 100%; padding: 0.75rem; font-size: 1rem;">
+              <i class="fas fa-sign-in-alt" style="margin-right: 0.5rem;"></i>
+              Sign In
+            </button>
           </div>
         </div>
       `;
