@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Hono } from 'hono';
+import { validate } from '../../common/validator';
+import { mapDataSchema, suspiciousActivitySchema } from './schemas';
 import type { AppVariables } from '../../types';
 import { env } from '../../env';
 import { requireAuth } from '../../middleware/require-auth';
@@ -64,25 +66,21 @@ adminRouter.get('/api/stats', requireAuth, requireAdminRole, (c) =>
  *   - active: boolean (optional) - filter by active status
  *   - accessible: boolean (optional) - filter by accessibility
  */
-adminRouter.get('/api/loos/map', requireAuth, requireAdminRole, (c) =>
-  handleRoute(c, 'admin.loos.map', async () => {
-    const activeParam = c.req.query('active');
-    const accessibleParam = c.req.query('accessible');
+adminRouter.get(
+  '/api/loos/map',
+  requireAuth,
+  requireAdminRole,
+  validate('query', mapDataSchema),
+  (c) =>
+    handleRoute(c, 'admin.loos.map', async () => {
+      const filters = c.req.valid('query');
+      const loos = await adminService.getMapData(filters);
 
-    const filters: { active?: boolean; accessible?: boolean } = {};
-
-    if (activeParam === 'true') filters.active = true;
-    if (activeParam === 'false') filters.active = false;
-    if (accessibleParam === 'true') filters.accessible = true;
-    if (accessibleParam === 'false') filters.accessible = false;
-
-    const loos = await adminService.getMapData(filters);
-
-    return c.json({
-      data: loos,
-      count: loos.length,
-    });
-  }),
+      return c.json({
+        data: loos,
+        count: loos.length,
+      });
+    }),
 );
 
 /**
@@ -95,23 +93,17 @@ adminRouter.get('/api/loos/map', requireAuth, requireAdminRole, (c) =>
  *   - minLocationChangeMeters: number (optional, default: 1000) - minimum distance to flag location change
  *   - minMassDeactivations: number (optional, default: 5) - minimum deactivations to flag as mass
  */
-adminRouter.get('/api/suspicious-activity', requireAuth, requireAdminRole, (c) =>
-  handleRoute(c, 'admin.suspicious-activity', async () => {
-    const hoursWindow = c.req.query('hoursWindow');
-    const minRapidUpdates = c.req.query('minRapidUpdates');
-    const minLocationChangeMeters = c.req.query('minLocationChangeMeters');
-    const minMassDeactivations = c.req.query('minMassDeactivations');
-
-    const options = {
-      ...(hoursWindow ? { hoursWindow: parseInt(hoursWindow, 10) } : {}),
-      ...(minRapidUpdates ? { minRapidUpdates: parseInt(minRapidUpdates, 10) } : {}),
-      ...(minLocationChangeMeters ? { minLocationChangeMeters: parseInt(minLocationChangeMeters, 10) } : {}),
-      ...(minMassDeactivations ? { minMassDeactivations: parseInt(minMassDeactivations, 10) } : {}),
-    };
-
-    const activity = await adminService.getSuspiciousActivity(options);
-    return c.json(activity);
-  }),
+adminRouter.get(
+  '/api/suspicious-activity',
+  requireAuth,
+  requireAdminRole,
+  validate('query', suspiciousActivitySchema),
+  (c) =>
+    handleRoute(c, 'admin.suspicious-activity', async () => {
+      const options = c.req.valid('query');
+      const activity = await adminService.getSuspiciousActivity(options);
+      return c.json(activity);
+    }),
 );
 
 /**

@@ -6,6 +6,7 @@ import type {
   LooResponse,
   NearbyLooResponse,
   ReportResponse,
+  OpeningTimes,
 } from './types';
 
 export const areaSelection = {
@@ -69,7 +70,7 @@ const mapSharedLooFields = (
   noPayment: source?.no_payment ?? null,
   paymentDetails: source?.payment_details ?? null,
   removalReason: source?.removal_reason ?? null,
-  openingTimes: source?.opening_times ?? null,
+  openingTimes: (source?.opening_times as unknown as OpeningTimes) ?? null,
   radar: source?.radar ?? null,
   location: extractCoordinates(source?.location),
 });

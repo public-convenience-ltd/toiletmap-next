@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { validate } from '../../common/validator';
 import { Prisma } from '../../generated/prisma-client';
 import { AppVariables } from '../../types';
 import { requireAuth } from '../../middleware/require-auth';
@@ -42,69 +43,39 @@ loosRouter.get('/geohash/:geohash', (c) =>
 );
 
 /** GET /loos/proximity */
-loosRouter.get('/proximity', (c) =>
-  handleRoute(c, 'loos.proximity', async () => {
-    const validation = proximitySchema.safeParse({
-      lat: c.req.query('lat'),
-      lng: c.req.query('lng'),
-      radius: c.req.query('radius'),
-    });
-    if (!validation.success)
-      return badRequest(
-        c,
-        'Invalid proximity query',
-        validation.error.format(),
-      );
+loosRouter.get(
+  '/proximity',
+  validate('query', proximitySchema, 'Invalid proximity query'),
+  (c) =>
+    handleRoute(c, 'loos.proximity', async () => {
+      const { lat, lng, radius } = c.req.valid('query');
+      const loos = await looService.getByProximity(lat, lng, radius);
 
-    const { lat, lng, radius } = validation.data;
-    const loos = await looService.getByProximity(lat, lng, radius);
-
-    return c.json({ data: loos, count: loos.length });
-  }),
+      return c.json({ data: loos, count: loos.length });
+    }),
 );
 
 /** GET /loos/search */
-loosRouter.get('/search', (c) =>
-  handleRoute(c, 'loos.search', async () => {
-    const validation = searchQuerySchema.safeParse({
-      search: c.req.query('search'),
-      areaName: c.req.query('areaName'),
-      areaType: c.req.query('areaType'),
-      active: c.req.query('active'),
-      accessible: c.req.query('accessible'),
-      allGender: c.req.query('allGender'),
-      radar: c.req.query('radar'),
-      babyChange: c.req.query('babyChange'),
-      noPayment: c.req.query('noPayment'),
-      verified: c.req.query('verified'),
-      hasLocation: c.req.query('hasLocation'),
-      sort: c.req.query('sort'),
-      limit: c.req.query('limit'),
-      page: c.req.query('page'),
-    });
-    if (!validation.success)
-      return badRequest(
-        c,
-        'Invalid search query',
-        validation.error.format(),
-      );
+loosRouter.get(
+  '/search',
+  validate('query', searchQuerySchema, 'Invalid search query'),
+  (c) =>
+    handleRoute(c, 'loos.search', async () => {
+      const params = c.req.valid('query') as LooSearchParams;
+      const { data, total } = await looService.search(params);
 
-    // Schema defaults guarantee required fields are present
-    const params = validation.data as LooSearchParams;
-    const { data, total } = await looService.search(params);
+      const offset = (params.page - 1) * params.limit;
+      const hasMore = offset + data.length < total;
 
-    const offset = (params.page - 1) * params.limit;
-    const hasMore = offset + data.length < total;
-
-    return c.json({
-      data,
-      count: data.length,
-      total,
-      page: params.page,
-      pageSize: params.limit,
-      hasMore,
-    });
-  }),
+      return c.json({
+        data,
+        count: data.length,
+        total,
+        page: params.page,
+        pageSize: params.limit,
+        hasMore,
+      });
+    }),
 );
 
 /** GET /loos/:id/reports */
@@ -154,64 +125,48 @@ loosRouter.get('/', (c) =>
 );
 
 /** POST /loos */
-loosRouter.post('/', requireAuth, (c) =>
-  handleRoute(c, 'loos.create', async () => {
-    const body = await parseJsonBody(c); // keep your existing tolerant body read
-    const validation = createMutationSchema.safeParse(body);
-    if (!validation.success)
-      return badRequest(
-        c,
-        'Invalid create request body',
-        validation.error.format(),
-      );
+loosRouter.post(
+  '/',
+  requireAuth,
+  validate('json', createMutationSchema, 'Invalid create request body'),
+  (c) =>
+    handleRoute(c, 'loos.create', async () => {
+      const validation = c.req.valid('json');
+      const contributor = extractContributor(c.get('user'));
+      const { id: requestedId, ...rest } = validation;
+      const id = requestedId ?? generateLooId();
 
-    const contributor = extractContributor(c.get('user'));
-    const { id: requestedId, ...rest } = validation.data;
-    const id = requestedId ?? generateLooId();
+      if (id.length !== LOO_ID_LENGTH)
+        return badRequest(c, `id must be exactly ${LOO_ID_LENGTH} characters`);
 
-    if (id.length !== LOO_ID_LENGTH)
-      return badRequest(c, `id must be exactly ${LOO_ID_LENGTH} characters`);
+      const existing = await looService.getById(id);
+      if (existing)
+        return c.json({ message: `Loo with id ${id} already exists` }, 409);
 
-    const existing = await looService.getById(id);
-    if (existing)
-      return c.json({ message: `Loo with id ${id} already exists` }, 409);
-
-    const created = await looService.create(
-      id,
-      rest,
-      contributor,
-    );
-    if (!created) throw new Error(`Failed to reload loo ${id} after creation`);
-    return c.json(created, 201);
-  }),
+      const created = await looService.create(id, rest, contributor);
+      if (!created) throw new Error(`Failed to reload loo ${id} after creation`);
+      return c.json(created, 201);
+    }),
 );
 
 /** PUT /loos/:id */
-loosRouter.put('/:id', requireAuth, (c) =>
-  handleRoute(c, 'loos.upsert', async () => {
-    const chk = requireIdParam(c.req.param('id'));
-    if (!chk.ok) return badRequest(c, chk.error);
+loosRouter.put(
+  '/:id',
+  requireAuth,
+  validate('json', baseMutationSchema, 'Invalid upsert request body'),
+  (c) =>
+    handleRoute(c, 'loos.upsert', async () => {
+      const chk = requireIdParam(c.req.param('id'));
+      if (!chk.ok) return badRequest(c, chk.error);
 
-    const body = await parseJsonBody(c);
-    const validation = baseMutationSchema.safeParse(body);
-    if (!validation.success)
-      return badRequest(
-        c,
-        'Invalid upsert request body',
-        validation.error.format(),
-      );
+      const validation = c.req.valid('json');
+      const contributor = extractContributor(c.get('user'));
+      const existing = await looService.getById(chk.id);
+      const saved = await looService.upsert(chk.id, validation, contributor);
+      if (!saved) throw new Error(`Failed to reload loo ${chk.id} after upsert`);
 
-    const contributor = extractContributor(c.get('user'));
-    const existing = await looService.getById(chk.id);
-    const saved = await looService.upsert(
-      chk.id,
-      validation.data,
-      contributor,
-    );
-    if (!saved) throw new Error(`Failed to reload loo ${chk.id} after upsert`);
-
-    return c.json(saved, existing ? 200 : 201);
-  }),
+      return c.json(saved, existing ? 200 : 201);
+    }),
 );
 
 /** DELETE /loos/:id */

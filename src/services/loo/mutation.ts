@@ -56,7 +56,7 @@ export const mapMutationToPrismaData = (
 
   if (mutation.openingTimes !== undefined) {
     // Preserve explicit null semantics on JSON
-    data.opening_times = mutation.openingTimes ?? null;
+    data.opening_times = (mutation.openingTimes ?? null) as Prisma.InputJsonValue;
   }
 
   return data;

@@ -125,8 +125,6 @@ export class LooService {
     );
   }
 
-  async getReports(id: string, options: { hydrate: true }): Promise<ReportResponse[]>;
-  async getReports(id: string, options?: { hydrate?: false }): Promise<ReportSummaryResponse[]>;
   async getReports(
     id: string,
     options: { hydrate?: boolean } = {},
@@ -194,6 +192,9 @@ export class LooService {
     }) as Prisma.toiletsUncheckedUpdateInput;
 
     await this.prisma.$transaction(async (tx) => {
+      // Try to update first, if not found, insert
+      // We use this pattern instead of prisma.upsert because we need to handle
+      // the audit log (updateLoo/insertLoo helpers handle this)
       const updatedCount = await updateLoo({
         tx,
         id,

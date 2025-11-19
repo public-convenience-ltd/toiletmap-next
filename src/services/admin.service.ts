@@ -168,18 +168,6 @@ export class AdminService {
     active?: boolean;
     accessible?: boolean;
   }): Promise<AdminMapLooResponse[]> {
-    const where: Prisma.toiletsWhereInput = {
-      geography: { not: null },
-    };
-
-    if (typeof filters?.active === 'boolean') {
-      where.active = filters.active;
-    }
-
-    if (typeof filters?.accessible === 'boolean') {
-      where.accessible = filters.accessible;
-    }
-
     // Use raw query for better performance with large datasets
     const query = Prisma.sql`
       SELECT
