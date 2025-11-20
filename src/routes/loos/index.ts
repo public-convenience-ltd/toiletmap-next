@@ -10,14 +10,15 @@ import {
 } from '../shared/route-helpers';
 import { parseIds } from '../shared/query';
 import { requireIdParam } from '../shared/params';
+import { parseActiveFlag } from '../shared/route-utils';
+import { extractContributor } from '../../utils/auth-utils';
 import {
   LOO_ID_LENGTH,
-  extractContributor,
   generateLooId,
   looService,
-  parseActiveFlag,
 } from '../../services/loo';
 import type { LooSearchParams } from '../../services/loo/types';
+
 
 import {
   baseMutationSchema,

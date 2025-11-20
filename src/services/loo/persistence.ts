@@ -1,5 +1,26 @@
+import { randomBytes } from 'crypto';
 import { Prisma } from '../../generated/prisma-client';
 import type { LooMutationAttributes } from './types';
+
+/**
+ * The required length for loo IDs.
+ * IDs are 24 characters (12 bytes in hex encoding).
+ */
+export const LOO_ID_LENGTH = 24;
+
+/**
+ * Generates a unique identifier for a new loo.
+ * Creates a cryptographically random 12-byte value and encodes it as a 24-character hex string.
+ *
+ * @returns A 24-character hexadecimal string suitable for use as a loo ID
+ *
+ * @example
+ * ```typescript
+ * const id = generateLooId();
+ * // Returns something like: "a1b2c3d4e5f6789012345678"
+ * ```
+ */
+export const generateLooId = (): string => randomBytes(12).toString('hex');
 
 // Low-level helpers that keep insert/update logic consistent and auditable.
 const emptyTextArray = Prisma.sql`ARRAY[]::text[]`;

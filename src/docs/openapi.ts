@@ -1,4 +1,5 @@
-import { LOO_ID_LENGTH } from '../services/loo/constants';
+import { LOO_ID_LENGTH } from '../services/loo';
+
 import type {
   MediaTypeObject,
   OpenAPIObject,
