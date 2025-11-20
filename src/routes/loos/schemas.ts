@@ -48,18 +48,11 @@ const dayOpeningHoursSchema = z.union([
       z.string().regex(timeRegex, 'Time must be in HH:mm format'),
     ])
     .refine(
-      ([open, close]) => {
-        // Special case: ["00:00", "00:00"] represents 24 hours
-        if (open === '00:00' && close === '00:00') {
-          return true;
-        }
-
-        // Disallow same start/end time (unless it's the 24h case above)
-        if (open === close) {
-          return false;
-        }
-
-        // Allow any other combination, including overnight (open > close)
+      () => {
+        // All combinations are allowed:
+        // - Any repeated value (e.g., ["00:00", "00:00"], ["12:00", "12:00"]) represents 24 hours
+        // - Overnight (e.g., ["22:00", "06:00"]) is valid
+        // - Standard (e.g., ["09:00", "17:00"]) is valid
         return true;
       },
       {

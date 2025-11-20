@@ -337,12 +337,13 @@ describe.sequential('Opening Times Validation', () => {
     createdIds.push(id);
   });
 
-  it('accepts opening times equal to each other (same time)', async () => {
+  it('accepts any repeated time as 24-hour representation (e.g., ["09:00", "09:00"])', async () => {
+    const id = generateLooId();
     const payload = {
-      id: generateLooId(),
-      name: 'Same Time Loo',
+      id,
+      name: 'Same Time 24 Hour Loo',
       openingTimes: [
-        ['09:00', '09:00'], // Invalid: opening == closing
+        ['09:00', '09:00'], // Valid: repeated value represents 24 hours
         ['09:00', '17:00'],
         ['09:00', '17:00'],
         ['09:00', '17:00'],
@@ -358,8 +359,10 @@ describe.sequential('Opening Times Validation', () => {
       body: JSON.stringify(payload),
     });
 
-    // This should be rejected because opening must be BEFORE closing
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(201);
+    const data = await response.json();
+    expect(data.openingTimes).toEqual(payload.openingTimes);
+    createdIds.push(id);
   });
 
   it('accepts ["00:00", "00:00"] as 24-hour representation', async () => {
@@ -375,6 +378,90 @@ describe.sequential('Opening Times Validation', () => {
         ['00:00', '00:00'], // Friday - 24 hours
         ['00:00', '00:00'], // Saturday - 24 hours
         ['00:00', '00:00'], // Sunday - 24 hours
+      ],
+    };
+
+    const response = await testClient.fetch('/loos', {
+      method: 'POST',
+      headers: authedJsonHeaders(authToken),
+      body: JSON.stringify(payload),
+    });
+
+    expect(response.status).toBe(201);
+    const data = await response.json();
+    expect(data.openingTimes).toEqual(payload.openingTimes);
+    createdIds.push(id);
+  });
+
+  it('accepts ["12:00", "12:00"] as 24-hour representation (midday)', async () => {
+    const id = generateLooId();
+    const payload = {
+      id,
+      name: 'Midday 24 Hour Loo',
+      openingTimes: [
+        ['12:00', '12:00'], // Monday - 24 hours
+        ['12:00', '12:00'], // Tuesday - 24 hours
+        ['12:00', '12:00'], // Wednesday - 24 hours
+        ['12:00', '12:00'], // Thursday - 24 hours
+        ['12:00', '12:00'], // Friday - 24 hours
+        ['12:00', '12:00'], // Saturday - 24 hours
+        ['12:00', '12:00'], // Sunday - 24 hours
+      ],
+    };
+
+    const response = await testClient.fetch('/loos', {
+      method: 'POST',
+      headers: authedJsonHeaders(authToken),
+      body: JSON.stringify(payload),
+    });
+
+    expect(response.status).toBe(201);
+    const data = await response.json();
+    expect(data.openingTimes).toEqual(payload.openingTimes);
+    createdIds.push(id);
+  });
+
+  it('accepts ["06:00", "06:00"] as 24-hour representation (early morning)', async () => {
+    const id = generateLooId();
+    const payload = {
+      id,
+      name: 'Early Morning 24 Hour Loo',
+      openingTimes: [
+        ['06:00', '06:00'], // Monday - 24 hours
+        ['06:00', '06:00'], // Tuesday - 24 hours
+        ['06:00', '06:00'], // Wednesday - 24 hours
+        ['06:00', '06:00'], // Thursday - 24 hours
+        ['06:00', '06:00'], // Friday - 24 hours
+        ['06:00', '06:00'], // Saturday - 24 hours
+        ['06:00', '06:00'], // Sunday - 24 hours
+      ],
+    };
+
+    const response = await testClient.fetch('/loos', {
+      method: 'POST',
+      headers: authedJsonHeaders(authToken),
+      body: JSON.stringify(payload),
+    });
+
+    expect(response.status).toBe(201);
+    const data = await response.json();
+    expect(data.openingTimes).toEqual(payload.openingTimes);
+    createdIds.push(id);
+  });
+
+  it('accepts ["18:00", "18:00"] as 24-hour representation (evening)', async () => {
+    const id = generateLooId();
+    const payload = {
+      id,
+      name: 'Evening 24 Hour Loo',
+      openingTimes: [
+        ['18:00', '18:00'], // Monday - 24 hours
+        ['18:00', '18:00'], // Tuesday - 24 hours
+        ['18:00', '18:00'], // Wednesday - 24 hours
+        ['18:00', '18:00'], // Thursday - 24 hours
+        ['18:00', '18:00'], // Friday - 24 hours
+        ['18:00', '18:00'], // Saturday - 24 hours
+        ['18:00', '18:00'], // Sunday - 24 hours
       ],
     };
 

@@ -174,6 +174,9 @@ export class LooService {
       orderBy: { ts: 'desc' },
     });
 
+    // We filter out system location updates as they are not user-contributed
+    // and are left over from our old system where we recorded a separate
+    // location report for each loo.
     const mapped = reportRecords
       .map((entry) => mapAuditRecordToReport(entry))
       .filter((report) => !report.contributor.endsWith('-location'));
