@@ -3,4 +3,6 @@ onlyBuiltDependencies:
   - '@prisma/engines'
   - esbuild
   - prisma
+  - sharp
   - supabase
+  - workerd
