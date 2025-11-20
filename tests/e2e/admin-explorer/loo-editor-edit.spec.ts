@@ -9,12 +9,31 @@ import {
   waitForToast,
   clickBackToList,
   waitForView,
+  clickAddNewLoo,
 } from './helpers/ui-helpers';
+import { generateValidLoo } from './fixtures/test-data';
 
 test.describe('Loo Editor - Edit Existing Loo', () => {
+  // Create a fresh test loo before each test to ensure isolated data
   test.beforeEach(async ({ authenticatedPage }) => {
     const page = authenticatedPage;
+
+    // Navigate to list and create a new test loo
     await navigateToView(page, 'list');
+    await clickAddNewLoo(page);
+
+    // Create a test loo with known data
+    const testLoo = generateValidLoo();
+    await page.fill('input[name="name"]', testLoo.name);
+    await setMapLocation(page, 51.5074, -0.1278);
+    await setTriState(page, 'accessible', 'unknown');
+    await setTriState(page, 'babyChange', 'unknown');
+    await setTriState(page, 'radar', 'unknown');
+    await setOpeningHours(page, 'monday', '10:00', '18:00');
+
+    await submitLooForm(page);
+    await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should load existing loo data in editor', async ({ authenticatedPage }) => {
@@ -135,8 +154,8 @@ test.describe('Loo Editor - Edit Existing Loo', () => {
     // Change location to a significantly different value
     await setMapLocation(page, 52.5, -1.5);
 
-    // Verify change in summary
-    await page.waitForTimeout(500);
+    // Verify change in summary (wait longer for map move to trigger update)
+    await page.waitForTimeout(1000);
     const changesList = page.locator('#changes-list');
     await expect(changesList).toContainText('Location');
 
@@ -255,25 +274,25 @@ test.describe('Loo Editor - Edit Existing Loo', () => {
 
   test('should reset form to original values', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    
+
     await clickEditLoo(page, 0);
     await waitForView(page, 'loo-editor');
-    
+
     // Get original name
     const nameInput = page.locator('input[name="name"]');
     const originalName = await nameInput.inputValue();
-    
+
     // Make changes
     await nameInput.fill('Changed Name');
     await setTriState(page, 'accessible', 'no');
-    
-    // Find and click reset button (might be via form reset or custom button)
-    const resetButton = page.locator('button:has-text("Reset")').first();
+
+    // Find and click the form reset button (not the map location reset button)
+    const resetButton = page.locator('button:has-text("Reset"):not(:has-text("Location"))');
     if (await resetButton.isVisible()) {
       await resetButton.click();
 
       // Wait for toast to appear (indicates reset completed)
-      await waitForToast(page, 'original');
+      await waitForToast(page, 'Form reset');
 
       // Verify form reset
       const currentName = await nameInput.inputValue();

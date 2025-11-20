@@ -498,13 +498,67 @@ export class LooEditor extends HTMLElement {
   }
 
   resetForm() {
-    if (!this.originalFormData) {
+    if (!this.originalFormData || !this.loo) {
       Toast.show('No original data to reset to', 'error', 2000);
       return;
     }
 
-    // Re-render the component to reset all form fields to original loo data
-    this.render();
+    const form = this.querySelector('form');
+    if (!form) return;
+
+    // Reset all form fields to original loo data
+    const loo = this.loo;
+
+    // Reset basic fields
+    if (form.elements['name']) form.elements['name'].value = loo.name || '';
+    if (form.elements['notes']) form.elements['notes'].value = loo.notes || '';
+    if (form.elements['paymentDetails']) form.elements['paymentDetails'].value = loo.paymentDetails || '';
+    if (form.elements['removalReason']) form.elements['removalReason'].value = loo.removalReason || '';
+
+    // Reset location
+    if (loo.location) {
+      if (form.elements['lat']) form.elements['lat'].value = loo.location.lat;
+      if (form.elements['lng']) form.elements['lng'].value = loo.location.lng;
+      if (this.mapPicker) {
+        this.mapPicker.setView([loo.location.lat, loo.location.lng], this.mapPicker.getZoom());
+      }
+    }
+
+    // Reset tri-state fields
+    const triStateFields = ['active', 'accessible', 'allGender', 'attended', 'automatic',
+                            'babyChange', 'children', 'men', 'women', 'radar',
+                            'urinalOnly', 'noPayment'];
+
+    triStateFields.forEach(field => {
+      const value = loo[field];
+      const radioValue = value === true ? 'true' : value === false ? 'false' : 'null';
+      const radio = form.querySelector(`input[name="${field}"][value="${radioValue}"]`);
+      if (radio) radio.checked = true;
+    });
+
+    // Reset opening hours
+    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    if (Array.isArray(loo.openingTimes)) {
+      loo.openingTimes.forEach((dayData, index) => {
+        const dayName = dayNames[index];
+        const closedCheckbox = form.elements[`openingHours.${dayName}.closed`];
+        const openInput = form.elements[`openingHours.${dayName}.open`];
+        const closeInput = form.elements[`openingHours.${dayName}.close`];
+
+        if (Array.isArray(dayData) && dayData.length === 2) {
+          if (closedCheckbox) closedCheckbox.checked = false;
+          if (openInput) openInput.value = dayData[0];
+          if (closeInput) closeInput.value = dayData[1];
+        } else {
+          if (closedCheckbox) closedCheckbox.checked = true;
+          if (openInput) openInput.value = '';
+          if (closeInput) closeInput.value = '';
+        }
+      });
+    }
+
+    // Update changes summary
+    this.updateChangesSummary();
 
     Toast.show('Form reset to original values', 'success', 2000);
   }
