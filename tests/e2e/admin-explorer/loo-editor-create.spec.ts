@@ -10,6 +10,7 @@ import {
   clickBackToList,
   expectValidationError,
   expectNoValidationErrors,
+  waitForView,
 } from './helpers/ui-helpers';
 import {
   generateValidLoo,
@@ -49,31 +50,31 @@ test.describe('Loo Editor - Create New Loo', () => {
   test('should create a new loo with minimal required fields', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const loo = generateValidLoo();
-    
+
     // Fill in required name
     await page.fill('input[name="name"]', loo.name);
-    
+
     // Submit form
     await submitLooForm(page);
-    
+
     // Verify toast notification
     await waitForToast(page, 'created successfully');
-    
+
     // Verify redirected to list view
-    await expect(page.locator('loo-list')).toBeVisible({ timeout: 5000 });
+    await waitForView(page, 'loo-list');
   });
 
   test('should create a loo with all fields filled', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const loo = generateValidLoo();
-    
+
     // Fill in basic info
     await page.fill('input[name="name"]', loo.name);
     await page.fill('textarea[name="notes"]', loo.notes!);
-    
+
     // Set location
     await setMapLocation(page, loo.location!.lat, loo.location!.lng);
-    
+
     // Set tri-state fields
     await setTriState(page, 'active', 'yes');
     await setTriState(page, 'accessible', 'yes');
@@ -81,10 +82,11 @@ test.describe('Loo Editor - Create New Loo', () => {
     await setTriState(page, 'women', 'yes');
     await setTriState(page, 'babyChange', 'yes');
     await setTriState(page, 'noPayment', 'yes');
-    
+
     // Submit
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should validate required name field', async ({ authenticatedPage }) => {
@@ -103,21 +105,24 @@ test.describe('Loo Editor - Create New Loo', () => {
   test('should create loo with opening hours', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const loo = generateLooWithOpeningHours();
-    
+
     await page.fill('input[name="name"]', loo.name);
-    
+
     // Set weekday hours (Mon-Fri)
     await setOpeningHours(page, 'monday', '09:00', '17:00');
 
     // Use copy button to copy Monday's hours to all days
-    await page.click('button[title="Copy to all days"]:near(input[name="openingHours.monday.open"])');
+    // Find the copy button in the same row as Monday's opening hours
+    const mondayRow = page.locator('input[name="openingHours.monday.open"]').locator('..');
+    await mondayRow.locator('button[title="Copy to all days"]').click();
 
     // Mark weekends as closed
     await setDayClosed(page, 'saturday', true);
     await setDayClosed(page, 'sunday', true);
-    
+
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should toggle payment details visibility based on noPayment field', async ({ authenticatedPage }) => {
@@ -141,17 +146,18 @@ test.describe('Loo Editor - Create New Loo', () => {
   test('should create loo with payment details', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const loo = generateLooWithPayment();
-    
+
     await page.fill('input[name="name"]', loo.name);
-    
+
     // Set as paid
     await setTriState(page, 'noPayment', 'no');
-    
+
     // Fill payment details
     await page.fill('input[name="paymentDetails"]', loo.paymentDetails!);
-    
+
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should validate payment details required when not free', async ({ authenticatedPage }) => {
@@ -172,38 +178,41 @@ test.describe('Loo Editor - Create New Loo', () => {
   test('should handle special characters in name and notes', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const loo = generateLooWithSpecialChars();
-    
+
     await page.fill('input[name="name"]', loo.name);
     await page.fill('textarea[name="notes"]', loo.notes!);
-    
+
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should create loo at edge location (date line)', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const loo = generateLooAtDateLine();
-    
+
     await page.fill('input[name="name"]', loo.name);
     await setMapLocation(page, loo.location!.lat, loo.location!.lng);
-    
+
     // Verify coordinates are displayed correctly
     const coordsDisplay = page.locator('#map-coords-display');
     await expect(coordsDisplay).toContainText('179.999');
-    
+
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should create loo at extreme latitude (north pole)', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const loo = generateLooAtNorthPole();
-    
+
     await page.fill('input[name="name"]', loo.name);
     await setMapLocation(page, loo.location!.lat, loo.location!.lng);
-    
+
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should validate latitude range (-90 to 90)', async ({ authenticatedPage }) => {
@@ -278,21 +287,22 @@ test.describe('Loo Editor - Create New Loo', () => {
 
   test('should handle closed day checkbox correctly', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    
+
     await page.fill('input[name="name"]', 'Weekend Closed Loo');
-    
+
     // Set hours for Monday
     await setOpeningHours(page, 'monday', '09:00', '17:00');
-    
+
     // Mark Saturday as closed
     await setDayClosed(page, 'saturday', true);
-    
+
     // Verify time inputs are disabled
     const saturdayOpen = page.locator('input[name="openingHours.saturday.open"]');
     await expect(saturdayOpen).toBeDisabled();
-    
+
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should use "Set Weekdays Only" helper', async ({ authenticatedPage }) => {
@@ -316,6 +326,7 @@ test.describe('Loo Editor - Create New Loo', () => {
 
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
+    await waitForView(page, 'loo-list');
   });
 
   test('should use "Clear All Hours" helper', async ({ authenticatedPage }) => {

@@ -28,8 +28,18 @@ export async function setTriState(
   fieldName: string,
   value: 'yes' | 'no' | 'unknown'
 ): Promise<void> {
-  const selector = `input[name="${fieldName}"][value="${value === 'yes' ? 'true' : value === 'no' ? 'false' : 'null'}"]`;
-  await page.click(selector);
+  const radioValue = value === 'yes' ? 'true' : value === 'no' ? 'false' : 'null';
+  const inputSelector = `input[name="${fieldName}"][value="${radioValue}"]`;
+
+  // Get the input's ID and click the associated label instead
+  // (radio inputs have opacity: 0, so we need to click the label)
+  const inputId = await page.locator(inputSelector).getAttribute('id');
+  if (inputId) {
+    await page.click(`label[for="${inputId}"]`);
+  } else {
+    // Fallback to clicking the input with force if no ID found
+    await page.click(inputSelector, { force: true });
+  }
 }
 
 /**
@@ -62,27 +72,22 @@ export async function setDayClosed(
 }
 
 /**
- * Set map location by entering coordinates
+ * Set map location by moving the map (updates the coordinate inputs)
  */
 export async function setMapLocation(page: Page, lat: number, lng: number): Promise<void> {
-  // The lat/lng inputs are readonly, so we need to move the map instead
   // Execute JavaScript to pan the Leaflet map and wait for the moveend event
+  // This simulates a user panning the map to select a location
   await page.evaluate(([lat, lng]) => {
     return new Promise<void>((resolve) => {
-      const mapContainer = document.querySelector('#location-map-picker') as any;
-      if (mapContainer && mapContainer._leaflet_id) {
-        // Get the Leaflet map instance
-        const map = (window as any).L.Map._instances[mapContainer._leaflet_id];
-        if (map) {
-          // Listen for moveend event to know when map has finished updating
-          map.once('moveend', () => {
-            // Give a small delay for coordinate display to update
-            setTimeout(() => resolve(), 100);
-          });
-          map.setView([lat, lng], map.getZoom());
-        } else {
-          resolve();
-        }
+      const editorElement = document.querySelector('loo-editor') as any;
+      if (editorElement && editorElement.mapPicker) {
+        const map = editorElement.mapPicker;
+        // Listen for moveend event to know when map has finished updating
+        map.once('moveend', () => {
+          // Give a small delay for coordinate display to update
+          setTimeout(() => resolve(), 100);
+        });
+        map.setView([lat, lng], map.getZoom());
       } else {
         resolve();
       }
@@ -93,23 +98,27 @@ export async function setMapLocation(page: Page, lat: number, lng: number): Prom
 /**
  * Wait for toast notification to appear
  */
-export async function waitForToast(page: Page, expectedText?: string): Promise<void> {
-  const toast = page.locator('.toast');
+export async function waitForToast(page: Page, expectedText?: string, waitForDisappear: boolean = false): Promise<void> {
+  // If expectedText is provided, filter by it immediately to handle multiple toasts
+  const toast = expectedText
+    ? page.locator('.toast').filter({ hasText: expectedText })
+    : page.locator('.toast').last(); // Use last() to get the most recent toast
+
   await expect(toast).toBeVisible({ timeout: 5000 });
-  
-  if (expectedText) {
-    await expect(toast).toContainText(expectedText);
+
+  // Optionally wait for toast to disappear
+  if (waitForDisappear) {
+    await expect(toast).toBeHidden({ timeout: 5000 });
   }
-  
-  // Wait for toast to disappear
-  await expect(toast).toBeHidden({ timeout: 5000 });
 }
 
 /**
  * Click the "Add New Loo" button
  */
 export async function clickAddNewLoo(page: Page): Promise<void> {
-  await page.click('button:has-text("Add New Loo")');
+  // Click the button in the loo list (not sidebar)
+  // Both sidebar and loo-list have "Add New Loo" buttons
+  await page.click('loo-list button:has-text("Add New Loo")');
   await page.waitForLoadState('networkidle');
 }
 
@@ -126,7 +135,9 @@ export async function clickBackToList(page: Page): Promise<void> {
  */
 export async function submitLooForm(page: Page): Promise<void> {
   await page.click('button[type="submit"]');
-  await page.waitForLoadState('networkidle');
+  // Don't wait for networkidle here - let the calling test decide what to wait for
+  // This allows tests to check for toasts/validation before navigation completes
+  await page.waitForTimeout(300); // Small delay for form submission to start
 }
 
 /**
@@ -175,9 +186,13 @@ export async function clickEditLoo(page: Page, index: number = 0): Promise<void>
  * Verify form has validation error for a field
  */
 export async function expectValidationError(page: Page, fieldName: string): Promise<void> {
-  const formGroup = page.locator(`.form-group:has(input[name="${fieldName}"])`);
-  await expect(formGroup).toHaveClass(/has-error/);
-  await expect(formGroup.locator('.form-error')).toBeVisible();
+  // Wait a bit for validation to run
+  await page.waitForTimeout(500);
+
+  // Check both .form-group and .form-row (for opening hours)
+  const formGroup = page.locator(`.form-group:has(input[name="${fieldName}"]), .form-group:has(textarea[name="${fieldName}"]), .form-row:has(input[name="${fieldName}"])`).first();
+  await expect(formGroup).toHaveClass(/has-error/, { timeout: 3000 });
+  await expect(formGroup.locator('.form-error')).toBeVisible({ timeout: 3000 });
 }
 
 /**

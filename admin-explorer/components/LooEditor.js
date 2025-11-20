@@ -105,6 +105,25 @@ export class LooEditor extends HTMLElement {
 
     this.mapPicker.on('moveend', updateCoordinates);
     updateCoordinates();
+
+    // Listen for manual coordinate input changes and update map
+    const latInput = this.querySelector('input[name="lat"]');
+    const lngInput = this.querySelector('input[name="lng"]');
+
+    const updateMapFromInputs = () => {
+      const newLat = parseFloat(latInput?.value);
+      const newLng = parseFloat(lngInput?.value);
+      if (!isNaN(newLat) && !isNaN(newLng) && this.mapPicker) {
+        this.mapPicker.setView([newLat, newLng], this.mapPicker.getZoom());
+      }
+    };
+
+    if (latInput) {
+      latInput.addEventListener('change', updateMapFromInputs);
+    }
+    if (lngInput) {
+      lngInput.addEventListener('change', updateMapFromInputs);
+    }
   }
 
   resetMapLocation() {
@@ -424,11 +443,13 @@ export class LooEditor extends HTMLElement {
       if (this.isNew) {
         await apiService.createLoo(data);
         Toast.show('Loo created successfully!', 'success');
-        this.backToList();
+        // Small delay to ensure toast is visible before navigation
+        setTimeout(() => this.backToList(), 100);
       } else {
         await apiService.updateLoo(this.loo.id, data);
         Toast.show('Loo updated successfully!', 'success');
-        this.backToList();
+        // Small delay to ensure toast is visible before navigation
+        setTimeout(() => this.backToList(), 100);
       }
       this.saving = false;
     } catch (error) {
@@ -749,7 +770,7 @@ export class LooEditor extends HTMLElement {
 
         <div style="display: grid; gap: var(--space-l); grid-template-columns: ${this.showReports && !this.isNew ? '1fr 400px' : '1fr'};">
           <div style="background: white; border-radius: var(--radius-lg); padding: var(--space-l); box-shadow: var(--shadow-sm);">
-            <form onsubmit="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleSubmit(event)); return false;">
+            <form novalidate onsubmit="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').handleSubmit(event)); return false;">
               <div style="display: grid; gap: var(--space-m);">
                 <div class="form-group">
                   <label>
@@ -799,8 +820,6 @@ export class LooEditor extends HTMLElement {
                         name="lat"
                         value="${loo.location?.lat || ''}"
                         placeholder="51.5074"
-                        readonly
-                        style="background: var(--color-bg-secondary);"
                       >
                     </div>
                     <div class="form-group">
@@ -811,8 +830,6 @@ export class LooEditor extends HTMLElement {
                         name="lng"
                         value="${loo.location?.lng || ''}"
                         placeholder="-0.1278"
-                        readonly
-                        style="background: var(--color-bg-secondary);"
                       >
                     </div>
                   </div>
