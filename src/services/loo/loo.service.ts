@@ -220,9 +220,7 @@ export class LooService {
     return reloaded ? mapLoo(reloaded) : null;
   }
 
-  async deleteById(id: string) {
-    return this.prisma.toilets.delete({ where: { id } });
-  }
+
 
   private reloadLoo(id: string) {
     return this.prisma.toilets.findUnique({

@@ -168,26 +168,6 @@ loosRouter.put(
     }),
 );
 
-/** DELETE /loos/:id */
-loosRouter.delete('/:id', requireAuth, (c) =>
-  handleRoute(c, 'loos.delete', async () => {
-    const chk = requireIdParam(c.req.param('id'));
-    if (!chk.ok) return badRequest(c, chk.error);
 
-    try {
-      await looService.deleteById(chk.id);
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
-        return notFound(c, 'Loo not found');
-      }
-      throw error;
-    }
-
-    return c.body(null, 204);
-  }),
-);
 
 export { loosRouter };
