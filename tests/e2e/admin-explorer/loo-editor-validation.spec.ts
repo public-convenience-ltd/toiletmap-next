@@ -68,7 +68,8 @@ test.describe('Loo Editor - Validation', () => {
       await page.fill('input[name="name"]', 'Boundary Lat Loo');
       
       // Test at exactly 90
-      await setMapLocation(page, 90, 0);
+      await page.fill('input[name="lat"]', '90');
+      await page.fill('input[name="lng"]', '0');
       await submitLooForm(page);
       await page.waitForTimeout(500);
       await expectNoValidationErrors(page);
@@ -78,7 +79,8 @@ test.describe('Loo Editor - Validation', () => {
       await page.fill('input[name="name"]', 'Boundary Lat Loo 2');
       
       // Test at exactly -90
-      await setMapLocation(page, -90, 0);
+      await page.fill('input[name="lat"]', '-90');
+      await page.fill('input[name="lng"]', '0');
       await submitLooForm(page);
       await page.waitForTimeout(500);
       await expectNoValidationErrors(page);
@@ -110,7 +112,8 @@ test.describe('Loo Editor - Validation', () => {
       await page.fill('input[name="name"]', 'Boundary Lng Loo');
       
       // Test at exactly 180
-      await setMapLocation(page, 0, 180);
+      await page.fill('input[name="lat"]', '0');
+      await page.fill('input[name="lng"]', '180');
       await submitLooForm(page);
       await page.waitForTimeout(500);
       await expectNoValidationErrors(page);
@@ -120,7 +123,8 @@ test.describe('Loo Editor - Validation', () => {
       await page.fill('input[name="name"]', 'Boundary Lng Loo 2');
       
       // Test at exactly -180
-      await setMapLocation(page, 0, -180);
+      await page.fill('input[name="lat"]', '0');
+      await page.fill('input[name="lng"]', '-180');
       await submitLooForm(page);
       await page.waitForTimeout(500);
       await expectNoValidationErrors(page);
@@ -375,7 +379,7 @@ test.describe('Loo Editor - Validation', () => {
       
       // Leave optional fields empty
       await page.fill('textarea[name="notes"]', '');
-      await page.fill('textarea[name="removalReason"]', '');
+      await page.fill('input[name="removalReason"]', '');
       
       await submitLooForm(page);
       await page.waitForTimeout(500);

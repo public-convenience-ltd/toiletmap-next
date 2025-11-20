@@ -64,16 +64,16 @@ test.describe('Contributors View', () => {
     await page.waitForLoadState('networkidle');
     
     // Look for clickable contributor items
-    const contributorLinks = page.locator('a[href*="contributor"], button:has-text("View")');
+    const contributorLinks = page.locator('button:has-text("View Details")');
     const count = await contributorLinks.count();
     
     if (count > 0) {
       await contributorLinks.first().click();
-      await page.waitForTimeout(500);
       
-      // Should navigate to details or stay on page with expanded view
-      const component = page.locator('contributor-stats');
-      await expect(component).toBeVisible();
+      // Should navigate to details view
+      // Check for the "Back to Leaderboard" button which is only present in details view
+      const backButton = page.locator('button:has-text("Back to Leaderboard")');
+      await expect(backButton).toBeVisible();
     }
   });
 

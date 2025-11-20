@@ -52,8 +52,8 @@ test.describe('Navigation and Routing', () => {
   test('should navigate to edit view when clicking Add New Loo', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     
-    // Click Add New Loo button
-    const addButton = page.locator('button:has-text("Add New Loo")');
+    // Click Add New Loo button in sidebar
+    const addButton = page.locator('admin-sidebar button:has-text("Add New Loo")');
     await addButton.click();
     await page.waitForLoadState('networkidle');
     
@@ -84,15 +84,19 @@ test.describe('Navigation and Routing', () => {
     // Navigate through views
     await page.click('button:has-text("Map View")');
     await waitForView(page, 'loo-map');
+    await page.waitForTimeout(1000);
     
     await page.click('button:has-text("Statistics")');
     await waitForView(page, 'admin-stats');
+    await page.waitForTimeout(1000);
     
     // Use browser back button
     await page.goBack();
+    await page.waitForTimeout(1000);
     await waitForView(page, 'loo-map');
     
     await page.goBack();
+    await page.waitForTimeout(1000);
     await waitForView(page, 'loo-list');
   });
 
@@ -102,19 +106,25 @@ test.describe('Navigation and Routing', () => {
     // Navigate through views
     await page.click('button:has-text("Map View")');
     await waitForView(page, 'loo-map');
+    await page.waitForTimeout(1000);
     
     await page.click('button:has-text("Statistics")');
     await waitForView(page, 'admin-stats');
+    await page.waitForTimeout(1000);
     
     // Go back twice
     await page.goBack();
+    await page.waitForTimeout(1000);
     await page.goBack();
+    await page.waitForTimeout(1000);
     
     // Go forward
     await page.goForward();
+    await page.waitForTimeout(1000);
     await waitForView(page, 'loo-map');
     
     await page.goForward();
+    await page.waitForTimeout(1000);
     await waitForView(page, 'admin-stats');
   });
 });

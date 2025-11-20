@@ -29,7 +29,7 @@ test.describe('Loo List View', () => {
   test('should display "Add New Loo" button', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     
-    const addButton = page.locator('button:has-text("Add New Loo")');
+    const addButton = page.locator('loo-list button:has-text("Add New Loo")');
     await expect(addButton).toBeVisible();
   });
 
