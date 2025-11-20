@@ -88,9 +88,9 @@ export async function setMapLocation(page: Page, lat: number, lng: number): Prom
   // This simulates a user panning the map to select a location
   await page.evaluate(([lat, lng]) => {
     return new Promise<void>((resolve) => {
-      const editorElement = document.querySelector('loo-editor') as any;
-      if (editorElement && editorElement.mapPicker) {
-        const map = editorElement.mapPicker;
+      const mapPicker = document.querySelector('loo-map-picker') as any;
+      if (mapPicker && mapPicker.map) {
+        const map = mapPicker.map;
         // Listen for moveend event to know when map has finished updating
         map.once('moveend', () => {
           // Give a small delay for coordinate display to update

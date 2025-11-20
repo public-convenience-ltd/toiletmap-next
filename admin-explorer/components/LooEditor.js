@@ -116,7 +116,7 @@ export class LooEditor extends HTMLElement {
     // Display errors
     errors.forEach(({ field, message }) => {
       let input = form.elements[field];
-      if (!input && (field === 'lat' || field === 'lng')) {
+      if (!input) {
           input = this.querySelector(`input[name="${field}"]`);
       }
 
@@ -129,14 +129,6 @@ export class LooEditor extends HTMLElement {
           errorEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
           container.appendChild(errorEl);
         }
-      } else if (field.startsWith('openingHours')) {
-          const container = this.querySelector('opening-hours-editor');
-           if (container) {
-              const errorEl = document.createElement('div');
-              errorEl.className = 'form-error';
-              errorEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
-              container.appendChild(errorEl);
-           }
       }
     });
 
@@ -290,13 +282,18 @@ export class LooEditor extends HTMLElement {
       Toast.show('No original data to reset to', 'error', 2000);
       return;
     }
-
+    console.log('Resetting form. Loo data:', this.loo);
     const form = this.querySelector('form');
     if (!form) return;
 
+    // Reset all form fields to original loo data
     const loo = this.loo;
-
-    if (form.elements['name']) form.elements['name'].value = loo.name || '';
+    
+    // Reset basic fields
+    if (form.elements['name']) {
+        console.log('Resetting name to:', loo.name);
+        form.elements['name'].value = loo.name || '';
+    }
     if (form.elements['notes']) form.elements['notes'].value = loo.notes || '';
     if (form.elements['paymentDetails']) form.elements['paymentDetails'].value = loo.paymentDetails || '';
     if (form.elements['removalReason']) form.elements['removalReason'].value = loo.removalReason || '';
