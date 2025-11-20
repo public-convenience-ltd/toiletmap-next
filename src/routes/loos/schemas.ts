@@ -39,7 +39,7 @@ export const proximitySchema = z
 // Each day is either ["HH:mm", "HH:mm"] (open) or [] (closed)
 // Array has 7 elements: Monday (0) through Sunday (6)
 // If all opening times are unknown, the field is null
-const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+const timeRegex = /^(([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00)$/;
 
 const dayOpeningHoursSchema = z.union([
   z
@@ -53,11 +53,12 @@ const dayOpeningHoursSchema = z.union([
         if (open === '00:00' && close === '00:00') {
           return true;
         }
-        // Otherwise, opening must be before closing
-        return open < close;
+        // Allow any other combination, including overnight (open > close)
+        // and closing at midnight (00:00 or 24:00)
+        return true;
       },
       {
-        message: 'Opening time must be before closing time (or use ["00:00", "00:00"] for 24 hours)',
+        message: 'Invalid opening times',
       }
     ),
   z.array(z.never()).length(0), // Empty array for closed days
