@@ -55,7 +55,6 @@ Every endpoint has at least one e2e spec. When adding new routes, mirror the exi
 
 - **Inspecting queries**: Complex read concerns are isolated in `src/services/loo/sql.ts`. The raw SQL returned from helpers is Prisma-safe (`Prisma.sql`).
 - **Adding new Prisma entities**: Update `prisma/schema.prisma`, run `pnpm prisma:generate`, and import types via `src/generated/prisma-client.ts`.
-- **Working on the admin explorer**: The HTML shell lives under `admin-explorer/`. Routes in `src/routes/admin/index.ts` template the Auth0 metadata; tweak there when wiring new single-page functionality.
 - **Regenerating OpenAPI**: `pnpm docs:generate` writes `docs/openapi.json` using the schema definitions in `src/docs/openapi.ts`.
 
 ## 6. Support Channels

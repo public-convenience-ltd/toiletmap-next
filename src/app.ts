@@ -4,7 +4,6 @@ import { AppVariables } from './types';
 import { loosRouter } from './routes/loos';
 import { areasRouter } from './routes/areas';
 import { openApiDocument } from './docs/openapi';
-import { adminRouter } from './routes/admin';
 
 export const createApp = () => {
   const app = new Hono<{ Variables: AppVariables }>();
@@ -19,7 +18,6 @@ export const createApp = () => {
 
   app.route('/loos', loosRouter);
   app.route('/areas', areasRouter);
-  app.route('/admin', adminRouter);
   app.get('/docs/openapi.json', (c) => c.json(openApiDocument));
   app.get('/docs', swaggerUI({ url: '/docs/openapi.json' }));
 

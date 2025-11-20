@@ -44,7 +44,7 @@ The CLI will read `supabase/config.toml`, run the migrations in `supabase/migrat
 
 ### Testing
 
-The Vitest-powered E2E suite boots Supabase for you (or connects to an already running instance) and exercises every public route, mutation path, and admin/doc endpoint:
+The Vitest-powered E2E suite boots Supabase for you (or connects to an already running instance) and exercises every public route, and mutation path:
 
 ```bash
 pnpm test:e2e

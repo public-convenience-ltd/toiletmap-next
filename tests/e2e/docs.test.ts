@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { openApiDocument } from '../../src/docs/openapi';
-import { env } from '../../src/env';
 import { testClient } from './context';
 
-/** Protects onboarding surfaces: OpenAPI JSON, Swagger UI, and admin shell. */
+/** Protects onboarding surfaces: OpenAPI JSON, and Swagger UI. */
 describe('Documentation & admin routes', () => {
   it('serves the OpenAPI document via /docs/openapi.json', async () => {
     const { response, data } = await testClient.json<typeof openApiDocument>(
@@ -27,23 +26,5 @@ describe('Documentation & admin routes', () => {
     expect(response.headers.get('content-type')).toMatch(/text\/html/);
     expect(html).toContain('id="swagger-ui"');
     expect(html).toContain('/docs/openapi.json');
-  });
-
-  it('renders the admin explorer placeholder with templated Auth0 data', async () => {
-    const response = await testClient.fetch('/admin');
-    const html = await response.text();
-
-    const expectedEnabled = Boolean(
-      env.auth0.dataExplorer.clientId &&
-        env.auth0.audience &&
-        env.auth0.issuerBaseUrl,
-    );
-
-    expect(response.status).toBe(200);
-    expect(html).not.toContain('__AUTH0_ENABLED__');
-    expect(html).toContain(
-      `data-auth0-enabled="${expectedEnabled ? 'true' : 'false'}"`,
-    );
-    expect(html).toContain(`data-auth0-audience="${env.auth0.audience}"`);
   });
 });

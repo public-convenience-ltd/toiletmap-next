@@ -16,10 +16,7 @@
     "supabase:start": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
     "supabase:stop": "supabase stop",
     "supabase:reset": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase db reset",
-    "test:e2e": "vitest run",
-    "test:e2e:playwright": "playwright test",
-    "test:e2e:playwright:ui": "playwright test --ui",
-    "test:e2e:playwright:headed": "playwright test --headed"
+    "test:e2e": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
@@ -36,10 +33,8 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@playwright/test": "^1.48.2",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "22.10.2",
-    "playwright": "^1.48.2",
     "supabase": "^2.58.5",
     "tsx": "4.20.6",
     "typescript": "5.9.3",
