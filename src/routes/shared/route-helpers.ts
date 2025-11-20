@@ -40,13 +40,3 @@ export const badRequest = (
 
 export const notFound = (c: AppContext, message: string) =>
   c.json({ message }, 404);
-
-export const parseJsonBody = async (c: AppContext) => {
-  try {
-    return await c.req.json();
-  } catch {
-    throw new HTTPException(400, {
-      res: c.json({ message: 'Request body must be valid JSON' }, 400),
-    });
-  }
-};
