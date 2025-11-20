@@ -56,18 +56,27 @@ export async function setOpeningHours(
 }
 
 /**
- * Mark a day as closed
+ * Mark a day as closed or set to custom hours
+ * Note: The UI now uses radio buttons for state selection (custom/24hours/closed)
+ * The checkboxes are hidden and managed by the radio button handlers
  */
 export async function setDayClosed(
   page: Page,
   day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday',
   closed: boolean
 ): Promise<void> {
-  const checkbox = page.locator(`input[name="openingHours.${day}.closed"]`);
-  if (closed) {
-    await checkbox.check();
+  // The UI uses radio buttons with labels. We need to click the label to trigger
+  // the onchange handler that updates the hidden checkboxes and disables/enables inputs
+  const stateValue = closed ? 'closed' : 'custom';
+  const radioSelector = `input[name="openingHours.${day}.state"][value="${stateValue}"]`;
+  
+  // Get the radio button's ID and click its label
+  const radioId = await page.locator(radioSelector).getAttribute('id');
+  if (radioId) {
+    await page.click(`label[for="${radioId}"]`);
   } else {
-    await checkbox.uncheck();
+    // Fallback: try clicking the radio directly with force
+    await page.locator(radioSelector).click({ force: true });
   }
 }
 

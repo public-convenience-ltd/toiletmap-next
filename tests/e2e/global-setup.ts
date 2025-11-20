@@ -250,7 +250,7 @@ function loadEnvironment() {
   log('Loading environment variables for E2E tests…');
   for (const file of envCandidates) {
     if (existsSync(file)) {
-      loadEnv({ path: file, override: false });
+      loadEnv({ path: file, override: false, quiet: true });
       log(`Applied environment file: ${file}`);
     }
   }

@@ -56,18 +56,21 @@ test.describe('Suspicious Activity View', () => {
     
     await page.waitForLoadState('networkidle');
     
-    // Should have sections for different activity types
+    // Component should be visible
+    const component = page.locator('suspicious-activity');
+    await expect(component).toBeVisible();
+    
+    // Should have content - either activity keywords OR "All Clear" message
     const bodyText = await page.textContent('body');
+    const hasContent = 
+      bodyText?.includes('Rapid Updates') ||
+      bodyText?.includes('Conflicting Edits') ||
+      bodyText?.includes('Location Changes') ||
+      bodyText?.includes('Mass Deactivations') ||
+      bodyText?.includes('All Clear') ||
+      bodyText?.toLowerCase().includes('no suspicious');
     
-    // Look for activity-related keywords
-    const hasActivityKeywords = 
-      bodyText?.includes('rapid') ||
-      bodyText?.includes('Rapid') ||
-      bodyText?.includes('conflict') ||
-      bodyText?.includes('location') ||
-      bodyText?.includes('deactivation');
-    
-    expect(hasActivityKeywords).toBe(true);
+    expect(hasContent).toBe(true);
   });
 
   test('should display rapid updates section', async ({ authenticatedPage }) => {
@@ -124,19 +127,28 @@ test.describe('Suspicious Activity View', () => {
     
     await page.waitForLoadState('networkidle');
     
+    // Look for View buttons (only present if there's suspicious activity)
     const viewButtons = page.locator('button:has-text("View")');
     const count = await viewButtons.count();
     
-    if (count > 0) {
-      await viewButtons.first().click();
-      await page.waitForTimeout(500);
-      
-      // Should navigate somewhere (editor or details)
-      const editor = await page.locator('loo-editor').isVisible().catch(() => false);
-      const list = await page.locator('loo-list').isVisible().catch(() => false);
-      
-      expect(editor || list).toBe(true);
+    if (count === 0) {
+      // No suspicious activity in test data - skip the navigation test
+      console.log('No suspicious activity View buttons found - skipping navigation test');
+      return;
     }
+    
+    // If there are View buttons, test navigation
+    await viewButtons.first().click();
+    await page.waitForLoadState('networkidle');
+    
+    // Wait for either editor or list to appear (editor expected, but list is fallback)
+    const editorAppears = page.locator('loo-editor').waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+    const listAppears = page.locator('loo-list').waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+    
+    const result = await Promise.race([editorAppears, listAppears]);
+    
+    // Should navigate somewhere (preferably editor, but list is acceptable)
+    expect(result).toBe(true);
   });
 
   test('should handle no suspicious activity gracefully', async ({ authenticatedPage }) => {

@@ -4,6 +4,7 @@ import {
   submitLooForm,
   setTriState,
   setOpeningHours,
+  setDayClosed,
   setMapLocation,
   expectValidationError,
   expectNoValidationErrors,
@@ -264,8 +265,7 @@ test.describe('Loo Editor - Validation', () => {
       await page.fill('input[name="name"]', 'Closed Day Loo');
       
       // Mark Monday as closed (no times needed)
-      const closedCheckbox = page.locator('input[name="openingHours.monday.closed"]');
-      await closedCheckbox.check();
+      await setDayClosed(page, 'monday', true);
       
       await submitLooForm(page);
       await page.waitForTimeout(500);

@@ -359,4 +359,33 @@ describe.sequential('Opening Times Validation', () => {
     // This should be rejected because opening must be BEFORE closing
     expect(response.status).toBe(400);
   });
+
+  it('accepts ["00:00", "00:00"] as 24-hour representation', async () => {
+    const id = generateLooId();
+    const payload = {
+      id,
+      name: 'True 24 Hour Loo',
+      openingTimes: [
+        ['00:00', '00:00'], // Monday - 24 hours
+        ['00:00', '00:00'], // Tuesday - 24 hours
+        ['00:00', '00:00'], // Wednesday - 24 hours
+        ['00:00', '00:00'], // Thursday - 24 hours
+        ['00:00', '00:00'], // Friday - 24 hours
+        ['00:00', '00:00'], // Saturday - 24 hours
+        ['00:00', '00:00'], // Sunday - 24 hours
+      ],
+    };
+
+    const response = await testClient.fetch('/loos', {
+      method: 'POST',
+      headers: authedJsonHeaders(authToken),
+      body: JSON.stringify(payload),
+    });
+
+    expect(response.status).toBe(201);
+    const data = await response.json();
+    expect(data.openingTimes).toEqual(payload.openingTimes);
+    createdIds.push(id);
+  });
 });
+

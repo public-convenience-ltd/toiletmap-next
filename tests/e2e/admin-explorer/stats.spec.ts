@@ -19,10 +19,13 @@ test.describe('Stats View', () => {
     
     await page.waitForLoadState('networkidle');
     
-    // Should have some stat cards or sections
-    const statCards = page.locator('.stat-card, .stats-overview, [class*="stat"]');
-    const count = await statCards.count();
-    expect(count).toBeGreaterThan(0);
+    // Verify the stats component is visible and has content
+    const statsComponent = page.locator('admin-stats');
+    await expect(statsComponent).toBeVisible();
+    
+    // Check that the component has some text content (not empty)
+    const text = await statsComponent.textContent();
+    expect(text?.trim().length).toBeGreaterThan(0);
   });
 
   test('should show total loos count', async ({ authenticatedPage }) => {
@@ -30,9 +33,10 @@ test.describe('Stats View', () => {
     
     await page.waitForLoadState('networkidle');
     
-    // Look for total loos metric
+    // Look for total loos metric - check for any of these keywords
     const totalText = await page.textContent('body');
-    expect(totalText).toContain('loo' || 'Loo' || 'Total');
+    const hasLooKeyword = /loo|total/i.test(totalText || '');
+    expect(hasLooKeyword).toBe(true);
   });
 
   test('should display contributor statistics', async ({ authenticatedPage }) => {

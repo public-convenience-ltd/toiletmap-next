@@ -47,9 +47,19 @@ const dayOpeningHoursSchema = z.union([
       z.string().regex(timeRegex, 'Time must be in HH:mm format'),
       z.string().regex(timeRegex, 'Time must be in HH:mm format'),
     ])
-    .refine(([open, close]) => open < close, {
-      message: 'Opening time must be before closing time',
-    }),
+    .refine(
+      ([open, close]) => {
+        // Special case: ["00:00", "00:00"] represents 24 hours
+        if (open === '00:00' && close === '00:00') {
+          return true;
+        }
+        // Otherwise, opening must be before closing
+        return open < close;
+      },
+      {
+        message: 'Opening time must be before closing time (or use ["00:00", "00:00"] for 24 hours)',
+      }
+    ),
   z.array(z.never()).length(0), // Empty array for closed days
 ]);
 
