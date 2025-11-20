@@ -66,19 +66,28 @@ export async function setDayClosed(
  */
 export async function setMapLocation(page: Page, lat: number, lng: number): Promise<void> {
   // The lat/lng inputs are readonly, so we need to move the map instead
-  // Execute JavaScript to pan the Leaflet map to the desired coordinates
+  // Execute JavaScript to pan the Leaflet map and wait for the moveend event
   await page.evaluate(([lat, lng]) => {
-    const mapContainer = document.querySelector('#location-map-picker') as any;
-    if (mapContainer && mapContainer._leaflet_id) {
-      // Get the Leaflet map instance
-      const map = (window as any).L.Map._instances[mapContainer._leaflet_id];
-      if (map) {
-        map.setView([lat, lng], map.getZoom());
+    return new Promise<void>((resolve) => {
+      const mapContainer = document.querySelector('#location-map-picker') as any;
+      if (mapContainer && mapContainer._leaflet_id) {
+        // Get the Leaflet map instance
+        const map = (window as any).L.Map._instances[mapContainer._leaflet_id];
+        if (map) {
+          // Listen for moveend event to know when map has finished updating
+          map.once('moveend', () => {
+            // Give a small delay for coordinate display to update
+            setTimeout(() => resolve(), 100);
+          });
+          map.setView([lat, lng], map.getZoom());
+        } else {
+          resolve();
+        }
+      } else {
+        resolve();
       }
-    }
+    });
   }, [lat, lng]);
-  
-  await page.waitForTimeout(500); // Wait for map to update and trigger moveend event
 }
 
 /**

@@ -108,10 +108,10 @@ test.describe('Loo Editor - Create New Loo', () => {
     
     // Set weekday hours (Mon-Fri)
     await setOpeningHours(page, 'monday', '09:00', '17:00');
-    
-    // Use "Copy to All" functionality
-    await page.click('button:has-text("Copy to All")');
-    
+
+    // Use copy button to copy Monday's hours to all days
+    await page.click('button[title="Copy to all days"]:near(input[name="openingHours.monday.open"])');
+
     // Mark weekends as closed
     await setDayClosed(page, 'saturday', true);
     await setDayClosed(page, 'sunday', true);
@@ -295,25 +295,25 @@ test.describe('Loo Editor - Create New Loo', () => {
     await waitForToast(page, 'created successfully');
   });
 
-  test('should use "Set Weekday Hours" helper', async ({ authenticatedPage }) => {
+  test('should use "Set Weekdays Only" helper', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    
+
     await page.fill('input[name="name"]', 'Weekday Hours Loo');
-    
+
     // Set Monday hours
     await setOpeningHours(page, 'monday', '09:00', '17:00');
-    
-    // Click "Set Weekday Hours" button
-    await page.click('button:has-text("Set Weekday Hours")');
-    
+
+    // Click "Set Weekdays Only" button
+    await page.click('button:has-text("Set Weekdays Only")');
+
     // Verify Friday has same hours
     const fridayOpen = page.locator('input[name="openingHours.friday.open"]');
     await expect(fridayOpen).toHaveValue('09:00');
-    
+
     // Verify Saturday is marked closed
     const saturdayClosed = page.locator('input[name="openingHours.saturday.closed"]');
     await expect(saturdayClosed).toBeChecked();
-    
+
     await submitLooForm(page);
     await waitForToast(page, 'created successfully');
   });

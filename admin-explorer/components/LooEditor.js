@@ -30,16 +30,12 @@ export class LooEditor extends HTMLElement {
 
     if (looId) {
       await this.loadLoo(looId);
+      // Capture initial form state for edit mode
+      queueMicrotask(() => {
+        this.captureFormData();
+        this.updateChangesSummary();
+      });
     }
-
-    // Set up event listeners after render
-    setTimeout(() => {
-      this.setupPaymentDetailsToggle();
-      this.setupMapPicker();
-      this.captureFormData();
-      this.updateChangesSummary();
-      this.setupFormChangeListeners();
-    }, 100);
   }
 
   setupPaymentDetailsToggle() {
@@ -190,13 +186,14 @@ export class LooEditor extends HTMLElement {
     errors.forEach(({ field, message }) => {
       const input = form.elements[field];
       if (input) {
-        const formGroup = input.closest('.form-group');
-        if (formGroup) {
-          formGroup.classList.add('has-error');
+        // Try to find form-group first, then form-row (for opening hours)
+        const container = input.closest('.form-group') || input.closest('.form-row');
+        if (container) {
+          container.classList.add('has-error');
           const errorEl = document.createElement('div');
           errorEl.className = 'form-error';
           errorEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
-          formGroup.appendChild(errorEl);
+          container.appendChild(errorEl);
         }
       }
     });
@@ -342,10 +339,6 @@ export class LooEditor extends HTMLElement {
       console.log('Opening times:', this.loo.openingTimes);
       this.loading = false;
       this.render();
-      setTimeout(() => {
-        this.setupPaymentDetailsToggle();
-        this.setupMapPicker();
-      }, 100);
     } catch (error) {
       console.error('Failed to load loo:', error);
       Toast.show(error.message || 'Failed to load loo', 'error');
@@ -1054,6 +1047,13 @@ export class LooEditor extends HTMLElement {
         </div>
       </div>
     `;
+
+    // Setup interactive components after DOM update
+    queueMicrotask(() => {
+      this.setupPaymentDetailsToggle();
+      this.setupMapPicker();
+      this.setupFormChangeListeners();
+    });
   }
 }
 
