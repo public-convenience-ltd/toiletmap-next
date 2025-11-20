@@ -503,40 +503,10 @@ export class LooEditor extends HTMLElement {
       return;
     }
 
-    const form = this.querySelector('form');
-    if (!form) return;
-
-    // Reset all text inputs and textareas
-    Object.keys(this.originalFormData).forEach(key => {
-      const element = form.elements[key];
-      if (element) {
-        if (element.type === 'radio') {
-          const radio = form.querySelector(`input[name="${key}"][value="${this.originalFormData[key]}"]`);
-          if (radio) radio.checked = true;
-        } else if (element.type === 'checkbox') {
-          element.checked = this.originalFormData[key];
-        } else {
-          element.value = this.originalFormData[key] || '';
-        }
-      }
-    });
-
-    // Reset opening hours closed states
-    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-      const checkbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-      if (checkbox && this.originalFormData[`openingHours.${day}.closed`] !== undefined) {
-        checkbox.checked = this.originalFormData[`openingHours.${day}.closed`];
-        this.toggleDayInputs(day);
-      }
-    });
-
-    // Reset map if needed
-    if (this.mapPicker && this.originalLocation) {
-      this.mapPicker.setView([this.originalLocation.lat, this.originalLocation.lng], 15);
-    }
+    // Re-render the component to reset all form fields to original loo data
+    this.render();
 
     Toast.show('Form reset to original values', 'success', 2000);
-    this.render();
   }
 
   setupFormChangeListeners() {

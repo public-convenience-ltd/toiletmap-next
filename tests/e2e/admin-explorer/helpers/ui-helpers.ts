@@ -169,7 +169,9 @@ export async function applyFilters(page: Page, filters: {
  * Get the number of loos displayed in the list
  */
 export async function getLooCount(page: Page): Promise<number> {
-  const looItems = await page.locator('loo-list .loo-item').count();
+  // LooList uses a table structure with tbody > tr elements
+  // Exclude the "No loos found" row by checking for button presence
+  const looItems = await page.locator('loo-list tbody tr').filter({ has: page.locator('button') }).count();
   return looItems;
 }
 
@@ -177,7 +179,8 @@ export async function getLooCount(page: Page): Promise<number> {
  * Click on a loo item in the list to edit it
  */
 export async function clickEditLoo(page: Page, index: number = 0): Promise<void> {
-  const looItems = page.locator('loo-list .loo-item');
+  // LooList uses a table structure with tbody > tr elements
+  const looItems = page.locator('loo-list tbody tr');
   await looItems.nth(index).locator('button:has-text("Edit")').click();
   await page.waitForLoadState('networkidle');
 }

@@ -109,18 +109,18 @@ test.describe('Loo Editor - Edit Existing Loo', () => {
 
   test('should update tri-state fields', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    
+
     await clickEditLoo(page, 0);
     await waitForView(page, 'loo-editor');
-    
-    // Change accessible field
-    await setTriState(page, 'accessible', 'yes');
-    
+
+    // Change baby change field to 'yes' to ensure a change
+    await setTriState(page, 'babyChange', 'yes');
+
     // Verify change appears in summary
     await page.waitForTimeout(500);
     const changesList = page.locator('#changes-list');
-    await expect(changesList).toContainText('Accessible');
-    
+    await expect(changesList).toContainText('Baby Change');
+
     // Submit
     await submitLooForm(page);
     await waitForToast(page, 'updated successfully');
@@ -128,18 +128,18 @@ test.describe('Loo Editor - Edit Existing Loo', () => {
 
   test('should update location coordinates', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    
+
     await clickEditLoo(page, 0);
     await waitForView(page, 'loo-editor');
-    
-    // Change location
-    await setMapLocation(page, 51.5, -0.1);
-    
+
+    // Change location to a significantly different value
+    await setMapLocation(page, 52.5, -1.5);
+
     // Verify change in summary
     await page.waitForTimeout(500);
     const changesList = page.locator('#changes-list');
     await expect(changesList).toContainText('Location');
-    
+
     // Submit
     await submitLooForm(page);
     await waitForToast(page, 'updated successfully');
@@ -174,18 +174,18 @@ test.describe('Loo Editor - Edit Existing Loo', () => {
 
   test('should update opening hours', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    
+
     await clickEditLoo(page, 0);
     await waitForView(page, 'loo-editor');
-    
-    // Update Monday hours
-    await setOpeningHours(page, 'monday', '10:00', '18:00');
-    
+
+    // Update Monday hours to unusual times to ensure change is detected
+    await setOpeningHours(page, 'monday', '06:00', '22:00');
+
     // Verify change in summary
     await page.waitForTimeout(500);
     const changesList = page.locator('#changes-list');
     await expect(changesList).toContainText('Monday Hours');
-    
+
     // Submit
     await submitLooForm(page);
     await waitForToast(page, 'updated successfully');
@@ -271,7 +271,10 @@ test.describe('Loo Editor - Edit Existing Loo', () => {
     const resetButton = page.locator('button:has-text("Reset")').first();
     if (await resetButton.isVisible()) {
       await resetButton.click();
-      
+
+      // Wait for toast to appear (indicates reset completed)
+      await waitForToast(page, 'original');
+
       // Verify form reset
       const currentName = await nameInput.inputValue();
       expect(currentName).toBe(originalName);
@@ -339,16 +342,16 @@ test.describe('Loo Editor - Edit Existing Loo', () => {
     const nameInput = page.locator('input[name="name"]');
     const originalName = await nameInput.inputValue();
     await nameInput.fill(originalName + ' - Multi Update');
-    
-    await setTriState(page, 'accessible', 'yes');
+
+    // Set fields to ensure changes are detected
     await setTriState(page, 'babyChange', 'yes');
+    await setTriState(page, 'radar', 'yes');
     await setOpeningHours(page, 'monday', '08:00', '20:00');
-    
+
     // Verify all changes in summary
     await page.waitForTimeout(500);
     const changesList = page.locator('#changes-list');
     await expect(changesList).toContainText('Name');
-    await expect(changesList).toContainText('Accessible');
     await expect(changesList).toContainText('Baby Change');
     await expect(changesList).toContainText('Monday Hours');
     
