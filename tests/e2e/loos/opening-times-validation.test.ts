@@ -178,12 +178,13 @@ describe.sequential('Opening Times Validation', () => {
     expect(data.issues).toBeDefined();
   });
 
-  it('rejects opening times with closing before opening', async () => {
+  it('accepts opening times with closing before opening (overnight)', async () => {
+    const id = generateLooId();
     const payload = {
-      id: generateLooId(),
+      id,
       name: 'Backwards Hours Loo',
       openingTimes: [
-        ['17:00', '09:00'], // Invalid: closing before opening
+        ['17:00', '09:00'], // Valid: overnight
         ['09:00', '17:00'],
         ['09:00', '17:00'],
         ['09:00', '17:00'],
@@ -199,9 +200,10 @@ describe.sequential('Opening Times Validation', () => {
       body: JSON.stringify(payload),
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(201);
     const data = await response.json();
-    expect(data.issues).toBeDefined();
+    expect(data.openingTimes).toEqual(payload.openingTimes);
+    createdIds.push(id);
   });
 
   it('rejects opening times with invalid hour (25:00)', async () => {

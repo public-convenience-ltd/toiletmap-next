@@ -53,8 +53,13 @@ const dayOpeningHoursSchema = z.union([
         if (open === '00:00' && close === '00:00') {
           return true;
         }
+
+        // Disallow same start/end time (unless it's the 24h case above)
+        if (open === close) {
+          return false;
+        }
+
         // Allow any other combination, including overnight (open > close)
-        // and closing at midnight (00:00 or 24:00)
         return true;
       },
       {

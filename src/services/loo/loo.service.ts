@@ -27,12 +27,27 @@ import type {
 } from './types';
 
 /**
- * Coordinates read/write interactions with loos while delegating heavy SQL
- * building to focused helpers for testability and security.
+ * Service for managing Loo (toilet) data.
+ *
+ * Handles all interactions with the database for loos, including:
+ * - Reading loos by ID, proximity, or search criteria.
+ * - Writing loos (create, update/upsert) with audit logging.
+ * - Retrieving audit history (reports).
+ *
+ * This service delegates complex SQL generation to `sql.ts` and
+ * data mapping to `mappers.ts` to keep the core logic clean.
  */
 export class LooService {
   constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
 
+  // ===========================================================================
+  // READ OPERATIONS
+  // ===========================================================================
+
+  /**
+   * Retrieves a single loo by its ID.
+   * Returns null if the loo does not exist.
+   */
   async getById(id: string): Promise<LooResponse | null> {
     const row = await this.prisma.toilets.findUnique({
       where: { id },
@@ -41,6 +56,10 @@ export class LooService {
     return row ? mapLoo(row) : null;
   }
 
+  /**
+   * Retrieves multiple loos by their IDs.
+   * The order of the returned loos matches the order of the input IDs.
+   */
   async getByIds(ids: string[]): Promise<LooResponse[]> {
     if (!ids.length) return [];
 
@@ -56,6 +75,10 @@ export class LooService {
     );
   }
 
+  /**
+   * Searches for loos based on various criteria (text search, filters, etc.).
+   * Supports pagination.
+   */
   async search(
     params: LooSearchParams,
   ): Promise<{ data: LooResponse[]; total: number }> {
@@ -91,6 +114,10 @@ export class LooService {
     return { data, total };
   }
 
+  /**
+   * Finds loos whose geohash starts with the given string.
+   * Useful for map-based tiling or broad area searches.
+   */
   async getWithinGeohash(
     geohash: string,
     active?: boolean | null,
@@ -107,6 +134,10 @@ export class LooService {
     return rows.map(mapLoo);
   }
 
+  /**
+   * Finds loos within a specified radius (in meters) of a coordinate.
+   * Uses PostGIS spherical distance calculation.
+   */
   async getByProximity(
     lat: number,
     lng: number,
@@ -125,6 +156,13 @@ export class LooService {
     );
   }
 
+  /**
+   * Retrieves the audit history (reports) for a specific loo.
+   *
+   * @param id - The ID of the loo.
+   * @param options.hydrate - If true, fully hydrates the report with diffs.
+   *                          If false, returns a summary.
+   */
   async getReports(
     id: string,
     options: { hydrate?: boolean } = {},
@@ -153,6 +191,17 @@ export class LooService {
     );
   }
 
+  // ===========================================================================
+  // WRITE OPERATIONS
+  // ===========================================================================
+
+  /**
+   * Creates a new loo.
+   *
+   * @param id - The ID for the new loo.
+   * @param mutation - The attributes to set on the loo.
+   * @param contributor - The user creating the loo (for audit trail).
+   */
   async create(
     id: string,
     mutation: LooMutationAttributes,
@@ -174,10 +223,20 @@ export class LooService {
       });
     });
 
-    const reloaded = await this.reloadLoo(id);
-    return reloaded ? mapLoo(reloaded) : null;
+    return this.getById(id);
   }
 
+  /**
+   * Updates an existing loo, or creates it if it doesn't exist (Upsert).
+   *
+   * This method uses a "try update, then insert" strategy within a transaction
+   * to ensure atomicity. This is preferred over `prisma.upsert` because we need
+   * to handle custom audit logging logic via `updateLoo` and `insertLoo` helpers.
+   *
+   * @param id - The ID of the loo to upsert.
+   * @param mutation - The attributes to update/set.
+   * @param contributor - The user performing the action.
+   */
   async upsert(
     id: string,
     mutation: LooMutationAttributes,
@@ -192,9 +251,8 @@ export class LooService {
     }) as Prisma.toiletsUncheckedUpdateInput;
 
     await this.prisma.$transaction(async (tx) => {
-      // Try to update first, if not found, insert
-      // We use this pattern instead of prisma.upsert because we need to handle
-      // the audit log (updateLoo/insertLoo helpers handle this)
+      // 1. Attempt to update the existing record.
+      //    The updateLoo helper handles the audit log creation.
       const updatedCount = await updateLoo({
         tx,
         id,
@@ -204,6 +262,8 @@ export class LooService {
         now,
       });
 
+      // 2. If no rows were updated, it means the loo doesn't exist.
+      //    So we insert a new record instead.
       if (updatedCount === 0) {
         await insertLoo({
           tx,
@@ -216,16 +276,6 @@ export class LooService {
       }
     });
 
-    const reloaded = await this.reloadLoo(id);
-    return reloaded ? mapLoo(reloaded) : null;
-  }
-
-
-
-  private reloadLoo(id: string) {
-    return this.prisma.toilets.findUnique({
-      where: { id },
-      include: { areas: areaSelection },
-    });
+    return this.getById(id);
   }
 }

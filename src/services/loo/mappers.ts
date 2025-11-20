@@ -16,6 +16,10 @@ export const areaSelection = {
   },
 } as const;
 
+/**
+ * Extracts coordinates from a GeoJSON-like object or raw database value.
+ * Expects { coordinates: [lng, lat] }.
+ */
 const extractCoordinates = (value: unknown): Coordinates | null => {
   if (!value || typeof value !== 'object') return null;
   const coordinates = (value as { coordinates?: unknown }).coordinates;
@@ -34,6 +38,10 @@ const valuesEqual = (a: unknown, b: unknown) => {
   return JSON.stringify(a) === JSON.stringify(b);
 };
 
+/**
+ * Keys to ignore when calculating the diff between two loo versions.
+ * These are internal fields or fields that change on every update.
+ */
 const IGNORED_AUDIT_DIFF_KEYS = new Set([
   'contributors',
   'geography',
@@ -52,6 +60,9 @@ const toDateISOString = (value: Date | string | null | undefined) => {
   return null;
 };
 
+/**
+ * Maps raw database fields to the common Loo interface.
+ */
 const mapSharedLooFields = (
   source: Partial<toilets> | null | undefined,
 ): LooCommon => ({
@@ -75,9 +86,15 @@ const mapSharedLooFields = (
   location: extractCoordinates(source?.location),
 });
 
+/**
+ * Maps a database area relation to the API AdminGeo format.
+ */
 export const mapArea = (area?: Partial<areas> | null): AdminGeo[] =>
   !area ? [] : [{ name: area.name ?? null, type: area.type ?? null }];
 
+/**
+ * Helper to construct a partial area object from joined columns.
+ */
 export const buildAreaFromJoin = (
   name?: string | null,
   type?: string | null,
@@ -86,6 +103,9 @@ export const buildAreaFromJoin = (
     ? null
     : { name: name ?? null, type: type ?? null };
 
+/**
+ * Maps a raw Prisma Loo result to the public API response format.
+ */
 export const mapLoo = (
   loo: toilets & { areas?: Partial<areas> | null },
 ): LooResponse => ({
@@ -99,6 +119,9 @@ export const mapLoo = (
   ...mapSharedLooFields(loo),
 });
 
+/**
+ * Maps a nearby loo result (including distance) to the public API response format.
+ */
 export const mapNearbyLoo = (
   loo: (toilets & { areas?: Partial<areas> | null }) & { distance: number },
 ): NearbyLooResponse => ({ ...mapLoo(loo), distance: loo.distance });
@@ -110,6 +133,50 @@ const buildReportSnapshot = (source: Partial<toilets> | null | undefined) => ({
   ...mapSharedLooFields(source),
 });
 
+/**
+ * Calculates the difference between two snapshots of a loo.
+ * Returns a record of field names to { previous, current } values.
+ */
+const calculateReportDiff = (
+  currentSnapshot: ReturnType<typeof buildReportSnapshot>,
+  previousSnapshot: ReturnType<typeof buildReportSnapshot> | null,
+) => {
+  const diff: Record<string, { previous: unknown; current: unknown }> = {};
+
+  if (previousSnapshot) {
+    const keys = new Set([
+      ...Object.keys(previousSnapshot),
+      ...Object.keys(currentSnapshot),
+    ]);
+    for (const key of keys) {
+      const nextValue = (currentSnapshot as Record<string, unknown>)[key];
+      const prevValue = (previousSnapshot as Record<string, unknown>)[key];
+      if (!valuesEqual(nextValue, prevValue)) {
+        diff[key] = {
+          previous: prevValue ?? null,
+          current: nextValue ?? null,
+        };
+      }
+    }
+  } else {
+    // Genesis report - show all non-null current values
+    for (const key of Object.keys(currentSnapshot)) {
+      const currentValue = (currentSnapshot as Record<string, unknown>)[key];
+      if (currentValue !== null) {
+        diff[key] = {
+          previous: null,
+          current: currentValue,
+        };
+      }
+    }
+  }
+  return diff;
+};
+
+/**
+ * Maps a raw audit record (record_version) to a ReportResponse.
+ * Calculates the diff between the old and new record states.
+ */
 export const mapAuditRecordToReport = ({
   id,
   ts,
@@ -148,35 +215,7 @@ export const mapAuditRecordToReport = ({
   }
 
   const isSystemReport = locationChanged && !hasNonLocationChanges;
-
-  const diff: Record<string, { previous: unknown; current: unknown }> = {};
-  if (previousSnapshot) {
-    const keys = new Set([
-      ...Object.keys(previousSnapshot),
-      ...Object.keys(currentSnapshot),
-    ]);
-    for (const key of keys) {
-      const nextValue = (currentSnapshot as Record<string, unknown>)[key];
-      const prevValue = (previousSnapshot as Record<string, unknown>)[key];
-      if (!valuesEqual(nextValue, prevValue)) {
-        diff[key] = {
-          previous: prevValue ?? null,
-          current: nextValue ?? null,
-        };
-      }
-    }
-  } else {
-    // Genesis report - show all non-null current values
-    for (const key of Object.keys(currentSnapshot)) {
-      const currentValue = (currentSnapshot as Record<string, unknown>)[key];
-      if (currentValue !== null) {
-        diff[key] = {
-          previous: null,
-          current: currentValue,
-        };
-      }
-    }
-  }
+  const diff = calculateReportDiff(currentSnapshot, previousSnapshot);
 
   return {
     id: id.toString(),

@@ -19,6 +19,11 @@ const buildContributorsUpdateClause = (
       `
     : null;
 
+/**
+ * Converts a location object to a PostGIS geography expression.
+ * We use raw SQL here because Prisma doesn't fully support PostGIS types natively
+ * in a way that allows easy casting to geography(Point, 4326).
+ */
 const geographyExpression = (location: LooMutationAttributes['location']) => {
   if (location === undefined) return null;
   if (location === null) return Prisma.sql`NULL`;
@@ -46,6 +51,11 @@ type InsertArgs = {
   now: Date;
 };
 
+/**
+ * Inserts a new loo record using raw SQL.
+ * Raw SQL is used to handle PostGIS geography types and array operations
+ * that are cumbersome or impossible with standard Prisma create.
+ */
 export const insertLoo = async ({
   tx,
   id,
@@ -95,6 +105,11 @@ type UpdateArgs = {
   now: Date;
 };
 
+/**
+ * Updates an existing loo record using raw SQL.
+ * Handles appending contributors and updating geography fields.
+ * Returns the number of affected rows (0 or 1).
+ */
 export const updateLoo = async ({
   tx,
   id,

@@ -164,6 +164,10 @@ type BuildSearchQueryArgs = {
   offset: number;
 };
 
+/**
+ * Builds the SQL queries for searching loos with pagination.
+ * Returns both the data query and the count query.
+ */
 export const buildSearchQueries = ({ params, limit, offset }: BuildSearchQueryArgs) => {
   const orderExpression =
     SORT_ORDER_SQL[params.sort] ?? SORT_ORDER_SQL['updated-desc'];
@@ -191,6 +195,10 @@ export const buildSearchQueries = ({ params, limit, offset }: BuildSearchQueryAr
   return { dataQuery, countQuery };
 };
 
+/**
+ * Builds a SQL query to select loos by a list of IDs.
+ * Preserves the order of IDs in the result.
+ */
 export const buildSelectByIdsQuery = (ids: readonly string[]) => {
   if (!ids.length) throw new Error('buildSelectByIdsQuery requires ids');
   return Prisma.sql`
@@ -201,6 +209,10 @@ export const buildSelectByIdsQuery = (ids: readonly string[]) => {
   `;
 };
 
+/**
+ * Builds a SQL query to find loos within a certain radius of a point.
+ * Uses PostGIS `ST_DistanceSphere` for calculation.
+ */
 export const buildProximityQuery = (lat: number, lng: number, radius: number) => {
   const distanceSql = Prisma.sql`ST_DistanceSphere(
     loo.geography::geometry,
