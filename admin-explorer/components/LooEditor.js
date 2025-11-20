@@ -3,6 +3,8 @@ import { Toast } from '../utils/Toast.js';
 import { eventBus } from '../utils/EventBus.js';
 import { componentRegistry, getNextComponentId } from '../utils/registry.js';
 import './ReportTimeline.js';
+import './OpeningHoursEditor.js';
+import './LooMapPicker.js';
 
 export class LooEditor extends HTMLElement {
   constructor() {
@@ -13,8 +15,6 @@ export class LooEditor extends HTMLElement {
     this.saving = false;
     this.isNew = true;
     this.showReports = false;
-    this.originalLocation = null;
-    this.mapPicker = null;
     this.originalFormData = null;
   }
 
@@ -61,81 +61,6 @@ export class LooEditor extends HTMLElement {
     }
   }
 
-  setupMapPicker() {
-    const mapContainer = this.querySelector('#location-map-picker');
-    if (!mapContainer || this.mapPicker) return;
-
-    const lat = parseFloat(this.querySelector('input[name="lat"]')?.value) || 51.5074;
-    const lng = parseFloat(this.querySelector('input[name="lng"]')?.value) || -0.1278;
-
-    // Store original location for reset functionality
-    if (!this.isNew && this.loo?.location) {
-      this.originalLocation = {
-        lat: this.loo.location.lat,
-        lng: this.loo.location.lng
-      };
-    }
-
-    this.mapPicker = L.map(mapContainer, {
-      center: [lat, lng],
-      zoom: 15,
-      scrollWheelZoom: true
-    });
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(this.mapPicker);
-
-    // Update coordinates on map move
-    const updateCoordinates = () => {
-      const center = this.mapPicker.getCenter();
-      const latInput = this.querySelector('input[name="lat"]');
-      const lngInput = this.querySelector('input[name="lng"]');
-      const coordsDisplay = this.querySelector('#map-coords-display');
-
-      if (latInput) latInput.value = center.lat.toFixed(6);
-      if (lngInput) lngInput.value = center.lng.toFixed(6);
-      if (coordsDisplay) {
-        coordsDisplay.innerHTML = `<code>${center.lat.toFixed(6)}</code>, <code>${center.lng.toFixed(6)}</code>`;
-      }
-
-      // Update changes summary when coordinates change
-      this.updateChangesSummary();
-    };
-
-    this.mapPicker.on('moveend', updateCoordinates);
-    updateCoordinates();
-
-    // Listen for manual coordinate input changes and update map
-    const latInput = this.querySelector('input[name="lat"]');
-    const lngInput = this.querySelector('input[name="lng"]');
-
-    const updateMapFromInputs = () => {
-      const newLat = parseFloat(latInput?.value);
-      const newLng = parseFloat(lngInput?.value);
-      if (!isNaN(newLat) && !isNaN(newLng) && this.mapPicker) {
-        this.mapPicker.setView([newLat, newLng], this.mapPicker.getZoom());
-      }
-    };
-
-    if (latInput) {
-      latInput.addEventListener('change', updateMapFromInputs);
-    }
-    if (lngInput) {
-      lngInput.addEventListener('change', updateMapFromInputs);
-    }
-  }
-
-  resetMapLocation() {
-    if (!this.mapPicker || !this.originalLocation) {
-      Toast.show('No original location to reset to', 'error', 2000);
-      return;
-    }
-
-    this.mapPicker.setView([this.originalLocation.lat, this.originalLocation.lng], 15);
-    Toast.show('Map location reset to original', 'success', 2000);
-  }
-
   getTriStateValue(fieldName) {
     const checked = this.querySelector(`input[name="${fieldName}"]:checked`);
     if (!checked) return null;
@@ -158,18 +83,19 @@ export class LooEditor extends HTMLElement {
     }
 
     // Validate location coordinates
-    const lat = form.elements['lat']?.value;
-    const lng = form.elements['lng']?.value;
+    const mapPicker = this.querySelector('loo-map-picker');
+    const { lat, lng } = mapPicker ? mapPicker.location : { lat: null, lng: null };
+    
     if (lat && !lng) {
       errors.push({ field: 'lng', message: 'Longitude is required when latitude is provided' });
     }
     if (lng && !lat) {
       errors.push({ field: 'lat', message: 'Latitude is required when longitude is provided' });
     }
-    if (lat && (parseFloat(lat) < -90 || parseFloat(lat) > 90)) {
+    if (lat && (lat < -90 || lat > 90)) {
       errors.push({ field: 'lat', message: 'Latitude must be between -90 and 90' });
     }
-    if (lng && (parseFloat(lng) < -180 || parseFloat(lng) > 180)) {
+    if (lng && (lng < -180 || lng > 180)) {
       errors.push({ field: 'lng', message: 'Longitude must be between -180 and 180' });
     }
 
@@ -180,34 +106,21 @@ export class LooEditor extends HTMLElement {
       errors.push({ field: 'paymentDetails', message: 'Payment details are required when not free' });
     }
 
-    // Validate opening hours - ensure both open and close times are provided for each day
-    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-      const is24Hours = form.elements[`openingHours.${day}.24hours`]?.checked;
-      const closed = form.elements[`openingHours.${day}.closed`]?.checked;
-      
-      if (closed || is24Hours) return; // Skip validation for closed days and 24-hour days
-
-      const open = form.elements[`openingHours.${day}.open`]?.value;
-      const close = form.elements[`openingHours.${day}.close`]?.value;
-      if ((open && !close) || (!open && close)) {
-        errors.push({
-          field: `openingHours.${day}.open`,
-          message: `Both opening and closing times required for ${day.charAt(0).toUpperCase() + day.slice(1)}`
-        });
-      }
-      if (open && close && open >= close) {
-        errors.push({
-          field: `openingHours.${day}.open`,
-          message: `Opening time must be before closing time for ${day.charAt(0).toUpperCase() + day.slice(1)}`
-        });
-      }
-    });
+    // Validate opening hours
+    const openingHoursEditor = this.querySelector('opening-hours-editor');
+    if (openingHoursEditor) {
+        const openingHoursErrors = openingHoursEditor.validate();
+        errors.push(...openingHoursErrors);
+    }
 
     // Display errors
     errors.forEach(({ field, message }) => {
-      const input = form.elements[field];
+      let input = form.elements[field];
+      if (!input && (field === 'lat' || field === 'lng')) {
+          input = this.querySelector(`input[name="${field}"]`);
+      }
+
       if (input) {
-        // Try to find form-group first, then form-row (for opening hours)
         const container = input.closest('.form-group') || input.closest('.form-row');
         if (container) {
           container.classList.add('has-error');
@@ -216,151 +129,18 @@ export class LooEditor extends HTMLElement {
           errorEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
           container.appendChild(errorEl);
         }
+      } else if (field.startsWith('openingHours')) {
+          const container = this.querySelector('opening-hours-editor');
+           if (container) {
+              const errorEl = document.createElement('div');
+              errorEl.className = 'form-error';
+              errorEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+              container.appendChild(errorEl);
+           }
       }
     });
 
     return errors.length === 0;
-  }
-
-  copyHoursToAll(sourceDay) {
-    const form = this.querySelector('form');
-    const openInput = form.querySelector(`input[name="openingHours.${sourceDay}.open"]`);
-    const closeInput = form.querySelector(`input[name="openingHours.${sourceDay}.close"]`);
-    const closedCheckbox = form.querySelector(`input[name="openingHours.${sourceDay}.closed"]`);
-    const is24HoursCheckbox = form.querySelector(`input[name="openingHours.${sourceDay}.24hours"]`);
-
-    if (!openInput || !closeInput || !closedCheckbox || !is24HoursCheckbox) return;
-
-    const openValue = openInput.value;
-    const closeValue = closeInput.value;
-    const closedValue = closedCheckbox.checked;
-    const is24HoursValue = is24HoursCheckbox.checked;
-
-    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-      const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
-      const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
-      const dayClosedCheckbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-      const day24HoursCheckbox = form.querySelector(`input[name="openingHours.${day}.24hours"]`);
-      if (dayOpenInput) dayOpenInput.value = openValue;
-      if (dayCloseInput) dayCloseInput.value = closeValue;
-      if (dayClosedCheckbox) dayClosedCheckbox.checked = closedValue;
-      if (day24HoursCheckbox) day24HoursCheckbox.checked = is24HoursValue;
-      this.toggleDayInputs(day);
-    });
-
-    Toast.show(`Copied ${sourceDay}'s hours to all days`, 'success', 2000);
-  }
-
-  toggleDayInputs(day) {
-    const form = this.querySelector('form');
-    const closedCheckbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-    const is24HoursCheckbox = form.querySelector(`input[name="openingHours.${day}.24hours"]`);
-    const openInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
-    const closeInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
-
-    if (closedCheckbox && is24HoursCheckbox && openInput && closeInput) {
-      const isClosed = closedCheckbox.checked;
-      const is24Hours = is24HoursCheckbox.checked;
-
-      if (isClosed || is24Hours) {
-        // Store current values before clearing
-        if (openInput.value) openInput.dataset.savedValue = openInput.value;
-        if (closeInput.value) closeInput.dataset.savedValue = closeInput.value;
-        openInput.value = '';
-        closeInput.value = '';
-        openInput.disabled = true;
-        closeInput.disabled = true;
-      } else {
-        // Restore saved values if they exist
-        if (openInput.dataset.savedValue) {
-          openInput.value = openInput.dataset.savedValue;
-          delete openInput.dataset.savedValue;
-        }
-        if (closeInput.dataset.savedValue) {
-          closeInput.value = closeInput.dataset.savedValue;
-          delete closeInput.dataset.savedValue;
-        }
-        openInput.disabled = false;
-        closeInput.disabled = false;
-      }
-    }
-  }
-
-  toggleDayState(day, state) {
-    // state can be: 'custom', '24hours', 'closed'
-    const form = this.querySelector('form');
-    const closedCheckbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-    const is24HoursCheckbox = form.querySelector(`input[name="openingHours.${day}.24hours"]`);
-
-    if (!closedCheckbox || !is24HoursCheckbox) return;
-
-    closedCheckbox.checked = (state === 'closed');
-    is24HoursCheckbox.checked = (state === '24hours');
-    this.toggleDayInputs(day);
-  }
-
-  clearAllHours() {
-    const form = this.querySelector('form');
-    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-      const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
-      const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
-      const dayClosedCheckbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-      const day24HoursCheckbox = form.querySelector(`input[name="openingHours.${day}.24hours"]`);
-      if (dayOpenInput) dayOpenInput.value = '';
-      if (dayCloseInput) dayCloseInput.value = '';
-      if (dayClosedCheckbox) dayClosedCheckbox.checked = false;
-      if (day24HoursCheckbox) day24HoursCheckbox.checked = false;
-      this.toggleDayInputs(day);
-    });
-
-    Toast.show('Cleared all opening hours', 'success', 2000);
-  }
-
-  setWeekdayHours() {
-    const form = this.querySelector('form');
-    const mondayOpen = form.querySelector('input[name="openingHours.monday.open"]');
-    const mondayClose = form.querySelector('input[name="openingHours.monday.close"]');
-    const mondayClosed = form.querySelector('input[name="openingHours.monday.closed"]');
-
-    if (!mondayOpen || !mondayClose || !mondayClosed) return;
-
-    const isMondayClosed = mondayClosed.checked;
-
-    if (!isMondayClosed && (!mondayOpen.value || !mondayClose.value)) {
-      Toast.show('Please set Monday hours first', 'error', 2000);
-      return;
-    }
-
-    const openValue = mondayOpen.value;
-    const closeValue = mondayClose.value;
-
-    // Set weekdays (Monday-Friday)
-    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
-      const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
-      const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
-      const dayClosedCheckbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-      const day24HoursCheckbox = form.querySelector(`input[name="openingHours.${day}.24hours"]`);
-      if (dayOpenInput) dayOpenInput.value = openValue;
-      if (dayCloseInput) dayCloseInput.value = closeValue;
-      if (dayClosedCheckbox) dayClosedCheckbox.checked = isMondayClosed;
-      if (day24HoursCheckbox) day24HoursCheckbox.checked = false;
-      this.toggleDayInputs(day);
-    });
-
-    // Mark weekends as closed
-    ['saturday', 'sunday'].forEach(day => {
-      const dayOpenInput = form.querySelector(`input[name="openingHours.${day}.open"]`);
-      const dayCloseInput = form.querySelector(`input[name="openingHours.${day}.close"]`);
-      const dayClosedCheckbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-      const day24HoursCheckbox = form.querySelector(`input[name="openingHours.${day}.24hours"]`);
-      if (dayOpenInput) dayOpenInput.value = '';
-      if (dayCloseInput) dayCloseInput.value = '';
-      if (dayClosedCheckbox) dayClosedCheckbox.checked = true;
-      if (day24HoursCheckbox) day24HoursCheckbox.checked = false;
-      this.toggleDayInputs(day);
-    });
-
-    Toast.show('Set weekday hours (Mon-Fri, weekends closed)', 'success', 2000);
   }
 
   disconnectedCallback() {
@@ -374,7 +154,6 @@ export class LooEditor extends HTMLElement {
     try {
       this.loo = await apiService.getLoo(id);
       console.log('Loaded loo data:', this.loo);
-      console.log('Opening times:', this.loo.openingTimes);
       this.loading = false;
       this.render();
     } catch (error) {
@@ -389,7 +168,6 @@ export class LooEditor extends HTMLElement {
     e.preventDefault();
     const form = e.target;
 
-    // Validate form
     if (!this.validateForm(form)) {
       Toast.show('Please fix the validation errors', 'error', 3000);
       return;
@@ -414,49 +192,36 @@ export class LooEditor extends HTMLElement {
       removalReason: form.elements['removalReason']?.value || null,
     };
 
-    const lat = form.elements['lat']?.value;
-    const lng = form.elements['lng']?.value;
-    if (lat && lng) {
-      data.location = {
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
-      };
+    const mapPicker = this.querySelector('loo-map-picker');
+    if (mapPicker) {
+        const { lat, lng } = mapPicker.location;
+        if (lat && lng) {
+            data.location = { lat, lng };
+        }
     }
 
-    // Collect opening hours and convert to array format
-    // Array has 7 elements: Monday (0) through Sunday (6)
-    // Each element is either ["HH:mm", "HH:mm"] (open), [] (closed), or ["00:00", "00:00"] (24 hours)
-    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const openingTimesArray = [];
-    let hasAnyOpeningTimes = false;
+    const openingHoursEditor = this.querySelector('opening-hours-editor');
+    if (openingHoursEditor) {
+        const times = openingHoursEditor.value;
+        const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const openingTimesArray = [];
+        let hasAnyOpeningTimes = false;
 
-    dayNames.forEach(day => {
-      const is24Hours = form.elements[`openingHours.${day}.24hours`]?.checked;
-      const closed = form.elements[`openingHours.${day}.closed`]?.checked;
-      const open = form.elements[`openingHours.${day}.open`]?.value;
-      const close = form.elements[`openingHours.${day}.close`]?.value;
+        dayNames.forEach(day => {
+            const time = times[day];
+            if (Array.isArray(time) && time.length > 0) {
+                openingTimesArray.push(time);
+                hasAnyOpeningTimes = true;
+            } else {
+                openingTimesArray.push([]);
+            }
+        });
 
-      if (is24Hours) {
-        openingTimesArray.push(['00:00', '00:00']);
-        hasAnyOpeningTimes = true;
-      } else if (closed) {
-        openingTimesArray.push([]);
-      } else if (open && close) {
-        openingTimesArray.push([open, close]);
-        hasAnyOpeningTimes = true;
-      } else {
-        // Unknown opening hours for this day
-        openingTimesArray.push([]);
-      }
-    });
-
-    // If all days are unknown (all empty arrays and no times set), send null
-    if (hasAnyOpeningTimes) {
-      data.openingTimes = openingTimesArray;
-      console.log('Opening times array:', openingTimesArray);
-    } else {
-      data.openingTimes = null;
-      console.log('Opening times set to null (all unknown)');
+        if (hasAnyOpeningTimes) {
+            data.openingTimes = openingTimesArray;
+        } else {
+            data.openingTimes = null;
+        }
     }
 
     this.saving = true;
@@ -466,12 +231,10 @@ export class LooEditor extends HTMLElement {
       if (this.isNew) {
         await apiService.createLoo(data);
         Toast.show('Loo created successfully!', 'success');
-        // Small delay to ensure toast is visible before navigation
         setTimeout(() => this.backToList(), 100);
       } else {
         await apiService.updateLoo(this.loo.id, data);
         Toast.show('Loo updated successfully!', 'success');
-        // Small delay to ensure toast is visible before navigation
         setTimeout(() => this.backToList(), 100);
       }
       this.saving = false;
@@ -499,27 +262,25 @@ export class LooEditor extends HTMLElement {
     const formData = new FormData(form);
     const data = {};
 
-    // Capture all form values
     for (const [key, value] of formData.entries()) {
       data[key] = value;
     }
 
-    // Capture radio button states
     form.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
       data[radio.name] = radio.value;
     });
 
-    // Capture checkbox states for opening hours
-    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
-      const checkbox = form.querySelector(`input[name="openingHours.${day}.closed"]`);
-      const checkbox24Hours = form.querySelector(`input[name="openingHours.${day}.24hours"]`);
-      if (checkbox) {
-        data[`openingHours.${day}.closed`] = checkbox.checked;
-      }
-      if (checkbox24Hours) {
-        data[`openingHours.${day}.24hours`] = checkbox24Hours.checked;
-      }
-    });
+    const mapPicker = this.querySelector('loo-map-picker');
+    if (mapPicker) {
+        const { lat, lng } = mapPicker.location;
+        data.lat = lat;
+        data.lng = lng;
+    }
+
+    const openingHoursEditor = this.querySelector('opening-hours-editor');
+    if (openingHoursEditor) {
+        data.openingTimes = openingHoursEditor.value;
+    }
 
     this.originalFormData = data;
   }
@@ -533,25 +294,18 @@ export class LooEditor extends HTMLElement {
     const form = this.querySelector('form');
     if (!form) return;
 
-    // Reset all form fields to original loo data
     const loo = this.loo;
 
-    // Reset basic fields
     if (form.elements['name']) form.elements['name'].value = loo.name || '';
     if (form.elements['notes']) form.elements['notes'].value = loo.notes || '';
     if (form.elements['paymentDetails']) form.elements['paymentDetails'].value = loo.paymentDetails || '';
     if (form.elements['removalReason']) form.elements['removalReason'].value = loo.removalReason || '';
 
-    // Reset location
-    if (loo.location) {
-      if (form.elements['lat']) form.elements['lat'].value = loo.location.lat;
-      if (form.elements['lng']) form.elements['lng'].value = loo.location.lng;
-      if (this.mapPicker) {
-        this.mapPicker.setView([loo.location.lat, loo.location.lng], this.mapPicker.getZoom());
-      }
+    const mapPicker = this.querySelector('loo-map-picker');
+    if (mapPicker && loo.location) {
+        mapPicker.location = loo.location;
     }
 
-    // Reset tri-state fields
     const triStateFields = ['active', 'accessible', 'allGender', 'attended', 'automatic',
                             'babyChange', 'children', 'men', 'women', 'radar',
                             'urinalOnly', 'noPayment'];
@@ -563,41 +317,17 @@ export class LooEditor extends HTMLElement {
       if (radio) radio.checked = true;
     });
 
-    // Reset opening hours
-    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    if (Array.isArray(loo.openingTimes)) {
-      loo.openingTimes.forEach((dayData, index) => {
-        const dayName = dayNames[index];
-        const closedCheckbox = form.elements[`openingHours.${dayName}.closed`];
-        const is24HoursCheckbox = form.elements[`openingHours.${dayName}.24hours`];
-        const openInput = form.elements[`openingHours.${dayName}.open`];
-        const closeInput = form.elements[`openingHours.${dayName}.close`];
-
-        if (Array.isArray(dayData) && dayData.length === 2) {
-          // Check if it's 24 hours
-          if (dayData[0] === '00:00' && dayData[1] === '00:00') {
-            if (closedCheckbox) closedCheckbox.checked = false;
-            if (is24HoursCheckbox) is24HoursCheckbox.checked = true;
-            if (openInput) openInput.value = '';
-            if (closeInput) closeInput.value = '';
-          } else {
-            if (closedCheckbox) closedCheckbox.checked = false;
-            if (is24HoursCheckbox) is24HoursCheckbox.checked = false;
-            if (openInput) openInput.value = dayData[0];
-            if (closeInput) closeInput.value = dayData[1];
-          }
-        } else {
-          if (closedCheckbox) closedCheckbox.checked = true;
-          if (is24HoursCheckbox) is24HoursCheckbox.checked = false;
-          if (openInput) openInput.value = '';
-          if (closeInput) closeInput.value = '';
-        }
-      });
+    const openingHoursEditor = this.querySelector('opening-hours-editor');
+    if (openingHoursEditor && loo.openingTimes) {
+        const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const times = {};
+        loo.openingTimes.forEach((dayData, index) => {
+            times[dayNames[index]] = dayData;
+        });
+        openingHoursEditor.value = times;
     }
 
-    // Update changes summary
     this.updateChangesSummary();
-
     Toast.show('Form reset to original values', 'success', 2000);
   }
 
@@ -605,7 +335,6 @@ export class LooEditor extends HTMLElement {
     const form = this.querySelector('form');
     if (!form) return;
 
-    // Listen for any input changes to update the summary
     form.addEventListener('input', () => {
       this.updateChangesSummary();
     });
@@ -613,6 +342,8 @@ export class LooEditor extends HTMLElement {
     form.addEventListener('change', () => {
       this.updateChangesSummary();
     });
+    
+    this.addEventListener('location-change', () => this.updateChangesSummary());
   }
 
   updateChangesSummary() {
@@ -662,7 +393,6 @@ export class LooEditor extends HTMLElement {
     const changes = [];
     const currentFormData = new FormData(form);
 
-    // Check tri-state fields
     const triStateFields = ['accessible', 'active', 'allGender', 'attended', 'automatic',
                             'babyChange', 'children', 'men', 'women', 'radar',
                             'urinalOnly', 'noPayment'];
@@ -686,7 +416,6 @@ export class LooEditor extends HTMLElement {
       }
     });
 
-    // Check text fields
     const textFields = ['name', 'notes', 'paymentDetails', 'removalReason'];
     textFields.forEach(field => {
       const element = form.elements[field];
@@ -703,58 +432,48 @@ export class LooEditor extends HTMLElement {
       }
     });
 
-    // Check location
-    const latElement = form.elements['lat'];
-    const lngElement = form.elements['lng'];
-    if (latElement && lngElement) {
-      const currentLat = latElement.value;
-      const currentLng = lngElement.value;
-      const originalLat = this.originalFormData['lat'] || '';
-      const originalLng = this.originalFormData['lng'] || '';
-
-      if (currentLat !== originalLat || currentLng !== originalLng) {
-        changes.push({
-          field: 'Location',
-          from: originalLat && originalLng ? `${originalLat}, ${originalLng}` : '(not set)',
-          to: currentLat && currentLng ? `${currentLat}, ${currentLng}` : '(not set)',
-        });
-      }
+    const mapPicker = this.querySelector('loo-map-picker');
+    if (mapPicker) {
+        const { lat, lng } = mapPicker.location;
+        const originalLat = this.originalFormData['lat'];
+        const originalLng = this.originalFormData['lng'];
+        
+        if (lat != originalLat || lng != originalLng) {
+             changes.push({
+                field: 'Location',
+                from: originalLat && originalLng ? `${originalLat}, ${originalLng}` : '(not set)',
+                to: lat && lng ? `${lat}, ${lng}` : '(not set)',
+             });
+        }
     }
 
-    // Check opening hours
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    dayNames.forEach((dayName, index) => {
-      const dayLower = dayName.toLowerCase();
-      const openElement = form.elements[`openingHours.${dayLower}.open`];
-      const closeElement = form.elements[`openingHours.${dayLower}.close`];
-      const closedCheckbox = form.querySelector(`input[name="openingHours.${dayLower}.closed"]`);
-      const is24HoursCheckbox = form.querySelector(`input[name="openingHours.${dayLower}.24hours"]`);
-
-      const currentOpen = openElement?.value || '';
-      const currentClose = closeElement?.value || '';
-      const currentClosed = closedCheckbox?.checked || false;
-      const current24Hours = is24HoursCheckbox?.checked || false;
-
-      const originalOpen = this.originalFormData[`openingHours.${dayLower}.open`] || '';
-      const originalClose = this.originalFormData[`openingHours.${dayLower}.close`] || '';
-      const originalClosed = this.originalFormData[`openingHours.${dayLower}.closed`] || false;
-      const original24Hours = this.originalFormData[`openingHours.${dayLower}.24hours`] || false;
-
-      if (currentOpen !== originalOpen || currentClose !== originalClose || currentClosed !== originalClosed || current24Hours !== original24Hours) {
-        const formatHours = (open, close, closed, is24Hours) => {
-          if (is24Hours) return '24 Hours';
-          if (closed) return 'Closed';
-          if (open && close) return `${open} - ${close}`;
-          return 'Unknown';
-        };
-
-        changes.push({
-          field: `${dayName} Hours`,
-          from: formatHours(originalOpen, originalClose, originalClosed, original24Hours),
-          to: formatHours(currentOpen, currentClose, currentClosed, current24Hours),
+    const openingHoursEditor = this.querySelector('opening-hours-editor');
+    if (openingHoursEditor) {
+        const currentTimes = openingHoursEditor.value;
+        const originalTimes = this.originalFormData.openingTimes || {};
+        
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+            const current = currentTimes[day] || [];
+            const original = originalTimes[day] || [];
+            
+            const currentStr = JSON.stringify(current);
+            const originalStr = JSON.stringify(original);
+            
+            if (currentStr !== originalStr) {
+                const formatHours = (arr) => {
+                    if (!arr || arr.length === 0) return 'Closed/Unknown';
+                    if (arr[0] === '00:00' && arr[1] === '00:00') return '24 Hours';
+                    return `${arr[0]} - ${arr[1]}`;
+                };
+                
+                changes.push({
+                    field: `${day.charAt(0).toUpperCase() + day.slice(1)} Hours`,
+                    from: formatHours(original),
+                    to: formatHours(current)
+                });
+            }
         });
-      }
-    });
+    }
 
     return changes;
   }
@@ -771,41 +490,6 @@ export class LooEditor extends HTMLElement {
 
     const loo = this.loo || {};
 
-    // Helper function to parse opening times from array format
-    // Array has 7 elements: Monday (0) through Sunday (6)
-    // Each element is either ["HH:mm", "HH:mm"] (open), [] (closed), or ["00:00", "00:00"] (24 hours)
-    const parseOpeningTimes = () => {
-      const times = {};
-      const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-
-      if (Array.isArray(loo.openingTimes)) {
-        loo.openingTimes.forEach((dayData, index) => {
-          const dayName = dayNames[index];
-          if (Array.isArray(dayData) && dayData.length === 2) {
-            // Check for 24-hour representation
-            if (dayData[0] === '00:00' && dayData[1] === '00:00') {
-              times[dayName] = { open: '', close: '', closed: false, is24Hours: true };
-            } else {
-              times[dayName] = { open: dayData[0], close: dayData[1], closed: false, is24Hours: false };
-            }
-          } else {
-            times[dayName] = { open: '', close: '', closed: true, is24Hours: false };
-          }
-        });
-      } else {
-        // Initialize with empty values if no opening times
-        dayNames.forEach(day => {
-          times[day] = { open: '', close: '', closed: false, is24Hours: false };
-        });
-      }
-
-      console.log('Parsed opening times for display:', times);
-      return times;
-    };
-
-    const openingTimes = parseOpeningTimes();
-
-    // Helper function to create tri-state control
     const createTriState = (name, value) => {
       const idPrefix = `${this.componentId}-${name}`;
       return `
@@ -821,6 +505,14 @@ export class LooEditor extends HTMLElement {
         </div>
       `;
     };
+
+    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const openingTimes = {};
+    if (Array.isArray(loo.openingTimes)) {
+        loo.openingTimes.forEach((dayData, index) => {
+            openingTimes[dayNames[index]] = dayData;
+        });
+    }
 
     this.innerHTML = `
       <div style="max-width: 900px;">
@@ -856,54 +548,7 @@ export class LooEditor extends HTMLElement {
                     <i class="fas fa-location-dot"></i>
                     Location
                   </h3>
-                  <div style="margin-bottom: var(--space-s);">
-                    <div class="map-picker">
-                      <div id="location-map-picker" style="width: 100%; height: 100%;"></div>
-                      <div class="map-picker-crosshair">
-                        <i class="fas fa-crosshairs"></i>
-                      </div>
-                      <div class="map-picker-info">
-                        <div class="map-picker-coords" id="map-coords-display">
-                          <code>${loo.location?.lat?.toFixed(6) || '51.507400'}</code>, <code>${loo.location?.lng?.toFixed(6) || '-0.127800'}</code>
-                        </div>
-                        <div style="font-size: var(--text--2); color: var(--color-text-secondary); margin-top: 4px;">
-                          Pan the map to set the location
-                        </div>
-                      </div>
-                    </div>
-                    ${!this.isNew && this.loo?.location ? `
-                      <button
-                        type="button"
-                        class="btn-sm btn-secondary"
-                        onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').resetMapLocation())"
-                        style="margin-top: var(--space-xs);"
-                      >
-                        <i class="fas fa-undo"></i> Reset to Original Location
-                      </button>
-                    ` : ''}
-                  </div>
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-s);">
-                    <div class="form-group">
-                      <label>Latitude</label>
-                      <input
-                        type="number"
-                        step="any"
-                        name="lat"
-                        value="${loo.location?.lat || ''}"
-                        placeholder="51.5074"
-                      >
-                    </div>
-                    <div class="form-group">
-                      <label>Longitude</label>
-                      <input
-                        type="number"
-                        step="any"
-                        name="lng"
-                        value="${loo.location?.lng || ''}"
-                        placeholder="-0.1278"
-                      >
-                    </div>
-                  </div>
+                  <loo-map-picker></loo-map-picker>
                 </div>
 
                 <div class="form-section">
@@ -1015,82 +660,7 @@ export class LooEditor extends HTMLElement {
                 </div>
 
                 <div class="form-section">
-                  <h3>Opening Hours</h3>
-                  <div style="font-size: var(--text--1); color: var(--color-text-secondary); margin-bottom: var(--space-s);">
-                    Set opening hours for each day or mark as closed. If all times are unknown, leave everything blank.
-                  </div>
-                  ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => {
-                    const dayLower = day.toLowerCase();
-                    const hours = openingTimes[dayLower] || { open: '', close: '', closed: false, is24Hours: false };
-                    const openValue = hours.open || '';
-                    const closeValue = hours.close || '';
-                    const isClosed = hours.closed || false;
-                    const is24Hours = hours.is24Hours || false;
-                    const idPrefix = `${this.componentId}-${dayLower}`;
-                    return `
-                      <div class="form-row" style="display: grid; grid-template-columns: 100px 1fr; gap: var(--space-s); align-items: start; margin-bottom: var(--space-s); padding-bottom: var(--space-s); border-bottom: 1px solid var(--color-border);">
-                        <label style="margin: 0; font-weight: 600; padding-top: var(--space-xs);">${day}</label>
-                        <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
-                          <div class="tri-state" style="margin-bottom: var(--space-xs);">
-                            <input type="radio" id="${idPrefix}-custom" name="openingHours.${dayLower}.state" value="custom" ${!isClosed && !is24Hours ? 'checked' : ''} onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').toggleDayState('${dayLower}', 'custom'))">
-                            <label for="${idPrefix}-custom">Custom</label>
-                            
-                            <input type="radio" id="${idPrefix}-24hours" name="openingHours.${dayLower}.state" value="24hours" ${is24Hours ? 'checked' : ''} onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').toggleDayState('${dayLower}', '24hours'))">
-                            <label for="${idPrefix}-24hours">24 Hours</label>
-                            
-                            <input type="radio" id="${idPrefix}-closed" name="openingHours.${dayLower}.state" value="closed" ${isClosed ? 'checked' : ''} onchange="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').toggleDayState('${dayLower}', 'closed'))">
-                            <label for="${idPrefix}-closed">Closed</label>
-                          </div>
-                          <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--space-xs); align-items: center;">
-                            <input
-                              type="time"
-                              name="openingHours.${dayLower}.open"
-                              value="${openValue}"
-                              placeholder="Open"
-                              ${isClosed || is24Hours ? 'disabled' : ''}
-                              style="padding: var(--space-2xs); font-size: var(--text--1);"
-                            >
-                            <input
-                              type="time"
-                              name="openingHours.${dayLower}.close"
-                              value="${closeValue}"
-                              placeholder="Close"
-                              ${isClosed || is24Hours ? 'disabled' : ''}
-                              style="padding: var(--space-2xs); font-size: var(--text--1);"
-                            >
-                            <button
-                              type="button"
-                              class="btn-sm btn-secondary"
-                              onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').copyHoursToAll('${dayLower}'))"
-                              title="Copy to all days"
-                              style="white-space: nowrap; padding: var(--space-3xs) var(--space-2xs);"
-                            >
-                              <i class="fas fa-copy"></i>
-                            </button>
-                          </div>
-                          <!-- Hidden checkboxes for form data -->
-                          <input type="checkbox" name="openingHours.${dayLower}.closed" ${isClosed ? 'checked' : ''} style="display: none;">
-                          <input type="checkbox" name="openingHours.${dayLower}.24hours" ${is24Hours ? 'checked' : ''} style="display: none;">
-                        </div>
-                      </div>
-                    `;
-                  }).join('')}
-                  <div style="margin-top: var(--space-xs); display: flex; gap: var(--space-xs);">
-                    <button
-                      type="button"
-                      class="btn-sm btn-secondary"
-                      onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').clearAllHours())"
-                    >
-                      <i class="fas fa-eraser"></i> Clear All
-                    </button>
-                    <button
-                      type="button"
-                      class="btn-sm btn-secondary"
-                      onclick="import('/admin/utils/registry.js').then(m => m.componentRegistry.get('${this.componentId}').setWeekdayHours())"
-                    >
-                      <i class="fas fa-business-time"></i> Set Weekdays Only
-                    </button>
-                  </div>
+                  <opening-hours-editor></opening-hours-editor>
                 </div>
 
                 <div class="form-group">
@@ -1143,11 +713,24 @@ export class LooEditor extends HTMLElement {
       </div>
     `;
 
-    // Setup interactive components after DOM update
     queueMicrotask(() => {
       this.setupPaymentDetailsToggle();
-      this.setupMapPicker();
       this.setupFormChangeListeners();
+      
+      const mapPicker = this.querySelector('loo-map-picker');
+      if (mapPicker) {
+          if (loo.location) {
+              mapPicker.location = loo.location;
+              mapPicker.original = loo.location;
+          } else {
+              mapPicker.location = { lat: 51.5074, lng: -0.1278 };
+          }
+      }
+      
+      const openingHoursEditor = this.querySelector('opening-hours-editor');
+      if (openingHoursEditor && openingTimes) {
+          openingHoursEditor.value = openingTimes;
+      }
     });
   }
 }
