@@ -10,7 +10,7 @@ const candidateEnvFiles = [
 
 for (const file of candidateEnvFiles) {
   if (existsSync(file)) {
-    loadEnv({ path: file, override: false });
+    loadEnv({ path: file, override: false, quiet: true });
   }
 }
 
