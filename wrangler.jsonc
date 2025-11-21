@@ -8,5 +8,13 @@
         "AUTH0_ISSUER_BASE_URL": "placeholder_value",
         "AUTH0_AUDIENCE": "placeholder_value",
         "POSTGRES_URI": "placeholder_value"
-    }
+    },
+	"observability": {
+		"logs": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"invocation_logs": true,
+		"persist": true
+		}
+	}
 }
