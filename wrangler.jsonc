@@ -7,9 +7,5 @@
 	"observability": {
 		"enabled": true
 	},
-	"upload_source_maps": true,
-	"assets": {
-		"directory": "./dist/toiletmap_server/",
-		"not_found_handling": "single-page-application"
-	}
+	"upload_source_maps": true
 }
