@@ -1,5 +1,13 @@
 import { createApp } from './app';
+import type { Env } from './types';
 
-const app = createApp();
-
-export default app;
+export default {
+    async fetch(
+        request: Request,
+        env: Env,
+        ctx: ExecutionContext,
+    ): Promise<Response> {
+        const app = createApp(env);
+        return app.fetch(request, env, ctx);
+    },
+};

@@ -1,56 +1,55 @@
 import { createMiddleware } from 'hono/factory';
 import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
-import { AppVariables, Auth0User } from '../types';
-import { getRequiredEnv } from '../utils/env-utils';
+import { AppVariables, Auth0User, Env } from '../types';
 
-const getJwksUri = () => {
-  const issuerBaseUrl = getRequiredEnv('AUTH0_ISSUER_BASE_URL');
+const getJwksUri = (issuerBaseUrl: string) => {
   const base = issuerBaseUrl.endsWith('/')
     ? issuerBaseUrl.replace(/\/+$/, '')
     : issuerBaseUrl;
   return `${base}/.well-known/jwks.json`;
 };
 
-const client = jwksClient({
-  jwksUri: getJwksUri(),
-  cache: true,
-  cacheMaxEntries: 5,
-  cacheMaxAge: 10 * 60 * 1000,
-  rateLimit: true,
-  jwksRequestsPerMinute: 10,
-});
-
-const getKey = (header: JwtHeader, callback: SigningKeyCallback) => {
-  if (!header.kid) {
-    return callback(
-      new Error('Missing kid in token header'),
-      undefined,
-    );
-  }
-
-  client.getSigningKey(header.kid, (err, key) => {
-    if (err) {
-      return callback(err, undefined);
-    }
-
-    if (!key) {
-      return callback(
-        new Error('No signing key returned'),
-        undefined,
-      );
-    }
-
-    const signingKey = key.getPublicKey();
-    return callback(null, signingKey);
-  });
-};
-
-const verifyToken = (token: string) =>
+const verifyToken = (
+  token: string,
+  audience: string,
+  issuerBaseUrl: string,
+) =>
   new Promise<Auth0User>((resolve, reject) => {
-    const audience = getRequiredEnv('AUTH0_AUDIENCE');
-    const issuerBaseUrl = getRequiredEnv('AUTH0_ISSUER_BASE_URL');
-    const issuer = issuerBaseUrl.endsWith('/') ? issuerBaseUrl : `${issuerBaseUrl}/`;
+    const issuer = issuerBaseUrl.endsWith('/')
+      ? issuerBaseUrl
+      : `${issuerBaseUrl}/`;
+
+    const client = jwksClient({
+      jwksUri: getJwksUri(issuerBaseUrl),
+      cache: true,
+      cacheMaxEntries: 5,
+      cacheMaxAge: 10 * 60 * 1000,
+      rateLimit: true,
+      jwksRequestsPerMinute: 10,
+    });
+
+    const getKey = (header: JwtHeader, callback: SigningKeyCallback) => {
+      if (!header.kid) {
+        return callback(
+          new Error('Missing kid in token header'),
+          undefined,
+        );
+      }
+
+      client.getSigningKey(header.kid, (err, key) => {
+        if (err) {
+          return callback(err, undefined);
+        }
+
+        if (!key) {
+          return callback(new Error('No signing key returned'), undefined);
+        }
+
+        const signingKey = key.getPublicKey();
+        return callback(null, signingKey);
+      });
+    };
 
     jwt.verify(
       token,
@@ -70,29 +69,34 @@ const verifyToken = (token: string) =>
     );
   });
 
-export const requireAuth = createMiddleware<{ Variables: AppVariables }>(
-  async (c, next) => {
-    const authorizationHeader =
-      c.req.header('authorization') ?? c.req.header('Authorization');
+export const requireAuth = createMiddleware<{
+  Variables: AppVariables;
+  Bindings: Env;
+}>(async (c, next) => {
+  const authorizationHeader =
+    c.req.header('authorization') ?? c.req.header('Authorization');
 
-    if (!authorizationHeader?.startsWith('Bearer ')) {
-      return c.json({ message: 'Unauthorized' }, 401);
-    }
+  if (!authorizationHeader?.startsWith('Bearer ')) {
+    return c.json({ message: 'Unauthorized' }, 401);
+  }
 
-    const token = authorizationHeader.slice(7).trim();
+  const token = authorizationHeader.slice(7).trim();
 
-    if (!token) {
-      return c.json({ message: 'Unauthorized' }, 401);
-    }
+  if (!token) {
+    return c.json({ message: 'Unauthorized' }, 401);
+  }
 
-    try {
-      const user = await verifyToken(token);
-      c.set('user', user);
-    } catch (error) {
-      console.error('Auth0 verification failed', error);
-      return c.json({ message: 'Unauthorized' }, 401);
-    }
+  try {
+    const user = await verifyToken(
+      token,
+      c.env.AUTH0_AUDIENCE,
+      c.env.AUTH0_ISSUER_BASE_URL,
+    );
+    c.set('user', user);
+  } catch (error) {
+    console.error('Auth0 verification failed', error);
+    return c.json({ message: 'Unauthorized' }, 401);
+  }
 
-    return next();
-  },
-);
+  return next();
+});

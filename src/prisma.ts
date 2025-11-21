@@ -1,9 +1,9 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "./generated/prisma/client";
 
-export const createPrismaClient = () => {
+export const createPrismaClient = (databaseUrl: string) => {
   const adapter = new PrismaPg({
-    connectionString: process.env.POSTGRES_URI,
+    connectionString: databaseUrl,
   });
 
   const prisma = new PrismaClient({

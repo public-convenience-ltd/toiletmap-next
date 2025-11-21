@@ -20,12 +20,13 @@ function getStringValue(
  * the most appropriate identifier.
  *
  * **Priority order:**
- * 1. Custom profile nickname (if `AUTH0_PROFILE_KEY` environment variable is set)
+ * 1. Custom profile nickname (if `profileKey` parameter is provided)
  * 2. User's `nickname` field
  * 3. User's `name` field
  * 4. User's `sub` (subject) field
  *
  * @param user - The Auth0 user object from the authentication context
+ * @param profileKey - Optional key to access custom profile data
  * @returns The contributor identifier string, or `null` if none can be determined
  *
  * @example
@@ -37,6 +38,7 @@ function getStringValue(
  */
 export function extractContributor(
   user: Auth0User | undefined | null,
+  profileKey?: string,
 ): string | null {
   // Early return for null/undefined users
   if (!user) {
@@ -44,7 +46,6 @@ export function extractContributor(
   }
 
   // Check for custom profile nickname first (if configured)
-  const profileKey = process.env.AUTH0_PROFILE_KEY;
   if (profileKey) {
     const profileValue = user[profileKey];
     if (typeof profileValue === 'object' && profileValue !== null) {

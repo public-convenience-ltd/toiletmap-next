@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { validate } from '../../common/validator';
-import { AppVariables } from '../../types';
+import { AppVariables, Env } from '../../types';
 import { requireAuth } from '../../middleware/require-auth';
 import {
   handleRoute,
@@ -27,7 +27,7 @@ import {
   searchQuerySchema,
 } from './schemas';
 
-const loosRouter = new Hono<{ Variables: AppVariables }>();
+const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
 /** GET /loos/geohash/:geohash */
 loosRouter.get('/geohash/:geohash', (c) =>
@@ -36,7 +36,7 @@ loosRouter.get('/geohash/:geohash', (c) =>
     if (!geohash) return badRequest(c, 'geohash path parameter is required');
 
     const activeFlag = parseActiveFlag(c.req.query('active'));
-    const looService = new LooService(createPrismaClient());
+    const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
     const loos = await looService.getWithinGeohash(geohash, activeFlag);
 
     return c.json({ data: loos, count: loos.length });
@@ -50,7 +50,7 @@ loosRouter.get(
   (c) =>
     handleRoute(c, 'loos.proximity', async () => {
       const { lat, lng, radius } = c.req.valid('query');
-      const looService = new LooService(createPrismaClient());
+      const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
       const loos = await looService.getByProximity(lat, lng, radius);
 
       return c.json({ data: loos, count: loos.length });
@@ -64,7 +64,7 @@ loosRouter.get(
   (c) =>
     handleRoute(c, 'loos.search', async () => {
       const params = c.req.valid('query') as LooSearchParams;
-      const looService = new LooService(createPrismaClient());
+      const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
       const { data, total } = await looService.search(params);
 
       const offset = (params.page - 1) * params.limit;
@@ -89,7 +89,7 @@ loosRouter.get('/:id/reports', (c) =>
 
     const hydrate =
       (c.req.query('hydrate') ?? '').toLowerCase() === 'true';
-    const looService = new LooService(createPrismaClient());
+    const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
     const reports = await looService.getReports(
       chk.id,
       hydrate ? { hydrate: true } : undefined,
@@ -104,7 +104,7 @@ loosRouter.get('/:id', (c) =>
     const chk = requireIdParam(c.req.param('id'));
     if (!chk.ok) return badRequest(c, chk.error);
 
-    const looService = new LooService(createPrismaClient());
+    const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
     const dto = await looService.getById(chk.id);
     if (!dto) return notFound(c, 'Loo not found');
 
@@ -124,7 +124,7 @@ loosRouter.get('/', (c) =>
         'Provide ids query parameter (comma separated or repeated) to fetch loos',
       );
     }
-    const looService = new LooService(createPrismaClient());
+    const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
     const loos = await looService.getByIds(ids);
     return c.json({ data: loos, count: loos.length });
   }),
@@ -138,14 +138,14 @@ loosRouter.post(
   (c) =>
     handleRoute(c, 'loos.create', async () => {
       const validation = c.req.valid('json');
-      const contributor = extractContributor(c.get('user'));
+      const contributor = extractContributor(c.get('user'), c.env.AUTH0_PROFILE_KEY);
       const { id: requestedId, ...rest } = validation;
       const id = requestedId ?? generateLooId();
 
       if (id.length !== LOO_ID_LENGTH)
         return badRequest(c, `id must be exactly ${LOO_ID_LENGTH} characters`);
 
-      const looService = new LooService(createPrismaClient());
+      const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
       const existing = await looService.getById(id);
       if (existing)
         return c.json({ message: `Loo with id ${id} already exists` }, 409);
@@ -167,8 +167,8 @@ loosRouter.put(
       if (!chk.ok) return badRequest(c, chk.error);
 
       const validation = c.req.valid('json');
-      const contributor = extractContributor(c.get('user'));
-      const looService = new LooService(createPrismaClient());
+      const contributor = extractContributor(c.get('user'), c.env.AUTH0_PROFILE_KEY);
+      const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
       const existing = await looService.getById(chk.id);
       const saved = await looService.upsert(chk.id, validation, contributor);
       if (!saved) throw new Error(`Failed to reload loo ${chk.id} after upsert`);
