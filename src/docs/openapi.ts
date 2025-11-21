@@ -114,11 +114,11 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
   },
   HealthResponse: {
     type: 'object',
-    required: ['status', 'service', 'uptime'],
+    required: ['status', 'service', 'timestamp'],
     properties: {
       status: { type: 'string', enum: ['ok'] },
       service: { type: 'string', example: 'toiletmap-hono-api' },
-      uptime: { type: 'number', example: 42.17 },
+      timestamp: { type: 'string', format: 'date-time', example: '2025-01-21T12:00:00.000Z' },
     },
   },
   JsonValue: jsonValueSchema,
