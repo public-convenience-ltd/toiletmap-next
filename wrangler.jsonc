@@ -1,5 +1,5 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
+	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "toiletmap-server",
 	"main": "./src/index.ts",
 	"compatibility_date": "2025-11-18",
@@ -9,7 +9,7 @@
 	},
 	"upload_source_maps": true,
 	"assets": {
-		"directory": "./dist/client",
+		"directory": "./dist/toiletmap_server/",
 		"not_found_handling": "single-page-application"
 	}
 }

@@ -5,4 +5,5 @@ dist
 .env.local
 .env.test
 .env.test.local
+.wrangler
 prisma/src/generated
