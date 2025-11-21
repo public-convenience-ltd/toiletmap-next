@@ -593,24 +593,6 @@ export const openApiDocument: OpenAPIObject = {
           401: authErrorResponse,
         },
       },
-      delete: {
-        tags: ['Loos'],
-        summary: 'Delete a loo',
-        parameters: [idPathParameter],
-        security: [{ bearerAuth: [] }],
-        responses: {
-          204: { description: 'Loo deleted.' },
-          400: {
-            description: 'Invalid loo identifier.',
-            content: jsonContent('ValidationErrorResponse'),
-          },
-          401: authErrorResponse,
-          404: {
-            description: 'Loo not found.',
-            content: jsonContent('ErrorResponse'),
-          },
-        },
-      },
     },
   '/loos/{id}/reports': {
     get: {
