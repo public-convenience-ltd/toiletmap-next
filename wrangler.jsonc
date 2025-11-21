@@ -4,5 +4,8 @@
 	"main": "./src/index.ts",
 	"compatibility_date": "2025-11-17",
 	"compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
-	"upload_source_maps": true
+	"vars": {
+        "AUTH0_ISSUER_BASE_URL": "placeholder_value",
+        "AUTH0_AUDIENCE": "placeholder_value"
+    }
 }

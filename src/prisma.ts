@@ -2,19 +2,17 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { PrismaClient } from "./generated/prisma/client";
 
-const adapter = new PrismaPg({
-  connectionString: process.env.POSTGRES_URI,
-});
-
 const prismaClientSingleton = () => {
+  const adapter = new PrismaPg({
+    connectionString: process.env.POSTGRES_URI,
+  });
+
   const prisma = new PrismaClient({
     adapter,
     log: ["info"],
   });
 
-  prisma.$extends(withAccelerate());
-
-  return prisma;
+  return prisma.$extends(withAccelerate());
 };
 
 export type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
