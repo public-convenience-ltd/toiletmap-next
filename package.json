@@ -4,18 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "pnpm run prisma:generate && vite build",
-    "start": "NODE_ENV=production node dist/toiletmap_server/index.js",
-    "check": "tsc --noEmit && vite build && wrangler deploy --dry-run",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "check": "wrangler deploy --dry-run",
     "cf-typegen": "wrangler types",
     "deploy": "wrangler deploy",
     "docs:generate": "tsx src/docs/generate.ts",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "supabase:start": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
     "supabase:stop": "supabase stop",
-    "supabase:reset": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase db reset",
-    "test:e2e": "vitest run"
+    "supabase:reset": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase db reset"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.5.1",
@@ -38,7 +36,6 @@
     "@types/node": "22.12.0",
     "@types/pg": "^8.15.6",
     "dotenv": "^17.2.3",
-    "msw": "^2.12.2",
     "supabase": "^2.58.5",
     "tsx": "4.20.6",
     "typescript": "5.9.3",

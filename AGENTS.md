@@ -13,7 +13,6 @@
 - **ORM**: Prisma v6.19+ (TypeScript ORM with type-safe clients)
 - **Validation**: Zod v4+ for runtime schema validation
 - **Authentication**: Auth0 JWT validation (RS256 tokens)
-- **Testing**: Vitest v4+ for E2E tests with deterministic auth server
 - **Runtime**: Node.js 20 (see `.nvmrc`)
 
 ## Architecture
@@ -110,7 +109,6 @@ pnpm supabase:start           # Start local Postgres (Docker)
 
 ```bash
 pnpm dev                      # Start dev server (tsx watch)
-pnpm test:e2e                 # Run full Vitest E2E suite
 pnpm check                    # TypeScript type checking
 pnpm prisma:studio            # Open Prisma Studio UI
 pnpm supabase:reset           # Reset DB with migrations + seed
