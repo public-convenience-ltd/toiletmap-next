@@ -1,11 +1,19 @@
 import { createMiddleware } from 'hono/factory';
 import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
-import { env } from '../env';
 import { AppVariables, Auth0User } from '../types';
+import { getRequiredEnv } from '../utils/env-utils';
+
+const getJwksUri = () => {
+  const issuerBaseUrl = getRequiredEnv('AUTH0_ISSUER_BASE_URL');
+  const base = issuerBaseUrl.endsWith('/')
+    ? issuerBaseUrl.replace(/\/+$/, '')
+    : issuerBaseUrl;
+  return `${base}/.well-known/jwks.json`;
+};
 
 const client = jwksClient({
-  jwksUri: env.auth0.jwksUri,
+  jwksUri: getJwksUri(),
   cache: true,
   cacheMaxEntries: 5,
   cacheMaxAge: 10 * 60 * 1000,
@@ -40,12 +48,16 @@ const getKey = (header: JwtHeader, callback: SigningKeyCallback) => {
 
 const verifyToken = (token: string) =>
   new Promise<Auth0User>((resolve, reject) => {
+    const audience = getRequiredEnv('AUTH0_AUDIENCE');
+    const issuerBaseUrl = getRequiredEnv('AUTH0_ISSUER_BASE_URL');
+    const issuer = issuerBaseUrl.endsWith('/') ? issuerBaseUrl : `${issuerBaseUrl}/`;
+
     jwt.verify(
       token,
       getKey,
       {
-        audience: env.auth0.audience,
-        issuer: env.auth0.issuerBaseUrl,
+        audience,
+        issuer,
         algorithms: ['RS256'],
       },
       (err, decoded) => {

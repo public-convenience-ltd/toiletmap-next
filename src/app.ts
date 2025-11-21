@@ -4,8 +4,12 @@ import { AppVariables } from './types';
 import { loosRouter } from './routes/loos';
 import { areasRouter } from './routes/areas';
 import { openApiDocument } from './docs/openapi';
+import { validateRequiredEnvVars } from './utils/env-utils';
 
 export const createApp = () => {
+  // Validate required environment variables at startup
+  validateRequiredEnvVars();
+
   const app = new Hono<{ Variables: AppVariables }>();
 
   app.get('/', (c) =>

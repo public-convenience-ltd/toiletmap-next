@@ -26,9 +26,6 @@ importers:
       '@prisma/extension-accelerate':
         specifier: ^2.0.2
         version: 2.0.2(@prisma/client@7.0.0(prisma@7.0.0(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
       hono:
         specifier: ^4.10.6
         version: 4.10.6
@@ -63,6 +60,9 @@ importers:
       '@types/pg':
         specifier: ^8.15.6
         version: 8.15.6
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       supabase:
         specifier: ^2.58.5
         version: 2.58.5
