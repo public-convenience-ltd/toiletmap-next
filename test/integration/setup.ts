@@ -1,13 +1,16 @@
 import 'dotenv/config';
 import { beforeAll, afterAll } from 'vitest';
+import { createPrismaClient, type PrismaClientInstance } from '../../src/prisma';
 import { startAuthServer, type IssueTokenFn } from './utils/auth-server';
 
 const state: {
   issueToken: IssueTokenFn | null;
   stopAuthServer: (() => Promise<void>) | null;
+  prisma: PrismaClientInstance | null;
 } = {
   issueToken: null,
   stopAuthServer: null,
+  prisma: null,
 };
 
 const getDatabaseUrl = () => {
@@ -18,21 +21,6 @@ const getDatabaseUrl = () => {
     );
   }
   return url;
-};
-
-const waitForSidecar = async () => {
-  const start = Date.now();
-  while (Date.now() - start < 10000) {
-    try {
-      const res = await fetch('http://localhost:3001/healthcheck');
-      if (res.ok) return;
-      console.log('Sidecar healthcheck status:', res.status);
-    } catch (e) {
-      console.log('Sidecar connection failed:', e.message);
-    }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('Sidecar failed to start');
 };
 
 beforeAll(async () => {
@@ -46,7 +34,9 @@ beforeAll(async () => {
   process.env.AUTH0_ISSUER_BASE_URL = authServer.issuer;
   process.env.AUTH0_PROFILE_KEY = 'app_metadata';
 
-  await waitForSidecar();
+  const prisma = createPrismaClient(databaseUrl);
+  await prisma.$connect();
+  state.prisma = prisma;
 
   state.issueToken = authServer.issueToken;
   state.stopAuthServer = authServer.stop;
@@ -56,13 +46,24 @@ afterAll(async () => {
   if (state.stopAuthServer) {
     await state.stopAuthServer();
   }
+  if (state.prisma) {
+    await state.prisma.$disconnect();
+  }
 });
 
 export const getTestContext = () => {
-  if (!state.issueToken) {
+  if (!state.issueToken || !state.prisma) {
     throw new Error('Integration test context is not ready yet.');
   }
   return {
     issueToken: state.issueToken,
+    prisma: state.prisma,
   };
+};
+
+export const getPrismaClient = (): PrismaClientInstance => {
+  if (!state.prisma) {
+    throw new Error('Prisma client is not initialised for integration tests.');
+  }
+  return state.prisma;
 };
