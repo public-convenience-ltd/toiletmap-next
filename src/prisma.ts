@@ -1,20 +1,30 @@
-import { PrismaClient } from './generated/prisma-client';
-import { env } from './env';
+import { PrismaPg } from "@prisma/adapter-pg";
+import { withAccelerate } from "@prisma/extension-accelerate";
+import { PrismaClient } from "./generated/prisma/client";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient;
-};
+const adapter = new PrismaPg({
+  connectionString: process.env.POSTGRES_URI,
+});
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    datasources: {
-      db: {
-        url: env.postgresUri,
-      },
-    },
+const prismaClientSingleton = () => {
+  const prisma = new PrismaClient({
+    adapter,
+    log: ["info"],
   });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+  prisma.$extends(withAccelerate());
+
+  return prisma;
+};
+
+export type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClientSingleton | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
+
+export { Prisma, toilets, areas } from "./generated/prisma/client";
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

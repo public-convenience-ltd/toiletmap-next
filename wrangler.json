@@ -1,8 +1,8 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "vite-react-template",
+	"name": "toiletmap-server",
 	"main": "./src/index.ts",
-	"compatibility_date": "2025-11-20",
+	"compatibility_date": "2025-11-18",
 	"compatibility_flags": ["nodejs_compat"],
 	"observability": {
 		"enabled": true

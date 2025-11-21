@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { validate } from '../../common/validator';
-import { Prisma } from '../../generated/prisma-client';
 import { AppVariables } from '../../types';
 import { requireAuth } from '../../middleware/require-auth';
 import {

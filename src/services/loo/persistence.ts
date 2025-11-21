@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { Prisma } from '../../generated/prisma-client';
+import { Prisma } from '../../prisma';
 import type { LooMutationAttributes } from './types';
 
 /**
