@@ -1,5 +1,5 @@
 import { createApp } from '../../src/app';
-import { prisma } from '../../src/prisma';
+import { createPrismaClient } from '../../src/prisma';
 
 const app = createApp();
 
@@ -16,4 +16,4 @@ export const testClient = {
   },
 };
 
-export { prisma };
+export { createPrismaClient };

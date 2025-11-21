@@ -1,7 +1,6 @@
 import { LooService } from './loo.service';
 
 export { LooService };
-export const looService = new LooService();
 
 export { LOO_ID_LENGTH, generateLooId } from './persistence';
 

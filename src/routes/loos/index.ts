@@ -14,8 +14,9 @@ import { extractContributor } from '../../utils/auth-utils';
 import {
   LOO_ID_LENGTH,
   generateLooId,
-  looService,
+  LooService,
 } from '../../services/loo';
+import { createPrismaClient } from '../../prisma';
 import type { LooSearchParams } from '../../services/loo/types';
 
 
@@ -35,6 +36,7 @@ loosRouter.get('/geohash/:geohash', (c) =>
     if (!geohash) return badRequest(c, 'geohash path parameter is required');
 
     const activeFlag = parseActiveFlag(c.req.query('active'));
+    const looService = new LooService(createPrismaClient());
     const loos = await looService.getWithinGeohash(geohash, activeFlag);
 
     return c.json({ data: loos, count: loos.length });
@@ -48,6 +50,7 @@ loosRouter.get(
   (c) =>
     handleRoute(c, 'loos.proximity', async () => {
       const { lat, lng, radius } = c.req.valid('query');
+      const looService = new LooService(createPrismaClient());
       const loos = await looService.getByProximity(lat, lng, radius);
 
       return c.json({ data: loos, count: loos.length });
@@ -61,6 +64,7 @@ loosRouter.get(
   (c) =>
     handleRoute(c, 'loos.search', async () => {
       const params = c.req.valid('query') as LooSearchParams;
+      const looService = new LooService(createPrismaClient());
       const { data, total } = await looService.search(params);
 
       const offset = (params.page - 1) * params.limit;
@@ -85,6 +89,7 @@ loosRouter.get('/:id/reports', (c) =>
 
     const hydrate =
       (c.req.query('hydrate') ?? '').toLowerCase() === 'true';
+    const looService = new LooService(createPrismaClient());
     const reports = await looService.getReports(
       chk.id,
       hydrate ? { hydrate: true } : undefined,
@@ -99,6 +104,7 @@ loosRouter.get('/:id', (c) =>
     const chk = requireIdParam(c.req.param('id'));
     if (!chk.ok) return badRequest(c, chk.error);
 
+    const looService = new LooService(createPrismaClient());
     const dto = await looService.getById(chk.id);
     if (!dto) return notFound(c, 'Loo not found');
 
@@ -118,6 +124,7 @@ loosRouter.get('/', (c) =>
         'Provide ids query parameter (comma separated or repeated) to fetch loos',
       );
     }
+    const looService = new LooService(createPrismaClient());
     const loos = await looService.getByIds(ids);
     return c.json({ data: loos, count: loos.length });
   }),
@@ -138,6 +145,7 @@ loosRouter.post(
       if (id.length !== LOO_ID_LENGTH)
         return badRequest(c, `id must be exactly ${LOO_ID_LENGTH} characters`);
 
+      const looService = new LooService(createPrismaClient());
       const existing = await looService.getById(id);
       if (existing)
         return c.json({ message: `Loo with id ${id} already exists` }, 409);
@@ -160,6 +168,7 @@ loosRouter.put(
 
       const validation = c.req.valid('json');
       const contributor = extractContributor(c.get('user'));
+      const looService = new LooService(createPrismaClient());
       const existing = await looService.getById(chk.id);
       const saved = await looService.upsert(chk.id, validation, contributor);
       if (!saved) throw new Error(`Failed to reload loo ${chk.id} after upsert`);

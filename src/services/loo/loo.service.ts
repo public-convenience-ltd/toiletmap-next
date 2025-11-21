@@ -1,4 +1,4 @@
-import { prisma as defaultPrisma, Prisma, PrismaClientSingleton, toilets } from '../../prisma';
+import { Prisma, PrismaClientInstance, toilets } from '../../prisma';
 import {
   areaSelection,
   buildAreaFromJoin,
@@ -36,7 +36,7 @@ import type {
  * data mapping to `mappers.ts` to keep the core logic clean.
  */
 export class LooService {
-  constructor(private readonly prisma: PrismaClientSingleton = defaultPrisma) { }
+  constructor(private readonly prisma: PrismaClientInstance) { }
 
   // ===========================================================================
   // READ OPERATIONS
