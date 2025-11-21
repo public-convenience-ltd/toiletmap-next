@@ -134,6 +134,10 @@ export const loadLooSeedData = async (): Promise<SeedFixtures> => {
     orderBy: { id: 'asc' },
   });
 
+  // Filter out any entries with null geohash (shouldn't happen due to where clause, but TypeScript needs this)
+  const inactiveWithGeohash = inactive
+    .filter((item): item is { id: string; geohash: string } => item.geohash !== null);
+
   const proximityRows = await prisma.$queryRaw<
     Array<{ id: string; lat: number; lng: number }>
   >`SELECT id, ST_Y(geography::geometry) AS lat, ST_X(geography::geometry) AS lng
@@ -178,8 +182,8 @@ export const loadLooSeedData = async (): Promise<SeedFixtures> => {
     reports: { id: surveyed.id, expectations: reportExpectations },
     geohash: {
       prefix: geohashPrefix,
-      inactive: inactive[0] ?? null,
-      allInactive: inactive,
+      inactive: inactiveWithGeohash[0] ?? null,
+      allInactive: inactiveWithGeohash,
     },
     proximity: proximityRows[0],
     areaId,

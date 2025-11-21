@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { baseMutationSchema } from '../../src/routes/loos/schemas';
 import { LooService } from '../../src/services/loo/loo.service';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClientSingleton } from '../../src/prisma';
 
 // Mock persistence helpers to avoid actual DB calls
 vi.mock('../../src/services/loo/persistence', () => ({
@@ -33,7 +33,7 @@ describe('Dataset Validation', () => {
         findMany: vi.fn(),
       },
       $queryRaw: vi.fn(),
-    } as unknown as PrismaClient;
+    } as unknown as PrismaClientSingleton;
 
     const looService = new LooService(mPrismaClient);
 

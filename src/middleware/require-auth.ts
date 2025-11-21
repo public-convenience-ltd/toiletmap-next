@@ -26,6 +26,13 @@ const getKey = (header: JwtHeader, callback: SigningKeyCallback) => {
       return callback(err, undefined);
     }
 
+    if (!key) {
+      return callback(
+        new Error('No signing key returned'),
+        undefined,
+      );
+    }
+
     const signingKey = key.getPublicKey();
     return callback(null, signingKey);
   });
