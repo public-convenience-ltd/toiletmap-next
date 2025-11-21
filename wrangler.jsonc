@@ -2,10 +2,7 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "toiletmap-server",
 	"main": "./src/index.ts",
-	"compatibility_date": "2025-11-18",
-	"compatibility_flags": ["nodejs_compat"],
-	"observability": {
-		"enabled": true
-	},
+	"compatibility_date": "2025-11-17",
+	"compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
 	"upload_source_maps": true
 }
