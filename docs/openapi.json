@@ -7,6 +7,10 @@
   },
   "servers": [
     {
+      "url": "https://toiletmap-server.gbtoiletmap.workers.dev",
+      "description": "Production"
+    },
+    {
       "url": "http://localhost:4001",
       "description": "Local development"
     }

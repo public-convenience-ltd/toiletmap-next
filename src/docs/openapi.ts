@@ -1,4 +1,5 @@
 import { LOO_ID_LENGTH } from '../services/loo';
+import { openApiInfo, openApiServers, openApiTags } from './config';
 
 import type {
   MediaTypeObject,
@@ -434,18 +435,9 @@ const pageParamSchema = {
 
 export const openApiDocument: OpenAPIObject = {
   openapi: '3.1.0',
-  info: {
-    title: 'Toilet Map API',
-    version: '1.0.0',
-    description:
-      'Programmatic access to Toilet Map loos and administrative areas.',
-  },
-  servers: [{ url: 'http://localhost:4001', description: 'Local development' }],
-  tags: [
-    { name: 'Meta', description: 'General service endpoints.' },
-    { name: 'Areas', description: 'Administrative area operations.' },
-    { name: 'Loos', description: 'Operations relating to loos.' },
-  ],
+  info: openApiInfo,
+  servers: openApiServers,
+  tags: openApiTags,
   components: {
     securitySchemes: {
       bearerAuth: {
