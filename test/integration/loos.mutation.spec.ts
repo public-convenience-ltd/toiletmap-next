@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { callApi, jsonRequest } from './utils/test-client';
 import { getTestContext } from './setup';
-import { createLooFixture } from './utils/fixtures';
+import { createLooFixture, getLooById } from './utils/fixtures';
 
 const buildPayload = (overrides: Record<string, unknown> = {}) => ({
   name: 'Central Station',
@@ -37,9 +37,8 @@ describe('loo mutation endpoints', () => {
   });
 
   it('prevents creating duplicate loos by id', async () => {
-    const { prisma } = getTestContext();
     const existingId = 'c'.repeat(24);
-    await createLooFixture(prisma, { id: existingId, name: 'Duplicate' });
+    await createLooFixture({ id: existingId, name: 'Duplicate' });
 
     const response = await callApi(
       '/loos',
@@ -51,7 +50,6 @@ describe('loo mutation endpoints', () => {
   });
 
   it('creates loos end-to-end when payloads are valid', async () => {
-    const { prisma } = getTestContext();
     const response = await callApi(
       '/loos',
       jsonRequest(
@@ -66,7 +64,7 @@ describe('loo mutation endpoints', () => {
     expect(body.name).toBe('Central Station');
     expect(body.noPayment).toBe(true);
 
-    const record = await prisma.toilets.findUnique({ where: { id: body.id } });
+    const record = await getLooById(body.id);
     expect(record?.contributors?.at(-1)).toBe('cf-worker');
   });
 
@@ -94,8 +92,7 @@ describe('loo mutation endpoints', () => {
   });
 
   it('updates an existing loo via upsert', async () => {
-    const { prisma } = getTestContext();
-    const existing = await createLooFixture(prisma, { name: 'Original Name' });
+    const existing = await createLooFixture({ name: 'Original Name' });
 
     const response = await callApi(
       `/loos/${existing.id}`,
@@ -109,7 +106,7 @@ describe('loo mutation endpoints', () => {
     const body = await response.json();
     expect(body.name).toBe('Updated Name');
 
-    const updatedRecord = await prisma.toilets.findUnique({ where: { id: existing.id } });
+    const updatedRecord = await getLooById(existing.id);
     expect(updatedRecord?.contributors?.at(-1)).toBe('update-author');
   });
 });

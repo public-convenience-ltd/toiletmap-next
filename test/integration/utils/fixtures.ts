@@ -1,28 +1,13 @@
-import { randomBytes } from 'node:crypto';
-import type { PrismaClientInstance } from '../../../src/prisma';
-import { LooService } from '../../../src/services/loo';
 import type {
-  Coordinates,
   LooMutationAttributes,
   LooResponse,
 } from '../../../src/services/loo/types';
+import type { toilets } from '../../../src/prisma';
 
-let areaCounter = 0;
-let coordinateCounter = 0;
-
-const deterministicAreaId = (counter: number) =>
-  counter.toString(16).padStart(24, '0').slice(-24);
-
-const nextCoordinates = (): Coordinates => {
-  coordinateCounter += 1;
-  return {
-    lat: 51.5 + coordinateCounter * 0.001,
-    lng: -0.12 - coordinateCounter * 0.001,
-  };
-};
+const SIDECAR_URL = 'http://localhost:3001';
 
 export const createAreaFixture = async (
-  prisma: PrismaClientInstance,
+  // prisma argument removed
   overrides: {
     id?: string;
     name?: string | null;
@@ -32,18 +17,17 @@ export const createAreaFixture = async (
     version?: number | null;
   } = {},
 ) => {
-  areaCounter += 1;
-  const area = await prisma.areas.create({
-    data: {
-      id: overrides.id ?? deterministicAreaId(areaCounter),
-      name: overrides.name ?? `Area ${areaCounter}`,
-      type: overrides.type ?? 'borough',
-      priority: overrides.priority ?? areaCounter,
-      dataset_id: overrides.datasetId ?? 1,
-      version: overrides.version ?? 1,
-    },
+  const response = await fetch(`${SIDECAR_URL}/fixtures/area`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(overrides),
   });
-  return area;
+
+  if (!response.ok) {
+    throw new Error(`Failed to create area fixture: ${response.statusText}`);
+  }
+
+  return response.json();
 };
 
 export type LooFixtureOverrides = LooMutationAttributes & {
@@ -51,47 +35,48 @@ export type LooFixtureOverrides = LooMutationAttributes & {
   contributor?: string | null;
 };
 
-const generateLooId = () => randomBytes(12).toString('hex');
-
 export const createLooFixture = async (
-  prisma: PrismaClientInstance,
+  // prisma argument removed
   overrides: LooFixtureOverrides = {},
 ): Promise<LooResponse> => {
-  const {
-    id = generateLooId(),
-    contributor = 'integration-fixture',
-    ...mutationOverrides
-  } = overrides;
+  const response = await fetch(`${SIDECAR_URL}/fixtures/loo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(overrides),
+  });
 
-  const { location: _ignoredLocation, ...withoutLocation } = mutationOverrides;
-  const hasCustomLocation = Object.prototype.hasOwnProperty.call(
-    overrides,
-    'location',
-  );
-  const locationValue = hasCustomLocation
-    ? (mutationOverrides.location ?? null)
-    : nextCoordinates();
-
-  const mutation: LooMutationAttributes = {
-    ...withoutLocation,
-    location: locationValue,
-  };
-
-  if (mutation.name === undefined) {
-    mutation.name = `Integration Loo ${coordinateCounter}`;
-  }
-  if (mutation.active === undefined) {
-    mutation.active = true;
-  }
-  if (mutation.accessible === undefined) {
-    mutation.accessible = true;
+  if (!response.ok) {
+    throw new Error(`Failed to create loo fixture: ${response.statusText}`);
   }
 
-  const service = new LooService(prisma);
-  await service.create(id, mutation, contributor);
-  const record = await service.getById(id);
-  if (!record) {
-    throw new Error('Failed to load loo fixture');
+  return response.json() as Promise<LooResponse>;
+};
+
+export const getLooById = async (id: string): Promise<toilets | null> => {
+  const response = await fetch(`${SIDECAR_URL}/loos/${id}`);
+  if (response.status === 404) {
+    return null;
   }
-  return record;
+  if (!response.ok) {
+    throw new Error(`Failed to get loo: ${response.statusText}`);
+  }
+  return response.json() as Promise<toilets>;
+};
+
+export const upsertLooFixture = async (
+  id: string,
+  data: LooMutationAttributes,
+  contributor: string,
+): Promise<LooResponse> => {
+  const response = await fetch(`${SIDECAR_URL}/fixtures/upsert-loo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, data, contributor }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to upsert loo fixture: ${response.statusText}`);
+  }
+
+  return response.json() as Promise<LooResponse>;
 };

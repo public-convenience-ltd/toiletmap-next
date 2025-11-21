@@ -32,7 +32,7 @@ export const createApp = (env: Env) => {
 
   app.onError((err, c) => {
     console.error('Unhandled error', err);
-    return c.json({ message: 'Internal Server Error' }, 500);
+    return c.json({ message: 'Internal Server Error', error: String(err), stack: err instanceof Error ? err.stack : undefined }, 500);
   });
 
   return app;

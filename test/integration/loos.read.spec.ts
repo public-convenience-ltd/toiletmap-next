@@ -1,20 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { callApi } from './utils/test-client';
-import { getTestContext } from './setup';
-import { createLooFixture } from './utils/fixtures';
-import { LooService } from '../../src/services/loo';
+import { createLooFixture, upsertLooFixture } from './utils/fixtures';
 
 const validButMissingId = '0'.repeat(24);
 
 describe('loo read endpoints', () => {
   it('filters geohash queries by the active flag', async () => {
-    const { prisma } = getTestContext();
-    const active = await createLooFixture(prisma, {
+    const active = await createLooFixture({
       name: 'Active Loo',
       location: { lat: 51.501, lng: -0.141 },
       active: true,
     });
-    const inactive = await createLooFixture(prisma, {
+    const inactive = await createLooFixture({
       name: 'Inactive Loo',
       location: { lat: 51.5015, lng: -0.1415 },
       active: false,
@@ -50,12 +47,11 @@ describe('loo read endpoints', () => {
   });
 
   it('returns nearby loos ordered by distance with the proximity endpoint', async () => {
-    const { prisma } = getTestContext();
-    const nearer = await createLooFixture(prisma, {
+    const nearer = await createLooFixture({
       name: 'Closer Loo',
       location: { lat: -10, lng: -10 },
     });
-    const farther = await createLooFixture(prisma, {
+    const farther = await createLooFixture({
       name: 'Farther Loo',
       location: { lat: -10, lng: -10.2 },
     });
@@ -71,10 +67,9 @@ describe('loo read endpoints', () => {
   });
 
   it('includes pagination metadata when searching loos', async () => {
-    const { prisma } = getTestContext();
-    await createLooFixture(prisma, { name: 'Central Library' });
-    await createLooFixture(prisma, { name: 'Central Park' });
-    await createLooFixture(prisma, { name: 'Riverside Walk' });
+    await createLooFixture({ name: 'Central Library' });
+    await createLooFixture({ name: 'Central Park' });
+    await createLooFixture({ name: 'Riverside Walk' });
 
     const response = await callApi(
       '/loos/search?search=Central&limit=1&page=2&sort=created-desc',
@@ -90,10 +85,9 @@ describe('loo read endpoints', () => {
   });
 
   it('returns audit history summaries and hydrated reports', async () => {
-    const { prisma } = getTestContext();
-    const target = await createLooFixture(prisma, { name: 'Audited Loo' });
-    const service = new LooService(prisma);
-    await service.upsert(
+    const target = await createLooFixture({ name: 'Audited Loo' });
+
+    await upsertLooFixture(
       target.id,
       { notes: 'Updated notes', radar: true },
       'report-author',
@@ -123,8 +117,7 @@ describe('loo read endpoints', () => {
     expect(missingResponse.status).toBe(404);
     expect(await missingResponse.json()).toEqual({ message: 'Loo not found' });
 
-    const { prisma } = getTestContext();
-    const existing = await createLooFixture(prisma, { name: 'Detail Loo' });
+    const existing = await createLooFixture({ name: 'Detail Loo' });
     const detailResponse = await callApi(`/loos/${existing.id}`);
     expect(detailResponse.status).toBe(200);
     const detail = await detailResponse.json();
@@ -140,11 +133,13 @@ describe('loo read endpoints', () => {
         'Provide ids query parameter (comma separated or repeated) to fetch loos',
     });
 
-    const { prisma } = getTestContext();
-    const first = await createLooFixture(prisma, { name: 'One' });
-    const second = await createLooFixture(prisma, { name: 'Two' });
+    const first = await createLooFixture({ name: 'One' });
+    const second = await createLooFixture({ name: 'Two' });
 
     const response = await callApi(`/loos?ids=${first.id},${second.id}`);
+    if (response.status !== 200) {
+      console.error('API Error Body:', await response.text());
+    }
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.count).toBe(2);

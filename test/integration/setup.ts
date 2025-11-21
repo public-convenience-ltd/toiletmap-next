@@ -1,15 +1,11 @@
 import { env } from 'cloudflare:test';
 import { beforeAll, afterAll } from 'vitest';
-import { createPrismaClient, type PrismaClientInstance } from '../../src/prisma';
-import { ensureDatabaseConnection } from './utils/database';
 import { startAuthServer, type IssueTokenFn } from './utils/auth-server';
 
 const state: {
-  prisma: PrismaClientInstance | null;
   issueToken: IssueTokenFn | null;
   stopAuthServer: (() => Promise<void>) | null;
 } = {
-  prisma: null,
   issueToken: null,
   stopAuthServer: null,
 };
@@ -27,6 +23,21 @@ const getDatabaseUrl = () => {
   return url;
 };
 
+const waitForSidecar = async () => {
+  const start = Date.now();
+  while (Date.now() - start < 10000) {
+    try {
+      const res = await fetch('http://localhost:3001/healthcheck');
+      if (res.ok) return;
+      console.log('Sidecar healthcheck status:', res.status);
+    } catch (e) {
+      console.log('Sidecar connection failed:', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('Sidecar failed to start');
+};
+
 beforeAll(async () => {
   const databaseUrl = getDatabaseUrl();
   env.POSTGRES_URI = databaseUrl;
@@ -38,27 +49,23 @@ beforeAll(async () => {
   env.AUTH0_ISSUER_BASE_URL = authServer.issuer;
   env.AUTH0_PROFILE_KEY = 'app_metadata';
 
-  const prisma = createPrismaClient(databaseUrl);
-  state.prisma = prisma;
+  await waitForSidecar();
+
   state.issueToken = authServer.issueToken;
   state.stopAuthServer = authServer.stop;
 });
 
 afterAll(async () => {
-  if (state.prisma) {
-    await state.prisma.$disconnect();
-  }
   if (state.stopAuthServer) {
     await state.stopAuthServer();
   }
 });
 
 export const getTestContext = () => {
-  if (!state.prisma || !state.issueToken) {
+  if (!state.issueToken) {
     throw new Error('Integration test context is not ready yet.');
   }
   return {
-    prisma: state.prisma,
     issueToken: state.issueToken,
   };
 };

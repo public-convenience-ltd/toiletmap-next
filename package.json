@@ -13,7 +13,8 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "supabase:start": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
     "supabase:stop": "supabase stop",
-    "supabase:reset": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase db reset"
+    "supabase:reset": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase db reset",
+    "test:e2e": "bash scripts/test-e2e.sh"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.5.1",

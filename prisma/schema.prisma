@@ -6,6 +6,12 @@ generator client {
   output       = "../src/generated/prisma"
 }
 
+generator client_sidecar {
+  previewFeatures = ["postgresqlExtensions"]
+  provider        = "prisma-client"
+  output          = "../test/integration/generated/client"
+}
+
 datasource db {
   provider   = "postgresql"
   extensions = [postgis(schema: "extensions"), uuid_ossp(map: "uuid-ossp", schema: "extensions")]
