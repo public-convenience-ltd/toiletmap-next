@@ -16,4 +16,4 @@ export const createPrismaClient = () => {
 
 export type PrismaClientInstance = ReturnType<typeof createPrismaClient>;
 
-export { Prisma, toilets, areas } from "./generated/prisma/client";
+export { Prisma, type toilets, type areas } from "./generated/prisma/client";
