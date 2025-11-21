@@ -22,7 +22,7 @@
     "@hono/zod-openapi": "^1.1.4",
     "@hono/zod-validator": "^0.7.5",
     "@prisma/adapter-pg": "^7.0.0",
-    "@prisma/client": "^7.0.0",
+    "@prisma/client": "^7.1.0-dev.3",
     "hono": "^4.10.6",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.0",
@@ -45,6 +45,6 @@
     "wrangler": "^4.50.0"
   },
   "overrides": {
-    "hono": "^4.10.6"
+    "hono": "~4.10.6"
   }
 }

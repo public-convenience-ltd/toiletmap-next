@@ -2,6 +2,7 @@ generator client {
   previewFeatures = ["postgresqlExtensions"]
   provider        = "prisma-client"
   moduleFormat = "esm"
+  runtime      = "cloudflare"
   output       = "../src/generated/prisma"
 }
 
