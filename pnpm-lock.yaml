@@ -21,8 +21,8 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
       '@prisma/client':
-        specifier: ^7.1.0-dev.3
-        version: 7.1.0-integration-engines-7-1-0-1-fix-broken-links-4f977cbccf35d76bd3516f82bb56758fe51d4e5e.1(prisma@7.0.0(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
+        specifier: ^7.0.0
+        version: 7.0.0(prisma@7.0.0(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
       hono:
         specifier: ^4.10.6
         version: 4.10.6
@@ -789,11 +789,11 @@ packages:
   '@prisma/adapter-pg@7.0.0':
     resolution: {integrity: sha512-cis1Ib+TVbtSi2VU5Zm1fSmAcA8jg7KwUTbJ6LcWIm1eww380utXM8G23F3UCEPOJO4HiKt6adP/Q1hukjAkgw==}
 
-  '@prisma/client-runtime-utils@7.1.0-integration-engines-7-1-0-1-fix-broken-links-4f977cbccf35d76bd3516f82bb56758fe51d4e5e.1':
-    resolution: {integrity: sha512-g3Oogq1X6+wF7sWbfst4Gamr+tof8hfJ4yGgZMMikmI+2tgEj8Ud2l/TbjVpwNVC62r8DjdwJTLY7x70mWGgOg==}
+  '@prisma/client-runtime-utils@7.0.0':
+    resolution: {integrity: sha512-PAiFgMBPrLSaakBwUpML5NevipuKSL3rtNr8pZ8CZ3OBXo0BFcdeGcBIKw/CxJP6H4GNa4+l5bzJPrk8Iq6tDw==}
 
-  '@prisma/client@7.1.0-integration-engines-7-1-0-1-fix-broken-links-4f977cbccf35d76bd3516f82bb56758fe51d4e5e.1':
-    resolution: {integrity: sha512-ZNQwdCEjBRldYrPojnFNKJn99pix0HKw0FHIQ5xrAOTTg1Qhp1MUbZdPKskpy7hB2NN8i8wimytngqZgLtQl2Q==}
+  '@prisma/client@7.0.0':
+    resolution: {integrity: sha512-FM1NtJezl0zH3CybLxcbJwShJt7xFGSRg+1tGhy3sCB8goUDnxnBR+RC/P35EAW8gjkzx7kgz7bvb0MerY2VSw==}
     engines: {node: ^20.19 || ^22.12 || ^24.0}
     peerDependencies:
       prisma: '*'
@@ -2336,11 +2336,11 @@ snapshots:
     transitivePeerDependencies:
       - pg-native
 
-  '@prisma/client-runtime-utils@7.1.0-integration-engines-7-1-0-1-fix-broken-links-4f977cbccf35d76bd3516f82bb56758fe51d4e5e.1': {}
+  '@prisma/client-runtime-utils@7.0.0': {}
 
-  '@prisma/client@7.1.0-integration-engines-7-1-0-1-fix-broken-links-4f977cbccf35d76bd3516f82bb56758fe51d4e5e.1(prisma@7.0.0(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)':
+  '@prisma/client@7.0.0(prisma@7.0.0(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
-      '@prisma/client-runtime-utils': 7.1.0-integration-engines-7-1-0-1-fix-broken-links-4f977cbccf35d76bd3516f82bb56758fe51d4e5e.1
+      '@prisma/client-runtime-utils': 7.0.0
     optionalDependencies:
       prisma: 7.0.0(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
       typescript: 5.9.3

@@ -16,4 +16,7 @@ export const testClient = {
   },
 };
 
+/** Singleton Prisma client for tests */
+export const prisma = createPrismaClient();
+
 export { createPrismaClient };

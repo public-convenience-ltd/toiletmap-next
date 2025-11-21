@@ -4,6 +4,15 @@ export default defineConfig({
   resolve: {
     extensions: ['.ts', '.js', '.mjs', '.jsx', '.tsx', '.json'],
   },
+  assetsInclude: ['**/*.wasm', '**/*.wasm?module'],
+  server: {
+    fs: {
+      allow: ['..'],
+    },
+  },
+  optimizeDeps: {
+    exclude: ['@prisma/client', '@prisma/adapter-pg'],
+  },
   test: {
     environment: 'node',
     include: ['tests/e2e/**/*.test.ts'],
