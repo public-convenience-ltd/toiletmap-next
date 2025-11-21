@@ -2,7 +2,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import type { PrismaClient as PrismaClientType } from "./generated/prisma/client";
 
 // Use test-compatible client in Node.js test environment, Cloudflare client otherwise
-const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+const isTestEnv =
+  process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 const clientModule = isTestEnv
   ? await import("../test/integration/generated/client/client")
   : await import("./generated/prisma/client");

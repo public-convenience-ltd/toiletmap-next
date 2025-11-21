@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "start": "wrangler dev",
-    "build": "wrangler build",
+    "build": "pnpm prisma:generate && wrangler build",
     "check": "wrangler deploy --dry-run",
     "cf-typegen": "wrangler types",
     "deploy": "wrangler deploy",
