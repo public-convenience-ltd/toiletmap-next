@@ -1,0 +1,12 @@
+# Cloudflare Workers Development Variables
+# These variables are loaded by wrangler during local development and testing
+# Copy this to .dev.vars and fill in your actual values
+
+# Database connection
+# Get this from: pnpm supabase:start (after starting Supabase locally)
+POSTGRES_URI=
+
+# Optional: Override AUTH0 settings for local testing
+# AUTH0_ISSUER_BASE_URL=
+# AUTH0_AUDIENCE=
+# AUTH0_PROFILE_KEY=
