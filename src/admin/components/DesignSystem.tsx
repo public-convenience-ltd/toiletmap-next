@@ -20,17 +20,43 @@ export const Input = (props: {
     name: string;
     value?: string;
     placeholder?: string;
+    error?: string;
 }) => {
     return (
         <label style="display: block; margin-bottom: var(--space-m);">
-            <span style="font-weight: bold;">{props.label}</span>
+            <span class="form-label" style="display: block; margin-bottom: var(--space-2xs);">{props.label}</span>
             <input
                 class="input"
                 type={props.type || 'text'}
                 name={props.name}
                 value={props.value}
                 placeholder={props.placeholder}
+                style={props.error ? 'border-color: var(--color-accent-pink);' : ''}
             />
+            {props.error && <FormError message={props.error} />}
+        </label>
+    );
+};
+
+export const TextArea = (props: {
+    label: string;
+    name: string;
+    value?: string;
+    placeholder?: string;
+    rows?: number;
+    error?: string;
+}) => {
+    return (
+        <label style="display: block; margin-bottom: var(--space-m);">
+            <span class="form-label" style="display: block; margin-bottom: var(--space-2xs);">{props.label}</span>
+            <textarea
+                class="text-area"
+                name={props.name}
+                rows={props.rows || 4}
+                placeholder={props.placeholder}
+                style={props.error ? 'border-color: var(--color-accent-pink);' : ''}
+            >{props.value}</textarea>
+            {props.error && <FormError message={props.error} />}
         </label>
     );
 };
@@ -38,26 +64,35 @@ export const Input = (props: {
 export const TriStateToggle = (props: {
     label: string;
     name: string;
-    value?: string | null; // 'true', 'false', or null/undefined
+    value?: string | null;
+    error?: string;
 }) => {
-    // Simple implementation using radio buttons for now
     return (
         <div style="margin-bottom: var(--space-m);">
-            <span style="font-weight: bold; display: block; margin-bottom: var(--space-3xs);">{props.label}</span>
-            <div style="display: flex; gap: var(--space-s);">
-                <label style="display: flex; align-items: center; gap: var(--space-3xs);">
+            <span class="form-label" style="display: block; margin-bottom: var(--space-2xs);">{props.label}</span>
+            <div class="tri-state-container">
+                <label class="tri-state-option">
                     <input type="radio" name={props.name} value="true" checked={props.value === 'true'} />
-                    Yes
+                    <span class="tri-state-label">Yes</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: var(--space-3xs);">
+                <label class="tri-state-option">
                     <input type="radio" name={props.name} value="false" checked={props.value === 'false'} />
-                    No
+                    <span class="tri-state-label">No</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: var(--space-3xs);">
-                    <input type="radio" name={props.name} value="" checked={!props.value} />
-                    Unknown
+                <label class="tri-state-option">
+                    <input type="radio" name={props.name} value="" checked={!props.value || props.value === ''} />
+                    <span class="tri-state-label">Unknown</span>
                 </label>
             </div>
+            {props.error && <FormError message={props.error} />}
         </div>
+    );
+};
+
+export const FormError = (props: { message: string }) => {
+    return (
+        <span class="form-error">
+            {props.message}
+        </span>
     );
 };

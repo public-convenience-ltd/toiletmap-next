@@ -91,13 +91,103 @@ export const Layout = (props: { title: string; children: any }) => {
           .button:hover { background-color: var(--color-blue); color: var(--color-turquoise); border-color: var(--color-blue); }
           
           /* Inputs */
-          .input {
+          .input,
+          .text-area {
             width: 100%;
             display: block;
-            padding: var(--space-2xs);
+            padding: var(--space-xs);
             color: var(--color-blue);
-            border: 1px solid var(--color-blue);
+            border: 2px solid var(--color-light-grey);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: var(--text-0);
+            transition: all 0.2s ease;
+            background: var(--color-white);
+          }
+          .input:hover,
+          .text-area:hover {
+            border-color: var(--color-aqua-accent);
+          }
+          .input:focus,
+          .text-area:focus {
+            outline: none;
+            border-color: var(--color-primary-navy);
+            box-shadow: 0 0 0 3px rgba(10, 22, 94, 0.1);
+          }
+          .input {
             margin-top: var(--space-3xs);
+          }
+          .text-area {
+            resize: vertical;
+            min-height: 100px;
+          }
+          
+          /* Form labels */
+          .form-label {
+            font-weight: 600;
+            color: var(--color-primary-navy);
+            font-size: var(--text-0);
+          }
+          
+          /* Form errors */
+          .form-error {
+            display: block;
+            color: var(--color-accent-pink);
+            font-size: var(--text--1);
+            font-weight: 600;
+            margin-top: var(--space-2xs);
+            padding-left: var(--space-xs);
+            border-left: 3px solid var(--color-accent-pink);
+          }
+          
+          /* Section headings */
+          h2 {
+            font-size: var(--text-2);
+            font-weight: 700;
+            color: var(--color-primary-navy);
+            margin: 0 0 var(--space-m) 0;
+          }
+          
+          /* Tri-state toggle - slimline & elegant */
+          .tri-state-container {
+            display: inline-flex;
+            background: var(--color-light-grey);
+            border-radius: 20px;
+            padding: 3px;
+            gap: 2px;
+          }
+          .tri-state-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+          }
+          .tri-state-option:hover .tri-state-label {
+            color: var(--color-primary-navy);
+          }
+          .tri-state-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            height: 0;
+          }
+          .tri-state-label {
+            padding: var(--space-2xs) var(--space-s);
+            border-radius: 17px;
+            transition: all 0.15s ease;
+            font-size: var(--text--1);
+            font-weight: 500;
+            color: var(--color-neutral-grey);
+            white-space: nowrap;
+          }
+          .tri-state-option input[type="radio"]:checked + .tri-state-label {
+            background: var(--color-turquoise);
+            color: var(--color-primary-navy);
+            font-weight: 700;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
           }
         </style>
       </head>

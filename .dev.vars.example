@@ -6,6 +6,10 @@
 # Get this from: pnpm supabase:start (after starting Supabase locally)
 POSTGRES_URI=
 
+# Auth0 Client Secret (for Regular Web Application)
+# Get this from your Auth0 application settings
+AUTH0_CLIENT_SECRET=
+
 # Optional: Override AUTH0 settings for local testing
 # AUTH0_ISSUER_BASE_URL=
 # AUTH0_AUDIENCE=

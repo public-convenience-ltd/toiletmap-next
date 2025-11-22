@@ -23,13 +23,21 @@ export interface Env {
   AUTH0_ISSUER_BASE_URL: string;
   AUTH0_AUDIENCE: string;
 
-  // Optional environment variables
-  AUTH0_PROFILE_KEY?: string;
+  // Auth0 OAuth configuration (Regular Web App)
   AUTH0_CLIENT_ID: string;
+  AUTH0_CLIENT_SECRET: string;
   AUTH0_SCOPE: string;
   AUTH0_REDIRECT_URI: string;
+
+  // Optional environment variables
+  AUTH0_PROFILE_KEY?: string;
 }
 
 export type AppVariables = {
-  user?: Auth0User;
+  user?: {
+    sub: string;
+    email?: string;
+    name?: string;
+    nickname?: string;
+  };
 };
