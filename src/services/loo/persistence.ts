@@ -1,6 +1,6 @@
-import { randomBytes } from 'crypto';
-import { Prisma } from '../../prisma';
-import type { LooMutationAttributes } from './types';
+import { randomBytes } from "crypto";
+import { Prisma } from "../../prisma";
+import type { LooMutationAttributes } from "./types";
 
 /**
  * The required length for loo IDs.
@@ -20,7 +20,7 @@ export const LOO_ID_LENGTH = 24;
  * // Returns something like: "a1b2c3d4e5f6789012345678"
  * ```
  */
-export const generateLooId = (): string => randomBytes(12).toString('hex');
+export const generateLooId = (): string => randomBytes(12).toString("hex");
 
 // Low-level helpers that keep insert/update logic consistent and auditable.
 const emptyTextArray = Prisma.sql`ARRAY[]::text[]`;
@@ -29,7 +29,7 @@ const buildContributorsInsertValue = (contributor: string | null | undefined) =>
   contributor ? Prisma.sql`ARRAY[${contributor}]` : emptyTextArray;
 
 const buildContributorsUpdateClause = (
-  contributor: string | null | undefined,
+  contributor: string | null | undefined
 ) =>
   contributor
     ? Prisma.sql`
@@ -45,7 +45,7 @@ const buildContributorsUpdateClause = (
  * We use raw SQL here because Prisma doesn't fully support PostGIS types natively
  * in a way that allows easy casting to geography(Point, 4326).
  */
-const geographyExpression = (location: LooMutationAttributes['location']) => {
+const geographyExpression = (location: LooMutationAttributes["location"]) => {
   if (location === undefined) return null;
   if (location === null) return Prisma.sql`NULL`;
   return Prisma.sql`
@@ -57,7 +57,7 @@ const geographyExpression = (location: LooMutationAttributes['location']) => {
 };
 
 const toColumnValueSql = (column: string, value: unknown) => {
-  if (column === 'opening_times' && value !== null) {
+  if (column === "opening_times" && value !== null) {
     return Prisma.sql`${JSON.stringify(value)}::jsonb`;
   }
   return Prisma.sql`${value}`;
@@ -86,10 +86,10 @@ export const insertLoo = async ({
   now,
 }: InsertArgs) => {
   const columns = [
-    Prisma.raw('id'),
-    Prisma.raw('created_at'),
-    Prisma.raw('updated_at'),
-    Prisma.raw('contributors'),
+    Prisma.raw("id"),
+    Prisma.raw("created_at"),
+    Prisma.raw("updated_at"),
+    Prisma.raw("contributors"),
   ];
   const values: Prisma.Sql[] = [
     Prisma.sql`${id}`,
@@ -105,7 +105,7 @@ export const insertLoo = async ({
 
   const geographySql = geographyExpression(mutation.location);
   if (geographySql) {
-    columns.push(Prisma.raw('geography'));
+    columns.push(Prisma.raw("geography"));
     values.push(geographySql);
   }
 
@@ -143,7 +143,7 @@ export const updateLoo = async ({
 
   for (const [key, value] of Object.entries(data)) {
     assignments.push(
-      Prisma.sql`${Prisma.raw(key)} = ${toColumnValueSql(key, value)}`,
+      Prisma.sql`${Prisma.raw(key)} = ${toColumnValueSql(key, value)}`
     );
   }
 

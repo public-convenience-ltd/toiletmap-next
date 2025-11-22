@@ -7,7 +7,8 @@
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "build": "pnpm prisma:generate && wrangler build",
-    "check": "wrangler deploy --dry-run",
+    "check": "pnpm typecheck && wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
     "deploy": "wrangler deploy",
     "docs:generate": "tsx src/docs/generate.ts",
@@ -42,7 +43,7 @@
     "typescript": "5.9.3",
     "vite": "^7.2.4",
     "vite-plugin-wasm": "^3.5.0",
-    "vitest": "^3.2.0",
+    "vitest": "^4.0.13",
     "wrangler": "^4.50.0"
   },
   "overrides": {

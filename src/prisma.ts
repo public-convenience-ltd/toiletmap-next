@@ -1,5 +1,8 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import type { PrismaClient as PrismaClientType } from "./generated/prisma/client";
+import type {
+  PrismaClient as PrismaClientType,
+  Prisma as PrismaNamespace,
+} from "./generated/prisma/client";
 
 // Use test-compatible client in Node.js test environment, Cloudflare client otherwise
 const isTestEnv =
@@ -8,7 +11,10 @@ const clientModule = isTestEnv
   ? await import("../test/integration/generated/client/client")
   : await import("./generated/prisma/client");
 
-const { PrismaClient, Prisma } = clientModule as any;
+const { PrismaClient, Prisma } = clientModule as {
+  PrismaClient: typeof PrismaClientType;
+  Prisma: typeof PrismaNamespace;
+};
 
 export const createPrismaClient = (databaseUrl: string): PrismaClientType => {
   const adapter = new PrismaPg({
