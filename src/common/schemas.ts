@@ -43,12 +43,12 @@ export const optionalTrimmedFilter = (max: number) =>
       value === undefined || value.length === 0 ? undefined : value,
     );
 
-const triStateOptions = ['true', 'false', 'null', 'any'] as const;
+const triStateOptions = ['true', 'false', 'unknown'] as const;
 export const triStateFilterSchema = z
   .preprocess(normalizeOptionalOption, z.enum(triStateOptions).optional())
   .transform((value) => {
-    if (!value || value === 'any') return undefined;
-    if (value === 'null') return null;
+    if (!value) return undefined;
+    if (value === 'unknown') return null;
     return value === 'true';
   });
 

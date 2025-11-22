@@ -395,8 +395,7 @@ const authErrorResponse = {
 
 const triStateFilterSchema = {
   type: 'string',
-  enum: ['any', 'true', 'false', 'null'],
-  default: 'any',
+  enum: ['true', 'false', 'unknown'],
 } satisfies SchemaObject;
 
 const booleanFilterSchema = {
@@ -741,7 +740,7 @@ export const openApiDocument: OpenAPIObject = {
             in: 'query' as const,
             required: false,
             description:
-              'Active status. Use `any` to include all values or `null` for unknown.',
+              'Active status. Omit to include all values, or use `unknown` for records where active status is not available.',
             schema: triStateFilterSchema,
           },
           {
@@ -749,7 +748,7 @@ export const openApiDocument: OpenAPIObject = {
             in: 'query' as const,
             required: false,
             description:
-              'Accessible flag. Use `any` to include all values or `null` for unknown.',
+              'Whether the toilet is accessible. Omit to include all values, or use `unknown` for records where accessibility information is not available.',
             schema: triStateFilterSchema,
           },
           {
@@ -757,7 +756,7 @@ export const openApiDocument: OpenAPIObject = {
             in: 'query' as const,
             required: false,
             description:
-              'All gender flag. Use `any` to include all values or `null` for unknown.',
+              'Whether the toilet is all-gender. Omit to include all values, or use `unknown` for records where this information is not available.',
             schema: triStateFilterSchema,
           },
           {
@@ -765,7 +764,7 @@ export const openApiDocument: OpenAPIObject = {
             in: 'query' as const,
             required: false,
             description:
-              'RADAR key availability. Use `any` to include all values or `null` for unknown.',
+              'Whether a RADAR key is required. Omit to include all values, or use `unknown` for records where RADAR key information is not available.',
             schema: triStateFilterSchema,
           },
           {
@@ -773,7 +772,7 @@ export const openApiDocument: OpenAPIObject = {
             in: 'query' as const,
             required: false,
             description:
-              'Baby change facilities. Use `any` to include all values or `null` for unknown.',
+              'Whether baby change facilities are available. Omit to include all values, or use `unknown` for records where this information is not available.',
             schema: triStateFilterSchema,
           },
           {
@@ -781,7 +780,7 @@ export const openApiDocument: OpenAPIObject = {
             in: 'query' as const,
             required: false,
             description:
-              'Whether payment is required. Use `any` to include all values or `null` for unknown.',
+              'Whether the toilet is free (no payment required). Omit to include all values, or use `unknown` for records where payment information is not available.',
             schema: triStateFilterSchema,
           },
           {
