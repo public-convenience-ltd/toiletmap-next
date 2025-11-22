@@ -4,6 +4,7 @@ import { baseMutationSchema } from '../../src/routes/loos/schemas';
 import { callApi, jsonRequest } from './utils/test-client';
 import { legacyRecordToMutation, type LegacyToiletRecord } from './utils/legacy-records';
 import { getTestContext } from './setup';
+import { cleanupManager } from './utils/cleanup';
 
 const datasetPath = new URL('../../toilets-2025-11-04.json', import.meta.url);
 const toiletsDataset = JSON.parse(
@@ -76,6 +77,7 @@ describe('Legacy dataset upsert coverage', () => {
           jsonRequest('PUT', payload, { Authorization: `Bearer ${token}` }),
         );
         expect([200, 201]).toContain(response.status);
+        cleanupManager.trackLoo(record.id);
       }
     },
     90_000,

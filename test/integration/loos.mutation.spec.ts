@@ -3,6 +3,7 @@ import { callApi, jsonRequest } from './utils/test-client';
 import { createFixtureFactory } from './utils/fixtures';
 import { getTestContext } from './setup';
 import { generateLooId, LOO_ID_LENGTH } from '../../src/services/loo';
+import { cleanupManager } from './utils/cleanup';
 
 const fixtures = createFixtureFactory();
 
@@ -31,6 +32,7 @@ describe('Loo mutation endpoints', () => {
       const body = await response.json();
       expect(body.id).toHaveLength(LOO_ID_LENGTH);
       expect(body.name).toBe(payload.name);
+      cleanupManager.trackLoo(body.id);
     });
 
     it('rejects duplicate ids with a 409', async () => {
@@ -98,6 +100,7 @@ describe('Loo mutation endpoints', () => {
       const body = await response.json();
       expect(body.id).toBe(id);
       expect(body.notes).toBe(payload.notes);
+      cleanupManager.trackLoo(id);
     });
 
     it('updates an existing loo and returns 200', async () => {

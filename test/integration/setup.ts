@@ -46,11 +46,24 @@ beforeAll(async () => {
   state.stopAuthServer = authServer.stop;
 });
 
+import { cleanupManager } from "./utils/cleanup";
+
 afterAll(async () => {
   if (state.stopAuthServer) {
     await state.stopAuthServer();
   }
   if (state.prisma) {
+    // Create a privileged client for cleanup
+    const databaseUrl = getDatabaseUrl();
+    const adminUrl = new URL(databaseUrl);
+    adminUrl.username = 'postgres';
+    adminUrl.password = 'postgres';
+
+    const adminPrisma = createPrismaClient(adminUrl.toString());
+    await adminPrisma.$connect();
+    await cleanupManager.cleanup(adminPrisma);
+    await adminPrisma.$disconnect();
+
     await state.prisma.$disconnect();
   }
 });

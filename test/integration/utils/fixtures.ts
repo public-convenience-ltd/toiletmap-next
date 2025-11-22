@@ -8,6 +8,7 @@ import type { areas, toilets } from '../../../src/prisma';
 import type { PrismaClientInstance } from '../../../src/prisma';
 import { LooService } from '../../../src/services/loo';
 import { getPrismaClient } from '../setup';
+import { cleanupManager } from './cleanup';
 
 type PrismaProvider = () => PrismaClientInstance;
 
@@ -40,12 +41,12 @@ export type AreaFixtureOverrides = {
 class AreaFixtures {
   #counter = 0;
 
-  constructor(private readonly getPrisma: PrismaProvider) {}
+  constructor(private readonly getPrisma: PrismaProvider) { }
 
   async create(overrides: AreaFixtureOverrides = {}): Promise<areas> {
     const prisma = this.getPrisma();
     this.#counter += 1;
-    return prisma.areas.create({
+    const area = await prisma.areas.create({
       data: {
         id: overrides.id ?? deterministicAreaId(this.#counter),
         name: overrides.name ?? `Area ${this.#counter}`,
@@ -55,6 +56,7 @@ class AreaFixtures {
         version: overrides.version ?? 1,
       },
     });
+    return area;
   }
 }
 
@@ -67,7 +69,7 @@ class LooFixtures {
   private readonly coordinates = new CoordinateSequence();
   private service: LooService | null = null;
 
-  constructor(private readonly getPrisma: PrismaProvider) {}
+  constructor(private readonly getPrisma: PrismaProvider) { }
 
   private getService() {
     if (!this.service) {
@@ -120,6 +122,7 @@ class LooFixtures {
     if (!record) {
       throw new Error('Failed to load loo fixture after creation');
     }
+    cleanupManager.trackLoo(record.id);
     return record;
   }
 
@@ -134,6 +137,7 @@ class LooFixtures {
     if (!record) {
       throw new Error('Failed to load loo fixture after upsert');
     }
+    cleanupManager.trackLoo(record.id);
     return record;
   }
 
