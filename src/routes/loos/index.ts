@@ -17,7 +17,6 @@ import {
   LooService,
 } from '../../services/loo';
 import { createPrismaClient } from '../../prisma';
-import type { LooSearchParams } from '../../services/loo/types';
 
 
 import {
@@ -63,7 +62,7 @@ loosRouter.get(
   validate('query', searchQuerySchema, 'Invalid search query'),
   (c) =>
     handleRoute(c, 'loos.search', async () => {
-      const params = c.req.valid('query') as LooSearchParams;
+      const params = c.req.valid('query');
       const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
       const { data, total } = await looService.search(params);
 

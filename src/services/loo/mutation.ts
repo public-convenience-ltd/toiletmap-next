@@ -1,5 +1,6 @@
 import { Prisma } from '../../generated/prisma/client';
 import type { LooMutationAttributes } from './types';
+import { openingTimesSchema } from './types';
 
 type MutationFieldMapEntry = {
   attr: keyof LooMutationAttributes;
@@ -29,10 +30,19 @@ type MutationPrismaKey = (typeof MUTATION_PRISMA_FIELD_MAP)[number]['prismaKey']
 type PrismaMutationData =
   Prisma.toiletsUncheckedCreateInput & Prisma.toiletsUncheckedUpdateInput;
 
-export const mapMutationToPrismaData = (
+// Overloaded signatures for type-safe returns
+export function mapMutationToPrismaData(
+  mutation: LooMutationAttributes,
+  options: { forCreate: true },
+): Prisma.toiletsUncheckedCreateInput;
+export function mapMutationToPrismaData(
+  mutation: LooMutationAttributes,
+  options: { forCreate: false },
+): Prisma.toiletsUncheckedUpdateInput;
+export function mapMutationToPrismaData(
   mutation: LooMutationAttributes,
   { forCreate }: { forCreate: boolean },
-) => {
+): Prisma.toiletsUncheckedCreateInput | Prisma.toiletsUncheckedUpdateInput {
   const data: Partial<
     Record<MutationPrismaKey, PrismaMutationData[MutationPrismaKey]>
   > &
@@ -55,9 +65,12 @@ export const mapMutationToPrismaData = (
   }
 
   if (mutation.openingTimes !== undefined) {
-    // Preserve explicit null semantics on JSON
-    data.opening_times = (mutation.openingTimes ?? null) as Prisma.InputJsonValue;
+    // Preserve explicit null semantics on JSON, validate with schema
+    const validated = openingTimesSchema.parse(mutation.openingTimes ?? null);
+    data.opening_times = validated as Prisma.InputJsonValue;
   }
 
-  return data;
+  // Type assertion: The built data object matches the expected Prisma input type
+  // based on the forCreate parameter (enforced by overloaded signatures)
+  return data as Prisma.toiletsUncheckedCreateInput | Prisma.toiletsUncheckedUpdateInput;
 };

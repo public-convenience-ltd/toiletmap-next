@@ -8,6 +8,7 @@ import type {
   ReportResponse,
   OpeningTimes,
 } from './types';
+import { openingTimesSchema, ToiletsRecordSchema } from './types';
 
 export const areaSelection = {
   select: {
@@ -65,7 +66,7 @@ const mapSharedLooFields = (
   noPayment: source?.no_payment ?? null,
   paymentDetails: source?.payment_details ?? null,
   removalReason: source?.removal_reason ?? null,
-  openingTimes: (source?.opening_times as unknown as OpeningTimes) ?? null,
+  openingTimes: openingTimesSchema.catch(null).parse(source?.opening_times ?? null),
   radar: source?.radar ?? null,
   location: extractCoordinates(source?.location),
 });
@@ -122,8 +123,8 @@ const buildReportSnapshot = (source: Partial<toilets> | null | undefined) => ({
  * Returns a record of field names to { previous, current } values.
  */
 const calculateReportDiff = (
-  currentSnapshot: ReturnType<typeof buildReportSnapshot>,
-  previousSnapshot: ReturnType<typeof buildReportSnapshot> | null,
+  currentSnapshot: Record<string, unknown>,
+  previousSnapshot: Record<string, unknown> | null,
 ) => {
   const diff: Record<string, { previous: unknown; current: unknown }> = {};
 
@@ -133,8 +134,8 @@ const calculateReportDiff = (
       ...Object.keys(currentSnapshot),
     ]);
     for (const key of keys) {
-      const nextValue = (currentSnapshot as Record<string, unknown>)[key];
-      const prevValue = (previousSnapshot as Record<string, unknown>)[key];
+      const nextValue = currentSnapshot[key];
+      const prevValue = previousSnapshot[key];
       if (!valuesEqual(nextValue, prevValue)) {
         diff[key] = {
           previous: prevValue ?? null,
@@ -145,7 +146,7 @@ const calculateReportDiff = (
   } else {
     // Genesis report - show all non-null current values
     for (const key of Object.keys(currentSnapshot)) {
-      const currentValue = (currentSnapshot as Record<string, unknown>)[key];
+      const currentValue = currentSnapshot[key];
       if (currentValue !== null) {
         diff[key] = {
           previous: null,
@@ -166,8 +167,8 @@ export const mapAuditRecordToReport = ({
   record,
   old_record: oldRecord,
 }: AuditRecord): ReportResponse => {
-  const typed = (record ?? {}) as Partial<toilets>;
-  const previous = (oldRecord ?? null) as Partial<toilets> | null;
+  const typed = ToiletsRecordSchema.parse(record ?? {});
+  const previous = oldRecord ? ToiletsRecordSchema.parse(oldRecord) : null;
   const contributors = Array.isArray(typed.contributors)
     ? typed.contributors
     : [];

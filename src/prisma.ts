@@ -1,8 +1,11 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import type {
   PrismaClient as PrismaClientType,
-  Prisma as PrismaNamespace,
 } from "./generated/prisma/client";
+
+// Directly import and re-export Prisma namespace for type resolution
+import { Prisma } from "./generated/prisma/client";
+export { Prisma };
 
 // Use test-compatible client in Node.js test environment, Cloudflare client otherwise
 const isTestEnv =
@@ -11,9 +14,8 @@ const clientModule = isTestEnv
   ? await import("../test/integration/generated/client/client")
   : await import("./generated/prisma/client");
 
-const { PrismaClient, Prisma } = clientModule as {
+const { PrismaClient } = clientModule as {
   PrismaClient: typeof PrismaClientType;
-  Prisma: typeof PrismaNamespace;
 };
 
 export const createPrismaClient = (databaseUrl: string): PrismaClientType => {
@@ -31,5 +33,4 @@ export const createPrismaClient = (databaseUrl: string): PrismaClientType => {
 
 export type PrismaClientInstance = ReturnType<typeof createPrismaClient>;
 
-export { Prisma };
 export type { toilets, areas } from "./generated/prisma/client";

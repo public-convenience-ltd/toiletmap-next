@@ -1,20 +1,20 @@
-import { Prisma, PrismaClientInstance, toilets } from '../../prisma';
+import { PrismaClientInstance, toilets } from "../../prisma";
 import {
   areaSelection,
   buildAreaFromJoin,
   mapAuditRecordToReport,
   mapLoo,
   mapNearbyLoo,
-} from './mappers';
-import { mapMutationToPrismaData } from './mutation';
-import { insertLoo, updateLoo } from './persistence';
+} from "./mappers";
+import { mapMutationToPrismaData } from "./mutation";
+import { insertLoo, updateLoo } from "./persistence";
 import {
   buildProximityQuery,
   buildSearchQueries,
   buildSelectByIdsQuery,
   type RawLooRow,
   type RawNearbyLooRow,
-} from './sql';
+} from "./sql";
 import type {
   LooMutationAttributes,
   LooResponse,
@@ -22,7 +22,17 @@ import type {
   ReportResponse,
   ReportSummaryResponse,
   LooSearchParams,
-} from './types';
+  RawNearbyLooRow as RawNearbyLooRowType,
+} from "./types";
+import { RawLooRowSchema, RawNearbyLooRowSchema } from "./types";
+
+/**
+ * Converts a validated RawLooRow to a toilets object by extracting only toilets fields.
+ */
+const rawLooToToilets = (raw: RawLooRow): toilets => {
+  const { area_name, area_type, ...toiletsFields } = raw;
+  return toiletsFields;
+};
 
 /**
  * Service for managing Loo (toilet) data.
@@ -36,7 +46,7 @@ import type {
  * data mapping to `mappers.ts` to keep the core logic clean.
  */
 export class LooService {
-  constructor(private readonly prisma: PrismaClientInstance) { }
+  constructor(private readonly prisma: PrismaClientInstance) {}
 
   // ===========================================================================
   // READ OPERATIONS
@@ -62,15 +72,15 @@ export class LooService {
     if (!ids.length) return [];
 
     const query = buildSelectByIdsQuery(ids);
-    const rows =
-      (await this.prisma.$queryRaw<RawLooRow[]>(query)) ?? [];
+    const rows = (await this.prisma.$queryRaw<RawLooRow[]>(query)) ?? [];
 
-    return rows.map((loo) =>
-      mapLoo({
-        ...(loo as toilets),
-        areas: buildAreaFromJoin(loo.area_name, loo.area_type),
-      }),
-    );
+    return rows.map((loo) => {
+      const validated = RawLooRowSchema.parse(loo);
+      return mapLoo({
+        ...rawLooToToilets(validated),
+        areas: buildAreaFromJoin(validated.area_name, validated.area_type),
+      });
+    });
   }
 
   /**
@@ -78,7 +88,7 @@ export class LooService {
    * Supports pagination.
    */
   async search(
-    params: LooSearchParams,
+    params: LooSearchParams
   ): Promise<{ data: LooResponse[]; total: number }> {
     const limit = Math.max(1, Math.min(params.limit, 200));
     const page = Math.max(1, params.page);
@@ -94,7 +104,7 @@ export class LooService {
 
     const countRows =
       (await this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery,
+        countQuery
       )) ?? [];
 
     const total =
@@ -102,12 +112,13 @@ export class LooService {
         ? Number(countRows[0].count)
         : 0;
 
-    const data = rows.map((loo) =>
-      mapLoo({
-        ...(loo as toilets),
-        areas: buildAreaFromJoin(loo.area_name, loo.area_type),
-      }),
-    );
+    const data = rows.map((loo) => {
+      const validated = RawLooRowSchema.parse(loo);
+      return mapLoo({
+        ...rawLooToToilets(validated),
+        areas: buildAreaFromJoin(validated.area_name, validated.area_type),
+      });
+    });
 
     return { data, total };
   }
@@ -118,11 +129,11 @@ export class LooService {
    */
   async getWithinGeohash(
     geohash: string,
-    active?: boolean | null,
+    active?: boolean | null
   ): Promise<LooResponse[]> {
     const where = {
       geohash: { startsWith: geohash },
-      ...(typeof active === 'boolean' ? { active: { equals: active } } : {}),
+      ...(typeof active === "boolean" ? { active: { equals: active } } : {}),
     } as const;
 
     const rows = await this.prisma.toilets.findMany({
@@ -139,19 +150,19 @@ export class LooService {
   async getByProximity(
     lat: number,
     lng: number,
-    radius: number,
+    radius: number
   ): Promise<NearbyLooResponse[]> {
     const query = buildProximityQuery(lat, lng, radius);
-    const loos =
-      (await this.prisma.$queryRaw<RawNearbyLooRow[]>(query)) ?? [];
+    const loos = (await this.prisma.$queryRaw<RawNearbyLooRow[]>(query)) ?? [];
 
-    return loos.map((loo) =>
-      mapNearbyLoo({
-        ...(loo as toilets),
-        areas: buildAreaFromJoin(loo.area_name, loo.area_type),
-        distance: loo.distance,
-      }),
-    );
+    return loos.map((loo) => {
+      const validated = RawNearbyLooRowSchema.parse(loo);
+      return mapNearbyLoo({
+        ...rawLooToToilets(validated),
+        areas: buildAreaFromJoin(validated.area_name, validated.area_type),
+        distance: validated.distance,
+      });
+    });
   }
 
   /**
@@ -163,13 +174,13 @@ export class LooService {
    */
   async getReports(
     id: string,
-    options: { hydrate?: boolean } = {},
+    options: { hydrate?: boolean } = {}
   ): Promise<ReportResponse[] | ReportSummaryResponse[]> {
     const { hydrate = false } = options;
     const reportRecords = await this.prisma.record_version.findMany({
-      where: { record: { path: ['id'], equals: id } },
+      where: { record: { path: ["id"], equals: id } },
       select: { record: true, old_record: true, id: true },
-      orderBy: { ts: 'asc' },
+      orderBy: { ts: "asc" },
     });
 
     // We filter out system location updates as they are not user-contributed
@@ -177,18 +188,16 @@ export class LooService {
     // location report for each loo.
     const mapped = reportRecords
       .map((entry) => mapAuditRecordToReport(entry))
-      .filter((report) => !report.contributor.endsWith('-location'));
+      .filter((report) => !report.contributor.endsWith("-location"));
 
     if (hydrate) return mapped;
 
-    return mapped.map(
-      ({ id: reportId, contributor, createdAt, diff }) => ({
-        id: reportId,
-        contributor,
-        createdAt,
-        diff,
-      }),
-    );
+    return mapped.map(({ id: reportId, contributor, createdAt, diff }) => ({
+      id: reportId,
+      contributor,
+      createdAt,
+      diff,
+    }));
   }
 
   // ===========================================================================
@@ -205,12 +214,12 @@ export class LooService {
   async create(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    contributor: string | null
   ): Promise<LooResponse | null> {
     const now = new Date();
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
-    }) as Prisma.toiletsUncheckedCreateInput;
+    });
 
     await this.prisma.$transaction(async (tx) => {
       await insertLoo({
@@ -240,15 +249,15 @@ export class LooService {
   async upsert(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    contributor: string | null
   ): Promise<LooResponse | null> {
     const now = new Date();
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
-    }) as Prisma.toiletsUncheckedCreateInput;
+    });
     const dataForUpdate = mapMutationToPrismaData(mutation, {
       forCreate: false,
-    }) as Prisma.toiletsUncheckedUpdateInput;
+    });
 
     await this.prisma.$transaction(async (tx) => {
       // 1. Attempt to update the existing record.

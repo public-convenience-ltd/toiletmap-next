@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { jsonValueSchema } from '../../common/schemas';
 
 // Strict schema for opening times
 // Each day is either ["HH:mm", "HH:mm"] (open) or [] (closed)
@@ -6,13 +7,12 @@ import { z } from 'zod';
 // If all opening times are unknown, the field is null
 const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
 
-const dayOpeningHoursSchema = z.union([
-  z.tuple([z.string().regex(timeRegex), z.string().regex(timeRegex)])
-    .refine(([open, close]) => open < close),
+export const dayOpeningHoursSchema = z.union([
+  z.tuple([z.string().regex(timeRegex), z.string().regex(timeRegex)]),
   z.array(z.never()).length(0), // Empty array for closed days
 ]);
 
-const openingTimesSchema = z.array(dayOpeningHoursSchema).length(7).nullable();
+export const openingTimesSchema = z.array(dayOpeningHoursSchema).length(7).nullable();
 
 export const CoordinatesSchema = z
   .object({
@@ -90,22 +90,9 @@ export const LooSearchSortOptions = [
 export const LooSearchSortSchema = z.enum(LooSearchSortOptions);
 export type LooSearchSort = z.infer<typeof LooSearchSortSchema>;
 
-export type LooSearchParams = {
-  search?: string;
-  areaName?: string;
-  areaType?: string;
-  active?: boolean | null;
-  accessible?: boolean | null;
-  allGender?: boolean | null;
-  radar?: boolean | null;
-  babyChange?: boolean | null;
-  noPayment?: boolean | null;
-  verified?: boolean;
-  hasLocation?: boolean;
-  limit: number;
-  page: number;
-  sort: LooSearchSort;
-};
+// LooSearchParams is now imported from routes/loos/schemas to ensure type consistency
+// This is re-exported here for convenience and backwards compatibility
+export type { SearchQuery as LooSearchParams } from '../../routes/loos/schemas';
 
 export const ReportDiffEntrySchema = z
   .object({
@@ -141,6 +128,80 @@ export type ReportResponse = z.infer<typeof ReportResponseSchema>;
 
 export type OpeningTimes = z.infer<typeof openingTimesSchema>;
 export type DayOpeningHours = z.infer<typeof dayOpeningHoursSchema>;
+
+// Schema for validating toilets database records from JSON audit fields
+// This matches the structure of the toilets table in Prisma
+export const ToiletsRecordSchema = z.object({
+  id: z.string(),
+  created_at: z.coerce.date().nullable(),
+  contributors: z.array(z.string()),
+  accessible: nullableBoolean,
+  active: nullableBoolean,
+  attended: nullableBoolean,
+  automatic: nullableBoolean,
+  baby_change: nullableBoolean,
+  men: nullableBoolean,
+  name: nullableString,
+  no_payment: nullableBoolean,
+  notes: nullableString,
+  payment_details: nullableString,
+  radar: nullableBoolean,
+  removal_reason: nullableString,
+  women: nullableBoolean,
+  updated_at: z.coerce.date().nullable(),
+  geography: jsonValueSchema.nullable(),
+  urinal_only: nullableBoolean,
+  all_gender: nullableBoolean,
+  children: nullableBoolean,
+  geohash: nullableString,
+  verified_at: z.coerce.date().nullable(),
+  area_id: nullableString,
+  opening_times: openingTimesSchema,
+  location: jsonValueSchema.nullable(),
+}).partial();
+
+export type ToiletsRecord = z.infer<typeof ToiletsRecordSchema>;
+
+// Schema for validating raw SQL query results (toilets with joined area fields)
+export const RawLooRowSchema = z.object({
+  id: z.string(),
+  created_at: z.coerce.date().nullable().optional(),
+  contributors: z.array(z.string()).optional(),
+  accessible: nullableBoolean.optional(),
+  active: nullableBoolean.optional(),
+  attended: nullableBoolean.optional(),
+  automatic: nullableBoolean.optional(),
+  baby_change: nullableBoolean.optional(),
+  men: nullableBoolean.optional(),
+  name: nullableString.optional(),
+  no_payment: nullableBoolean.optional(),
+  notes: nullableString.optional(),
+  payment_details: nullableString.optional(),
+  radar: nullableBoolean.optional(),
+  removal_reason: nullableString.optional(),
+  women: nullableBoolean.optional(),
+  updated_at: z.coerce.date().nullable().optional(),
+  geography: jsonValueSchema.nullable().optional(),
+  urinal_only: nullableBoolean.optional(),
+  all_gender: nullableBoolean.optional(),
+  children: nullableBoolean.optional(),
+  geohash: nullableString.optional(),
+  verified_at: z.coerce.date().nullable().optional(),
+  area_id: nullableString.optional(),
+  opening_times: openingTimesSchema.optional(),
+  location: jsonValueSchema.nullable().optional(),
+  area_name: nullableString.optional(),
+  area_type: nullableString.optional(),
+});
+
+export type RawLooRow = z.infer<typeof RawLooRowSchema>;
+
+// Schema for validating nearby loo query results (includes distance)
+export const RawNearbyLooRowSchema = RawLooRowSchema.extend({
+  distance: z.number().nonnegative(),
+});
+
+export type RawNearbyLooRow = z.infer<typeof RawNearbyLooRowSchema>;
 
 export type LooMutationAttributes = {
   name?: string | null;
