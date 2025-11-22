@@ -5,6 +5,8 @@ import { loosRouter } from './routes/loos';
 import { areasRouter } from './routes/areas';
 import { openApiDocument } from './docs/openapi';
 
+import { admin } from './admin';
+
 export const createApp = (env: Env) => {
   const app = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
@@ -16,6 +18,7 @@ export const createApp = (env: Env) => {
     }),
   );
 
+  app.route('/admin', admin);
   app.route('/loos', loosRouter);
   app.route('/areas', areasRouter);
   app.get('/docs/openapi.json', (c) => c.json(openApiDocument));

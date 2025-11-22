@@ -25,6 +25,9 @@ export interface Env {
 
   // Optional environment variables
   AUTH0_PROFILE_KEY?: string;
+  AUTH0_CLIENT_ID: string;
+  AUTH0_SCOPE: string;
+  AUTH0_REDIRECT_URI: string;
 }
 
 export type AppVariables = {
