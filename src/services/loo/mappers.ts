@@ -29,26 +29,10 @@ const extractCoordinates = (value: unknown): Coordinates | null => {
   return { lat, lng };
 };
 
-const coordinatesEqual = (a: Coordinates | null, b: Coordinates | null) =>
-  (a === null && b === null) ||
-  (a !== null && b !== null && a.lat === b.lat && a.lng === b.lng);
-
 const valuesEqual = (a: unknown, b: unknown) => {
   if (a === b) return true;
   return JSON.stringify(a) === JSON.stringify(b);
 };
-
-/**
- * Keys to ignore when calculating the diff between two loo versions.
- * These are internal fields or fields that change on every update.
- */
-const IGNORED_AUDIT_DIFF_KEYS = new Set([
-  'contributors',
-  'geography',
-  'geohash',
-  'location',
-  'updated_at',
-]);
 
 const toDateISOString = (value: Date | string | null | undefined) => {
   if (!value) return null;
@@ -126,7 +110,7 @@ export const mapNearbyLoo = (
   loo: (toilets & { areas?: Partial<areas> | null }) & { distance: number },
 ): NearbyLooResponse => ({ ...mapLoo(loo), distance: loo.distance });
 
-type AuditRecord = Pick<record_version, 'id' | 'ts' | 'record' | 'old_record'>;
+type AuditRecord = Pick<record_version, 'id' | 'record' | 'old_record'>;
 
 const buildReportSnapshot = (source: Partial<toilets> | null | undefined) => ({
   verifiedAt: toDateISOString(source?.verified_at),
@@ -179,7 +163,6 @@ const calculateReportDiff = (
  */
 export const mapAuditRecordToReport = ({
   id,
-  ts,
   record,
   old_record: oldRecord,
 }: AuditRecord): ReportResponse => {
@@ -190,31 +173,17 @@ export const mapAuditRecordToReport = ({
     : [];
   const latestContributor =
     contributors.length > 0 ? contributors[contributors.length - 1] : null;
-  const createdAt = toDateISOString(ts) ?? new Date().toISOString();
+
+  // For the first report (genesis), use the loo's created_at timestamp.
+  // For subsequent reports, use the loo's updated_at timestamp.
+  const createdAt = previous === null
+    ? toDateISOString(typed.created_at) ?? new Date().toISOString()
+    : toDateISOString(typed.updated_at) ?? new Date().toISOString();
+
   const shared = mapSharedLooFields(typed);
   const currentSnapshot = buildReportSnapshot(typed);
   const previousSnapshot = previous ? buildReportSnapshot(previous) : null;
 
-  const newLocation = extractCoordinates(typed.location);
-  const oldLocation = extractCoordinates(previous?.location);
-  const locationChanged =
-    previous !== null && !coordinatesEqual(newLocation, oldLocation);
-
-  let hasNonLocationChanges = false;
-  if (previous !== null) {
-    const keys = new Set([...Object.keys(previous), ...Object.keys(typed)]);
-    for (const key of keys) {
-      if (IGNORED_AUDIT_DIFF_KEYS.has(key)) continue;
-      const nextValue = (typed as Record<string, unknown>)[key];
-      const prevValue = (previous as Record<string, unknown>)[key];
-      if (!valuesEqual(nextValue, prevValue)) {
-        hasNonLocationChanges = true;
-        break;
-      }
-    }
-  }
-
-  const isSystemReport = locationChanged && !hasNonLocationChanges;
   const diff = calculateReportDiff(currentSnapshot, previousSnapshot);
 
   return {
@@ -222,7 +191,6 @@ export const mapAuditRecordToReport = ({
     contributor: latestContributor ?? 'Anonymous',
     createdAt,
     verifiedAt: toDateISOString(typed.verified_at),
-    isSystemReport,
     diff: Object.keys(diff).length ? diff : null,
     ...shared,
   };

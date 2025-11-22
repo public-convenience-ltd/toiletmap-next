@@ -2,7 +2,7 @@ import type {
   Coordinates,
   LooMutationAttributes,
   OpeningTimes,
-} from '../../../src/services/loo/types';
+} from "../../../src/services/loo/types";
 
 type LegacyLocation = {
   type?: string | null;
@@ -39,12 +39,12 @@ export type LegacyToiletRecord = {
 
 const toNullableBoolean = (value: unknown): boolean | null => {
   if (value === null || value === undefined) return null;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value === 1;
-  if (typeof value === 'string') {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
     const lower = value.trim().toLowerCase();
-    if (['true', 't', '1', 'yes', 'y'].includes(lower)) return true;
-    if (['false', 'f', '0', 'no', 'n'].includes(lower)) return false;
+    if (["true", "t", "1", "yes", "y"].includes(lower)) return true;
+    if (["false", "f", "0", "no", "n"].includes(lower)) return false;
   }
   return null;
 };
@@ -62,7 +62,7 @@ const toCoordinates = (value: LegacyLocation): Coordinates | null => {
   const coords = value.coordinates;
   if (!Array.isArray(coords) || coords.length < 2) return null;
   const [lng, lat] = coords;
-  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
   return { lat, lng };
 };
 
@@ -73,7 +73,7 @@ const normaliseId = (value: string | null): string | null => {
 };
 
 export const legacyRecordToMutation = (
-  record: LegacyToiletRecord,
+  record: LegacyToiletRecord
 ): LooMutationAttributes => {
   const mutation: LooMutationAttributes = {
     name: record.name,

@@ -123,7 +123,6 @@ export const ReportSummaryResponseSchema = z
     id: z.string(),
     contributor: z.string(),
     createdAt: z.string(),
-    isSystemReport: z.boolean(),
     diff: ReportDiffSchema.nullable(),
   })
   .strict();
@@ -135,7 +134,6 @@ export const ReportResponseSchema = z
     contributor: z.string(),
     createdAt: z.string(),
     verifiedAt: nullableString,
-    isSystemReport: z.boolean(),
     diff: ReportDiffSchema.nullable(),
   })
   .merge(LooCommonSchema);

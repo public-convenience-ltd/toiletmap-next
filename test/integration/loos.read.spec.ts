@@ -88,6 +88,90 @@ describe("Loo read endpoints", () => {
       const hydrated = await hydratedResponse.json();
       expect(hydrated.data[0]).toHaveProperty("notes");
     });
+
+    it("returns reports in chronological ascending order with correct timestamps", async () => {
+      // Create initial loo
+      const loo = await fixtures.loos.create({
+        notes: "First version",
+        accessible: true,
+      });
+
+      // Wait a bit to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Make first update
+      await fixtures.loos.upsert(
+        loo.id,
+        { notes: "Second version", radar: true },
+        "user-one"
+      );
+
+      // Wait a bit to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Make second update
+      await fixtures.loos.upsert(
+        loo.id,
+        { notes: "Third version", babyChange: true },
+        "user-two"
+      );
+
+      // Fetch the loo to get its created_at and updated_at
+      const looResponse = await callApi(`/loos/${loo.id}`);
+      const looData = await looResponse.json();
+
+      // Fetch reports
+      const response = await callApi(`/loos/${loo.id}/reports?hydrate=true`);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      // Should have 3 reports (initial creation + 2 updates)
+      expect(body.count).toBe(3);
+      expect(body.data).toHaveLength(3);
+
+      // Verify chronological ordering (oldest first)
+      const timestamps = body.data.map((r: { createdAt: string }) =>
+        new Date(r.createdAt).getTime()
+      );
+      expect(timestamps[0]).toBeLessThan(timestamps[1]);
+      expect(timestamps[1]).toBeLessThan(timestamps[2]);
+
+      // Verify report contents are in chronological order
+      expect(body.data[0].notes).toBe("First version");
+      expect(body.data[1].notes).toBe("Second version");
+      expect(body.data[2].notes).toBe("Third version");
+
+      // First report should use the loo's created_at
+      expect(body.data[0].createdAt).toBe(looData.createdAt);
+
+      // Subsequent reports should use their respective updated_at
+      // (which for the last report matches the loo's current updated_at)
+      expect(body.data[2].createdAt).toBe(looData.updatedAt);
+
+      // Verify isSystemReport field is NOT present
+      expect(body.data[0]).not.toHaveProperty("isSystemReport");
+      expect(body.data[1]).not.toHaveProperty("isSystemReport");
+      expect(body.data[2]).not.toHaveProperty("isSystemReport");
+
+      // Verify diff information is present
+      expect(body.data[0].diff).toBeTruthy();
+      expect(body.data[1].diff).toBeTruthy();
+      expect(body.data[2].diff).toBeTruthy();
+    });
+
+    it("ensures summary reports also don't include isSystemReport", async () => {
+      const loo = await fixtures.loos.create({ notes: "Test" });
+      await fixtures.loos.upsert(loo.id, { radar: true }, "test-user");
+
+      const response = await callApi(`/loos/${loo.id}/reports`);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+
+      expect(body.count).toBeGreaterThan(0);
+      for (const report of body.data) {
+        expect(report).not.toHaveProperty("isSystemReport");
+      }
+    });
   });
 
   describe("GET /loos/geohash/:geohash", () => {

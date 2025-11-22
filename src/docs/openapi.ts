@@ -140,12 +140,11 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
   },
   ReportSummary: {
     type: 'object',
-    required: ['id', 'contributor', 'createdAt', 'isSystemReport', 'diff'],
+    required: ['id', 'contributor', 'createdAt', 'diff'],
     properties: {
       id: { type: 'string', example: '9234' },
       contributor: { type: 'string', example: 'jane.doe' },
       createdAt: { type: 'string', format: 'date-time' },
-      isSystemReport: { type: 'boolean' },
       diff: {
         description: 'Field-level changes introduced by the report.',
         anyOf: [schemaRef('ReportDiff'), { type: 'null' }],
@@ -275,13 +274,12 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
   },
   Report: {
     type: 'object',
-    required: ['id', 'contributor', 'createdAt', 'isSystemReport', 'diff'],
+    required: ['id', 'contributor', 'createdAt', 'diff'],
     properties: {
       id: { type: 'string', example: '9234' },
       contributor: { type: 'string', example: 'jane.doe' },
       createdAt: { type: 'string', format: 'date-time' },
       verifiedAt: nullableDateTime,
-      isSystemReport: { type: 'boolean' },
       diff: {
         description: 'Field-level changes introduced by the report.',
         anyOf: [schemaRef('ReportDiff'), { type: 'null' }],

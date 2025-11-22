@@ -168,8 +168,8 @@ export class LooService {
     const { hydrate = false } = options;
     const reportRecords = await this.prisma.record_version.findMany({
       where: { record: { path: ['id'], equals: id } },
-      select: { record: true, old_record: true, id: true, ts: true },
-      orderBy: { ts: 'desc' },
+      select: { record: true, old_record: true, id: true },
+      orderBy: { ts: 'asc' },
     });
 
     // We filter out system location updates as they are not user-contributed
@@ -182,11 +182,10 @@ export class LooService {
     if (hydrate) return mapped;
 
     return mapped.map(
-      ({ id: reportId, contributor, createdAt, isSystemReport, diff }) => ({
+      ({ id: reportId, contributor, createdAt, diff }) => ({
         id: reportId,
         contributor,
         createdAt,
-        isSystemReport,
         diff,
       }),
     );

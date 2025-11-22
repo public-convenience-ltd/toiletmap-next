@@ -161,7 +161,7 @@
         "required": [
           "status",
           "service",
-          "uptime"
+          "timestamp"
         ],
         "properties": {
           "status": {
@@ -174,9 +174,10 @@
             "type": "string",
             "example": "toiletmap-hono-api"
           },
-          "uptime": {
-            "type": "number",
-            "example": 42.17
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-01-21T12:00:00.000Z"
           }
         }
       },
@@ -246,7 +247,6 @@
           "id",
           "contributor",
           "createdAt",
-          "isSystemReport",
           "diff"
         ],
         "properties": {
@@ -261,9 +261,6 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "isSystemReport": {
-            "type": "boolean"
           },
           "diff": {
             "description": "Field-level changes introduced by the report.",
@@ -636,7 +633,6 @@
           "id",
           "contributor",
           "createdAt",
-          "isSystemReport",
           "diff"
         ],
         "properties": {
@@ -658,9 +654,6 @@
               "null"
             ],
             "format": "date-time"
-          },
-          "isSystemReport": {
-            "type": "boolean"
           },
           "diff": {
             "description": "Field-level changes introduced by the report.",
@@ -1419,96 +1412,84 @@
             "name": "active",
             "in": "query",
             "required": false,
-            "description": "Active status. Use `any` to include all values or `null` for unknown.",
+            "description": "Active status. Omit to include all values, or use `unknown` for records where active status is not available.",
             "schema": {
               "type": "string",
               "enum": [
-                "any",
                 "true",
                 "false",
-                "null"
-              ],
-              "default": "any"
+                "unknown"
+              ]
             }
           },
           {
             "name": "accessible",
             "in": "query",
             "required": false,
-            "description": "Accessible flag. Use `any` to include all values or `null` for unknown.",
+            "description": "Whether the toilet is accessible. Omit to include all values, or use `unknown` for records where accessibility information is not available.",
             "schema": {
               "type": "string",
               "enum": [
-                "any",
                 "true",
                 "false",
-                "null"
-              ],
-              "default": "any"
+                "unknown"
+              ]
             }
           },
           {
             "name": "allGender",
             "in": "query",
             "required": false,
-            "description": "All gender flag. Use `any` to include all values or `null` for unknown.",
+            "description": "Whether the toilet is all-gender. Omit to include all values, or use `unknown` for records where this information is not available.",
             "schema": {
               "type": "string",
               "enum": [
-                "any",
                 "true",
                 "false",
-                "null"
-              ],
-              "default": "any"
+                "unknown"
+              ]
             }
           },
           {
             "name": "radar",
             "in": "query",
             "required": false,
-            "description": "RADAR key availability. Use `any` to include all values or `null` for unknown.",
+            "description": "Whether a RADAR key is required. Omit to include all values, or use `unknown` for records where RADAR key information is not available.",
             "schema": {
               "type": "string",
               "enum": [
-                "any",
                 "true",
                 "false",
-                "null"
-              ],
-              "default": "any"
+                "unknown"
+              ]
             }
           },
           {
             "name": "babyChange",
             "in": "query",
             "required": false,
-            "description": "Baby change facilities. Use `any` to include all values or `null` for unknown.",
+            "description": "Whether baby change facilities are available. Omit to include all values, or use `unknown` for records where this information is not available.",
             "schema": {
               "type": "string",
               "enum": [
-                "any",
                 "true",
                 "false",
-                "null"
-              ],
-              "default": "any"
+                "unknown"
+              ]
             }
           },
           {
             "name": "noPayment",
             "in": "query",
             "required": false,
-            "description": "Whether payment is required. Use `any` to include all values or `null` for unknown.",
+            "description": "Whether the toilet is free (no payment required). Omit to include all values, or use `unknown` for records where payment information is not available.",
             "schema": {
               "type": "string",
               "enum": [
-                "any",
                 "true",
                 "false",
-                "null"
-              ],
-              "default": "any"
+                "unknown"
+              ]
             }
           },
           {
