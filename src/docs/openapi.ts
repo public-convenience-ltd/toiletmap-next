@@ -144,7 +144,14 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
     required: ['id', 'contributor', 'createdAt', 'diff'],
     properties: {
       id: { type: 'string', example: '9234' },
-      contributor: { type: 'string', example: 'jane.doe' },
+      contributor: {
+        anyOf: [
+          { type: 'string', example: 'jane.doe' },
+          { type: 'null' },
+        ],
+        description:
+          'Contributor identifier. Null unless the caller provides an Auth0 admin token.',
+      },
       createdAt: { type: 'string', format: 'date-time' },
       diff: {
         description: 'Field-level changes introduced by the report.',
@@ -283,7 +290,14 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
     required: ['id', 'contributor', 'createdAt', 'diff'],
     properties: {
       id: { type: 'string', example: '9234' },
-      contributor: { type: 'string', example: 'jane.doe' },
+      contributor: {
+        anyOf: [
+          { type: 'string', example: 'jane.doe' },
+          { type: 'null' },
+        ],
+        description:
+          'Contributor identifier. Null unless the caller provides an Auth0 admin token.',
+      },
       createdAt: { type: 'string', format: 'date-time' },
       verifiedAt: nullableDateTime,
       diff: {
@@ -420,7 +434,7 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       data: {
         type: 'array',
         description:
-          'Summary report entries. Pass hydrate=true to receive full Report objects.',
+          'Summary report entries. Pass hydrate=true to receive full Report objects. Contributor fields are null unless the caller includes an Auth0 admin token.',
         items: schemaRef('ReportSummary'),
       },
       count: { type: 'number', example: 2 },
@@ -752,35 +766,41 @@ export const openApiDocument: OpenAPIObject = {
             description: 'Invalid identifier or payload.',
             content: jsonContent('ValidationErrorResponse'),
           },
-          401: authErrorResponse,
+          401: {
+            description: 'Invalid or unauthorized bearer token.',
+            content: jsonContent('ErrorResponse'),
+          },
         },
       },
     },
     '/api/loos/{id}/reports': {
-    get: {
-      tags: ['Loos'],
-      summary: 'List reports for a loo',
-      parameters: [
-        idPathParameter,
-        {
-          name: 'hydrate',
-          in: 'query',
-          required: false,
-          description:
-            'Set to true to include full report snapshots instead of diffs.',
-          schema: { type: 'boolean', default: false },
-        },
-      ],
-      responses: {
-        200: {
-          description:
-            'Reports associated with the loo. Returns diffs by default; full records when hydrate=true.',
-          content: jsonContent('ReportListResponse'),
-        },
-        400: {
-          description: 'Invalid loo identifier.',
-          content: jsonContent('ValidationErrorResponse'),
+      get: {
+        tags: ['Loos'],
+        summary: 'List reports for a loo',
+        description:
+          'Contributor identifiers are redacted unless the caller includes an Auth0 admin bearer token.',
+        parameters: [
+          idPathParameter,
+          {
+            name: 'hydrate',
+            in: 'query',
+            required: false,
+            description:
+              'Set to true to include full report snapshots instead of diffs.',
+            schema: { type: 'boolean', default: false },
           },
+        ],
+        responses: {
+          200: {
+            description:
+              'Reports associated with the loo. Returns diffs by default; full records when hydrate=true.',
+            content: jsonContent('ReportListResponse'),
+          },
+          400: {
+            description: 'Invalid loo identifier.',
+            content: jsonContent('ValidationErrorResponse'),
+          },
+          401: authErrorResponse,
         },
       },
     },

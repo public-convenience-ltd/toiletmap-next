@@ -113,7 +113,7 @@ export type ReportDiff = z.infer<typeof ReportDiffSchema>;
 export const ReportSummaryResponseSchema = z
   .object({
     id: z.string(),
-    contributor: z.string(),
+    contributor: z.string().nullable(),
     createdAt: z.string(),
     diff: ReportDiffSchema.nullable(),
   })
@@ -123,7 +123,7 @@ export type ReportSummaryResponse = z.infer<typeof ReportSummaryResponseSchema>;
 export const ReportResponseSchema = z
   .object({
     id: z.string(),
-    contributor: z.string(),
+    contributor: z.string().nullable(),
     createdAt: z.string(),
     verifiedAt: nullableString,
     diff: ReportDiffSchema.nullable(),

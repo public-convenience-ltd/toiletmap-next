@@ -69,48 +69,89 @@ const verifyToken = (
     );
   });
 
+const normalizeUser = (user: Auth0User): RequestUser => {
+  const subject = typeof user?.sub === 'string' ? user.sub.trim() : null;
+  if (!subject) {
+    throw new Error('Auth0 token missing `sub` claim');
+  }
+
+  const normalizedPermissions = Array.isArray(user.permissions)
+    ? user.permissions.filter(
+        (permission): permission is string =>
+          typeof permission === 'string',
+      )
+    : undefined;
+
+  return {
+    ...user,
+    sub: subject,
+    permissions: normalizedPermissions,
+  };
+};
+
+const authenticateBearer = async (
+  token: string,
+  env: Pick<Env, 'AUTH0_AUDIENCE' | 'AUTH0_ISSUER_BASE_URL'>,
+): Promise<RequestUser> => {
+  const user = await verifyToken(
+    token,
+    env.AUTH0_AUDIENCE,
+    env.AUTH0_ISSUER_BASE_URL,
+  );
+  return normalizeUser(user);
+};
+
+const readAuthorizationHeader = (value?: string | null) =>
+  value ?? null;
+
+const extractBearerToken = (headerValue: string | null) => {
+  if (!headerValue?.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = headerValue.slice(7).trim();
+  return token || null;
+};
+
+export const optionalAuth = createMiddleware<{
+  Variables: AppVariables;
+  Bindings: Env;
+}>(async (c, next) => {
+  const token = extractBearerToken(
+    readAuthorizationHeader(
+      c.req.header('authorization') ?? c.req.header('Authorization'),
+    ),
+  );
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const user = await authenticateBearer(token, c.env);
+    c.set('user', user);
+  } catch (error) {
+    console.error('Optional Auth0 verification failed', error);
+    return c.json({ message: 'Unauthorized' }, 401);
+  }
+
+  return next();
+});
+
 export const requireAuth = createMiddleware<{
   Variables: AppVariables;
   Bindings: Env;
 }>(async (c, next) => {
-  const authorizationHeader =
+  const headerValue =
     c.req.header('authorization') ?? c.req.header('Authorization');
-
-  if (!authorizationHeader?.startsWith('Bearer ')) {
-    return c.json({ message: 'Unauthorized' }, 401);
-  }
-
-  const token = authorizationHeader.slice(7).trim();
+  const token = extractBearerToken(readAuthorizationHeader(headerValue));
 
   if (!token) {
     return c.json({ message: 'Unauthorized' }, 401);
   }
 
   try {
-    const user = await verifyToken(
-      token,
-      c.env.AUTH0_AUDIENCE,
-      c.env.AUTH0_ISSUER_BASE_URL,
-    );
-    const subject = typeof user?.sub === 'string' ? user.sub.trim() : null;
-    if (!subject) {
-      console.error('Auth0 token missing `sub` claim');
-      return c.json({ message: 'Unauthorized' }, 401);
-    }
-
-    const normalizedPermissions = Array.isArray(user.permissions)
-      ? user.permissions.filter(
-          (permission): permission is string => typeof permission === 'string',
-        )
-      : undefined;
-
-    const normalizedUser: RequestUser = {
-      ...user,
-      sub: subject,
-      permissions: normalizedPermissions,
-    };
-
-    c.set('user', normalizedUser);
+    const user = await authenticateBearer(token, c.env);
+    c.set('user', user);
   } catch (error) {
     console.error('Auth0 verification failed', error);
     return c.json({ message: 'Unauthorized' }, 401);

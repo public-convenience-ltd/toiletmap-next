@@ -317,9 +317,12 @@ export class LooService {
    */
   async getReports(
     id: string,
-    options: { hydrate?: boolean } = {}
+    options: { hydrate?: boolean; includeContributors?: boolean } = {},
   ): Promise<ReportResponse[] | ReportSummaryResponse[]> {
-    const { hydrate = false } = options;
+    const {
+      hydrate = false,
+      includeContributors = false,
+    } = options;
     const reportRecords = await this.prisma.record_version.findMany({
       where: { record: { path: ["id"], equals: id } },
       select: { record: true, old_record: true, id: true },
@@ -331,11 +334,19 @@ export class LooService {
     // location report for each loo.
     const mapped = reportRecords
       .map((entry) => mapAuditRecordToReport(entry))
-      .filter((report) => !report.contributor.endsWith("-location"));
+      .filter(
+        (report) =>
+          !report.contributor ||
+          !report.contributor.endsWith("-location"),
+      );
 
-    if (hydrate) return mapped;
+    const sanitized = includeContributors
+      ? mapped
+      : mapped.map((report) => ({ ...report, contributor: null }));
 
-    return mapped.map(({ id: reportId, contributor, createdAt, diff }) => ({
+    if (hydrate) return sanitized;
+
+    return sanitized.map(({ id: reportId, contributor, createdAt, diff }) => ({
       id: reportId,
       contributor,
       createdAt,

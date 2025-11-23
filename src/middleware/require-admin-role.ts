@@ -1,7 +1,17 @@
 import { createMiddleware } from 'hono/factory';
-import { AppVariables } from '../types';
+import { AppVariables, RequestUser } from '../types';
 
-const ADMIN_ROLE_ID = 'access:admin';
+export const ADMIN_ROLE_ID = 'access:admin';
+
+export const hasAdminRole = (
+  user?: RequestUser | null,
+): boolean => {
+  if (!user) return false;
+  const permissions = Array.isArray(user.permissions)
+    ? user.permissions
+    : [];
+  return permissions.includes(ADMIN_ROLE_ID);
+};
 
 /**
  * Middleware to require admin role permissions.
@@ -15,13 +25,7 @@ export const requireAdminRole = createMiddleware<{ Variables: AppVariables }>(
       return c.json({ message: 'Unauthorized' }, 401);
     }
 
-    // Check if user has admin permission in their permissions array
-    const permissions = Array.isArray(user.permissions)
-      ? user.permissions
-      : [];
-    const hasAdminRole = permissions.includes(ADMIN_ROLE_ID);
-
-    if (!hasAdminRole) {
+    if (!hasAdminRole(user)) {
       return c.json(
         { message: 'Forbidden: Admin role required' },
         403,

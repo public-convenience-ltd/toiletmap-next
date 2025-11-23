@@ -4,6 +4,14 @@ import { createFixtureFactory } from "./utils/fixtures";
 import { getTestContext } from "./setup";
 
 const fixtures = createFixtureFactory();
+const adminHeaders = () => {
+  const { issueToken } = getTestContext();
+  return {
+    Authorization: `Bearer ${issueToken({
+      permissions: ["access:admin"],
+    })}`,
+  };
+};
 
 describe("Loo read endpoints", () => {
   describe("GET /api/loos/:id", () => {
@@ -63,7 +71,7 @@ describe("Loo read endpoints", () => {
   });
 
   describe("GET /api/loos/:id/reports", () => {
-    it("returns audit history summaries and hydrated reports", async () => {
+    it("returns audit history summaries and hydrated reports with contributor details redacted", async () => {
       const loo = await fixtures.loos.create({ notes: "Original notes" });
       await fixtures.loos.upsert(
         loo.id,
@@ -77,8 +85,8 @@ describe("Loo read endpoints", () => {
       expect(summary.count).toBeGreaterThan(0);
       expect(summary.data[0]).toMatchObject({
         id: expect.any(String),
-        contributor: expect.any(String),
       });
+      expect(summary.data[0].contributor).toBeNull();
       expect(summary.data[0]).not.toHaveProperty("notes");
 
       const hydratedResponse = await callApi(
@@ -87,6 +95,35 @@ describe("Loo read endpoints", () => {
       expect(hydratedResponse.status).toBe(200);
       const hydrated = await hydratedResponse.json();
       expect(hydrated.data[0]).toHaveProperty("notes");
+      expect(hydrated.data[0].contributor).toBeNull();
+    });
+
+    it("returns contributor details when the caller has the admin role", async () => {
+      const loo = await fixtures.loos.create({ notes: "Original notes" });
+      await fixtures.loos.upsert(
+        loo.id,
+        { notes: "Updated notes", radar: true },
+        "reports-test"
+      );
+
+      const summaryResponse = await callApi(`/api/loos/${loo.id}/reports`, {
+        headers: adminHeaders(),
+      });
+      expect(summaryResponse.status).toBe(200);
+      const summary = await summaryResponse.json();
+      const latestSummary =
+        summary.data[summary.data.length - 1];
+      expect(latestSummary.contributor).toBe("reports-test");
+
+      const hydratedResponse = await callApi(
+        `/api/loos/${loo.id}/reports?hydrate=true`,
+        { headers: adminHeaders() }
+      );
+      expect(hydratedResponse.status).toBe(200);
+      const hydrated = await hydratedResponse.json();
+      const latestHydrated =
+        hydrated.data[hydrated.data.length - 1];
+      expect(latestHydrated.contributor).toBe("reports-test");
     });
 
     it("returns reports in chronological ascending order with correct timestamps", async () => {

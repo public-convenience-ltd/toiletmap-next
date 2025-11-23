@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { validate } from '../../common/validator';
 import { AppVariables, Env } from '../../types';
-import { requireAuth } from '../../middleware/require-auth';
+import { optionalAuth, requireAuth } from '../../middleware/require-auth';
 import {
   handleRoute,
   badRequest,
@@ -17,6 +17,7 @@ import {
   LooService,
 } from '../../services/loo';
 import { createPrismaClient } from '../../prisma';
+import { hasAdminRole } from '../../middleware/require-admin-role';
 
 
 import {
@@ -101,7 +102,7 @@ loosRouter.get(
 );
 
 /** GET /loos/:id/reports */
-loosRouter.get('/:id/reports', (c) =>
+loosRouter.get('/:id/reports', optionalAuth, (c) =>
   handleRoute(c, 'loos.reports', async () => {
     const chk = requireIdParam(c.req.param('id'));
     if (!chk.ok) return badRequest(c, chk.error);
@@ -111,7 +112,10 @@ loosRouter.get('/:id/reports', (c) =>
     const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
     const reports = await looService.getReports(
       chk.id,
-      hydrate ? { hydrate: true } : undefined,
+      {
+        hydrate,
+        includeContributors: hasAdminRole(c.get('user')),
+      },
     );
     return c.json({ data: reports, count: reports.length });
   }),
