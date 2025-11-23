@@ -63,12 +63,13 @@ export const startAuthServer = async (
       },
     } satisfies Record<string, unknown>;
 
-    const payload = { ...defaults, ...claims };
+    const { aud, ...restClaims } = claims;
+    const payload = { ...defaults, ...restClaims };
 
     return jwt.sign(payload, privateKeyPem, {
       algorithm: 'RS256',
       keyid: kid,
-      audience: options.audience,
+      audience: (aud as string) || options.audience,
       issuer: `${issuer}/`,
     });
   };

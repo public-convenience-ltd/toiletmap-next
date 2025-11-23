@@ -3,7 +3,7 @@ import { Layout } from '../../components/Layout';
 import { TriStateToggle, Input, Button, TextArea } from '../../components/DesignSystem';
 import { looSchema } from '../../utils/validation';
 import { Env } from '../../../types';
-import { getSession } from '../../utils/session';
+import { getSession } from '../../../auth/session';
 import { toBoolOrNull, toNullableString } from './helpers';
 
 const renderLooForm = (c: Context, errors?: Record<string, string>) => {
@@ -151,9 +151,9 @@ export const loosCreatePost = async (c: Context<{ Bindings: Env }>) => {
         const body = await response.json().catch(() => null);
         const bodyMessage =
             body &&
-            typeof body === 'object' &&
-            'message' in body &&
-            typeof (body as { message?: unknown }).message === 'string'
+                typeof body === 'object' &&
+                'message' in body &&
+                typeof (body as { message?: unknown }).message === 'string'
                 ? ((body as { message: string }).message ?? null)
                 : null;
         const fallbackMessage =

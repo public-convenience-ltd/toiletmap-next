@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { Env } from '../types';
-import { setSessionCookies, clearSessionCookies } from './utils/session';
+import { setSessionCookies, clearSessionCookies } from '../auth/session';
 
 export const login = async (c: Context<{ Bindings: Env }>) => {
     const authorizationUrl = new URL(`${c.env.AUTH0_ISSUER_BASE_URL}authorize`);
@@ -8,6 +8,7 @@ export const login = async (c: Context<{ Bindings: Env }>) => {
     authorizationUrl.searchParams.set('redirect_uri', c.env.AUTH0_REDIRECT_URI);
     authorizationUrl.searchParams.set('response_type', 'code');
     authorizationUrl.searchParams.set('scope', c.env.AUTH0_SCOPE);
+    authorizationUrl.searchParams.set('audience', c.env.AUTH0_AUDIENCE);
 
     return c.redirect(authorizationUrl.toString());
 };

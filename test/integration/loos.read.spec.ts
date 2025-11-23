@@ -13,6 +13,13 @@ const adminHeaders = () => {
   };
 };
 
+const authHeaders = () => {
+  const { issueToken } = getTestContext();
+  return {
+    Authorization: `Bearer ${issueToken()}`,
+  };
+};
+
 describe("Loo read endpoints", () => {
   describe("GET /api/loos/:id", () => {
     it("returns a persisted loo with area metadata", async () => {
@@ -23,7 +30,10 @@ describe("Loo read endpoints", () => {
         location: { lat: 51.501, lng: -0.124 },
       });
 
-      const response = await callApi(`/api/loos/${loo.id}`);
+      const response = await callApi(`/api/loos/${loo.id}`, { headers: authHeaders() });
+      if (response.status !== 200) {
+        console.log('DEBUG ERROR BODY:', await response.text());
+      }
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.id).toBe(loo.id);
@@ -40,7 +50,7 @@ describe("Loo read endpoints", () => {
     });
 
     it("returns 404 when a loo is missing", async () => {
-      const response = await callApi("/api/loos/ffffffffffffffffffffffff");
+      const response = await callApi("/api/loos/ffffffffffffffffffffffff", { headers: authHeaders() });
       expect(response.status).toBe(404);
       const body = await response.json();
       expect(body.message).toMatch(/not found/i);
@@ -52,7 +62,7 @@ describe("Loo read endpoints", () => {
       const first = await fixtures.loos.create();
       const second = await fixtures.loos.create();
 
-      const response = await callApi(`/api/loos?ids=${first.id}&ids=${second.id}`);
+      const response = await callApi(`/api/loos?ids=${first.id}&ids=${second.id}`, { headers: authHeaders() });
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.count).toBe(2);
@@ -63,7 +73,7 @@ describe("Loo read endpoints", () => {
     });
 
     it("rejects requests without ids", async () => {
-      const response = await callApi("/api/loos");
+      const response = await callApi("/api/loos", { headers: authHeaders() });
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.message).toMatch(/provide ids/i);
@@ -79,7 +89,7 @@ describe("Loo read endpoints", () => {
         "reports-test"
       );
 
-      const summaryResponse = await callApi(`/api/loos/${loo.id}/reports`);
+      const summaryResponse = await callApi(`/api/loos/${loo.id}/reports`, { headers: authHeaders() });
       expect(summaryResponse.status).toBe(200);
       const summary = await summaryResponse.json();
       expect(summary.count).toBeGreaterThan(0);
@@ -90,7 +100,8 @@ describe("Loo read endpoints", () => {
       expect(summary.data[0]).not.toHaveProperty("notes");
 
       const hydratedResponse = await callApi(
-        `/api/loos/${loo.id}/reports?hydrate=true`
+        `/api/loos/${loo.id}/reports?hydrate=true`,
+        { headers: authHeaders() }
       );
       expect(hydratedResponse.status).toBe(200);
       const hydrated = await hydratedResponse.json();
@@ -154,11 +165,11 @@ describe("Loo read endpoints", () => {
       );
 
       // Fetch the loo to get its created_at and updated_at
-      const looResponse = await callApi(`/api/loos/${loo.id}`);
+      const looResponse = await callApi(`/api/loos/${loo.id}`, { headers: authHeaders() });
       const looData = await looResponse.json();
 
       // Fetch reports
-      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`);
+      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, { headers: authHeaders() });
       expect(response.status).toBe(200);
       const body = await response.json();
 
@@ -200,7 +211,7 @@ describe("Loo read endpoints", () => {
       const loo = await fixtures.loos.create({ notes: "Test" });
       await fixtures.loos.upsert(loo.id, { radar: true }, "test-user");
 
-      const response = await callApi(`/api/loos/${loo.id}/reports`);
+      const response = await callApi(`/api/loos/${loo.id}/reports`, { headers: authHeaders() });
       expect(response.status).toBe(200);
       const body = await response.json();
 
@@ -228,7 +239,8 @@ describe("Loo read endpoints", () => {
       }
 
       const activeResponse = await callApi(
-        `/api/loos/geohash/${prefix}?active=true`
+        `/api/loos/geohash/${prefix}?active=true`,
+        { headers: authHeaders() }
       );
       expect(activeResponse.status).toBe(200);
       const activeBody = await activeResponse.json();
@@ -237,7 +249,8 @@ describe("Loo read endpoints", () => {
       );
 
       const inactiveResponse = await callApi(
-        `/api/loos/geohash/${prefix}?active=false`
+        `/api/loos/geohash/${prefix}?active=false`,
+        { headers: authHeaders() }
       );
       expect(inactiveResponse.status).toBe(200);
       const inactiveBody = await inactiveResponse.json();
@@ -257,7 +270,8 @@ describe("Loo read endpoints", () => {
       });
 
       const response = await callApi(
-        "/api/loos/proximity?lat=51.5&lng=-0.12&radius=800"
+        "/api/loos/proximity?lat=51.5&lng=-0.12&radius=800",
+        { headers: authHeaders() }
       );
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -270,7 +284,7 @@ describe("Loo read endpoints", () => {
     });
 
     it("validates query parameters", async () => {
-      const response = await callApi("/api/loos/proximity?lat=foo&lng=bar");
+      const response = await callApi("/api/loos/proximity?lat=foo&lng=bar", { headers: authHeaders() });
       expect(response.status).toBe(400);
     });
   });
@@ -298,7 +312,8 @@ describe("Loo read endpoints", () => {
       });
 
       const response = await callApi(
-        `/api/loos/search?search=${suffix}&limit=2&page=1&sort=name-asc&hasLocation=true`
+        `/api/loos/search?search=${suffix}&limit=2&page=1&sort=name-asc&hasLocation=true`,
+        { headers: authHeaders() }
       );
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -311,7 +326,8 @@ describe("Loo read endpoints", () => {
       ]);
 
       const noLocationResponse = await callApi(
-        `/api/loos/search?search=${suffix}&hasLocation=false&limit=10&page=1`
+        `/api/loos/search?search=${suffix}&hasLocation=false&limit=10&page=1`,
+        { headers: authHeaders() }
       );
       const noLocationBody = await noLocationResponse.json();
       expect(
@@ -320,7 +336,7 @@ describe("Loo read endpoints", () => {
     });
 
     it("rejects invalid pagination arguments", async () => {
-      const response = await callApi("/api/loos/search?limit=5000&page=0");
+      const response = await callApi("/api/loos/search?limit=5000&page=0", { headers: authHeaders() });
       expect(response.status).toBe(400);
     });
   });
@@ -347,6 +363,7 @@ describe("Loo read endpoints", () => {
 
       const response = await callApi(
         `/api/loos/metrics?active=true&search=${encodeURIComponent(marker)}`,
+        { headers: authHeaders() }
       );
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -359,7 +376,10 @@ describe("Loo read endpoints", () => {
     });
 
     it("respects the recentWindowDays override", async () => {
-      const response = await callApi("/api/loos/metrics?recentWindowDays=5");
+      const response = await callApi("/api/loos/metrics?recentWindowDays=5", { headers: authHeaders() });
+      if (response.status !== 200) {
+        console.error('DEBUG METRICS ERROR:', await response.text());
+      }
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.recentWindowDays).toBe(5);

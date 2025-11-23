@@ -37,6 +37,7 @@ beforeAll(async () => {
   const authServer = await startAuthServer({ audience });
   process.env.AUTH0_ISSUER_BASE_URL = authServer.issuer;
   process.env.AUTH0_PROFILE_KEY = "app_metadata";
+  process.env.AUTH0_CLIENT_ID = "integration-test-client-id";
 
   const prisma = createPrismaClient(databaseUrl);
   await prisma.$connect();

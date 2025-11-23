@@ -7,6 +7,8 @@ import { openApiDocument } from './docs/openapi';
 
 import { admin } from './admin';
 
+import { requireAuth } from './middleware/require-auth';
+
 export const createApp = (env: Env) => {
   const app = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
@@ -19,10 +21,16 @@ export const createApp = (env: Env) => {
   );
 
   app.route('/admin', admin);
-  app.route('/api/loos', loosRouter);
-  app.route('/api/areas', areasRouter);
+
+  // Documentation - Public
   app.get('/api/docs/openapi.json', (c) => c.json(openApiDocument));
   app.get('/api/docs', swaggerUI({ url: '/api/docs/openapi.json' }));
+
+  // Require Authentication for all other API routes
+  app.use('/api/*', requireAuth);
+
+  app.route('/api/loos', loosRouter);
+  app.route('/api/areas', areasRouter);
 
   app.notFound((c) =>
     c.json(

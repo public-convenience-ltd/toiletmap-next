@@ -75,6 +75,10 @@ The server listens on `PORT` (defaults to `4001`) and exposes a health check at 
 - `supabase/seed.sql` – Deterministic dataset used during `supabase:start`.
 - `prisma/schema.prisma` – Prisma schema with the generated client outputting to `src/generated/prisma/client`.
 
+## Authentication
+
+Authentication is handled via Auth0. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for details on how to authenticate for the API and Admin Interface.
+
 ## API Overview
 
 The canonical response schemas live in `src/services/loo/types.ts` (see `LooResponseSchema`, `NearbyLooResponseSchema`, and friends) and are expressed with Zod so you can rely on them both at type-level and runtime if needed.

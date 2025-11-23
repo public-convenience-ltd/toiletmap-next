@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { Env, AppVariables } from '../types';
-import { getSession } from './utils/session';
+import { getSession } from '../auth/session';
 
 /**
  * Authentication middleware for admin routes
