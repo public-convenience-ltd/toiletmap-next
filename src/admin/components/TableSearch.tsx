@@ -64,8 +64,10 @@ export const TableSearch = (props: TableSearchProps) => {
             params.set(key, value);
         });
         if (searchQuery) params.set('search', searchQuery);
-        if (sortBy) params.set('sortBy', sortBy);
-        if (sortOrder) params.set('sortOrder', sortOrder);
+        if (sortBy) {
+            params.set('sortBy', sortBy);
+            params.set('sortOrder', sortOrder);
+        }
         if (pageSize) params.set('pageSize', String(pageSize));
         if (currentPage) params.set('page', String(currentPage));
         Object.entries(activeFilters).forEach(([key, value]) => {
@@ -177,11 +179,13 @@ export const TableSearch = (props: TableSearchProps) => {
     };
 
     const handleSort = (colKey: string) => {
-        let newOrder: 'asc' | 'desc' = 'asc';
-        if (sortBy === colKey && sortOrder === 'asc') {
-            newOrder = 'desc';
+        if (sortBy !== colKey) {
+            return buildUrl({ sortBy: colKey, sortOrder: 'asc', page: '1' });
         }
-        return buildUrl({ sortBy: colKey, sortOrder: newOrder, page: '1' });
+        if (sortOrder !== 'desc') {
+            return buildUrl({ sortOrder: 'desc', page: '1' });
+        }
+        return buildUrl({ sortBy: '', sortOrder: '', page: '1' });
     };
 
     const appliedFilters = filters
@@ -214,29 +218,27 @@ export const TableSearch = (props: TableSearchProps) => {
                     data-autosubmit="search"
                     data-allow-empty="true"
                 >
-                    <div class="search-input-wrapper">
-                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                        <input
-                            type="text"
-                            class="search-input"
-                            placeholder={searchPlaceholder}
-                            name="search"
-                            value={searchQuery}
-                            autocomplete="off"
-                        />
-                        {searchQuery && (
-                            <button type="button" class="search-clear-btn" data-clear-search>
-                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                            </button>
-                        )}
+                    <div class="search-form__row">
+                        <div class="search-input-wrapper">
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <input
+                                type="text"
+                                class="search-input"
+                                placeholder={searchPlaceholder}
+                                name="search"
+                                value={searchQuery}
+                                autocomplete="off"
+                            />
+                            {searchQuery && (
+                                <button type="button" class="search-clear-btn" data-clear-search>
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            )}
+                        </div>
                     </div>
-                    {renderHiddenStateInputs({
-                        omit: ['search', ...filters.map((filter) => filter.key)],
-                        overrides: { page: '1' },
-                    })}
 
                     {filters.length > 0 && (
-                        <div class="filter-controls">
+                        <div class="filter-controls" role="group" aria-label="Filters">
                             {filters.map((filter) => (
                                 <div class="filter-select-wrapper">
                                     <label class="visually-hidden" for={`filter-${filter.key}`}>
@@ -261,23 +263,37 @@ export const TableSearch = (props: TableSearchProps) => {
                             ))}
                         </div>
                     )}
+
+                    {renderHiddenStateInputs({
+                        omit: ['search', ...filters.map((filter) => filter.key)],
+                        overrides: { page: '1' },
+                    })}
                 </form>
             </div>
 
             {appliedFilters.length > 0 && (
                 <div class="active-filters">
                     {appliedFilters.map((filter) => (
-                        <a
-                            class="filter-chip"
-                            href={buildUrl({ [filter.key]: '', page: '1' })}
-                            title={`Remove filter ${filter.label}`}
-                        >
-                            <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
-                            {filter.label}: {filter.valueLabel}
-                        </a>
+                        <form method="get" action={currentPath} class="filter-chip">
+                            <span class="filter-chip__label">
+                                {filter.label}: {filter.valueLabel}
+                            </span>
+                            <button
+                                type="submit"
+                                class="filter-chip__remove"
+                                aria-label={`Remove filter ${filter.label}`}
+                            >
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                            {renderHiddenStateInputs({
+                                omit: [filter.key],
+                                overrides: { page: '1' },
+                            })}
+                        </form>
                     ))}
-                    <a class="filter-chip" href={clearFiltersUrl}>
-                        <i class="fa-solid fa-rotate" aria-hidden="true"></i> Reset filters
+                    <a class="filter-chip filter-chip--reset" href={clearFiltersUrl}>
+                        <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                        <span class="filter-chip__label">Reset filters</span>
                     </a>
                 </div>
             )}

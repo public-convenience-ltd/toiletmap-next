@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { Layout } from '../components/Layout';
-import { TriStateToggle, Input, Button, TextArea, Badge } from '../components/DesignSystem';
-import { TableSearch, BooleanBadge, formatDate } from '../components/TableSearch';
+import { TriStateToggle, Input, Button, TextArea } from '../components/DesignSystem';
+import { TableSearch, formatDate } from '../components/TableSearch';
 import { looSchema } from '../utils/validation';
 import { Env } from '../../types';
 import { RECENT_WINDOW_DAYS } from '../../common/constants';
@@ -164,8 +164,11 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
 
     const sortCandidates = ['name', 'updated_at', 'verified_at', 'created_at'] as const;
     type SortKey = typeof sortCandidates[number];
-    const rawSortKey = (url.searchParams.get('sortBy') ?? 'updated_at') as SortKey;
-    const sortBy: SortKey = sortCandidates.includes(rawSortKey) ? rawSortKey : 'updated_at';
+    const sortParam = url.searchParams.get('sortBy');
+    const normalizedSortParam =
+        sortParam && sortCandidates.includes(sortParam as SortKey) ? (sortParam as SortKey) : null;
+    const sortBy: SortKey = normalizedSortParam ?? 'updated_at';
+    const hasCustomSort = Boolean(normalizedSortParam);
     const sortOrder = url.searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
 
     const sanitizeFilter = (key: string, allowed: string[]) => {
@@ -309,77 +312,109 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
                             {row.geohash && <span class="table-cell-subtle">{row.geohash}</span>}
                             <span class="table-cell-subtle">#{row.id.slice(-6)}</span>
                         </div>
-                        <div class="table-chip-list">
-                            <Badge variant="neutral" icon="fa-clock">
-                                {row.openingLabel}
-                            </Badge>
+                        <div class="meta-pill-group">
+                            <span class="meta-pill">{row.openingLabel}</span>
                         </div>
                     </div>
                 ),
             },
             {
                 key: 'verified_at',
-                label: 'Status & verification',
+                label: 'Status',
                 sortable: true,
-                render: (_value: Date | null, row: typeof tableRows[number]) => (
-                    <div class="table-chip-list">
-                {BooleanBadge(row.active, 'Active', 'Inactive', 'Unknown')}
-                {row.verified_at
-                    ? <Badge variant="yes" icon="fa-shield-halved">Verified</Badge>
-                    : <Badge variant="unknown" icon="fa-triangle-exclamation">Needs review</Badge>}
-                    </div>
-                ),
+                render: (_value: Date | null, row: typeof tableRows[number]) => {
+                    const statusLabel =
+                        row.active === true ? 'Active' : row.active === false ? 'Inactive' : 'Status unknown';
+                    const statusTone = row.active === true ? 'positive' : row.active === false ? 'negative' : 'muted';
+                    const verificationLabel = row.verified_at
+                        ? `Verified ${formatDate(row.verified_at)}`
+                        : 'Awaiting verification';
+                    return (
+                        <div class="detail-stack">
+                            <span class="status-line">
+                                <span class={`status-dot status-dot--${statusTone}`}></span>
+                                {statusLabel}
+                            </span>
+                            <span class="muted-text">{verificationLabel}</span>
+                        </div>
+                    );
+                },
             },
             {
                 key: 'accessible',
                 label: 'Access & facilities',
                 sortable: false,
                 render: (_value: boolean | null, row: typeof tableRows[number]) => {
-                    const babyVariant = row.baby_change === true ? 'yes' : row.baby_change === false ? 'no' : 'unknown';
-                    const babyLabel =
-                        row.baby_change === true ? 'Baby change' : row.baby_change === false ? 'No baby change' : 'Baby change unknown';
-                    const radarVariant = row.radar === true ? 'yes' : row.radar === false ? 'no' : 'unknown';
-                    const radarLabel =
-                        row.radar === true ? 'RADAR required' : row.radar === false ? 'No RADAR key' : 'RADAR unknown';
-
+                    const accessLabel =
+                        row.accessible === true
+                            ? 'Accessible'
+                            : row.accessible === false
+                                ? 'Limited access'
+                                : 'Unknown';
+                    const facilities = [
+                        row.baby_change === true
+                            ? 'Baby change'
+                            : row.baby_change === false
+                                ? 'No baby change'
+                                : null,
+                        row.radar === true ? 'RADAR key' : row.radar === false ? 'Open access' : null,
+                    ].filter(Boolean) as string[];
                     return (
-                        <div class="table-chip-list">
-                            {BooleanBadge(row.accessible, 'Accessible', 'Limited access', 'Unknown')}
-                            <Badge variant={babyVariant} icon="fa-baby">
-                                {babyLabel}
-                            </Badge>
-                            <Badge variant={radarVariant} icon="fa-key">
-                                {radarLabel}
-                            </Badge>
+                        <div class="detail-stack">
+                            <div class="detail-row">
+                                <span class="detail-label">Access</span>
+                                <span class="detail-value">{accessLabel}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Facilities</span>
+                                <span class="detail-value">
+                                    {facilities.length > 0 ? facilities.join(' / ') : 'Details unavailable'}
+                                </span>
+                            </div>
                         </div>
                     );
                 },
             },
             {
                 key: 'no_payment',
-                label: 'Cost & contributions',
+                label: 'Cost & contributors',
                 sortable: false,
-                render: (_value: boolean | null, row: typeof tableRows[number]) => (
-                    <div class="table-chip-list">
-                        {BooleanBadge(row.no_payment, 'Free to use', 'Paid access', 'Unknown')}
-                        <Badge variant="neutral" icon="fa-user-group">
-                            {row.contributorsCount} contributors
-                        </Badge>
-                    </div>
-                ),
+                render: (_value: boolean | null, row: typeof tableRows[number]) => {
+                    const costLabel =
+                        row.no_payment === true
+                            ? 'Free to use'
+                            : row.no_payment === false
+                                ? 'Paid access'
+                                : 'Unknown';
+                    return (
+                        <div class="detail-stack">
+                            <div class="detail-row">
+                                <span class="detail-label">Cost</span>
+                                <span class="detail-value">{costLabel}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Contributors</span>
+                                <span class="detail-value">
+                                    {row.contributorsCount.toLocaleString('en-GB')}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                },
             },
             {
                 key: 'updated_at',
                 label: 'Activity',
                 sortable: true,
                 render: (_value: Date | null, row: typeof tableRows[number]) => (
-                    <div>
-                        <div class="table-cell-meta">
-                            <strong>{formatDate(row.updated_at)}</strong>
-                            <span>Last update</span>
+                    <div class="detail-stack">
+                        <div class="detail-row">
+                            <span class="detail-label">Updated</span>
+                            <span class="detail-value">{formatDate(row.updated_at)}</span>
                         </div>
-                        <div class="table-cell-meta">
-                            <span>Created {formatDate(row.created_at)}</span>
+                        <div class="detail-row">
+                            <span class="detail-label">Created</span>
+                            <span class="detail-value">{formatDate(row.created_at)}</span>
                         </div>
                     </div>
                 ),
@@ -399,65 +434,62 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
                     <Button href="/admin/loos/create">Add New Loo</Button>
                 </div>
 
-                <div class="insights-grid">
-                    {insightCards.map((card, index) => (
-                        <div class={`insight-card ${index === 0 ? 'insight-card--accent' : ''}`}>
-                            <span class="insight-title">{card.title}</span>
-                            <div class="insight-value">{card.value.toLocaleString('en-GB')}</div>
-                            <div class="insight-meta">
-                                <i class="fa-solid fa-circle" aria-hidden="true" style="font-size: 0.4rem;"></i>
-                                <span>{card.meta}</span>
+                <section class="stats-panel">
+                    <div class="metric-grid">
+                        {insightCards.map((card) => (
+                            <div class="metric-card">
+                                <p class="metric-label">{card.title}</p>
+                                <p class="metric-value">{card.value.toLocaleString('en-GB')}</p>
+                                <p class="metric-meta">{card.meta}</p>
                             </div>
-                            <div class="sparkline"></div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
 
-                <div class="insights-grid">
-                    <div class="insight-card">
-                        <h3 style="margin-top: 0;">Feature coverage</h3>
-                        <ul class="legend-list">
-                            {featureStats.map((stat) => (
-                                <li class="legend-item">
-                                    <div class="legend-label">
-                                        <span>{stat.label}</span>
-                                    </div>
-                                    <div style="min-width: 120px;">
-                                        <div class="stat-bar">
+                    <div class="stat-sections">
+                        <div class="stat-section">
+                            <p class="stat-heading">Feature coverage</p>
+                            <ul class="stat-progress-list">
+                                {featureStats.map((stat) => (
+                                    <li class="stat-progress-item">
+                                        <div class="stat-progress">
+                                            <span>{stat.label}</span>
+                                            <span>{stat.value.toLocaleString('en-GB')}</span>
+                                        </div>
+                                        <div class="stat-progress-bar">
                                             <div
-                                                class="stat-bar__fill"
+                                                class="stat-progress-bar__fill"
                                                 style={`width: ${percentage(stat.value, totalCount)}%;`}
                                             ></div>
                                         </div>
-                                        <small>
-                                            {stat.value.toLocaleString('en-GB')} • {percentage(stat.value, totalCount)}%
-                                        </small>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                                        <span class="stat-progress-meta">
+                                            {percentage(stat.value, totalCount)}% of filtered set
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
 
-                    <div class="insight-card insight-card--accent">
-                        <h3 style="margin-top: 0;">Top areas (by records)</h3>
-                        <ul class="legend-list">
-                            {areaDistribution.length === 0 && (
-                                <li class="legend-item">
-                                    <span class="legend-label">No areas match the current filters.</span>
-                                </li>
-                            )}
-                            {areaDistribution.map((area) => (
-                                <li class="legend-item">
-                                    <div class="legend-label">
-                                        <span class="legend-dot" style={`background: ${area.color};`}></span>
-                                        {area.name}
-                                    </div>
-                                    <strong>{area.count.toLocaleString('en-GB')}</strong>
-                                </li>
-                            ))}
-                        </ul>
+                        <div class="stat-section">
+                            <p class="stat-heading">Top areas</p>
+                            <ul class="stat-list">
+                                {areaDistribution.length === 0 && (
+                                    <li class="stat-list-item">
+                                        <span class="stat-list-label muted-text">No areas match the current filters.</span>
+                                    </li>
+                                )}
+                                {areaDistribution.map((area) => (
+                                    <li class="stat-list-item">
+                                        <span class="stat-list-label">
+                                            <span class="status-dot" style={`background: ${area.color};`}></span>
+                                            {area.name}
+                                        </span>
+                                        <strong>{area.count.toLocaleString('en-GB')}</strong>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     </div>
-                </div>
+                </section>
 
                 <TableSearch
                     data={tableRows}
@@ -468,8 +500,8 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
                     pageSize={pageSize}
                     currentPage={resolvedPage}
                     searchQuery={searchQuery}
-                    sortBy={sortBy}
-                    sortOrder={sortOrder}
+                    sortBy={hasCustomSort ? sortBy : ''}
+                    sortOrder={hasCustomSort ? sortOrder : undefined}
                     activeFilters={filtersState}
                     currentPath="/admin/loos"
                     mode="server"
