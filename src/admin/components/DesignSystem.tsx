@@ -96,3 +96,18 @@ export const FormError = (props: { message: string }) => {
         </span>
     );
 };
+
+export const Badge = (props: {
+    children: any;
+    variant?: 'neutral' | 'yes' | 'no' | 'unknown';
+    icon?: string;
+    title?: string;
+}) => {
+    const className = `badge badge--${props.variant || 'neutral'}`;
+    return (
+        <span class={className} title={props.title}>
+            {props.icon && <i class={`fa-solid ${props.icon}`} aria-hidden="true"></i>}
+            <span>{props.children}</span>
+        </span>
+    );
+};
