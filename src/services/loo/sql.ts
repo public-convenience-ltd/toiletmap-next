@@ -1,16 +1,7 @@
-import { Prisma, toilets } from '../../prisma';
+import { Prisma } from '../../prisma';
 import type { LooSearchParams, LooSearchSort } from './types';
 
 // Centralised SQL fragments for read-heavy loo operations.
-
-export type RawLooRow = (toilets & {
-  area_name?: string | null;
-  area_type?: string | null;
-}) & {
-  id: string;
-};
-
-export type RawNearbyLooRow = RawLooRow & { distance: number };
 
 const BASE_COLUMNS: readonly Prisma.Sql[] = [
   Prisma.sql`loo.id`,
@@ -36,6 +27,7 @@ const BASE_COLUMNS: readonly Prisma.Sql[] = [
   Prisma.sql`loo.opening_times`,
   Prisma.sql`loo.radar`,
   Prisma.sql`loo.location`,
+  Prisma.sql`loo.area_id`,
   Prisma.sql`area.name AS area_name`,
   Prisma.sql`area.type AS area_type`,
 ];

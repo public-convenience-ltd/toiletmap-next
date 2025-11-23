@@ -684,8 +684,15 @@ export const loosCreatePost = async (c: Context<{ Bindings: Env }>) => {
         }
 
         const body = await response.json().catch(() => null);
+        const bodyMessage =
+            body &&
+            typeof body === 'object' &&
+            'message' in body &&
+            typeof (body as { message?: unknown }).message === 'string'
+                ? ((body as { message: string }).message ?? null)
+                : null;
         const fallbackMessage =
-            body?.message ??
+            bodyMessage ??
             (response.status === 400
                 ? 'The API rejected this request. Please review the inputs.'
                 : 'Failed to create loo. Please try again.');

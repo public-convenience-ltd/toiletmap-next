@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
-import { AppVariables, Auth0User, Env } from '../types';
+import { AppVariables, Auth0User, Env, RequestUser } from '../types';
 
 const getJwksUri = (issuerBaseUrl: string) => {
   const base = issuerBaseUrl.endsWith('/')
@@ -92,7 +92,25 @@ export const requireAuth = createMiddleware<{
       c.env.AUTH0_AUDIENCE,
       c.env.AUTH0_ISSUER_BASE_URL,
     );
-    c.set('user', user);
+    const subject = typeof user?.sub === 'string' ? user.sub.trim() : null;
+    if (!subject) {
+      console.error('Auth0 token missing `sub` claim');
+      return c.json({ message: 'Unauthorized' }, 401);
+    }
+
+    const normalizedPermissions = Array.isArray(user.permissions)
+      ? user.permissions.filter(
+          (permission): permission is string => typeof permission === 'string',
+        )
+      : undefined;
+
+    const normalizedUser: RequestUser = {
+      ...user,
+      sub: subject,
+      permissions: normalizedPermissions,
+    };
+
+    c.set('user', normalizedUser);
   } catch (error) {
     console.error('Auth0 verification failed', error);
     return c.json({ message: 'Unauthorized' }, 401);

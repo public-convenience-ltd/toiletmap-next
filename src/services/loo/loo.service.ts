@@ -14,8 +14,6 @@ import {
   buildSearchQueries,
   buildSelectByIdsQuery,
   createSearchWhereBuilder,
-  type RawLooRow,
-  type RawNearbyLooRow,
 } from "./sql";
 import type {
   LooMutationAttributes,
@@ -26,15 +24,43 @@ import type {
   LooSearchParams,
   LooMetricsResponse,
 } from "./types";
-import { RawLooRowSchema, RawNearbyLooRowSchema } from "./types";
+import {
+  RawLooRowSchema,
+  RawNearbyLooRowSchema,
+  type RawLooRow,
+  type RawNearbyLooRow,
+} from "./types";
 
 /**
  * Converts a validated RawLooRow to a toilets object by extracting only toilets fields.
  */
-const rawLooToToilets = (raw: RawLooRow): toilets => {
-  const { area_name, area_type, ...toiletsFields } = raw;
-  return toiletsFields;
-};
+const rawLooToToilets = (raw: RawLooRow): toilets => ({
+  id: raw.id,
+  created_at: raw.created_at ?? null,
+  contributors: raw.contributors ?? [],
+  accessible: raw.accessible ?? null,
+  active: raw.active ?? null,
+  attended: raw.attended ?? null,
+  automatic: raw.automatic ?? null,
+  baby_change: raw.baby_change ?? null,
+  men: raw.men ?? null,
+  name: raw.name ?? null,
+  no_payment: raw.no_payment ?? null,
+  notes: raw.notes ?? null,
+  payment_details: raw.payment_details ?? null,
+  radar: raw.radar ?? null,
+  removal_reason: raw.removal_reason ?? null,
+  women: raw.women ?? null,
+  updated_at: raw.updated_at ?? null,
+  urinal_only: raw.urinal_only ?? null,
+  all_gender: raw.all_gender ?? null,
+  children: raw.children ?? null,
+  geohash: raw.geohash ?? null,
+  verified_at: raw.verified_at ?? null,
+  area_id: raw.area_id ?? null,
+  opening_times: raw.opening_times ?? null,
+  location: raw.location ?? null,
+});
 
 /**
  * Service for managing Loo (toilet) data.

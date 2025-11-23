@@ -13,6 +13,10 @@ export type Auth0User = {
   [key: string]: unknown;
 };
 
+export type RequestUser = Auth0User & {
+  sub: string;
+};
+
 /**
  * Cloudflare Workers environment bindings
  * Defines all environment variables and bindings available to the worker
@@ -34,10 +38,5 @@ export interface Env {
 }
 
 export type AppVariables = {
-  user?: {
-    sub: string;
-    email?: string;
-    name?: string;
-    nickname?: string;
-  };
+  user?: RequestUser;
 };

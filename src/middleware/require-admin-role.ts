@@ -16,8 +16,10 @@ export const requireAdminRole = createMiddleware<{ Variables: AppVariables }>(
     }
 
     // Check if user has admin permission in their permissions array
-    const permissions = user.permissions as string[] | undefined;
-    const hasAdminRole = permissions?.includes(ADMIN_ROLE_ID);
+    const permissions = Array.isArray(user.permissions)
+      ? user.permissions
+      : [];
+    const hasAdminRole = permissions.includes(ADMIN_ROLE_ID);
 
     if (!hasAdminRole) {
       return c.json(
