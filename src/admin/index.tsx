@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { Env } from '../types';
 import { login, callback, logout } from './auth';
-import { loosList, loosCreate, loosCreatePost } from './pages/Loos';
+import { loosList, loosCreate, loosCreatePost } from './pages/loos';
 import { contributorsList } from './pages/Contributors';
 import { dashboard } from './pages/Dashboard';
 import { requireAuth } from './middleware';

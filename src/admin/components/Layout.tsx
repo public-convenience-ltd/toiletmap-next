@@ -112,6 +112,15 @@ export const Layout = (props: { title: string; children: any }) => {
             transition: all 0.2s ease;
           }
           .button:hover { background-color: var(--color-blue); color: var(--color-turquoise); border-color: var(--color-blue); }
+          .button--secondary {
+            background-color: transparent;
+            color: var(--color-primary-navy);
+            border-color: rgba(10, 22, 94, 0.35);
+          }
+          .button--secondary:hover {
+            background-color: rgba(10, 22, 94, 0.08);
+            color: var(--color-primary-navy);
+          }
           
           /* Inputs */
           .input,
@@ -356,6 +365,22 @@ export const Layout = (props: { title: string; children: any }) => {
             flex-wrap: wrap;
             gap: var(--space-s);
             width: 100%;
+          }
+          .table-controls {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-s);
+            margin-bottom: var(--space-m);
+          }
+          .table-controls__row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-s);
+          }
+          .table-section {
+            margin-top: var(--space-m);
           }
           .search-input-wrapper {
             position: relative;
@@ -606,6 +631,49 @@ export const Layout = (props: { title: string; children: any }) => {
             color: var(--color-primary-navy);
             margin-bottom: var(--space-s);
           }
+          .async-state {
+            text-align: center;
+            padding: var(--space-l);
+            border: 1px dashed rgba(10, 22, 94, 0.15);
+            border-radius: 12px;
+            color: var(--color-neutral-grey);
+          }
+          .async-state--error {
+            color: var(--color-accent-pink);
+            border-color: rgba(237, 61, 98, 0.35);
+          }
+          .loading-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-2xs);
+          }
+          .loading-indicator p {
+            margin: 0;
+          }
+          .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 3px solid rgba(10, 22, 94, 0.15);
+            border-top-color: var(--color-primary-navy);
+            animation: spin 0.9s linear infinite;
+          }
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+          @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+          }
+          .metric-card--loading {
+            animation: pulse 1.5s ease-in-out infinite;
+          }
+          .metric-card--error {
+            border: 1px solid rgba(237, 61, 98, 0.4);
+            box-shadow: 0 0 0 1px rgba(237, 61, 98, 0.2);
+          }
 
           .pagination {
             display: flex;
@@ -616,6 +684,10 @@ export const Layout = (props: { title: string; children: any }) => {
             margin-top: var(--space-m);
           }
           .pagination-controls {
+            display: inline-flex;
+            gap: var(--space-3xs);
+          }
+          .pagination-dynamic {
             display: inline-flex;
             gap: var(--space-3xs);
           }
