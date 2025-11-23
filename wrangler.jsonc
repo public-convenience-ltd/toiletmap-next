@@ -15,7 +15,7 @@
     "production": {
       "vars": {
         "AUTH0_REDIRECT_URI": "https://toiletmap-server.gbtoiletmap.workers.dev/admin/callback",
-      }
+      },"name": "toiletmap-server"
     },
     "development": {
       "vars": {
