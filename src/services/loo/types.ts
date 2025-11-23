@@ -14,6 +14,10 @@ export const dayOpeningHoursSchema = z.union([
 
 export const openingTimesSchema = z.array(dayOpeningHoursSchema).length(7).nullable();
 
+// Database records occasionally contain legacy or incomplete opening_times data.
+// This schema gracefully falls back to null instead of throwing so searches don't explode.
+const openingTimesFromDbSchema = openingTimesSchema.catch(null);
+
 export const CoordinatesSchema = z
   .object({
     lat: z.number().finite(),
@@ -176,7 +180,7 @@ export const ToiletsRecordSchema = z.object({
   geohash: nullableString,
   verified_at: z.coerce.date().nullable(),
   area_id: nullableString,
-  opening_times: openingTimesSchema,
+  opening_times: openingTimesFromDbSchema,
   location: jsonValueSchema.nullable(),
 }).partial();
 
@@ -208,7 +212,7 @@ export const RawLooRowSchema = z.object({
   geohash: nullableString.optional(),
   verified_at: z.coerce.date().nullable().optional(),
   area_id: nullableString.optional(),
-  opening_times: openingTimesSchema.optional(),
+  opening_times: openingTimesFromDbSchema.optional(),
   location: jsonValueSchema.nullable().optional(),
   area_name: nullableString.optional(),
   area_type: nullableString.optional(),
