@@ -6,7 +6,7 @@ import { getTestContext } from "./setup";
 const fixtures = createFixtureFactory();
 
 describe("Loo read endpoints", () => {
-  describe("GET /loos/:id", () => {
+  describe("GET /api/loos/:id", () => {
     it("returns a persisted loo with area metadata", async () => {
       const { prisma } = getTestContext();
       const existingArea = await prisma.areas.findFirst();
@@ -15,7 +15,7 @@ describe("Loo read endpoints", () => {
         location: { lat: 51.501, lng: -0.124 },
       });
 
-      const response = await callApi(`/loos/${loo.id}`);
+      const response = await callApi(`/api/loos/${loo.id}`);
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.id).toBe(loo.id);
@@ -32,19 +32,19 @@ describe("Loo read endpoints", () => {
     });
 
     it("returns 404 when a loo is missing", async () => {
-      const response = await callApi("/loos/ffffffffffffffffffffffff");
+      const response = await callApi("/api/loos/ffffffffffffffffffffffff");
       expect(response.status).toBe(404);
       const body = await response.json();
       expect(body.message).toMatch(/not found/i);
     });
   });
 
-  describe("GET /loos (ids)", () => {
+  describe("GET /api/loos (ids)", () => {
     it("returns loos matching provided ids and preserves order", async () => {
       const first = await fixtures.loos.create();
       const second = await fixtures.loos.create();
 
-      const response = await callApi(`/loos?ids=${first.id}&ids=${second.id}`);
+      const response = await callApi(`/api/loos?ids=${first.id}&ids=${second.id}`);
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.count).toBe(2);
@@ -55,14 +55,14 @@ describe("Loo read endpoints", () => {
     });
 
     it("rejects requests without ids", async () => {
-      const response = await callApi("/loos");
+      const response = await callApi("/api/loos");
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.message).toMatch(/provide ids/i);
     });
   });
 
-  describe("GET /loos/:id/reports", () => {
+  describe("GET /api/loos/:id/reports", () => {
     it("returns audit history summaries and hydrated reports", async () => {
       const loo = await fixtures.loos.create({ notes: "Original notes" });
       await fixtures.loos.upsert(
@@ -71,7 +71,7 @@ describe("Loo read endpoints", () => {
         "reports-test"
       );
 
-      const summaryResponse = await callApi(`/loos/${loo.id}/reports`);
+      const summaryResponse = await callApi(`/api/loos/${loo.id}/reports`);
       expect(summaryResponse.status).toBe(200);
       const summary = await summaryResponse.json();
       expect(summary.count).toBeGreaterThan(0);
@@ -82,7 +82,7 @@ describe("Loo read endpoints", () => {
       expect(summary.data[0]).not.toHaveProperty("notes");
 
       const hydratedResponse = await callApi(
-        `/loos/${loo.id}/reports?hydrate=true`
+        `/api/loos/${loo.id}/reports?hydrate=true`
       );
       expect(hydratedResponse.status).toBe(200);
       const hydrated = await hydratedResponse.json();
@@ -117,11 +117,11 @@ describe("Loo read endpoints", () => {
       );
 
       // Fetch the loo to get its created_at and updated_at
-      const looResponse = await callApi(`/loos/${loo.id}`);
+      const looResponse = await callApi(`/api/loos/${loo.id}`);
       const looData = await looResponse.json();
 
       // Fetch reports
-      const response = await callApi(`/loos/${loo.id}/reports?hydrate=true`);
+      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`);
       expect(response.status).toBe(200);
       const body = await response.json();
 
@@ -163,7 +163,7 @@ describe("Loo read endpoints", () => {
       const loo = await fixtures.loos.create({ notes: "Test" });
       await fixtures.loos.upsert(loo.id, { radar: true }, "test-user");
 
-      const response = await callApi(`/loos/${loo.id}/reports`);
+      const response = await callApi(`/api/loos/${loo.id}/reports`);
       expect(response.status).toBe(200);
       const body = await response.json();
 
@@ -174,7 +174,7 @@ describe("Loo read endpoints", () => {
     });
   });
 
-  describe("GET /loos/geohash/:geohash", () => {
+  describe("GET /api/loos/geohash/:geohash", () => {
     it("filters loos by geohash prefix and active flag", async () => {
       const sharedLocation = { lat: 51.504, lng: -0.11 };
       const activeLoo = await fixtures.loos.create({
@@ -191,7 +191,7 @@ describe("Loo read endpoints", () => {
       }
 
       const activeResponse = await callApi(
-        `/loos/geohash/${prefix}?active=true`
+        `/api/loos/geohash/${prefix}?active=true`
       );
       expect(activeResponse.status).toBe(200);
       const activeBody = await activeResponse.json();
@@ -200,7 +200,7 @@ describe("Loo read endpoints", () => {
       );
 
       const inactiveResponse = await callApi(
-        `/loos/geohash/${prefix}?active=false`
+        `/api/loos/geohash/${prefix}?active=false`
       );
       expect(inactiveResponse.status).toBe(200);
       const inactiveBody = await inactiveResponse.json();
@@ -210,7 +210,7 @@ describe("Loo read endpoints", () => {
     });
   });
 
-  describe("GET /loos/proximity", () => {
+  describe("GET /api/loos/proximity", () => {
     it("returns loos within the requested radius", async () => {
       const near = await fixtures.loos.create({
         location: { lat: 51.5, lng: -0.12 },
@@ -220,7 +220,7 @@ describe("Loo read endpoints", () => {
       });
 
       const response = await callApi(
-        "/loos/proximity?lat=51.5&lng=-0.12&radius=800"
+        "/api/loos/proximity?lat=51.5&lng=-0.12&radius=800"
       );
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -233,12 +233,12 @@ describe("Loo read endpoints", () => {
     });
 
     it("validates query parameters", async () => {
-      const response = await callApi("/loos/proximity?lat=foo&lng=bar");
+      const response = await callApi("/api/loos/proximity?lat=foo&lng=bar");
       expect(response.status).toBe(400);
     });
   });
 
-  describe("GET /loos/search", () => {
+  describe("GET /api/loos/search", () => {
     it("supports pagination, sorting, and hasLocation filters", async () => {
       const suffix = Date.now().toString(36);
       const makeName = (label: string) => `${label} ${suffix}`;
@@ -261,7 +261,7 @@ describe("Loo read endpoints", () => {
       });
 
       const response = await callApi(
-        `/loos/search?search=${suffix}&limit=2&page=1&sort=name-asc&hasLocation=true`
+        `/api/loos/search?search=${suffix}&limit=2&page=1&sort=name-asc&hasLocation=true`
       );
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -274,7 +274,7 @@ describe("Loo read endpoints", () => {
       ]);
 
       const noLocationResponse = await callApi(
-        `/loos/search?search=${suffix}&hasLocation=false&limit=10&page=1`
+        `/api/loos/search?search=${suffix}&hasLocation=false&limit=10&page=1`
       );
       const noLocationBody = await noLocationResponse.json();
       expect(
@@ -283,8 +283,49 @@ describe("Loo read endpoints", () => {
     });
 
     it("rejects invalid pagination arguments", async () => {
-      const response = await callApi("/loos/search?limit=5000&page=0");
+      const response = await callApi("/api/loos/search?limit=5000&page=0");
       expect(response.status).toBe(400);
+    });
+  });
+
+  describe("GET /api/loos/metrics", () => {
+    it("summarises filtered counts", async () => {
+      const marker = `metrics-${Date.now()}`;
+      await fixtures.loos.create({
+        active: true,
+        accessible: true,
+        babyChange: true,
+        radar: true,
+        noPayment: true,
+        notes: marker,
+      });
+      await fixtures.loos.create({
+        active: false,
+        accessible: false,
+        babyChange: false,
+        radar: false,
+        noPayment: false,
+        notes: marker,
+      });
+
+      const response = await callApi(
+        `/api/loos/metrics?active=true&search=${encodeURIComponent(marker)}`,
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.totals.filtered).toBe(1);
+      expect(body.totals.accessible).toBe(1);
+      expect(body.totals.babyChange).toBe(1);
+      expect(body.totals.radar).toBe(1);
+      expect(body.totals.freeAccess).toBe(1);
+      expect(Array.isArray(body.areas)).toBe(true);
+    });
+
+    it("respects the recentWindowDays override", async () => {
+      const response = await callApi("/api/loos/metrics?recentWindowDays=5");
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.recentWindowDays).toBe(5);
     });
   });
 });

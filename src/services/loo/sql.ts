@@ -90,22 +90,22 @@ const addNullableBooleanCondition = (
   conditions.push(Prisma.sql`${Prisma.raw(column)} = ${value}`);
 };
 
-const buildWhereClause = (
-  params: Pick<
-    LooSearchParams,
-    | 'search'
-    | 'areaName'
-    | 'areaType'
-    | 'active'
-    | 'accessible'
-    | 'allGender'
-    | 'radar'
-    | 'babyChange'
-    | 'noPayment'
-    | 'verified'
-    | 'hasLocation'
-  >,
-) => {
+type SearchFilterParams = Pick<
+  LooSearchParams,
+  | 'search'
+  | 'areaName'
+  | 'areaType'
+  | 'active'
+  | 'accessible'
+  | 'allGender'
+  | 'radar'
+  | 'babyChange'
+  | 'noPayment'
+  | 'verified'
+  | 'hasLocation'
+>;
+
+const buildSearchFilterConditions = (params: SearchFilterParams) => {
   const conditions: Prisma.Sql[] = [];
 
   if (params.search) {
@@ -153,9 +153,42 @@ const buildWhereClause = (
     );
   }
 
-  return conditions.length
+  return conditions;
+};
+
+const buildWhereClauseFromConditions = (conditions: Prisma.Sql[]) =>
+  conditions.length
     ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`
     : Prisma.sql``;
+
+const extractSearchFilters = (params: LooSearchParams): SearchFilterParams => ({
+  search: params.search,
+  areaName: params.areaName,
+  areaType: params.areaType,
+  active: params.active,
+  accessible: params.accessible,
+  allGender: params.allGender,
+  radar: params.radar,
+  babyChange: params.babyChange,
+  noPayment: params.noPayment,
+  verified: params.verified,
+  hasLocation: params.hasLocation,
+});
+
+export const createSearchWhereBuilder = (params: LooSearchParams) => {
+  const filterParams = extractSearchFilters(params);
+  const baseConditions = buildSearchFilterConditions(filterParams);
+
+  const buildWhere = (extra?: Prisma.Sql | Prisma.Sql[]) => {
+    const extras = extra
+      ? Array.isArray(extra)
+        ? extra
+        : [extra]
+      : [];
+    return buildWhereClauseFromConditions([...baseConditions, ...extras]);
+  };
+
+  return { buildWhere };
 };
 
 type BuildSearchQueryArgs = {
@@ -169,13 +202,14 @@ type BuildSearchQueryArgs = {
  * Returns both the data query and the count query.
  */
 export const buildSearchQueries = ({ params, limit, offset }: BuildSearchQueryArgs) => {
+  const { buildWhere } = createSearchWhereBuilder(params);
   const orderExpression =
     SORT_ORDER_SQL[params.sort] ?? SORT_ORDER_SQL['updated-desc'];
   const orderSql = Prisma.sql`ORDER BY ${Prisma.join([
     orderExpression,
     Prisma.sql`loo.id ASC`,
   ])}`;
-  const whereClause = buildWhereClause(params);
+  const whereClause = buildWhere();
 
   const dataQuery = Prisma.sql`
     ${buildSelectClause()}

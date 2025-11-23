@@ -3,12 +3,12 @@ import { Layout } from '../components/Layout';
 import { TriStateToggle, Input, Button, TextArea, Badge } from '../components/DesignSystem';
 import { TableSearch, BooleanBadge, formatDate } from '../components/TableSearch';
 import { looSchema } from '../utils/validation';
-import { createPrismaClient, Prisma } from '../../prisma';
 import { Env } from '../../types';
+import { RECENT_WINDOW_DAYS } from '../../common/constants';
+import { getSession } from '../utils/session';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const AREA_COLORS = ['#0a165e', '#ed3d62', '#92f9db', '#f4c430', '#7b61ff'];
-const RECENT_WINDOW_DAYS = 30;
 
 const TABLE_FILTERS = [
     {
@@ -60,6 +60,51 @@ const percentage = (value: number, total: number) => {
 
 type OpeningSchedule = [string, string][];
 
+type ApiLoo = {
+    id: string;
+    name: string | null;
+    area: Array<{ name: string | null }>;
+    geohash: string | null;
+    active: boolean | null;
+    verifiedAt: string | null;
+    accessible: boolean | null;
+    babyChange: boolean | null;
+    noPayment: boolean | null;
+    radar: boolean | null;
+    updatedAt: string | null;
+    createdAt: string | null;
+    contributorsCount?: number;
+    openingTimes: OpeningSchedule | null;
+};
+
+type LooSearchResponse = {
+    data: ApiLoo[];
+    count: number;
+    total: number;
+    page: number;
+    pageSize: number;
+    hasMore: boolean;
+};
+
+type LooMetricsResponse = {
+    recentWindowDays: number;
+    totals: {
+        filtered: number;
+        active: number;
+        verified: number;
+        accessible: number;
+        babyChange: number;
+        radar: number;
+        freeAccess: number;
+        recent: number;
+    };
+    areas: Array<{
+        areaId: string | null;
+        name: string;
+        count: number;
+    }>;
+};
+
 const getOpeningLabel = (openingTimes: unknown): string => {
     if (!openingTimes || !Array.isArray(openingTimes)) return 'Hours unknown';
     const schedule = openingTimes as OpeningSchedule;
@@ -77,8 +122,38 @@ const getOpeningLabel = (openingTimes: unknown): string => {
     return 'Hours unknown';
 };
 
+const mapSortToApiSort = (column: string, order: 'asc' | 'desc') => {
+    switch (column) {
+        case 'name':
+            return order === 'asc' ? 'name-asc' : 'name-desc';
+        case 'created_at':
+            return order === 'asc' ? 'created-asc' : 'created-desc';
+        case 'verified_at':
+            return order === 'asc' ? 'verified-asc' : 'verified-desc';
+        case 'updated_at':
+        default:
+            return order === 'asc' ? 'updated-asc' : 'updated-desc';
+    }
+};
+
+const fetchApiJson = async <T,>(
+    c: Context,
+    path: string,
+    searchParams?: URLSearchParams,
+): Promise<T> => {
+    const url = new URL(path, c.req.url);
+    if (searchParams) {
+        url.search = searchParams.toString();
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+        const message = await response.text().catch(() => '');
+        throw new Error(`API request failed (${response.status}): ${message || url.pathname}`);
+    }
+    return response.json() as Promise<T>;
+};
+
 export const loosList = async (c: Context<{ Bindings: Env }>) => {
-    const prisma = createPrismaClient(c.env.POSTGRES_URI);
     const url = new URL(c.req.url);
 
     const searchQuery = (url.searchParams.get('search') ?? '').trim();
@@ -87,7 +162,7 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
     const requestedPageSize = parseInt(url.searchParams.get('pageSize') ?? '25', 10);
     const pageSize = clampPageSize(requestedPageSize);
 
-    const sortCandidates = ['name', 'updated_at', 'verified_at', 'created_at', 'accessible', 'no_payment'] as const;
+    const sortCandidates = ['name', 'updated_at', 'verified_at', 'created_at'] as const;
     type SortKey = typeof sortCandidates[number];
     const rawSortKey = (url.searchParams.get('sortBy') ?? 'updated_at') as SortKey;
     const sortBy: SortKey = sortCandidates.includes(rawSortKey) ? rawSortKey : 'updated_at';
@@ -108,59 +183,6 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
         verification: sanitizeFilter('verification', ['all', 'verified', 'unverified']),
     };
 
-    const where: Prisma.toiletsWhereInput = {};
-
-    if (searchQuery) {
-        where.OR = [
-            { name: { contains: searchQuery, mode: 'insensitive' } },
-            { notes: { contains: searchQuery, mode: 'insensitive' } },
-            { geohash: { contains: searchQuery, mode: 'insensitive' } },
-            { id: { contains: searchQuery } },
-            { areas: { name: { contains: searchQuery, mode: 'insensitive' } } },
-        ];
-    }
-
-    if (filtersState.status === 'active') {
-        where.active = true;
-    } else if (filtersState.status === 'inactive') {
-        where.active = false;
-    }
-
-    if (filtersState.access === 'accessible') {
-        where.accessible = true;
-    } else if (filtersState.access === 'not_accessible') {
-        where.accessible = false;
-    }
-
-    if (filtersState.payment === 'free') {
-        where.no_payment = true;
-    } else if (filtersState.payment === 'paid') {
-        where.no_payment = false;
-    }
-
-    if (filtersState.verification === 'verified') {
-        where.verified_at = { not: null };
-    } else if (filtersState.verification === 'unverified') {
-        where.verified_at = null;
-    }
-
-    const sortMap: Record<SortKey, (direction: Prisma.SortOrder) => Prisma.toiletsOrderByWithRelationInput> = {
-        name: (direction) => ({ name: direction }),
-        updated_at: (direction) => ({ updated_at: direction }),
-        verified_at: (direction) => ({ verified_at: direction }),
-        created_at: (direction) => ({ created_at: direction }),
-        accessible: (direction) => ({ accessible: direction }),
-        no_payment: (direction) => ({ no_payment: direction }),
-    };
-
-    const orderBy = sortMap[sortBy](sortOrder);
-    const skip = (page - 1) * pageSize;
-    const recentThreshold = new Date(Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-
-    const withCondition = (extra: Prisma.toiletsWhereInput): Prisma.toiletsWhereInput => ({
-        AND: [where, extra],
-    });
-
     const filterConfig = TABLE_FILTERS.map((filter) => ({
         key: filter.key,
         label: filter.label,
@@ -171,105 +193,71 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
     }));
 
     try {
-        const [
-            loos,
-            totalCount,
-            activeCount,
-            verifiedCount,
-            accessibleCount,
-            babyChangeCount,
-            radarCount,
-            freeAccessCount,
-            recentCount,
-            areaGroups,
-        ] = await prisma.$transaction([
-            prisma.toilets.findMany({
-                where,
-                orderBy,
-                include: {
-                    areas: {
-                        select: { name: true },
-                    },
-                },
-                skip,
-                take: pageSize,
-            }),
-            prisma.toilets.count({ where }),
-            prisma.toilets.count({ where: withCondition({ active: true }) }),
-            prisma.toilets.count({ where: withCondition({ verified_at: { not: null } }) }),
-            prisma.toilets.count({ where: withCondition({ accessible: true }) }),
-            prisma.toilets.count({ where: withCondition({ baby_change: true }) }),
-            prisma.toilets.count({ where: withCondition({ radar: true }) }),
-            prisma.toilets.count({ where: withCondition({ no_payment: true }) }),
-            prisma.toilets.count({ where: withCondition({ updated_at: { gte: recentThreshold } }) }),
-            prisma.toilets.groupBy({
-                by: ['area_id'],
-                where,
-                _count: { _all: true },
-                orderBy: {
-                    _count: { id: 'desc' },
-                },
-                take: 5,
-            }),
-        ]);
+        const applyFilterMapping = (
+            params: URLSearchParams,
+            value: string,
+            key: string,
+            mapping: Record<string, 'true' | 'false'>,
+        ) => {
+            const mapped = mapping[value];
+            if (mapped) {
+                params.set(key, mapped);
+            }
+        };
 
+        const apiSearchParams = new URLSearchParams();
+        if (searchQuery) {
+            apiSearchParams.set('search', searchQuery);
+        }
+        apiSearchParams.set('page', String(page));
+        apiSearchParams.set('limit', String(pageSize));
+        apiSearchParams.set('sort', mapSortToApiSort(sortBy, sortOrder));
+        applyFilterMapping(apiSearchParams, filtersState.status, 'active', { active: 'true', inactive: 'false' });
+        applyFilterMapping(apiSearchParams, filtersState.access, 'accessible', {
+            accessible: 'true',
+            not_accessible: 'false',
+        });
+        applyFilterMapping(apiSearchParams, filtersState.payment, 'noPayment', { free: 'true', paid: 'false' });
+        applyFilterMapping(apiSearchParams, filtersState.verification, 'verified', {
+            verified: 'true',
+            unverified: 'false',
+        });
+
+        const searchResponse = await fetchApiJson<LooSearchResponse>(c, '/api/loos/search', apiSearchParams);
+        const totalCount = searchResponse.total;
         const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
         let resolvedPage = Math.min(page, totalPages);
-        let pagedLoos = loos;
+        let pagedLoos = searchResponse.data;
 
-        if (totalCount > 0 && loos.length === 0 && page > totalPages) {
+        if (totalCount > 0 && pagedLoos.length === 0 && page > totalPages) {
             resolvedPage = totalPages;
-            pagedLoos = await prisma.toilets.findMany({
-                where,
-                orderBy,
-                include: {
-                    areas: { select: { name: true } },
-                },
-                skip: (resolvedPage - 1) * pageSize,
-                take: pageSize,
-            });
+            const fallbackParams = new URLSearchParams(apiSearchParams);
+            fallbackParams.set('page', String(resolvedPage));
+            const fallbackResponse = await fetchApiJson<LooSearchResponse>(c, '/api/loos/search', fallbackParams);
+            pagedLoos = fallbackResponse.data;
         }
 
-        const areaIds = areaGroups
-            .map((group) => group.area_id)
-            .filter((id): id is string => Boolean(id));
-
-        const areaRecords = areaIds.length
-            ? await prisma.areas.findMany({
-                where: { id: { in: areaIds } },
-                select: { id: true, name: true },
-            })
-            : [];
-
-        const areaNameMap = new Map(areaRecords.map((area) => [area.id, area.name ?? 'Unnamed area']));
-
-        const areaDistribution = areaGroups.map((group, index) => {
-            const count =
-                typeof group._count === 'object' && group._count !== null && '_all' in group._count
-                    ? (group._count as { _all?: number })._all ?? 0
-                    : 0;
-            return {
-                name: group.area_id ? areaNameMap.get(group.area_id) ?? 'Unknown area' : 'Unassigned area',
-                count,
-                color: AREA_COLORS[index % AREA_COLORS.length],
-            };
-        });
+        const metricsParams = new URLSearchParams(apiSearchParams);
+        metricsParams.delete('limit');
+        metricsParams.delete('page');
+        metricsParams.set('recentWindowDays', RECENT_WINDOW_DAYS.toString());
+        const metrics = await fetchApiJson<LooMetricsResponse>(c, '/api/loos/metrics', metricsParams);
 
         const tableRows = pagedLoos.map((loo) => ({
             id: loo.id,
             name: loo.name ?? 'Unnamed location',
-            areaName: loo.areas?.name ?? 'Unassigned area',
+            areaName: loo.area[0]?.name ?? 'Unassigned area',
             geohash: loo.geohash,
             active: loo.active,
-            verified_at: loo.verified_at,
+            verified_at: loo.verifiedAt,
             accessible: loo.accessible,
-            baby_change: loo.baby_change,
-            no_payment: loo.no_payment,
+            baby_change: loo.babyChange,
+            no_payment: loo.noPayment,
             radar: loo.radar,
-            updated_at: loo.updated_at,
-            created_at: loo.created_at,
-            contributorsCount: loo.contributors?.length ?? 0,
-            openingLabel: getOpeningLabel(loo.opening_times as unknown),
+            updated_at: loo.updatedAt,
+            created_at: loo.createdAt,
+            contributorsCount: loo.contributorsCount ?? 0,
+            openingLabel: getOpeningLabel(loo.openingTimes as unknown),
         }));
 
         const insightCards = [
@@ -280,27 +268,33 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
             },
             {
                 title: 'Active coverage',
-                value: activeCount,
-                meta: `${percentage(activeCount, totalCount)}% active`,
+                value: metrics.totals.active,
+                meta: `${percentage(metrics.totals.active, totalCount)}% active`,
             },
             {
                 title: 'Accessibility ready',
-                value: accessibleCount,
-                meta: `${percentage(accessibleCount, totalCount)}% accessible`,
+                value: metrics.totals.accessible,
+                meta: `${percentage(metrics.totals.accessible, totalCount)}% accessible`,
             },
             {
-                title: `Updated last ${RECENT_WINDOW_DAYS}d`,
-                value: recentCount,
-                meta: recentCount ? 'Recently edited' : 'Needs attention',
+                title: `Updated last ${metrics.recentWindowDays}d`,
+                value: metrics.totals.recent,
+                meta: metrics.totals.recent ? 'Recently edited' : 'Needs attention',
             },
         ];
 
         const featureStats = [
-            { label: 'Baby changing', value: babyChangeCount },
-            { label: 'RADAR key', value: radarCount },
-            { label: 'Free to use', value: freeAccessCount },
-            { label: 'Verified', value: verifiedCount },
+            { label: 'Baby changing', value: metrics.totals.babyChange },
+            { label: 'RADAR key', value: metrics.totals.radar },
+            { label: 'Free to use', value: metrics.totals.freeAccess },
+            { label: 'Verified', value: metrics.totals.verified },
         ];
+
+        const areaDistribution = metrics.areas.map((area, index) => ({
+            name: area.name,
+            count: area.count,
+            color: AREA_COLORS[index % AREA_COLORS.length],
+        }));
 
         const columns = [
             {
@@ -339,7 +333,7 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
             {
                 key: 'accessible',
                 label: 'Access & facilities',
-                sortable: true,
+                sortable: false,
                 render: (_value: boolean | null, row: typeof tableRows[number]) => {
                     const babyVariant = row.baby_change === true ? 'yes' : row.baby_change === false ? 'no' : 'unknown';
                     const babyLabel =
@@ -364,7 +358,7 @@ export const loosList = async (c: Context<{ Bindings: Env }>) => {
             {
                 key: 'no_payment',
                 label: 'Cost & contributions',
-                sortable: true,
+                sortable: false,
                 render: (_value: boolean | null, row: typeof tableRows[number]) => (
                     <div class="table-chip-list">
                         {BooleanBadge(row.no_payment, 'Free to use', 'Paid access', 'Unknown')}
@@ -584,12 +578,22 @@ export const loosCreate = (c: Context) => {
     return renderLooForm(c);
 };
 
+const toBoolOrNull = (val?: string | null) => {
+    if (val === 'true') return true;
+    if (val === 'false') return false;
+    return null;
+};
+
+const toNullableString = (val?: string | null) => {
+    if (!val) return null;
+    const trimmed = val.trim();
+    return trimmed.length ? trimmed : null;
+};
+
 export const loosCreatePost = async (c: Context<{ Bindings: Env }>) => {
     try {
         const formData = await c.req.formData();
         const data = Object.fromEntries(formData);
-
-        // Validate the data
         const result = looSchema.safeParse(data);
 
         if (!result.success) {
@@ -602,48 +606,61 @@ export const loosCreatePost = async (c: Context<{ Bindings: Env }>) => {
             return renderLooForm(c, errors);
         }
 
-        // Convert tri-state values to booleans or null
-        const toBoolOrNull = (val?: string | null) => {
-            if (val === 'true') return true;
-            if (val === 'false') return false;
-            return null;
+        const session = getSession(c);
+        if (!session) {
+            return c.redirect('/admin/login');
+        }
+
+        const payload = {
+            name: result.data.name,
+            notes: toNullableString(result.data.notes),
+            accessible: toBoolOrNull(result.data.accessible),
+            radar: toBoolOrNull(result.data.radar),
+            attended: toBoolOrNull(result.data.attended),
+            automatic: toBoolOrNull(result.data.automatic),
+            noPayment: toBoolOrNull(result.data.noPayment),
+            paymentDetails: toNullableString(result.data.paymentDetails),
+            babyChange: toBoolOrNull(result.data.babyChange),
+            men: toBoolOrNull(result.data.men),
+            women: toBoolOrNull(result.data.women),
+            allGender: toBoolOrNull(result.data.allGender),
+            children: toBoolOrNull(result.data.children),
+            urinalOnly: toBoolOrNull(result.data.urinalOnly),
+            active: toBoolOrNull(result.data.active),
+            removalReason: toNullableString(result.data.removalReason),
+            location: {
+                lat: result.data.lat,
+                lng: result.data.lng,
+            },
         };
 
-        // Create Prisma client
-        const prisma = createPrismaClient(c.env.POSTGRES_URI);
-
-        // Generate a unique ID (24 character hex string)
-        const id = Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-
-        // Create the loo in the database
-        await prisma.toilets.create({
-            data: {
-                id,
-                name: result.data.name,
-                notes: result.data.notes || null,
-                accessible: toBoolOrNull(result.data.accessible),
-                radar: toBoolOrNull(result.data.radar),
-                attended: toBoolOrNull(result.data.attended),
-                automatic: toBoolOrNull(result.data.automatic),
-                no_payment: toBoolOrNull(result.data.noPayment),
-                payment_details: result.data.paymentDetails || null,
-                baby_change: toBoolOrNull(result.data.babyChange),
-                men: toBoolOrNull(result.data.men),
-                women: toBoolOrNull(result.data.women),
-                all_gender: toBoolOrNull(result.data.allGender),
-                children: toBoolOrNull(result.data.children),
-                urinal_only: toBoolOrNull(result.data.urinalOnly),
-                active: toBoolOrNull(result.data.active),
-                removal_reason: result.data.removalReason || null,
-                contributors: [],
-                created_at: new Date(),
-                updated_at: new Date(),
+        const response = await fetch(new URL('/api/loos', c.req.url), {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                Authorization: `Bearer ${session.accessToken}`,
             },
+            body: JSON.stringify(payload),
         });
 
-        return c.redirect('/admin/loos');
+        if (response.status === 201) {
+            return c.redirect('/admin/loos');
+        }
+
+        if (response.status === 401) {
+            return c.redirect('/admin/login');
+        }
+
+        const body = await response.json().catch(() => null);
+        const fallbackMessage =
+            body?.message ??
+            (response.status === 400
+                ? 'The API rejected this request. Please review the inputs.'
+                : 'Failed to create loo. Please try again.');
+
+        return renderLooForm(c, { _error: fallbackMessage });
     } catch (error) {
-        console.error('Error creating loo:', error);
+        console.error('Error creating loo via API:', error);
         return renderLooForm(c, { _error: 'Failed to create loo. Please try again.' });
     }
 };

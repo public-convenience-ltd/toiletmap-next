@@ -73,7 +73,7 @@ describe('Legacy dataset upsert coverage', () => {
         }
 
         const response = await callApi(
-          `/loos/${record.id}`,
+          `/api/loos/${record.id}`,
           jsonRequest('PUT', payload, { Authorization: `Bearer ${token}` }),
         );
         expect([200, 201]).toContain(response.status);

@@ -101,6 +101,9 @@ export const mapLoo = (
   updatedAt: toDateISOString(loo.updated_at),
   verifiedAt: toDateISOString(loo.verified_at),
   reports: [],
+  contributorsCount: Array.isArray(loo.contributors)
+    ? loo.contributors.length
+    : 0,
   ...mapSharedLooFields(loo),
 });
 

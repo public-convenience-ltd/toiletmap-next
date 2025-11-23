@@ -67,6 +67,7 @@ export const LooResponseSchema = z
     updatedAt: nullableString,
     verifiedAt: nullableString,
     reports: z.array(z.unknown()),
+    contributorsCount: z.number().int().nonnegative().default(0),
   })
   .merge(LooCommonSchema);
 export type LooResponse = z.infer<typeof LooResponseSchema>;
@@ -128,6 +129,25 @@ export type ReportResponse = z.infer<typeof ReportResponseSchema>;
 
 export type OpeningTimes = z.infer<typeof openingTimesSchema>;
 export type DayOpeningHours = z.infer<typeof dayOpeningHoursSchema>;
+
+export type LooMetricsResponse = {
+  recentWindowDays: number;
+  totals: {
+    filtered: number;
+    active: number;
+    verified: number;
+    accessible: number;
+    babyChange: number;
+    radar: number;
+    freeAccess: number;
+    recent: number;
+  };
+  areas: Array<{
+    areaId: string | null;
+    name: string;
+    count: number;
+  }>;
+};
 
 // Schema for validating toilets database records from JSON audit fields
 // This matches the structure of the toilets table in Prisma

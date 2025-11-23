@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LOO_ID_LENGTH } from "../../services/loo";
+import { RECENT_WINDOW_DAYS } from "../../common/constants";
 import {
   CoordinatesSchema,
   LooSearchSortOptions,
@@ -123,6 +124,11 @@ export const searchQuerySchema = z.object({
   page: createNumberParam(1, null, 1),
 });
 
+export const metricsQuerySchema = searchQuerySchema.extend({
+  recentWindowDays: createNumberParam(1, 365, RECENT_WINDOW_DAYS),
+});
+
 export type MutationPayload = z.infer<typeof baseMutationSchema>;
 export type CreateMutationPayload = z.infer<typeof createMutationSchema>;
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
+export type MetricsQuery = z.infer<typeof metricsQuerySchema>;

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { callApi } from './utils/test-client';
 
-describe('GET /areas', () => {
+describe('GET /api/areas', () => {
   it('returns persisted areas with count metadata', async () => {
-    const response = await callApi('/areas');
+    const response = await callApi('/api/areas');
     expect(response.status).toBe(200);
 
     const body = await response.json();

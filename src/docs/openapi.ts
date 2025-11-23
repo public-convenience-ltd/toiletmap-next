@@ -1,4 +1,5 @@
 import { LOO_ID_LENGTH } from '../services/loo';
+import { RECENT_WINDOW_DAYS } from '../common/constants';
 import { openApiInfo, openApiServers, openApiTags } from './config';
 
 import type {
@@ -208,7 +209,7 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
   UpdateLooRequest: schemaRef('LooMutation'),
   Loo: {
     type: 'object',
-    required: ['id', 'area', 'reports'],
+    required: ['id', 'area', 'reports', 'contributorsCount'],
     properties: {
       id: {
         type: 'string',
@@ -250,6 +251,11 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
         type: 'array',
         description: 'Recent reports are populated on specific endpoints.',
         items: {},
+      },
+      contributorsCount: {
+        type: 'number',
+        description: 'Number of contributors recorded for the loo.',
+        example: 4,
       },
       location: {
         anyOf: [schemaRef('Coordinates'), { type: 'null' }],
@@ -345,6 +351,57 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       hasMore: { type: 'boolean', example: true },
     },
   },
+  LooMetricsResponse: {
+    type: 'object',
+    required: ['recentWindowDays', 'totals', 'areas'],
+    properties: {
+      recentWindowDays: {
+        type: 'number',
+        description: 'Number of days considered when computing recent updates.',
+        example: 30,
+      },
+      totals: {
+        type: 'object',
+        required: [
+          'filtered',
+          'active',
+          'verified',
+          'accessible',
+          'babyChange',
+          'radar',
+          'freeAccess',
+          'recent',
+        ],
+        properties: {
+          filtered: { type: 'number', example: 128 },
+          active: { type: 'number', example: 120 },
+          verified: { type: 'number', example: 45 },
+          accessible: { type: 'number', example: 80 },
+          babyChange: { type: 'number', example: 30 },
+          radar: { type: 'number', example: 22 },
+          freeAccess: { type: 'number', example: 90 },
+          recent: {
+            type: 'number',
+            description: 'Records updated within the recentWindowDays timeframe.',
+            example: 12,
+          },
+        },
+      },
+      areas: {
+        type: 'array',
+        description: 'Top areas by record count for the current filters.',
+        items: {
+          type: 'object',
+          required: ['name', 'count'],
+          properties: {
+            areaId: nullableString(LOO_ID_LENGTH),
+            name: { type: 'string', example: 'City of London' },
+            count: { type: 'number', example: 37 },
+          },
+        },
+      },
+    },
+  },
   NearbyLooListResponse: {
     type: 'object',
     required: ['data', 'count'],
@@ -430,6 +487,114 @@ const pageParamSchema = {
   default: 1,
 } satisfies SchemaObject;
 
+const searchFilterParameters: ParameterObject[] = [
+  {
+    name: 'search',
+    in: 'query' as const,
+    required: false,
+    description: 'Keyword search across id, name, geohash, and notes.',
+    schema: { type: 'string', maxLength: 200 } as SchemaObject,
+  },
+  {
+    name: 'areaName',
+    in: 'query' as const,
+    required: false,
+    description: 'Matches administrative area name (case-insensitive).',
+    schema: { type: 'string', maxLength: 200 } as SchemaObject,
+  },
+  {
+    name: 'areaType',
+    in: 'query' as const,
+    required: false,
+    description: 'Matches administrative area type (case-insensitive).',
+    schema: { type: 'string', maxLength: 100 } as SchemaObject,
+  },
+  {
+    name: 'active',
+    in: 'query' as const,
+    required: false,
+    description:
+      'Active status. Omit to include all values, or use `unknown` for records where active status is not available.',
+    schema: triStateFilterSchema,
+  },
+  {
+    name: 'accessible',
+    in: 'query' as const,
+    required: false,
+    description:
+      'Whether the toilet is accessible. Omit to include all values, or use `unknown` for records where accessibility information is not available.',
+    schema: triStateFilterSchema,
+  },
+  {
+    name: 'allGender',
+    in: 'query' as const,
+    required: false,
+    description:
+      'Whether the toilet is all-gender. Omit to include all values, or use `unknown` for records where this information is not available.',
+    schema: triStateFilterSchema,
+  },
+  {
+    name: 'radar',
+    in: 'query' as const,
+    required: false,
+    description:
+      'Whether a RADAR key is required. Omit to include all values, or use `unknown` for records where RADAR key information is not available.',
+    schema: triStateFilterSchema,
+  },
+  {
+    name: 'babyChange',
+    in: 'query' as const,
+    required: false,
+    description:
+      'Whether baby change facilities are available. Omit to include all values, or use `unknown` for records where this information is not available.',
+    schema: triStateFilterSchema,
+  },
+  {
+    name: 'noPayment',
+    in: 'query' as const,
+    required: false,
+    description:
+      'Whether the toilet is free (no payment required). Omit to include all values, or use `unknown` for records where payment information is not available.',
+    schema: triStateFilterSchema,
+  },
+  {
+    name: 'verified',
+    in: 'query' as const,
+    required: false,
+    description: 'Verification status. Use `any` to include all values.',
+    schema: booleanFilterSchema,
+  },
+  {
+    name: 'hasLocation',
+    in: 'query' as const,
+    required: false,
+    description:
+      'Filter by whether the record has a known location. Use `any` to include all values.',
+    schema: booleanFilterSchema,
+  },
+  {
+    name: 'sort',
+    in: 'query' as const,
+    required: false,
+    description: 'Sort order for results.',
+    schema: sortFilterSchema,
+  },
+  {
+    name: 'limit',
+    in: 'query' as const,
+    required: false,
+    description: 'Maximum results per page (1–200, default 50).',
+    schema: limitParamSchema,
+  },
+  {
+    name: 'page',
+    in: 'query' as const,
+    required: false,
+    description: 'Page number (1-indexed, default 1).',
+    schema: pageParamSchema,
+  },
+];
+
 export const openApiDocument: OpenAPIObject = {
   openapi: '3.1.0',
   info: openApiInfo,
@@ -458,7 +623,7 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
-    '/areas': {
+    '/api/areas': {
       get: {
         tags: ['Areas'],
         summary: 'List administrative areas',
@@ -470,7 +635,7 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
-    '/loos': {
+    '/api/loos': {
       get: {
         tags: ['Loos'],
         summary: 'Fetch loos by ID',
@@ -544,7 +709,7 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
-    '/loos/{id}': {
+    '/api/loos/{id}': {
       get: {
         tags: ['Loos'],
         summary: 'Fetch a single loo',
@@ -591,7 +756,7 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
-  '/loos/{id}/reports': {
+    '/api/loos/{id}/reports': {
     get: {
       tags: ['Loos'],
       summary: 'List reports for a loo',
@@ -619,7 +784,7 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
-    '/loos/geohash/{geohash}': {
+    '/api/loos/geohash/{geohash}': {
       get: {
         tags: ['Loos'],
         summary: 'List loos by geohash prefix',
@@ -651,7 +816,7 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
-    '/loos/proximity': {
+    '/api/loos/proximity': {
       get: {
         tags: ['Loos'],
         summary: 'Find loos near a location',
@@ -706,123 +871,49 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
-    '/loos/search': {
+    '/api/loos/search': {
       get: {
         tags: ['Loos'],
         summary: 'Search loos with filters',
-        parameters: [
-          {
-            name: 'search',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Keyword search across id, name, geohash, and notes.',
-            schema: { type: 'string', maxLength: 200 } as SchemaObject,
-          },
-          {
-            name: 'areaName',
-            in: 'query' as const,
-            required: false,
-            description: 'Matches administrative area name (case-insensitive).',
-            schema: { type: 'string', maxLength: 200 } as SchemaObject,
-          },
-          {
-            name: 'areaType',
-            in: 'query' as const,
-            required: false,
-            description: 'Matches administrative area type (case-insensitive).',
-            schema: { type: 'string', maxLength: 100 } as SchemaObject,
-          },
-          {
-            name: 'active',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Active status. Omit to include all values, or use `unknown` for records where active status is not available.',
-            schema: triStateFilterSchema,
-          },
-          {
-            name: 'accessible',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Whether the toilet is accessible. Omit to include all values, or use `unknown` for records where accessibility information is not available.',
-            schema: triStateFilterSchema,
-          },
-          {
-            name: 'allGender',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Whether the toilet is all-gender. Omit to include all values, or use `unknown` for records where this information is not available.',
-            schema: triStateFilterSchema,
-          },
-          {
-            name: 'radar',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Whether a RADAR key is required. Omit to include all values, or use `unknown` for records where RADAR key information is not available.',
-            schema: triStateFilterSchema,
-          },
-          {
-            name: 'babyChange',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Whether baby change facilities are available. Omit to include all values, or use `unknown` for records where this information is not available.',
-            schema: triStateFilterSchema,
-          },
-          {
-            name: 'noPayment',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Whether the toilet is free (no payment required). Omit to include all values, or use `unknown` for records where payment information is not available.',
-            schema: triStateFilterSchema,
-          },
-          {
-            name: 'verified',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Verification status. Use `any` to include all values.',
-            schema: booleanFilterSchema,
-          },
-          {
-            name: 'hasLocation',
-            in: 'query' as const,
-            required: false,
-            description:
-              'Filter by whether the record has a known location. Use `any` to include all values.',
-            schema: booleanFilterSchema,
-          },
-          {
-            name: 'sort',
-            in: 'query' as const,
-            required: false,
-            description: 'Sort order for results.',
-            schema: sortFilterSchema,
-          },
-          {
-            name: 'limit',
-            in: 'query' as const,
-            required: false,
-            description: 'Maximum results per page (1–200, default 50).',
-            schema: limitParamSchema,
-          },
-          {
-            name: 'page',
-            in: 'query' as const,
-            required: false,
-            description: 'Page number (1-indexed, default 1).',
-            schema: pageParamSchema,
-          },
-        ],
+        parameters: searchFilterParameters,
         responses: {
           200: {
             description: 'Paged search results.',
             content: jsonContent('LooSearchResponse'),
+          },
+          400: {
+            description: 'Invalid query parameters.',
+            content: jsonContent('ValidationErrorResponse'),
+          },
+        },
+      },
+    },
+    '/api/loos/metrics': {
+      get: {
+        tags: ['Loos'],
+        summary: 'Retrieve aggregate metrics for filtered loos',
+        description:
+          'Returns counts and top-area information for the same query parameters accepted by `/api/loos/search`.',
+        parameters: [
+          ...searchFilterParameters,
+          {
+            name: 'recentWindowDays',
+            in: 'query' as const,
+            required: false,
+            description:
+              'Overrides the number of days considered when calculating the "recent" total (default 30, max 365).',
+            schema: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 365,
+              default: RECENT_WINDOW_DAYS,
+            },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Aggregated metrics for the supplied filters.',
+            content: jsonContent('LooMetricsResponse'),
           },
           400: {
             description: 'Invalid query parameters.',

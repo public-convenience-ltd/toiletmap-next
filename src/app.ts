@@ -19,10 +19,10 @@ export const createApp = (env: Env) => {
   );
 
   app.route('/admin', admin);
-  app.route('/loos', loosRouter);
-  app.route('/areas', areasRouter);
-  app.get('/docs/openapi.json', (c) => c.json(openApiDocument));
-  app.get('/docs', swaggerUI({ url: '/docs/openapi.json' }));
+  app.route('/api/loos', loosRouter);
+  app.route('/api/areas', areasRouter);
+  app.get('/api/docs/openapi.json', (c) => c.json(openApiDocument));
+  app.get('/api/docs', swaggerUI({ url: '/api/docs/openapi.json' }));
 
   app.notFound((c) =>
     c.json(

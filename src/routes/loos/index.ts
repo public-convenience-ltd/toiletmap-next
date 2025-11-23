@@ -22,9 +22,11 @@ import { createPrismaClient } from '../../prisma';
 import {
   baseMutationSchema,
   createMutationSchema,
+  metricsQuerySchema,
   proximitySchema,
   searchQuerySchema,
 } from './schemas';
+import type { MetricsQuery, SearchQuery } from './schemas';
 
 const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
@@ -77,6 +79,24 @@ loosRouter.get(
         pageSize: params.limit,
         hasMore,
       });
+    }),
+);
+
+/** GET /loos/metrics */
+loosRouter.get(
+  '/metrics',
+  validate('query', metricsQuerySchema, 'Invalid metrics query'),
+  (c) =>
+    handleRoute(c, 'loos.metrics', async () => {
+      const looService = new LooService(createPrismaClient(c.env.POSTGRES_URI));
+      const { recentWindowDays, ...params } = c.req.valid(
+        'query',
+      ) as MetricsQuery;
+      const metrics = await looService.getSearchMetrics(
+        params as SearchQuery,
+        { recentWindowDays },
+      );
+      return c.json(metrics);
     }),
 );
 

@@ -1,4 +1,5 @@
-import { PrismaClientInstance, toilets } from "../../prisma";
+import { PrismaClientInstance, toilets, Prisma } from "../../prisma";
+import { RECENT_WINDOW_DAYS } from "../../common/constants";
 import {
   areaSelection,
   buildAreaFromJoin,
@@ -12,6 +13,7 @@ import {
   buildProximityQuery,
   buildSearchQueries,
   buildSelectByIdsQuery,
+  createSearchWhereBuilder,
   type RawLooRow,
   type RawNearbyLooRow,
 } from "./sql";
@@ -22,7 +24,7 @@ import type {
   ReportResponse,
   ReportSummaryResponse,
   LooSearchParams,
-  RawNearbyLooRow as RawNearbyLooRowType,
+  LooMetricsResponse,
 } from "./types";
 import { RawLooRowSchema, RawNearbyLooRowSchema } from "./types";
 
@@ -121,6 +123,121 @@ export class LooService {
     });
 
     return { data, total };
+  }
+
+  /**
+   * Computes aggregate insights for search filters to support admin dashboards.
+   */
+  async getSearchMetrics(
+    params: LooSearchParams,
+    options: { recentWindowDays?: number } = {}
+  ): Promise<LooMetricsResponse> {
+    const recentWindowDays =
+      options.recentWindowDays ?? RECENT_WINDOW_DAYS;
+    const recentThreshold = new Date(
+      Date.now() - recentWindowDays * 24 * 60 * 60 * 1000
+    );
+    const { buildWhere } = createSearchWhereBuilder(params);
+    const fromClause = Prisma.sql`
+      FROM toilets loo
+      LEFT JOIN areas area ON area.id = loo.area_id
+    `;
+
+    const countQuery = (extra?: Prisma.Sql) => Prisma.sql`
+      SELECT COUNT(*)::bigint AS count
+      ${fromClause}
+      ${buildWhere(extra)}
+    `;
+
+    const areaQuery = Prisma.sql`
+      SELECT
+        loo.area_id,
+        area.name AS area_name,
+        COUNT(*)::bigint AS count
+      ${fromClause}
+      ${buildWhere()}
+      GROUP BY loo.area_id, area.name
+      ORDER BY count DESC
+      LIMIT 5
+    `;
+
+    const [
+      totalRows,
+      activeRows,
+      verifiedRows,
+      accessibleRows,
+      babyChangeRows,
+      radarRows,
+      freeRows,
+      recentRows,
+      areaRows,
+    ] = await this.prisma.$transaction([
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery()
+      ),
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery(Prisma.sql`loo.active = TRUE`)
+      ),
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery(Prisma.sql`loo.verified_at IS NOT NULL`)
+      ),
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery(Prisma.sql`loo.accessible = TRUE`)
+      ),
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery(Prisma.sql`loo.baby_change = TRUE`)
+      ),
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery(Prisma.sql`loo.radar = TRUE`)
+      ),
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery(Prisma.sql`loo.no_payment = TRUE`)
+      ),
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        countQuery(Prisma.sql`loo.updated_at >= ${recentThreshold}`)
+      ),
+      this.prisma.$queryRaw<
+        Array<{ area_id: string | null; area_name: string | null; count: bigint | number | string }>
+      >(areaQuery),
+    ]);
+
+    const toNumber = (
+      rows?: Array<{ count: bigint | number | string }> | null
+    ) => {
+      const list = rows ?? [];
+      const raw = list[0]?.count ?? 0;
+      return typeof raw === "bigint" ? Number(raw) : Number(raw ?? 0);
+    };
+
+    const parseAreaCount = (row: {
+      area_id: string | null;
+      area_name: string | null;
+      count: bigint | number | string;
+    }) => ({
+      areaId: row.area_id,
+      name:
+        row.area_name ??
+        (row.area_id ? "Unknown area" : "Unassigned area"),
+      count:
+        typeof row.count === "bigint"
+          ? Number(row.count)
+          : Number(row.count ?? 0),
+    });
+
+    return {
+      recentWindowDays,
+      totals: {
+        filtered: toNumber(totalRows),
+        active: toNumber(activeRows),
+        verified: toNumber(verifiedRows),
+        accessible: toNumber(accessibleRows),
+        babyChange: toNumber(babyChangeRows),
+        radar: toNumber(radarRows),
+        freeAccess: toNumber(freeRows),
+        recent: toNumber(recentRows),
+      },
+      areas: (areaRows ?? []).map(parseAreaCount),
+    };
   }
 
   /**

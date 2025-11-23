@@ -22,4 +22,5 @@ export type {
   NearbyLooResponse,
   ReportResponse,
   LooMutationAttributes,
+  LooMetricsResponse,
 } from './types';
