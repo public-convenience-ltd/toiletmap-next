@@ -1367,7 +1367,7 @@
             }
           },
           "401": {
-            "description": "Authentication required.",
+            "description": "Invalid or unauthorized bearer token.",
             "content": {
               "application/json": {
                 "schema": {

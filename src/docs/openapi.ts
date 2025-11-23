@@ -800,7 +800,10 @@ export const openApiDocument: OpenAPIObject = {
             description: 'Invalid loo identifier.',
             content: jsonContent('ValidationErrorResponse'),
           },
-          401: authErrorResponse,
+          401: {
+            description: 'Invalid or unauthorized bearer token.',
+            content: jsonContent('ErrorResponse'),
+          },
         },
       },
     },

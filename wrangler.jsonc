@@ -12,6 +12,13 @@
     "AUTH0_SCOPE": "openid profile email",
     "AUTH0_REDIRECT_URI": "http://localhost:8787/admin/callback"
   },
+  "env": {
+    "production": {
+      "vars": {
+        "AUTH0_REDIRECT_URI": "https://toiletmap-server.gbtoiletmap.workers.dev/admin/callback"
+      }
+    }
+  },
   "observability": {
     "logs": {
       "enabled": true,
