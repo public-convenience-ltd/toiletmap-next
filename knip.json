@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip/schema.json",
+  "entry": [
+    "src/index.ts",
+    "src/admin/pages/loos/client/index.client.tsx",
+    "src/admin/pages/loos/create/client/index.client.tsx",
+    "src/admin/pages/loos/edit/client/index.client.tsx",
+    "scripts/**/*.ts",
+    "src/docs/generate.ts",
+    "vite.config.ts",
+    "vite.config.client.ts",
+    "vitest.config.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "scripts/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "ignore": [
+    "dist/**",
+    "public/**",
+    "src/generated/**",
+    "test/integration/generated/**"
+  ],
+  "ignoreDependencies": [
+    "@prisma/client",
+    "pg",
+    "@types/pg"
+  ]
+}

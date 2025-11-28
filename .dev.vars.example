@@ -1,0 +1,24 @@
+# Cloudflare Workers Development Variables
+# These variables are loaded by wrangler during local development and testing
+# Copy this to .dev.vars and fill in your actual values
+
+# Database Connection Notes:
+#
+# Runtime connections use Hyperdrive bindings (configured in wrangler.jsonc):
+# - Production: HYPERDRIVE binding (configured in Cloudflare dashboard)
+# - Development: TEST_DB binding with localConnectionString
+#
+# You can override TEST_DB's localConnectionString without editing wrangler.jsonc:
+# CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=postgresql://user:pass@host:port/db
+
+# Ensure that supabase can read in our seed data.
+SUPABASE_SCANNER_BUFFER_SIZE=100mb
+
+# Auth0 Client Secret (for Regular Web Application)
+# Get this from your Auth0 application settings
+AUTH0_CLIENT_SECRET=
+
+# Optional: Override AUTH0 settings for local testing
+# AUTH0_ISSUER_BASE_URL=
+# AUTH0_AUDIENCE=
+# AUTH0_PROFILE_KEY=

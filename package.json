@@ -1,0 +1,61 @@
+{
+  "name": "toiletmap-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm run dev:local",
+    "dev:local": "concurrently --names \"VITE,WRANGLER,AUTH\" -c \"blue,magenta,green\" \"pnpm dev:client\" \"pnpm dev:server\" \"pnpm auth:server\"",
+    "dev:api": "concurrently --names \"VITE,WRANGLER\" -c \"blue,magenta\" \"pnpm dev:client\" \"pnpm dev:server\"",
+    "dev:client": "vite build --config vite.config.client.ts --watch",
+    "dev:server": "wrangler dev --env development",
+    "start": "wrangler dev --env production",
+    "build:client": "vite build --config vite.config.client.ts",
+    "build:worker": "pnpm prisma:generate && wrangler build",
+    "build": "pnpm build:client && pnpm build:worker",
+    "check": "pnpm typecheck && wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types",
+    "deploy": "wrangler deploy --env production",
+    "docs:generate": "tsx src/docs/generate.ts",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "supabase:start": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase db reset",
+    "test:e2e": "bash scripts/test-e2e.sh",
+    "auth:server": "tsx scripts/start-auth-server.ts",
+    "token:issue": "tsx scripts/issue-test-token.ts"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.5.1",
+    "@hono/zod-validator": "^0.7.5",
+    "@prisma/adapter-pg": "^7.0.1",
+    "@prisma/client": "^7.0.1",
+    "@types/leaflet": "^1.9.21",
+    "hono": "^4.10.7",
+    "leaflet": "^1.9.4",
+    "openapi3-ts": "^4.5.0",
+    "pg": "^8.16.3",
+    "prisma": "^7.0.1",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.15.3",
+    "@types/node": "24.10.1",
+    "@types/pg": "^8.15.6",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.2.3",
+    "knip": "^5.70.2",
+    "supabase": "^2.63.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vite": "^7.2.4",
+    "vitest": "^4.0.14",
+    "wrangler": "^4.51.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "hono": "^4.10.6"
+    }
+  }
+}
