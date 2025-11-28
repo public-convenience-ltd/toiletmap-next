@@ -147,6 +147,49 @@ export const mapNearbyLoo = (
   loo: (toilets & { areas?: Partial<areas> | null }) & { distance: number },
 ): NearbyLooResponse => ({ ...mapLoo(loo), distance: loo.distance });
 
+export enum FILTER_TYPE {
+  NO_PAYMENT = 0b00000001,
+  ALL_GENDER = 0b00000010,
+  AUTOMATIC = 0b00000100,
+  ACCESSIBLE = 0b00001000,
+  BABY_CHNG = 0b00010000,
+  RADAR = 0b00100000,
+}
+
+export const genLooFilterBitmask = (loo: {
+  noPayment?: boolean | null;
+  allGender?: boolean | null;
+  automatic?: boolean | null;
+  accessible?: boolean | null;
+  babyChange?: boolean | null;
+  radar?: boolean | null;
+}) => {
+  const {
+    noPayment = false,
+    allGender = false,
+    automatic = false,
+    accessible = false,
+    babyChange = false,
+    radar = false,
+  } = loo;
+
+  const noPaymentValue = noPayment ? FILTER_TYPE.NO_PAYMENT : 0;
+  const allGenderValue = allGender ? FILTER_TYPE.ALL_GENDER : 0;
+  const automaticValue = automatic ? FILTER_TYPE.AUTOMATIC : 0;
+  const accessibleValue = accessible ? FILTER_TYPE.ACCESSIBLE : 0;
+  const babyChangeValue = babyChange ? FILTER_TYPE.BABY_CHNG : 0;
+  const radarValue = radar ? FILTER_TYPE.RADAR : 0;
+
+  return (
+    noPaymentValue |
+    allGenderValue |
+    automaticValue |
+    accessibleValue |
+    babyChangeValue |
+    radarValue
+  );
+};
+
 type AuditRecord = Pick<record_version, 'id' | 'record' | 'old_record'>;
 
 const buildReportSnapshot = (

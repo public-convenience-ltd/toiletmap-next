@@ -331,6 +331,42 @@ describe("Loo read endpoints", () => {
         inactiveLoo.id
       );
     });
+
+    it("returns compressed data when compressed=true", async () => {
+      const loo = await fixtures.loos.create({
+        active: true,
+        noPayment: true,
+        allGender: true,
+        automatic: false,
+        accessible: false,
+        babyChange: false,
+        radar: false,
+      });
+      const prefix = loo.geohash?.slice(0, 6);
+      if (!prefix) {
+        throw new Error("Fixture geohash was not generated");
+      }
+
+      const response = await callApi(
+        `/api/loos/geohash/${prefix}?compressed=true`,
+        { headers: authHeaders() }
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      const item = body.data.find((row: [string, string, number]) => row[0] === loo.id);
+      expect(item).toBeDefined();
+      expect(Array.isArray(item)).toBe(true);
+      expect(item).toHaveLength(3);
+
+      const [id, geohash, filter] = item;
+      expect(id).toBe(loo.id);
+      expect(typeof geohash).toBe('string');
+      expect(geohash).toBe(loo.geohash);
+
+      // Check filter bitmask
+      // NO_PAYMENT (1) | ALL_GENDER (2) = 3
+      expect(filter).toBe(3);
+    });
   });
 
   describe("GET /api/loos/proximity", () => {

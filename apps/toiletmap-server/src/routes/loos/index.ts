@@ -41,8 +41,15 @@ loosRouter.get(
   (c) =>
     handleRoute(c, 'loos.geohash', async () => {
       const { geohash } = c.req.valid('param');
-      const { active } = c.req.valid('query');
+      const { active, compressed } = c.req.valid('query');
       const looService = c.get('looService');
+
+      if (compressed) {
+        const loos = await looService.getWithinGeohashCompressed(geohash, active);
+        c.header('Cache-Control', 'public, max-age=300'); // 5 minutes
+        return c.json({ data: loos, count: loos.length });
+      }
+
       const loos = await looService.getWithinGeohash(geohash, active);
 
       c.header('Cache-Control', 'public, max-age=300'); // 5 minutes

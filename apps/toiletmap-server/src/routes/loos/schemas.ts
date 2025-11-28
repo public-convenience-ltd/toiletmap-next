@@ -120,7 +120,12 @@ export const geohashQuerySchema = z.object({
     if (normalized === 'any' || normalized === 'all') return 'any';
     return 'true';
   }, z.enum(['true', 'false', 'any']).default('true'))
-  .transform((value) => value === 'any' ? null : value === 'true'),
+    .transform((value) => value === 'any' ? null : value === 'true'),
+  compressed: z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    return value.trim().toLowerCase();
+  }, z.enum(['true', 'false']).optional())
+    .transform((value) => value === 'true'),
 });
 
 export const reportsQuerySchema = z.object({
@@ -128,7 +133,7 @@ export const reportsQuerySchema = z.object({
     if (typeof value !== 'string') return value;
     return value.trim().toLowerCase();
   }, z.enum(['true', 'false']).optional())
-  .transform((value) => value === 'true'),
+    .transform((value) => value === 'true'),
 });
 
 export const idsQuerySchema = z.object({

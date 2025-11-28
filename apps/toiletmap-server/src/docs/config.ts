@@ -16,5 +16,5 @@ export const openApiServers = [
     url: 'https://toiletmap-server.gbtoiletmap.workers.dev',
     description: 'Production',
   },
-  { url: 'http://localhost:4001', description: 'Local development' },
+  { url: 'http://localhost:8787', description: 'Local development' },
 ];

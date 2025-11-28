@@ -71,6 +71,12 @@ const NearbyLooResponseSchema = LooResponseSchema.extend({
 });
 export type NearbyLooResponse = z.infer<typeof NearbyLooResponseSchema>;
 
+export type CompressedLoo = [
+  string, // id
+  string, // geohash
+  number, // filter mask
+];
+
 export const LooSearchSortOptions = [
   'updated-desc',
   'updated-asc',

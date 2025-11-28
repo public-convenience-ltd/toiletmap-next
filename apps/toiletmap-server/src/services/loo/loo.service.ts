@@ -7,6 +7,7 @@ import {
   mapLoo,
   mapNearbyLoo,
   rawLooToToilets,
+  genLooFilterBitmask,
 } from "./mappers";
 import { mapMutationToPrismaData } from "./mutation";
 import { insertLoo, updateLoo } from "./persistence";
@@ -24,6 +25,7 @@ import type {
   ReportSummaryResponse,
   LooSearchParams,
   LooMetricsResponse,
+  CompressedLoo,
 } from "./types";
 import {
   RawLooRowSchema,
@@ -282,6 +284,49 @@ export class LooService {
       include: { areas: areaSelection },
     });
     return rows.map(mapLoo);
+  }
+
+  /**
+   * Finds loos whose geohash starts with the given string and returns a compressed format.
+   * Optimized for map rendering.
+   */
+  async getWithinGeohashCompressed(
+    geohash: string,
+    active?: boolean | null
+  ): Promise<CompressedLoo[]> {
+    const where = {
+      geohash: { startsWith: geohash },
+      ...(typeof active === "boolean" ? { active: { equals: active } } : {}),
+    } as const;
+
+    const rows = await this.prisma.toilets.findMany({
+      where,
+      select: {
+        id: true,
+        geohash: true,
+        no_payment: true,
+        all_gender: true,
+        automatic: true,
+        accessible: true,
+        baby_change: true,
+        radar: true,
+      },
+    });
+
+    return rows.map((row) => {
+      return [
+        row.id,
+        row.geohash ?? '',
+        genLooFilterBitmask({
+          noPayment: row.no_payment,
+          allGender: row.all_gender,
+          automatic: row.automatic,
+          accessible: row.accessible,
+          babyChange: row.baby_change,
+          radar: row.radar,
+        }),
+      ];
+    });
   }
 
   /**

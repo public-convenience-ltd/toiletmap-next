@@ -11,7 +11,7 @@
       "description": "Production"
     },
     {
-      "url": "http://localhost:4001",
+      "url": "http://localhost:8787",
       "description": "Local development"
     }
   ],
@@ -1018,6 +1018,51 @@
             "example": 2
           }
         }
+      },
+      "CompressedLoo": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "ID"
+            },
+            {
+              "type": "string",
+              "description": "Geohash Suffix"
+            },
+            {
+              "type": "number",
+              "description": "Filter Mask"
+            }
+          ]
+        },
+        "minItems": 3,
+        "maxItems": 3,
+        "example": [
+          "9234",
+          "vj",
+          3
+        ]
+      },
+      "CompressedLooListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompressedLoo"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 2
+          }
+        }
       }
     }
   },
@@ -1423,6 +1468,16 @@
                 "all"
               ]
             }
+          },
+          {
+            "name": "compressed",
+            "in": "query",
+            "required": false,
+            "description": "Return compressed data optimized for map rendering. If true, returns CompressedLoo objects.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -1431,7 +1486,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LooListResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LooListResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CompressedLooListResponse"
+                    }
+                  ]
                 }
               }
             }

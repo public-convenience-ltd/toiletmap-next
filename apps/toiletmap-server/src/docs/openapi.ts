@@ -440,6 +440,30 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       count: { type: 'number', example: 2 },
     },
   },
+  CompressedLoo: {
+    type: 'array',
+    items: {
+      oneOf: [
+        { type: 'string', description: 'ID' },
+        { type: 'string', description: 'Geohash' },
+        { type: 'number', description: 'Filter Mask' },
+      ],
+    },
+    minItems: 3,
+    maxItems: 3,
+    example: ['9234', 'gcpvj', 3],
+  },
+  CompressedLooListResponse: {
+    type: 'object',
+    required: ['data', 'count'],
+    properties: {
+      data: {
+        type: 'array',
+        items: schemaRef('CompressedLoo'),
+      },
+      count: { type: 'number', example: 2 },
+    },
+  },
 };
 
 const idSchema: SchemaObject = {
@@ -835,11 +859,31 @@ export const openApiDocument: OpenAPIObject = {
               enum: ['true', 'false', 'any', 'all'],
             },
           },
+          {
+            name: 'compressed',
+            in: 'query',
+            required: false,
+            description:
+              'Return compressed data optimized for map rendering. If true, returns CompressedLoo objects.',
+            schema: {
+              type: 'boolean',
+              default: false,
+            },
+          },
         ],
         responses: {
           200: {
             description: 'Loos matching the supplied geohash prefix.',
-            content: jsonContent('LooListResponse'),
+            content: {
+              'application/json': {
+                schema: {
+                  oneOf: [
+                    schemaRef('LooListResponse'),
+                    schemaRef('CompressedLooListResponse'),
+                  ],
+                },
+              },
+            },
           },
         },
       },
