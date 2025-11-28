@@ -1,0 +1,10 @@
+{
+  "name": "toiletmap-client",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-02-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [],
+  "vars": {
+    "APP_NAME": "Toilet Map Client"
+  }
+}

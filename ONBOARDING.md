@@ -2,6 +2,8 @@
 
 Welcome to the Toilet Map API project! This guide will help you understand the architecture, set up your development environment, and become a productive contributor.
 
+> **Repository layout**: The code now lives inside a pnpm workspace. The API/Admin worker is under `apps/toiletmap-server`, while `apps/toiletmap-client` hosts a placeholder frontend worker. Unless noted, all paths in this guide refer to `apps/toiletmap-server`.
+
 ## Table of Contents
 
 - [Project Mission](#project-mission)

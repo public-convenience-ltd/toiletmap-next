@@ -2,6 +2,8 @@
 
 > **Purpose**: This document provides AI coding assistants with essential context about the Toilet Map API project to enable effective contributions.
 
+**Workspace layout**: This repository is a pnpm monorepo. The API/Admin worker now lives in `apps/toiletmap-server` (all paths below are relative to that directory unless noted). A placeholder frontend worker is available in `apps/toiletmap-client`.
+
 ## Project Overview
 
 **Toilet Map API** is a REST API service and admin interface for managing public toilet data, deployed as a [Cloudflare Worker](https://workers.cloudflare.com/). Built on the [Hono](https://hono.dev/) framework, it provides CRUD operations for toilet records with geospatial queries, audit trails, authentication, and a server-side rendered admin dashboard.
