@@ -186,7 +186,7 @@ AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=your_client_id              # OAuth2 client ID
 AUTH0_CLIENT_SECRET=your_client_secret      # OAuth2 client secret (Cloudflare secret)
-AUTH0_REDIRECT_URI=https://your-worker.workers.dev/admin/callback
+AUTH0_REDIRECT_URI=https://your-worker.workers.dev/admin/callback  # Fallback; actual redirect uses the incoming request origin
 AUTH0_MANAGEMENT_CLIENT_ID=mgmt_client_id   # Auth0 Management API client (M2M)
 AUTH0_MANAGEMENT_CLIENT_SECRET=mgmt_secret  # Store as a secret
 
@@ -442,12 +442,12 @@ Form-based loo creation with:
   "env": {
     "production": {
       "vars": {
-        "AUTH0_REDIRECT_URI": "https://your-worker.workers.dev/admin/callback"
+        "AUTH0_REDIRECT_URI": "https://your-worker.workers.dev/admin/callback" // Fallback; runtime derives the redirect from request origin
       }
     },
     "development": {
       "vars": {
-        "AUTH0_REDIRECT_URI": "http://localhost:8787/admin/callback"
+        "AUTH0_REDIRECT_URI": "http://localhost:8787/admin/callback" // Local fallback when origin cannot be determined
       }
     }
   },

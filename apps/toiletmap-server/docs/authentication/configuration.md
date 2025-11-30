@@ -46,9 +46,11 @@ Production uses real Auth0 credentials configured via environment variables:
 - `AUTH0_AUDIENCE`: The API Identifier.
 - `AUTH0_CLIENT_ID`: Client ID for the application.
 - `AUTH0_CLIENT_SECRET`: Client Secret (stored as Cloudflare secret).
-- `AUTH0_REDIRECT_URI`: Callback URL (e.g., `https://www.toiletmap.org.uk/admin/callback`).
+- `AUTH0_REDIRECT_URI`: Optional fallback callback URL (the worker derives the redirect from the incoming request origin, so preview deployments work automatically).
 - `AUTH0_SCOPE`: OAuth scopes requested.
 - `AUTH0_PROFILE_KEY`: Path to extract contributor name from JWT claims (optional).
+
+ℹ️ The `/admin/login` handler now inspects each incoming request and builds the redirect URI dynamically (e.g., `https://743a6af5-toiletmap-server.../admin/callback`). Keeping a fallback value configured ensures Auth0 continues to accept the callback while freeing you from manually updating the URL for preview or alias deployments.
 
 ## Testing Against Production Auth0 Locally
 
@@ -59,7 +61,8 @@ AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=your_client_id
 AUTH0_CLIENT_SECRET=your_client_secret
-AUTH0_REDIRECT_URI=http://localhost:8787/admin/callback
+# Optional fallback; runtime derives redirect URI automatically
+# AUTH0_REDIRECT_URI=http://localhost:8787/admin/callback
 AUTH0_SCOPE=openid profile email offline_access roles access:admin
 ```
 

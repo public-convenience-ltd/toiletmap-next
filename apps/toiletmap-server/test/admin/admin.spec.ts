@@ -215,18 +215,24 @@ afterEach(() => {
 });
 
 describe("Admin Routes", () => {
-  it("should redirect to Auth0 login page when accessing /admin/login", async () => {
-    const res = await app.request("/admin/login", {}, env);
-    expect(res.status).toBe(302);
-    const location = res.headers.get("Location");
-    expect(location).toContain(env.AUTH0_ISSUER_BASE_URL);
-    expect(location).toContain(
-      `client_id=${encodeURIComponent(env.AUTH0_CLIENT_ID)}`
-    );
-    expect(location).toContain(
-      `redirect_uri=${encodeURIComponent(env.AUTH0_REDIRECT_URI)}`
-    );
-  });
+it("should redirect to Auth0 login page when accessing /admin/login", async () => {
+  const previewOrigin =
+    "https://preview-123-toiletmap-server.gbtoiletmap.workers.dev";
+  const res = await app.request(`${previewOrigin}/admin/login`, {}, env);
+  expect(res.status).toBe(302);
+  const location = res.headers.get("Location");
+  expect(location).toBeTruthy();
+  const redirectLocation = new URL(location as string);
+  expect(redirectLocation.origin).toBe(
+    new URL(env.AUTH0_ISSUER_BASE_URL).origin
+  );
+  expect(redirectLocation.searchParams.get("client_id")).toBe(
+    env.AUTH0_CLIENT_ID
+  );
+  expect(redirectLocation.searchParams.get("redirect_uri")).toBe(
+    `${previewOrigin}/admin/callback`
+  );
+});
 
   it("should render dataset explorer at /admin when session cookies are present", async () => {
     const res = await app.request(
