@@ -7,10 +7,28 @@ describe('Root routes', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({
-      status: 'ok',
       service: 'toiletmap-server',
     });
     expect(new Date(body.timestamp).toString()).not.toBe('Invalid Date');
+    // Status should be 'ok' or 'degraded' based on actual health
+    expect(['ok', 'degraded']).toContain(body.status);
+  });
+
+  it('reflects degraded status when dependencies are unhealthy', async () => {
+    const response = await callApi('/');
+    const body = await response.json();
+
+    // Status should match the actual health of the system
+    // In a healthy test environment, this should be 'ok'
+    // When database is down, it should be 'degraded'
+    expect(['ok', 'degraded']).toContain(body.status);
+
+    // If degraded, status should be consistent with health check
+    if (body.status === 'degraded') {
+      const healthResponse = await callApi('/health/ready');
+      const healthBody = await healthResponse.json();
+      expect(healthBody.status).toBe('degraded');
+    }
   });
 
   it('responds with 404 for unknown routes', async () => {

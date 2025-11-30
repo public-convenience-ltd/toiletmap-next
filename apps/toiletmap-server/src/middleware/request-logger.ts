@@ -11,7 +11,7 @@ import { createLogger } from '../utils/logger';
  * - User information (if authenticated)
  * - Error details (if any)
  */
-export const requestLogger = (env?: 'production' | 'development'): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
+export const requestLogger = (env?: 'production' | 'preview' | 'development'): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
   const logger = createLogger(env);
 
   return async (c, next) => {

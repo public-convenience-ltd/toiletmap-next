@@ -183,8 +183,9 @@ class Logger {
 /**
  * Create a logger instance based on environment
  */
-export function createLogger(env?: 'production' | 'development'): Logger {
-  const isProduction = env === 'production';
+export function createLogger(env?: 'production' | 'preview' | 'development'): Logger {
+  // Treat preview as production for logging purposes
+  const isProduction = env === 'production' || env === 'preview';
 
   return new Logger({
     minLevel: isProduction ? 'info' : 'debug',

@@ -60,11 +60,33 @@ export const createApp = (env: Env) => {
   app.route('/health', healthRouter);
 
   // Root endpoint with user info (for backward compatibility)
-  app.get('/', optionalAuth, (c) => {
+  app.get('/', optionalAuth, async (c) => {
     const user = c.get('user');
     const isAdmin = hasAdminRole(user);
+
+    // Check database health to determine overall status
+    let dbHealthy = true;
+    try {
+      const looService = c.get('looService');
+      // Quick health check - just verify the service can access the database
+      // This uses the same underlying connection as the health check
+      await looService['prisma'].$queryRaw`SELECT 1 as health_check`;
+    } catch (error) {
+      dbHealthy = false;
+      logger.warn('Database health check failed on root endpoint', {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        } : {
+          name: 'UnknownError',
+          message: String(error),
+        },
+      });
+    }
+
     return c.json({
-      status: 'ok',
+      status: dbHealthy ? 'ok' : 'degraded',
       service: 'toiletmap-server',
       timestamp: new Date().toISOString(),
       user: user ? {
