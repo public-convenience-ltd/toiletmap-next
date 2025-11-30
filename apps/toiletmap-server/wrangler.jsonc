@@ -30,7 +30,8 @@
     "AUTH0_CLIENT_SECRET": "test_client_secret",
     "AUTH0_PROFILE_KEY": "name",
     "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
-    "AUTH0_SCOPE": "openid profile email offline_access roles access:admin"
+    "AUTH0_SCOPE": "openid profile email offline_access roles",
+    "ENVIRONMENT": "development"
   },
   "env": {
     "production": {
