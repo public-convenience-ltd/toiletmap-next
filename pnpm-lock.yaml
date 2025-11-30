@@ -15,12 +15,6 @@ importers:
       '@biomejs/biome':
         specifier: 2.3.8
         version: 2.3.8
-
-  apps/toiletmap-client:
-    devDependencies:
-      '@cloudflare/workers-types':
-        specifier: ^4.20250204.0
-        version: 4.20251128.0
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -28,11 +22,13 @@ importers:
         specifier: ^4.51.0
         version: 4.51.0(@cloudflare/workers-types@4.20251128.0)
 
-  apps/toiletmap-design-system:
+  apps/toiletmap-client:
     devDependencies:
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+      '@cloudflare/workers-types':
+        specifier: ^4.20250204.0
+        version: 4.20251128.0
+
+  apps/toiletmap-design-system: {}
 
   apps/toiletmap-server:
     dependencies:
@@ -94,18 +90,12 @@ importers:
       tsx:
         specifier: 4.20.6
         version: 4.20.6
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
       vite:
         specifier: ^7.2.4
         version: 7.2.4(@types/node@24.10.1)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vitest:
         specifier: ^4.0.14
         version: 4.0.14(@types/node@24.10.1)(jiti@2.6.1)(msw@2.12.2(@types/node@24.10.1)(typescript@5.9.3))(tsx@4.20.6)(yaml@2.8.1)
-      wrangler:
-        specifier: ^4.51.0
-        version: 4.51.0(@cloudflare/workers-types@4.20251128.0)
 
 packages:
 
