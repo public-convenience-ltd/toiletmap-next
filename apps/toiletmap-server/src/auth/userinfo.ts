@@ -1,4 +1,4 @@
-import { logger } from '../utils/logger';
+import { logger } from "../utils/logger";
 
 const USERINFO_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -12,9 +12,9 @@ const userInfoCache = new Map<string, CacheEntry>();
 const encoder = new TextEncoder();
 
 const hashToken = async (token: string): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(token));
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
   const bytes = new Uint8Array(digest);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 
 const getCachedUserInfo = (key: string): UserInfoResponse | null => {
@@ -36,11 +36,9 @@ const setCachedUserInfo = (key: string, payload: UserInfoResponse) => {
 
 const normalizeIssuer = (issuerBaseUrl: string) => {
   if (!issuerBaseUrl) {
-    throw new Error('Missing Auth0 issuer base URL');
+    throw new Error("Missing Auth0 issuer base URL");
   }
-  return issuerBaseUrl.endsWith('/')
-    ? issuerBaseUrl
-    : `${issuerBaseUrl}/`;
+  return issuerBaseUrl.endsWith("/") ? issuerBaseUrl : `${issuerBaseUrl}/`;
 };
 
 type UserInfoResponse = {
@@ -72,10 +70,10 @@ export const fetchUserInfo = async (
     });
 
     if (!response.ok) {
-      logger.warn('Auth0 userinfo request failed', {
+      logger.warn("Auth0 userinfo request failed", {
         status: response.status,
         statusText: response.statusText,
-        endpoint: '/userinfo',
+        endpoint: "/userinfo",
       });
       return null;
     }
@@ -83,7 +81,7 @@ export const fetchUserInfo = async (
     const payload = (await response.json()) as UserInfoResponse;
     if (!payload?.sub) {
       logger.warn('Auth0 userinfo response missing "sub" claim', {
-        endpoint: '/userinfo',
+        endpoint: "/userinfo",
       });
       return null;
     }
@@ -92,10 +90,10 @@ export const fetchUserInfo = async (
     return payload;
   } catch (error) {
     if (error instanceof Error) {
-      logger.logError(error, { endpoint: '/userinfo' });
+      logger.logError(error, { endpoint: "/userinfo" });
     } else {
-      logger.error('Failed to fetch Auth0 userinfo', {
-        endpoint: '/userinfo',
+      logger.error("Failed to fetch Auth0 userinfo", {
+        endpoint: "/userinfo",
         errorMessage: String(error),
       });
     }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { callApi } from "./utils/test-client";
-import { createFixtureFactory } from "./utils/fixtures";
 import { getTestContext } from "./setup";
+import { createFixtureFactory } from "./utils/fixtures";
+import { callApi } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
 const adminHeaders = () => {
@@ -32,7 +32,7 @@ describe("Loo read endpoints", () => {
 
       const response = await callApi(`/api/loos/${loo.id}`, { headers: authHeaders() });
       if (response.status !== 200) {
-        console.log('DEBUG ERROR BODY:', await response.text());
+        console.log("DEBUG ERROR BODY:", await response.text());
       }
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -50,7 +50,9 @@ describe("Loo read endpoints", () => {
     });
 
     it("returns 404 when a loo is missing", async () => {
-      const response = await callApi("/api/loos/ffffffffffffffffffffffff", { headers: authHeaders() });
+      const response = await callApi("/api/loos/ffffffffffffffffffffffff", {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(404);
       const body = await response.json();
       expect(body.message).toMatch(/not found/i);
@@ -70,21 +72,20 @@ describe("Loo read endpoints", () => {
       const first = await fixtures.loos.create();
       const second = await fixtures.loos.create();
 
-      const response = await callApi(`/api/loos?ids=${first.id}&ids=${second.id}`, { headers: authHeaders() });
+      const response = await callApi(`/api/loos?ids=${first.id}&ids=${second.id}`, {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.count).toBe(2);
-      expect(body.data.map((item: { id: string }) => item.id)).toEqual([
-        first.id,
-        second.id,
-      ]);
+      expect(body.data.map((item: { id: string }) => item.id)).toEqual([first.id, second.id]);
     });
 
     it("rejects requests without ids", async () => {
       const response = await callApi("/api/loos", { headers: authHeaders() });
       expect(response.status).toBe(400);
       const body = await response.json();
-      expect(body.message).toBe('Invalid ids query parameter');
+      expect(body.message).toBe("Invalid ids query parameter");
       expect(body.issues).toBeDefined();
     });
   });
@@ -92,13 +93,11 @@ describe("Loo read endpoints", () => {
   describe("GET /api/loos/:id/reports", () => {
     it("returns audit history summaries and hydrated reports with contributor details redacted", async () => {
       const loo = await fixtures.loos.create({ notes: "Original notes" });
-      await fixtures.loos.upsert(
-        loo.id,
-        { notes: "Updated notes", radar: true },
-        "reports-test"
-      );
+      await fixtures.loos.upsert(loo.id, { notes: "Updated notes", radar: true }, "reports-test");
 
-      const summaryResponse = await callApi(`/api/loos/${loo.id}/reports`, { headers: authHeaders() });
+      const summaryResponse = await callApi(`/api/loos/${loo.id}/reports`, {
+        headers: authHeaders(),
+      });
       expect(summaryResponse.status).toBe(200);
       const summary = await summaryResponse.json();
       expect(summary.count).toBeGreaterThan(0);
@@ -108,10 +107,9 @@ describe("Loo read endpoints", () => {
       expect(summary.data[0].contributor).toBeNull();
       expect(summary.data[0]).not.toHaveProperty("notes");
 
-      const hydratedResponse = await callApi(
-        `/api/loos/${loo.id}/reports?hydrate=true`,
-        { headers: authHeaders() }
-      );
+      const hydratedResponse = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
+        headers: authHeaders(),
+      });
       expect(hydratedResponse.status).toBe(200);
       const hydrated = await hydratedResponse.json();
       expect(hydrated.data[0]).toHaveProperty("notes");
@@ -120,29 +118,22 @@ describe("Loo read endpoints", () => {
 
     it("returns contributor details when the caller has the admin role", async () => {
       const loo = await fixtures.loos.create({ notes: "Original notes" });
-      await fixtures.loos.upsert(
-        loo.id,
-        { notes: "Updated notes", radar: true },
-        "reports-test"
-      );
+      await fixtures.loos.upsert(loo.id, { notes: "Updated notes", radar: true }, "reports-test");
 
       const summaryResponse = await callApi(`/api/loos/${loo.id}/reports`, {
         headers: adminHeaders(),
       });
       expect(summaryResponse.status).toBe(200);
       const summary = await summaryResponse.json();
-      const latestSummary =
-        summary.data[summary.data.length - 1];
+      const latestSummary = summary.data[summary.data.length - 1];
       expect(latestSummary.contributor).toBe("reports-test");
 
-      const hydratedResponse = await callApi(
-        `/api/loos/${loo.id}/reports?hydrate=true`,
-        { headers: adminHeaders() }
-      );
+      const hydratedResponse = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
+        headers: adminHeaders(),
+      });
       expect(hydratedResponse.status).toBe(200);
       const hydrated = await hydratedResponse.json();
-      const latestHydrated =
-        hydrated.data[hydrated.data.length - 1];
+      const latestHydrated = hydrated.data[hydrated.data.length - 1];
       expect(latestHydrated.contributor).toBe("reports-test");
     });
 
@@ -154,31 +145,25 @@ describe("Loo read endpoints", () => {
       });
 
       // Wait a bit to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Make first update
-      await fixtures.loos.upsert(
-        loo.id,
-        { notes: "Second version", radar: true },
-        "user-one"
-      );
+      await fixtures.loos.upsert(loo.id, { notes: "Second version", radar: true }, "user-one");
 
       // Wait a bit to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Make second update
-      await fixtures.loos.upsert(
-        loo.id,
-        { notes: "Third version", babyChange: true },
-        "user-two"
-      );
+      await fixtures.loos.upsert(loo.id, { notes: "Third version", babyChange: true }, "user-two");
 
       // Fetch the loo to get its created_at and updated_at
       const looResponse = await callApi(`/api/loos/${loo.id}`, { headers: authHeaders() });
       const looData = await looResponse.json();
 
       // Fetch reports
-      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, { headers: authHeaders() });
+      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(200);
       const body = await response.json();
 
@@ -188,7 +173,7 @@ describe("Loo read endpoints", () => {
 
       // Verify chronological ordering (oldest first)
       const timestamps = body.data.map((r: { createdAt: string }) =>
-        new Date(r.createdAt).getTime()
+        new Date(r.createdAt).getTime(),
       );
       expect(timestamps[0]).toBeLessThan(timestamps[1]);
       expect(timestamps[1]).toBeLessThan(timestamps[2]);
@@ -222,16 +207,8 @@ describe("Loo read endpoints", () => {
         notes: "Baseline version",
       });
 
-      await fixtures.loos.upsert(
-        loo.id,
-        { notes: "Second version" },
-        "user-one"
-      );
-      await fixtures.loos.upsert(
-        loo.id,
-        { notes: "Third version" },
-        "user-two"
-      );
+      await fixtures.loos.upsert(loo.id, { notes: "Second version" }, "user-one");
+      await fixtures.loos.upsert(loo.id, { notes: "Third version" }, "user-two");
 
       const versions = await prisma.record_version.findMany({
         where: { record: { path: ["id"], equals: loo.id } },
@@ -248,27 +225,23 @@ describe("Loo read endpoints", () => {
         });
       }
 
-      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, { headers: authHeaders() });
+      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(200);
       const body = await response.json();
 
       const notesTimeline = body.data.map((report: { notes: string | null }) => report.notes);
-      expect(notesTimeline).toEqual([
-        "Baseline version",
-        "Second version",
-        "Third version",
-      ]);
+      expect(notesTimeline).toEqual(["Baseline version", "Second version", "Third version"]);
     });
 
     it("includes name changes in the diff payload", async () => {
       const loo = await fixtures.loos.create({ name: "Original Name" });
-      await fixtures.loos.upsert(
-        loo.id,
-        { name: "Updated Name" },
-        "name-tester"
-      );
+      await fixtures.loos.upsert(loo.id, { name: "Updated Name" }, "name-tester");
 
-      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, { headers: authHeaders() });
+      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(200);
       const body = await response.json();
       const latest = body.data[body.data.length - 1];
@@ -311,25 +284,19 @@ describe("Loo read endpoints", () => {
         throw new Error("Fixture geohash was not generated");
       }
 
-      const activeResponse = await callApi(
-        `/api/loos/geohash/${prefix}?active=true`,
-        { headers: authHeaders() }
-      );
+      const activeResponse = await callApi(`/api/loos/geohash/${prefix}?active=true`, {
+        headers: authHeaders(),
+      });
       expect(activeResponse.status).toBe(200);
       const activeBody = await activeResponse.json();
-      expect(activeBody.data.map((row: { id: string }) => row.id)).toContain(
-        activeLoo.id
-      );
+      expect(activeBody.data.map((row: { id: string }) => row.id)).toContain(activeLoo.id);
 
-      const inactiveResponse = await callApi(
-        `/api/loos/geohash/${prefix}?active=false`,
-        { headers: authHeaders() }
-      );
+      const inactiveResponse = await callApi(`/api/loos/geohash/${prefix}?active=false`, {
+        headers: authHeaders(),
+      });
       expect(inactiveResponse.status).toBe(200);
       const inactiveBody = await inactiveResponse.json();
-      expect(inactiveBody.data.map((row: { id: string }) => row.id)).toContain(
-        inactiveLoo.id
-      );
+      expect(inactiveBody.data.map((row: { id: string }) => row.id)).toContain(inactiveLoo.id);
     });
 
     it("returns compressed data when compressed=true", async () => {
@@ -347,10 +314,9 @@ describe("Loo read endpoints", () => {
         throw new Error("Fixture geohash was not generated");
       }
 
-      const response = await callApi(
-        `/api/loos/geohash/${prefix}?compressed=true`,
-        { headers: authHeaders() }
-      );
+      const response = await callApi(`/api/loos/geohash/${prefix}?compressed=true`, {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(200);
       const body = await response.json();
       const item = body.data.find((row: [string, string, number]) => row[0] === loo.id);
@@ -360,7 +326,7 @@ describe("Loo read endpoints", () => {
 
       const [id, geohash, filter] = item;
       expect(id).toBe(loo.id);
-      expect(typeof geohash).toBe('string');
+      expect(typeof geohash).toBe("string");
       expect(geohash).toBe(loo.geohash);
 
       // Check filter bitmask
@@ -378,22 +344,19 @@ describe("Loo read endpoints", () => {
         location: { lat: 53.0, lng: -2.0 },
       });
 
-      const response = await callApi(
-        "/api/loos/proximity?lat=51.5&lng=-0.12&radius=800",
-        { headers: authHeaders() }
-      );
+      const response = await callApi("/api/loos/proximity?lat=51.5&lng=-0.12&radius=800", {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(200);
       const body = await response.json();
-      expect(
-        body.data.some((entry: { id: string }) => entry.id === near.id)
-      ).toBe(true);
-      expect(
-        body.data.every((entry: { distance: number }) => entry.distance >= 0)
-      ).toBe(true);
+      expect(body.data.some((entry: { id: string }) => entry.id === near.id)).toBe(true);
+      expect(body.data.every((entry: { distance: number }) => entry.distance >= 0)).toBe(true);
     });
 
     it("validates query parameters", async () => {
-      const response = await callApi("/api/loos/proximity?lat=foo&lng=bar", { headers: authHeaders() });
+      const response = await callApi("/api/loos/proximity?lat=foo&lng=bar", {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(400);
     });
   });
@@ -422,7 +385,7 @@ describe("Loo read endpoints", () => {
 
       const response = await callApi(
         `/api/loos/search?search=${suffix}&limit=2&page=1&sort=name-asc&hasLocation=true`,
-        { headers: authHeaders() }
+        { headers: authHeaders() },
       );
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -436,16 +399,16 @@ describe("Loo read endpoints", () => {
 
       const noLocationResponse = await callApi(
         `/api/loos/search?search=${suffix}&hasLocation=false&limit=10&page=1`,
-        { headers: authHeaders() }
+        { headers: authHeaders() },
       );
       const noLocationBody = await noLocationResponse.json();
-      expect(
-        noLocationBody.data.map((row: { id: string }) => row.id)
-      ).toContain(noLocation.id);
+      expect(noLocationBody.data.map((row: { id: string }) => row.id)).toContain(noLocation.id);
     });
 
     it("rejects invalid pagination arguments", async () => {
-      const response = await callApi("/api/loos/search?limit=5000&page=0", { headers: authHeaders() });
+      const response = await callApi("/api/loos/search?limit=5000&page=0", {
+        headers: authHeaders(),
+      });
       expect(response.status).toBe(400);
     });
   });
@@ -472,7 +435,7 @@ describe("Loo read endpoints", () => {
 
       const response = await callApi(
         `/api/loos/metrics?active=true&search=${encodeURIComponent(marker)}`,
-        { headers: authHeaders() }
+        { headers: authHeaders() },
       );
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -485,9 +448,11 @@ describe("Loo read endpoints", () => {
     });
 
     it("respects the recentWindowDays override", async () => {
-      const response = await callApi("/api/loos/metrics?recentWindowDays=5", { headers: authHeaders() });
+      const response = await callApi("/api/loos/metrics?recentWindowDays=5", {
+        headers: authHeaders(),
+      });
       if (response.status !== 200) {
-        console.error('DEBUG METRICS ERROR:', await response.text());
+        console.error("DEBUG METRICS ERROR:", await response.text());
       }
       expect(response.status).toBe(200);
       const body = await response.json();

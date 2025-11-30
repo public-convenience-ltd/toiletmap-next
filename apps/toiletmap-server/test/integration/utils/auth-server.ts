@@ -1,6 +1,6 @@
-import { createServer, ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { createSign, generateKeyPairSync, randomUUID } from 'node:crypto';
+import { createSign, generateKeyPairSync, randomUUID } from "node:crypto";
+import { createServer, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 
 export type IssueTokenFn = (claims?: Record<string, unknown>) => string;
 
@@ -26,15 +26,13 @@ type AuthCodeMetadata = {
 const authCodes = new Map<string, AuthCodeMetadata>();
 const accessTokenProfiles = new Map<string, UserProfile>();
 
-
-
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 const signJwt = (
   payload: Record<string, unknown>,
@@ -47,8 +45,8 @@ const signJwt = (
   },
 ) => {
   const header = {
-    alg: 'RS256',
-    typ: 'JWT',
+    alg: "RS256",
+    typ: "JWT",
     kid: options.kid,
   };
 
@@ -63,11 +61,11 @@ const signJwt = (
     exp,
   };
 
-  const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
-  const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
+  const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+  const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString("base64url");
 
   const data = `${encodedHeader}.${encodedPayload}`;
-  const signature = createSign('RSA-SHA256').update(data).sign(privateKey, 'base64url');
+  const signature = createSign("RSA-SHA256").update(data).sign(privateKey, "base64url");
 
   return `${data}.${signature}`;
 };
@@ -114,51 +112,45 @@ type CustomizationParseResult =
   | { success: true; customization: ApprovalCustomization; formState: CustomizationFormState }
   | { success: false; errors: string[]; formState: CustomizationFormState };
 
-const DEFAULT_PERMISSIONS = ['access:admin', 'report:loo'];
+const DEFAULT_PERMISSIONS = ["access:admin", "report:loo"];
 
 const toInitials = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) {
-    return 'TU';
+    return "TU";
   }
   const parts = trimmed.split(/\s+/u).slice(0, 2);
-  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('') || 'TU';
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "TU";
 };
 
 const buildDefaultFormState = (params: AuthorizeParams): CustomizationFormState => ({
-  name: 'Test User',
-  email: 'test@localhost',
-  nickname: 'testuser',
-  sub: 'auth0|test-user',
-  picture: '',
-  contributorName: 'Test User',
+  name: "Test User",
+  email: "test@localhost",
+  nickname: "testuser",
+  sub: "auth0|test-user",
+  picture: "",
+  contributorName: "Test User",
   scope: params.scope,
   permissions: [...DEFAULT_PERMISSIONS],
-  extraPermissions: '',
-  customClaims: '',
+  extraPermissions: "",
+  customClaims: "",
 });
 
 const buildDefaultCustomization = (params: AuthorizeParams): ApprovalCustomization => ({
   scope: params.scope,
   profile: {
-    sub: 'auth0|test-user',
-    name: 'Test User',
-    email: 'test@localhost',
-    nickname: 'testuser',
+    sub: "auth0|test-user",
+    name: "Test User",
+    email: "test@localhost",
+    nickname: "testuser",
     permissions: [...DEFAULT_PERMISSIONS],
-    contributorName: 'Test User',
+    contributorName: "Test User",
     customClaims: {},
   },
 });
 
 const normalizePermissions = (values: string[]) => {
-  return Array.from(
-    new Set(
-      values
-        .map((perm) => perm.trim())
-        .filter((perm) => perm.length > 0),
-    ),
-  );
+  return Array.from(new Set(values.map((perm) => perm.trim()).filter((perm) => perm.length > 0)));
 };
 
 const parseCustomizationForm = (
@@ -168,47 +160,46 @@ const parseCustomizationForm = (
   const defaults = buildDefaultFormState(params);
 
   const formState: CustomizationFormState = {
-    name: form.get('user_name')?.trim() || defaults.name,
-    email: form.get('user_email')?.trim() || defaults.email,
-    nickname: form.get('user_nickname')?.trim() || defaults.nickname,
-    sub: form.get('user_sub')?.trim() || defaults.sub,
-    picture: form.get('user_picture')?.trim() || '',
-    contributorName: form.get('contributor_name')?.trim() || '',
-    scope: form.get('scope')?.trim() || defaults.scope,
-    permissions: normalizePermissions(form.getAll('permissions')),
-    extraPermissions: form.get('extra_permissions') ?? '',
-    customClaims: form.get('custom_claims') ?? '',
+    name: form.get("user_name")?.trim() || defaults.name,
+    email: form.get("user_email")?.trim() || defaults.email,
+    nickname: form.get("user_nickname")?.trim() || defaults.nickname,
+    sub: form.get("user_sub")?.trim() || defaults.sub,
+    picture: form.get("user_picture")?.trim() || "",
+    contributorName: form.get("contributor_name")?.trim() || "",
+    scope: form.get("scope")?.trim() || defaults.scope,
+    permissions: normalizePermissions(form.getAll("permissions")),
+    extraPermissions: form.get("extra_permissions") ?? "",
+    customClaims: form.get("custom_claims") ?? "",
   };
 
   const errors: string[] = [];
 
   const extraPermissions = normalizePermissions(
-    formState.extraPermissions
-      .split(/[\n,]+/u)
-      .map((value) => value.trim()),
+    formState.extraPermissions.split(/[\n,]+/u).map((value) => value.trim()),
   );
 
-  const permissions = normalizePermissions([
-    ...formState.permissions,
-    ...extraPermissions,
-  ]);
+  const permissions = normalizePermissions([...formState.permissions, ...extraPermissions]);
 
   let customClaims: Record<string, unknown> = {};
   if (formState.customClaims.trim().length > 0) {
     try {
       const parsed = JSON.parse(formState.customClaims);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        errors.push('Custom claim overrides must be a valid JSON object.');
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        errors.push("Custom claim overrides must be a valid JSON object.");
       } else {
         customClaims = parsed as Record<string, unknown>;
       }
-    } catch (error) {
-      errors.push('Custom claim overrides must be valid JSON.');
+    } catch (_error) {
+      errors.push("Custom claim overrides must be valid JSON.");
     }
   }
 
   if (errors.length > 0) {
-    return { success: false, errors, formState: { ...formState, permissions: formState.permissions } };
+    return {
+      success: false,
+      errors,
+      formState: { ...formState, permissions: formState.permissions },
+    };
   }
 
   return {
@@ -248,7 +239,7 @@ const applyContributorName = (claims: Record<string, unknown>, contributorName?:
     return;
   }
   const existing = claims.app_metadata;
-  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+  if (existing && typeof existing === "object" && !Array.isArray(existing)) {
     claims.app_metadata = {
       ...(existing as Record<string, unknown>),
       contributor_name: contributorName,
@@ -294,12 +285,12 @@ const parseAuthorizeParams = (
   params: URLSearchParams,
   defaultAudience: string,
 ): AuthorizeParams | null => {
-  const clientId = params.get('client_id');
-  const redirectUri = params.get('redirect_uri');
-  const state = params.get('state');
-  const nonce = params.get('nonce');
-  const scope = params.get('scope') ?? 'openid profile email';
-  const audience = params.get('audience') ?? defaultAudience;
+  const clientId = params.get("client_id");
+  const redirectUri = params.get("redirect_uri");
+  const state = params.get("state");
+  const nonce = params.get("nonce");
+  const scope = params.get("scope") ?? "openid profile email";
+  const audience = params.get("audience") ?? defaultAudience;
 
   if (!clientId || !redirectUri || !state || !nonce) {
     return null;
@@ -343,30 +334,23 @@ const renderLoginPage = (
   };
 
   const extraPermissions = normalizePermissions(
-    formState.extraPermissions
-      .split(/[\n,]+/u)
-      .map((value) => value.trim()),
+    formState.extraPermissions.split(/[\n,]+/u).map((value) => value.trim()),
   );
-  const previewPermissions = normalizePermissions([
-    ...formState.permissions,
-    ...extraPermissions,
-  ]);
+  const previewPermissions = normalizePermissions([...formState.permissions, ...extraPermissions]);
   const permissionsMarkup =
     previewPermissions.length === 0
       ? '<span class="pill pill--muted">No permissions</span>'
-      : previewPermissions
-        .map((perm) => `<span class="pill">${escapeHtml(perm)}</span>`)
-        .join('');
+      : previewPermissions.map((perm) => `<span class="pill">${escapeHtml(perm)}</span>`).join("");
 
   const errorMarkup =
     errors.length > 0
       ? `<div class="alert">${errors
-        .map((message) => `<p>${escapeHtml(message)}</p>`)
-        .join('')}</div>`
-      : '';
+          .map((message) => `<p>${escapeHtml(message)}</p>`)
+          .join("")}</div>`
+      : "";
 
   const isPermissionChecked = (value: string) =>
-    formState.permissions.includes(value) ? 'checked' : '';
+    formState.permissions.includes(value) ? "checked" : "";
 
   const avatarInitials = escapeHtml(toInitials(formState.name));
 
@@ -790,11 +774,11 @@ const renderLoginPage = (
             <h3>Permissions</h3>
             <div class="toggle-grid">
               <label class="pill-toggle">
-                <input type="checkbox" name="permissions" value="access:admin" ${isPermissionChecked('access:admin')} />
+                <input type="checkbox" name="permissions" value="access:admin" ${isPermissionChecked("access:admin")} />
                 <span>access:admin</span>
               </label>
               <label class="pill-toggle">
-                <input type="checkbox" name="permissions" value="report:loo" ${isPermissionChecked('report:loo')} />
+                <input type="checkbox" name="permissions" value="report:loo" ${isPermissionChecked("report:loo")} />
                 <span>report:loo</span>
               </label>
             </div>
@@ -884,7 +868,7 @@ const renderLoginPage = (
           if (preview.scope && scopeInput) preview.scope.textContent = scopeInput.value || '${escapeHtml(scope)}';
           if (preview.avatar) {
             const initials = name
-              .split(/\s+/)
+              .split(/s+/)
               .slice(0, 2)
               .map((part) => part.charAt(0).toUpperCase())
               .join('') || 'TU';
@@ -952,13 +936,13 @@ const approveAuthorization = (
 
   try {
     const callbackUrl = new URL(params.redirectUri);
-    callbackUrl.searchParams.set('code', code);
-    callbackUrl.searchParams.set('state', params.state);
+    callbackUrl.searchParams.set("code", code);
+    callbackUrl.searchParams.set("state", params.state);
     res.writeHead(302, { Location: callbackUrl.toString() });
     res.end();
-  } catch (error) {
-    res.writeHead(400, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: 'invalid_redirect_uri' }));
+  } catch (_error) {
+    res.writeHead(400, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "invalid_redirect_uri" }));
   }
 };
 
@@ -966,69 +950,79 @@ const approveAuthorization = (
  * Starts a tiny JWKS + OAuth2 server so integration tests and local development
  * can exercise the Auth0 middleware end-to-end, including admin UI login.
  */
-export const startAuthServer = async (
-  options: StartAuthServerOptions,
-): Promise<AuthServer> => {
-  const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+export const startAuthServer = async (options: StartAuthServerOptions): Promise<AuthServer> => {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
   });
 
   const kid = randomUUID();
-  const jwk = publicKey.export({ format: 'jwk' }) as Record<string, string>;
+  const jwk = publicKey.export({ format: "jwk" }) as Record<string, string>;
   const publicJwk = {
     ...jwk,
     kid,
-    alg: 'RS256',
-    use: 'sig',
+    alg: "RS256",
+    use: "sig",
   };
 
   const server = createServer((req, res) => {
     const reqUrl = req.url ? new URL(req.url, `http://${req.headers.host}`) : null;
 
     // JWKS endpoint for JWT verification
-    if (req.method === 'GET' && reqUrl?.pathname === '/.well-known/jwks.json') {
-      res.writeHead(200, { 'content-type': 'application/json' });
+    if (req.method === "GET" && reqUrl?.pathname === "/.well-known/jwks.json") {
+      res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ keys: [publicJwk] }));
       return;
     }
 
     // OAuth2 authorization endpoint (interactive + auto-approve)
-    if (reqUrl?.pathname === '/authorize') {
-      if (req.method === 'GET') {
+    if (reqUrl?.pathname === "/authorize") {
+      if (req.method === "GET") {
         const params = parseAuthorizeParams(reqUrl.searchParams, options.audience);
         if (!params) {
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing required parameters' }));
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: "invalid_request",
+              error_description: "Missing required parameters",
+            }),
+          );
           return;
         }
 
-        if (reqUrl.searchParams.get('auto') === '1') {
+        if (reqUrl.searchParams.get("auto") === "1") {
           approveAuthorization(res, params);
           return;
         }
 
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(renderLoginPage(params, buildDefaultFormState(params)));
         return;
       }
 
-      if (req.method === 'POST') {
-        let body = '';
-        req.on('data', (chunk) => {
+      if (req.method === "POST") {
+        let body = "";
+        req.on("data", (chunk) => {
           body += chunk.toString();
         });
-        req.on('end', () => {
+        req.on("end", () => {
           const form = new URLSearchParams(body);
           const params = parseAuthorizeParams(form, options.audience);
           if (!params) {
-            res.writeHead(400, { 'content-type': 'application/json' });
-            res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing required parameters' }));
+            res.writeHead(400, { "content-type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "invalid_request",
+                error_description: "Missing required parameters",
+              }),
+            );
             return;
           }
           const customizationResult = parseCustomizationForm(form, params);
           if (!customizationResult.success) {
-            res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' });
-            res.end(renderLoginPage(params, customizationResult.formState, customizationResult.errors));
+            res.writeHead(400, { "content-type": "text/html; charset=utf-8" });
+            res.end(
+              renderLoginPage(params, customizationResult.formState, customizationResult.errors),
+            );
             return;
           }
           approveAuthorization(res, params, customizationResult.customization);
@@ -1038,91 +1032,90 @@ export const startAuthServer = async (
     }
 
     // OAuth2 token endpoint
-    if (req.method === 'POST' && req.url === '/oauth/token') {
-      let body = '';
-      req.on('data', (chunk) => {
+    if (req.method === "POST" && req.url === "/oauth/token") {
+      let body = "";
+      req.on("data", (chunk) => {
         body += chunk.toString();
       });
 
-      req.on('end', () => {
+      req.on("end", () => {
         try {
           const params = JSON.parse(body);
           const { grant_type, code, client_id } = params;
 
-          if (grant_type !== 'authorization_code') {
-            res.writeHead(400, { 'content-type': 'application/json' });
-            res.end(JSON.stringify({ error: 'unsupported_grant_type' }));
+          if (grant_type !== "authorization_code") {
+            res.writeHead(400, { "content-type": "application/json" });
+            res.end(JSON.stringify({ error: "unsupported_grant_type" }));
             return;
           }
 
-          if (!code || !authCodes.has(code)) {
-            res.writeHead(400, { 'content-type': 'application/json' });
-            res.end(JSON.stringify({ error: 'invalid_grant', error_description: 'Invalid authorization code' }));
+          const codeMetadata = authCodes.get(code);
+          if (!codeMetadata) {
+            res.writeHead(400, { "content-type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "invalid_grant",
+                error_description: "Invalid authorization code",
+              }),
+            );
             return;
           }
 
-          const codeMetadata = authCodes.get(code)!;
           authCodes.delete(code); // One-time use
 
           const nonce = codeMetadata.nonce;
           const requestedAudience = codeMetadata.audience || options.audience;
-          const grantedScope = codeMetadata.scope || 'openid profile email';
+          const grantedScope = codeMetadata.scope || "openid profile email";
           const profile = codeMetadata.profile;
 
-          const privateKeyPem = privateKey.export({ format: 'pem', type: 'pkcs1' }) as string;
+          const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs1" }) as string;
           const address = server.address() as AddressInfo;
           const issuer = `http://127.0.0.1:${address.port}/`;
 
           // Generate access token
           const accessTokenPayload = buildAccessTokenPayload(profile);
-          const accessToken = signJwt(
-            accessTokenPayload,
-            privateKeyPem,
-            {
-              kid,
-              audience: requestedAudience,
-              issuer,
-              expiresIn: 86400, // 24h in seconds
-            }
-          );
+          const accessToken = signJwt(accessTokenPayload, privateKeyPem, {
+            kid,
+            audience: requestedAudience,
+            issuer,
+            expiresIn: 86400, // 24h in seconds
+          });
           accessTokenProfiles.set(accessToken, profile);
 
           // Generate ID token with nonce
           const idTokenPayload = buildIdTokenPayload(profile, nonce);
-          const idToken = signJwt(
-            idTokenPayload,
-            privateKeyPem,
-            {
-              kid,
-              audience: client_id, // ID token audience is the client_id
-              issuer,
-              expiresIn: 86400, // 24h in seconds
-            }
-          );
+          const idToken = signJwt(idTokenPayload, privateKeyPem, {
+            kid,
+            audience: client_id, // ID token audience is the client_id
+            issuer,
+            expiresIn: 86400, // 24h in seconds
+          });
 
-          res.writeHead(200, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({
-            access_token: accessToken,
-            id_token: idToken,
-            token_type: 'Bearer',
-            scope: grantedScope,
-            expires_in: 86400,
-          }));
-        } catch (error) {
-          res.writeHead(500, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: 'server_error' }));
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify({
+              access_token: accessToken,
+              id_token: idToken,
+              token_type: "Bearer",
+              scope: grantedScope,
+              expires_in: 86400,
+            }),
+          );
+        } catch (_error) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "server_error" }));
         }
       });
       return;
     }
 
     // Userinfo endpoint (optional, for completeness)
-    if (req.method === 'GET' && req.url === '/userinfo') {
+    if (req.method === "GET" && req.url === "/userinfo") {
       const authHeader = req.headers.authorization;
       let payload: Record<string, unknown> | null = null;
 
-      if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.slice('Bearer '.length);
+      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.slice("Bearer ".length);
         const profile = accessTokenProfiles.get(token);
         if (profile) {
           payload = buildUserInfoPayload(profile);
@@ -1131,38 +1124,38 @@ export const startAuthServer = async (
 
       if (!payload) {
         payload = {
-          sub: 'auth0|test-user',
-          name: 'Test User',
-          nickname: 'testuser',
-          email: 'test@localhost',
+          sub: "auth0|test-user",
+          name: "Test User",
+          nickname: "testuser",
+          email: "test@localhost",
         };
       }
 
-      res.writeHead(200, { 'content-type': 'application/json' });
+      res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(payload));
       return;
     }
 
-    res.writeHead(404, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ message: 'Not Found' }));
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ message: "Not Found" }));
   });
 
   await new Promise<void>((resolve) => {
     const port = options.port ?? 0; // Use provided port or random (0)
-    server.listen(port, '127.0.0.1', () => resolve());
+    server.listen(port, "127.0.0.1", () => resolve());
   });
 
   const address = server.address() as AddressInfo;
   const issuer = `http://127.0.0.1:${address.port}`;
-  const privateKeyPem = privateKey.export({ format: 'pem', type: 'pkcs1' }) as string;
+  const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs1" }) as string;
 
   const issueToken: IssueTokenFn = (claims = {}) => {
     const defaults = {
-      sub: 'auth0|integration-test-user',
-      nickname: 'integration-test-user',
-      name: 'Integration Tester',
+      sub: "auth0|integration-test-user",
+      nickname: "integration-test-user",
+      name: "Integration Tester",
       app_metadata: {
-        nickname: 'integration-tester',
+        nickname: "integration-tester",
       },
     } satisfies Record<string, unknown>;
 
@@ -1170,11 +1163,11 @@ export const startAuthServer = async (
     const payload = { ...defaults, ...restClaims };
 
     let audienceOverride: string | string[] | undefined;
-    if (typeof aud === 'string') {
+    if (typeof aud === "string") {
       audienceOverride = aud;
     } else if (Array.isArray(aud)) {
       const stringAudiences = aud.filter(
-        (value): value is string => typeof value === 'string' && value.length > 0,
+        (value): value is string => typeof value === "string" && value.length > 0,
       );
       audienceOverride = stringAudiences.length > 0 ? stringAudiences : undefined;
     }

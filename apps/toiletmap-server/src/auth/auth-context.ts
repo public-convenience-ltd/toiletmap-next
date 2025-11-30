@@ -1,16 +1,13 @@
-import { Context } from 'hono';
-import { AppVariables, Env, RequestUser } from '../types';
-import { authenticateToken } from './verify';
-import { clearSessionCookies, getSession, SessionData, SessionUser } from './session';
-import { fetchUserInfo as fetchAuth0UserInfo } from './userinfo';
-import { logger } from '../utils/logger';
+import type { Context } from "hono";
+import type { AppVariables, Env, RequestUser } from "../types";
+import { logger } from "../utils/logger";
+import { clearSessionCookies, getSession, type SessionData, type SessionUser } from "./session";
+import { fetchUserInfo as fetchAuth0UserInfo } from "./userinfo";
+import { authenticateToken } from "./verify";
 
 type AuthenticatedContext = Context<{ Bindings: Env; Variables: AppVariables }>;
 
-type AuthSource =
-  | 'authorization-header'
-  | 'session-access-token'
-  | 'session-id-token';
+type AuthSource = "authorization-header" | "session-access-token" | "session-id-token";
 
 export interface AuthResult {
   user: RequestUser;
@@ -25,10 +22,10 @@ export interface AuthOptions {
 }
 
 const getAuthorizationHeader = (c: AuthenticatedContext) =>
-  c.req.header('authorization') ?? c.req.header('Authorization') ?? null;
+  c.req.header("authorization") ?? c.req.header("Authorization") ?? null;
 
 const extractBearerToken = (headerValue: string | null) => {
-  if (!headerValue?.startsWith('Bearer ')) {
+  if (!headerValue?.startsWith("Bearer ")) {
     return null;
   }
   const token = headerValue.slice(7).trim();
@@ -37,10 +34,7 @@ const extractBearerToken = (headerValue: string | null) => {
 
 type ProfileSource = SessionUser | Record<string, unknown> | null | undefined;
 
-const mergeProfile = (
-  user: RequestUser,
-  profile?: ProfileSource,
-): RequestUser => {
+const mergeProfile = (user: RequestUser, profile?: ProfileSource): RequestUser => {
   if (!profile) {
     return user;
   }
@@ -48,9 +42,9 @@ const mergeProfile = (
   const sanitizedProfile = Object.fromEntries(
     Object.entries(profile).filter(
       ([, value]) =>
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean' ||
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean" ||
         value === null ||
         value === undefined,
     ),
@@ -67,8 +61,7 @@ const mergeProfile = (
   };
 };
 
-const shouldFetchUserInfo = (options?: AuthOptions) =>
-  options?.fetchUserInfo !== false;
+const shouldFetchUserInfo = (options?: AuthOptions) => options?.fetchUserInfo !== false;
 
 const enrichUser = async (
   c: AuthenticatedContext,
@@ -87,10 +80,7 @@ const enrichUser = async (
     return user;
   }
 
-  const profile = await fetchAuth0UserInfo(
-    params.accessToken,
-    c.env.AUTH0_ISSUER_BASE_URL,
-  );
+  const profile = await fetchAuth0UserInfo(params.accessToken, c.env.AUTH0_ISSUER_BASE_URL);
   if (!profile) {
     return user;
   }
@@ -103,18 +93,14 @@ const authenticateBearer = async (
   token: string,
   options?: AuthOptions,
 ): Promise<AuthResult> => {
-  const user = await authenticateToken(
-    token,
-    c.env,
-    options?.audience ?? c.env.AUTH0_AUDIENCE,
-  );
+  const user = await authenticateToken(token, c.env, options?.audience ?? c.env.AUTH0_AUDIENCE);
   return {
     user: await enrichUser(c, user, {
       accessToken: token,
       options,
     }),
     token,
-    source: 'authorization-header',
+    source: "authorization-header",
   };
 };
 
@@ -137,7 +123,7 @@ const authenticateWithSession = async (
           options,
         }),
         token: session.accessToken,
-        source: 'session-access-token',
+        source: "session-access-token",
         session,
       };
     } catch (error) {
@@ -145,12 +131,12 @@ const authenticateWithSession = async (
         throw error;
       }
       if (error instanceof Error) {
-        logger.warn('Session access token verification failed, falling back to id_token', {
+        logger.warn("Session access token verification failed, falling back to id_token", {
           errorName: error.name,
           errorMessage: error.message,
         });
       } else {
-        logger.warn('Session access token verification failed, falling back to id_token', {
+        logger.warn("Session access token verification failed, falling back to id_token", {
           errorMessage: String(error),
         });
       }
@@ -159,28 +145,24 @@ const authenticateWithSession = async (
 
   if (session.idToken) {
     try {
-      const user = await authenticateToken(
-        session.idToken,
-        c.env,
-        c.env.AUTH0_CLIENT_ID,
-      );
+      const user = await authenticateToken(session.idToken, c.env, c.env.AUTH0_CLIENT_ID);
       return {
         user: await enrichUser(c, user, {
           sessionProfile: session.user,
           options,
         }),
         token: session.idToken,
-        source: 'session-id-token',
+        source: "session-id-token",
         session,
       };
     } catch (error) {
       if (error instanceof Error) {
-        logger.warn('Session id token verification failed, clearing session', {
+        logger.warn("Session id token verification failed, clearing session", {
           errorName: error.name,
           errorMessage: error.message,
         });
       } else {
-        logger.warn('Session id token verification failed, clearing session', {
+        logger.warn("Session id token verification failed, clearing session", {
           errorMessage: String(error),
         });
       }
@@ -192,7 +174,7 @@ const authenticateWithSession = async (
   return null;
 };
 
-export const authenticateRequest = async (
+export const authenticateRequest = (
   c: AuthenticatedContext,
   options?: AuthOptions,
 ): Promise<AuthResult | null> => {
@@ -203,7 +185,7 @@ export const authenticateRequest = async (
 
   const session = getSession(c);
   if (!session) {
-    return null;
+    return Promise.resolve(null);
   }
 
   return authenticateWithSession(c, session, options);

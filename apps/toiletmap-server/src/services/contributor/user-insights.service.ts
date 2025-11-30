@@ -1,14 +1,14 @@
-import { RECENT_WINDOW_DAYS } from '../../common/constants';
-import { Prisma, PrismaClientInstance } from '../../prisma';
-import { mapAuditRecordToReport } from '../loo/mappers';
-import type { ContributorReport, ContributorStats, ContributorSuggestion } from './types';
+import { RECENT_WINDOW_DAYS } from "../../common/constants";
+import { Prisma, type PrismaClientInstance } from "../../prisma";
+import { mapAuditRecordToReport } from "../loo/mappers";
+import type { ContributorReport, ContributorStats, ContributorSuggestion } from "./types";
 
 type RawCount = bigint | number | string | null | undefined;
 
 const toNumber = (value: RawCount): number => {
   if (value === null || value === undefined) return 0;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
   const parsed = Number(value);
   return Number.isNaN(parsed) ? 0 : parsed;
 };
@@ -20,7 +20,7 @@ const toIsoString = (value: Date | string | null | undefined): string | null => 
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
-const escapeLikeTerm = (term: string) => term.replace(/([\\%_])/g, '\\$1');
+const escapeLikeTerm = (term: string) => term.replace(/([\\%_])/g, "\\$1");
 
 export class UserInsightsService {
   constructor(private readonly prisma: PrismaClientInstance) {}
@@ -31,9 +31,7 @@ export class UserInsightsService {
       return null;
     }
 
-    const recentThreshold = new Date(
-      Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-    );
+    const recentThreshold = new Date(Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
     const [summaryRow] = await this.prisma.$queryRaw<
       Array<{

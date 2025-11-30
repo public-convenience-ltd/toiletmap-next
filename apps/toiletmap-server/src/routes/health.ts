@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { Env, AppVariables } from "../types";
 import { createPrismaClient } from "../prisma";
+import type { AppVariables, Env } from "../types";
 import { sanitizeHealthCheckError } from "../utils/error-sanitizer";
 
 /**
@@ -49,8 +49,7 @@ healthRouter.get("/ready", async (c) => {
   const dbCheckStart = Date.now();
   try {
     const connectionString =
-      c.env.HYPERDRIVE?.connectionString ??
-      c.env.TEST_HYPERDRIVE?.connectionString;
+      c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_HYPERDRIVE?.connectionString;
     if (!connectionString) {
       throw new Error("No database connection string available");
     }
@@ -66,12 +65,7 @@ healthRouter.get("/ready", async (c) => {
     });
   } catch (error) {
     // Sanitize error for client response
-    const sanitized = sanitizeHealthCheckError(
-      c.env,
-      "database",
-      error,
-      Date.now() - dbCheckStart
-    );
+    const sanitized = sanitizeHealthCheckError(c.env, "database", error, Date.now() - dbCheckStart);
 
     checks.push({
       name: "database",
@@ -92,7 +86,7 @@ healthRouter.get("/ready", async (c) => {
       timestamp: new Date().toISOString(),
       checks,
     },
-    statusCode
+    statusCode,
   );
 });
 

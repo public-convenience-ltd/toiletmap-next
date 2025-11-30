@@ -5,7 +5,7 @@
  * as "public" environments that should not expose sensitive error details.
  */
 
-import { Env } from '../types';
+import type { Env } from "../types";
 
 /**
  * Determines if the current environment is public-facing and should
@@ -18,7 +18,7 @@ export function isPublicEnvironment(env: Env): boolean {
   // Explicitly check for development to be safe by default
   // If ENVIRONMENT is not set or is anything other than 'development',
   // we treat it as public to prevent accidental information disclosure
-  return env.ENVIRONMENT !== 'development';
+  return env.ENVIRONMENT !== "development";
 }
 
 /**
@@ -28,14 +28,12 @@ export function isPublicEnvironment(env: Env): boolean {
  * @param env - Environment bindings
  * @returns 'production', 'preview', or 'development'
  */
-export function getEnvironmentName(
-  env: Env,
-): 'production' | 'preview' | 'development' {
-  if (env.ENVIRONMENT === 'production') {
-    return 'production';
+export function getEnvironmentName(env: Env): "production" | "preview" | "development" {
+  if (env.ENVIRONMENT === "production") {
+    return "production";
   }
-  if (env.ENVIRONMENT === 'preview') {
-    return 'preview';
+  if (env.ENVIRONMENT === "preview") {
+    return "preview";
   }
-  return 'development';
+  return "development";
 }

@@ -1,15 +1,12 @@
-import type { Auth0User } from '../types';
+import type { Auth0User } from "../types";
 
 /**
  * Safely extracts a string value from an object using a key.
  * Returns the trimmed string if it exists and is non-empty, otherwise null.
  */
-function getStringValue(
-  obj: Record<string, unknown>,
-  key: string,
-): string | null {
+function getStringValue(obj: Record<string, unknown>, key: string): string | null {
   const value = obj[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 /**
@@ -48,9 +45,9 @@ export function extractContributor(
   // Check for custom profile nickname first (if configured)
   if (profileKey) {
     const profileValue = user[profileKey];
-    if (typeof profileValue === 'object' && profileValue !== null) {
+    if (typeof profileValue === "object" && profileValue !== null) {
       const profile = profileValue as Record<string, unknown>;
-      const nickname = getStringValue(profile, 'nickname');
+      const nickname = getStringValue(profile, "nickname");
       if (nickname) {
         return nickname;
       }

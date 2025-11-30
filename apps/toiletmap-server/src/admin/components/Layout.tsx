@@ -1,4 +1,4 @@
-import { html } from 'hono/html';
+import { html } from "hono/html";
 
 export const Layout = (props: { title: string; children: unknown }) => {
   return html`
@@ -452,11 +452,21 @@ export const Layout = (props: { title: string; children: unknown }) => {
             outline-offset: 2px;
           }
           .filter-controls {
+            /* Reset fieldset default styles */
+            border: 0;
+            padding: 0;
+            margin: 0;
+            min-inline-size: auto;
+            /* Layout */
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: var(--space-xs);
             width: 100%;
             min-width: 0;
+          }
+          .table-controls__refresh {
+            margin-top: var(--space-3xs);
+            align-self: start;
           }
 
           /* Create form layout */

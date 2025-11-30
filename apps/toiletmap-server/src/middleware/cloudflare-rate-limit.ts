@@ -1,5 +1,5 @@
-import { Context, MiddlewareHandler } from "hono";
-import { Env, AppVariables } from "../types";
+import type { Context, MiddlewareHandler } from "hono";
+import type { AppVariables, Env } from "../types";
 import { logger } from "../utils/logger";
 import { rateLimit } from "./rate-limit";
 
@@ -7,7 +7,7 @@ import { rateLimit } from "./rate-limit";
  * Rate limiting configuration for Cloudflare Rate Limiting API
  */
 interface CloudflareRateLimitConfig {
-  binding: 'RATE_LIMIT_READ' | 'RATE_LIMIT_WRITE' | 'RATE_LIMIT_ADMIN' | 'RATE_LIMIT_AUTH';
+  binding: "RATE_LIMIT_READ" | "RATE_LIMIT_WRITE" | "RATE_LIMIT_ADMIN" | "RATE_LIMIT_AUTH";
   keyGenerator: (c: Context<{ Bindings: Env; Variables: AppVariables }>) => string;
   message?: string;
   name?: string;
@@ -42,7 +42,7 @@ interface CloudflareRateLimitConfig {
  * ```
  */
 const cloudflareRateLimit = (
-  config: CloudflareRateLimitConfig
+  config: CloudflareRateLimitConfig,
 ): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
   const {
     binding,
@@ -65,13 +65,13 @@ const cloudflareRateLimit = (
     const rateLimiter = c.env[binding];
 
     if (!rateLimiter) {
-      logger.error('Rate limiter binding not found', {
+      logger.error("Rate limiter binding not found", {
         binding,
         path: c.req.path,
         method: c.req.method,
       });
       if (fallbackLimiter) {
-        logger.warn('Falling back to in-memory rate limiter', {
+        logger.warn("Falling back to in-memory rate limiter", {
           rateLimiter: name,
           binding,
           path: c.req.path,
@@ -88,7 +88,7 @@ const cloudflareRateLimit = (
       const { success } = await rateLimiter.limit({ key });
 
       if (!success) {
-        logger.warn('Rate limit exceeded', {
+        logger.warn("Rate limit exceeded", {
           rateLimiter: name,
           key,
           path: c.req.path,
@@ -99,7 +99,7 @@ const cloudflareRateLimit = (
             message,
             error: "rate_limit_exceeded",
           },
-          429
+          429,
         );
       }
     } catch (error) {
@@ -110,7 +110,7 @@ const cloudflareRateLimit = (
           method: c.req.method,
         });
       } else {
-        logger.error('Rate limiting error', {
+        logger.error("Rate limiting error", {
           rateLimiter: name,
           path: c.req.path,
           method: c.req.method,
@@ -119,7 +119,7 @@ const cloudflareRateLimit = (
       }
       // Fallback to in-memory limiter if available, otherwise allow request
       if (fallbackLimiter) {
-        logger.warn('Rate limiter error, falling back to in-memory limiter', {
+        logger.warn("Rate limiter error, falling back to in-memory limiter", {
           rateLimiter: name,
           binding,
           path: c.req.path,
@@ -141,7 +141,7 @@ const cloudflareRateLimit = (
 const getClientIp = (c: Context): string => {
   return (
     c.req.header("cf-connecting-ip") ||
-    c.req.header("x-forwarded-for")?.split(',')[0]?.trim() ||
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
     "unknown"
   );
 };
@@ -150,7 +150,7 @@ const getClientIp = (c: Context): string => {
  * Get user ID from context, or fall back to IP
  */
 const getUserIdOrIp = (c: Context<{ Bindings: Env; Variables: AppVariables }>): string => {
-  const user = c.get('user');
+  const user = c.get("user");
   if (user?.sub) {
     return `user:${user.sub}`;
   }
@@ -163,7 +163,7 @@ const getUserIdOrIp = (c: Context<{ Bindings: Env; Variables: AppVariables }>): 
 export const rateLimiters = {
   /** Public read operations (100 req/min, IP-based) */
   read: cloudflareRateLimit({
-    binding: 'RATE_LIMIT_READ',
+    binding: "RATE_LIMIT_READ",
     keyGenerator: (c) => `read:${getClientIp(c)}`,
     message: "Too many requests, please try again later",
     name: "read",
@@ -175,7 +175,7 @@ export const rateLimiters = {
 
   /** Write operations (20 req/min, user or IP-based) */
   write: cloudflareRateLimit({
-    binding: 'RATE_LIMIT_WRITE',
+    binding: "RATE_LIMIT_WRITE",
     keyGenerator: (c) => `write:${getUserIdOrIp(c)}`,
     message: "Too many requests, please slow down",
     name: "write",
@@ -187,7 +187,7 @@ export const rateLimiters = {
 
   /** Admin operations (60 req/min, user or IP-based) */
   admin: cloudflareRateLimit({
-    binding: 'RATE_LIMIT_ADMIN',
+    binding: "RATE_LIMIT_ADMIN",
     keyGenerator: (c) => `admin:${getUserIdOrIp(c)}`,
     message: "Too many admin requests, please try again later",
     name: "admin",
@@ -199,7 +199,7 @@ export const rateLimiters = {
 
   /** Authentication attempts (5 req/min, IP-based) */
   auth: cloudflareRateLimit({
-    binding: 'RATE_LIMIT_AUTH',
+    binding: "RATE_LIMIT_AUTH",
     keyGenerator: (c) => `auth:${getClientIp(c)}`,
     message: "Too many authentication attempts, please try again later",
     name: "auth",

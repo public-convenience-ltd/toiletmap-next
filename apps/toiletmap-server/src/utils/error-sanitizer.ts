@@ -5,14 +5,14 @@
  * internal paths, or stack traces in public-facing error responses.
  */
 
-import { isPublicEnvironment } from './environment';
-import { Env } from '../types';
+import type { Env } from "../types";
+import { isPublicEnvironment } from "./environment";
 
 /**
  * Sanitized error response for health checks
  */
 export interface SanitizedHealthCheckError {
-  status: 'error';
+  status: "error";
   message: string;
   responseTime?: number;
 }
@@ -54,7 +54,7 @@ export function sanitizeHealthCheckError(
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   return {
-    status: 'error',
+    status: "error",
     message: isPublic ? `${checkName} check failed` : errorMessage,
     responseTime,
   };
@@ -79,7 +79,7 @@ export function sanitizeHealthCheckError(
 export function sanitizeApiError(
   env: Env,
   error: unknown,
-  fallbackMessage: string = 'An unexpected error occurred',
+  fallbackMessage: string = "An unexpected error occurred",
 ): SanitizedApiError {
   const isPublic = isPublicEnvironment(env);
 

@@ -1,12 +1,10 @@
-import { z } from 'zod';
+import { z } from "zod";
 import {
   jsonValueSchema,
-  openingTimesSchema,
-  openingTimesFromDbSchema,
-  dayOpeningHoursSchema,
   type OpeningTimes,
-  type DayOpeningHours,
-} from '../../common/schemas';
+  openingTimesFromDbSchema,
+  openingTimesSchema,
+} from "../../common/schemas";
 
 export const CoordinatesSchema = z
   .object({
@@ -78,14 +76,14 @@ export type CompressedLoo = [
 ];
 
 export const LooSearchSortOptions = [
-  'updated-desc',
-  'updated-asc',
-  'created-desc',
-  'created-asc',
-  'verified-desc',
-  'verified-asc',
-  'name-asc',
-  'name-desc',
+  "updated-desc",
+  "updated-asc",
+  "created-desc",
+  "created-asc",
+  "verified-desc",
+  "verified-asc",
+  "name-asc",
+  "name-desc",
 ] as const;
 
 const LooSearchSortSchema = z.enum(LooSearchSortOptions);
@@ -93,7 +91,7 @@ export type LooSearchSort = z.infer<typeof LooSearchSortSchema>;
 
 // LooSearchParams is now imported from routes/loos/schemas to ensure type consistency
 // This is re-exported here for convenience and backwards compatibility
-export type { SearchQuery as LooSearchParams } from '../../routes/loos/schemas';
+export type { SearchQuery as LooSearchParams } from "../../routes/loos/schemas";
 
 const ReportDiffEntrySchema = z
   .object({
@@ -101,10 +99,10 @@ const ReportDiffEntrySchema = z
     current: z.unknown(),
   })
   .strict();
-type ReportDiffEntry = z.infer<typeof ReportDiffEntrySchema>;
+type _ReportDiffEntry = z.infer<typeof ReportDiffEntrySchema>;
 
 const ReportDiffSchema = z.record(z.string(), ReportDiffEntrySchema);
-type ReportDiff = z.infer<typeof ReportDiffSchema>;
+type _ReportDiff = z.infer<typeof ReportDiffSchema>;
 
 const ReportSummaryResponseSchema = z
   .object({
@@ -151,36 +149,38 @@ export type LooMetricsResponse = {
 
 // Schema for validating toilets database records from JSON audit fields
 // This matches the structure of the toilets table in Prisma
-export const ToiletsRecordSchema = z.object({
-  id: z.string(),
-  created_at: z.coerce.date().nullable(),
-  contributors: z.array(z.string()),
-  accessible: nullableBoolean,
-  active: nullableBoolean,
-  attended: nullableBoolean,
-  automatic: nullableBoolean,
-  baby_change: nullableBoolean,
-  men: nullableBoolean,
-  name: nullableString,
-  no_payment: nullableBoolean,
-  notes: nullableString,
-  payment_details: nullableString,
-  radar: nullableBoolean,
-  removal_reason: nullableString,
-  women: nullableBoolean,
-  updated_at: z.coerce.date().nullable(),
-  geography: jsonValueSchema.nullable(),
-  urinal_only: nullableBoolean,
-  all_gender: nullableBoolean,
-  children: nullableBoolean,
-  geohash: nullableString,
-  verified_at: z.coerce.date().nullable(),
-  area_id: nullableString,
-  opening_times: openingTimesFromDbSchema,
-  location: jsonValueSchema.nullable(),
-}).partial();
+export const ToiletsRecordSchema = z
+  .object({
+    id: z.string(),
+    created_at: z.coerce.date().nullable(),
+    contributors: z.array(z.string()),
+    accessible: nullableBoolean,
+    active: nullableBoolean,
+    attended: nullableBoolean,
+    automatic: nullableBoolean,
+    baby_change: nullableBoolean,
+    men: nullableBoolean,
+    name: nullableString,
+    no_payment: nullableBoolean,
+    notes: nullableString,
+    payment_details: nullableString,
+    radar: nullableBoolean,
+    removal_reason: nullableString,
+    women: nullableBoolean,
+    updated_at: z.coerce.date().nullable(),
+    geography: jsonValueSchema.nullable(),
+    urinal_only: nullableBoolean,
+    all_gender: nullableBoolean,
+    children: nullableBoolean,
+    geohash: nullableString,
+    verified_at: z.coerce.date().nullable(),
+    area_id: nullableString,
+    opening_times: openingTimesFromDbSchema,
+    location: jsonValueSchema.nullable(),
+  })
+  .partial();
 
-type ToiletsRecord = z.infer<typeof ToiletsRecordSchema>;
+type _ToiletsRecord = z.infer<typeof ToiletsRecordSchema>;
 
 // Schema for validating raw SQL query results (toilets with joined area fields)
 export const RawLooRowSchema = z.object({

@@ -1,17 +1,17 @@
-import { Context } from "hono";
-import { Layout } from "../../components/Layout";
-import { Button, Badge, CollapsibleCard } from "../../components/DesignSystem";
-import { AppVariables, Env, RequestUser } from "../../../types";
-import { extractContributor } from "../../../utils/auth-utils";
+import type { Context } from "hono";
+import { RECENT_WINDOW_DAYS } from "../../../common/constants";
 import { createPrismaClient } from "../../../prisma";
 import {
-  ContributorReport,
-  ContributorStats,
-  ContributorSuggestion,
+  type ContributorReport,
+  type ContributorStats,
+  type ContributorSuggestion,
   UserInsightsService,
 } from "../../../services/contributor";
-import { RECENT_WINDOW_DAYS } from "../../../common/constants";
+import type { AppVariables, Env, RequestUser } from "../../../types";
+import { extractContributor } from "../../../utils/auth-utils";
 import { logger } from "../../../utils/logger";
+import { Badge, Button, CollapsibleCard } from "../../components/DesignSystem";
+import { Layout } from "../../components/Layout";
 
 type AdminContext = Context<{ Bindings: Env; Variables: AppVariables }>;
 
@@ -30,8 +30,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
 });
 
 const formatNumber = (value: number) => numberFormatter.format(value);
-const formatDate = (value: string | null) =>
-  value ? dateFormatter.format(new Date(value)) : "—";
+const formatDate = (value: string | null) => (value ? dateFormatter.format(new Date(value)) : "—");
 const formatDateTime = (value: string | null) =>
   value ? dateTimeFormatter.format(new Date(value)) : "—";
 
@@ -47,9 +46,7 @@ const formatDiffValue = (value: unknown) => {
 const buildUserName = (user: RequestUser | undefined) =>
   user?.name || user?.nickname || user?.email || user?.sub || "Signed-in user";
 
-const buildAffordanceMessage = (
-  summary: ContributorStats["summary"]
-): string => {
+const buildAffordanceMessage = (summary: ContributorStats["summary"]): string => {
   if (summary.totalEvents === 0 && summary.totalLoos === 0) {
     return "We have not recorded any edits for this contributor yet.";
   }
@@ -62,7 +59,7 @@ const buildAffordanceMessage = (
 const buildSuggestionLinks = (
   suggestions: ContributorSuggestion[],
   selectedHandle: string,
-  searchTerm: string
+  searchTerm: string,
 ) =>
   suggestions.map((entry) => {
     const link = new URL("/admin/users/statistics", "http://localhost");
@@ -118,23 +115,19 @@ const formatDiffLabel = (field: string) => {
 
 const renderDiffValue = (value: unknown, variant: "previous" | "current") => (
   <span class={`diff-chip diff-chip--${variant}`}>
-    <span class="diff-chip__label">
-      {variant === "previous" ? "Was" : "Now"}
-    </span>
+    <span class="diff-chip__label">{variant === "previous" ? "Was" : "Now"}</span>
     <span class="diff-chip__value">{formatDiffValue(value)}</span>
   </span>
 );
 
 export const userStatistics = async (c: AdminContext) => {
   const requestUser = c.get("user");
-  const defaultHandle =
-    extractContributor(requestUser, c.env.AUTH0_PROFILE_KEY) ?? "";
+  const defaultHandle = extractContributor(requestUser, c.env.AUTH0_PROFILE_KEY) ?? "";
   const selectedHandleParam = (c.req.query("handle") ?? "").trim();
   const selectedHandle = selectedHandleParam || defaultHandle;
   const searchTerm = (c.req.query("search") ?? "").trim();
   const connectionString =
-    c.env.HYPERDRIVE?.connectionString ??
-    c.env.TEST_HYPERDRIVE?.connectionString;
+    c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_HYPERDRIVE?.connectionString;
   if (!connectionString) {
     throw new Error("No database connection string available");
   }
@@ -156,8 +149,7 @@ export const userStatistics = async (c: AdminContext) => {
         errorMessage: String(error),
       });
     }
-    suggestionsError =
-      error instanceof Error ? error.message : "Unable to load suggestions.";
+    suggestionsError = error instanceof Error ? error.message : "Unable to load suggestions.";
   }
 
   let stats: ContributorStats | null = null;
@@ -175,19 +167,12 @@ export const userStatistics = async (c: AdminContext) => {
         });
       }
       statsError =
-        error instanceof Error
-          ? error.message
-          : "Unable to load contributor statistics.";
+        error instanceof Error ? error.message : "Unable to load contributor statistics.";
     }
   }
 
-  const viewingSelf =
-    Boolean(defaultHandle) && selectedHandle === defaultHandle;
-  const suggestionLinks = buildSuggestionLinks(
-    suggestions,
-    selectedHandle,
-    searchTerm
-  );
+  const viewingSelf = Boolean(defaultHandle) && selectedHandle === defaultHandle;
+  const suggestionLinks = buildSuggestionLinks(suggestions, selectedHandle, searchTerm);
   const handleDisplay = selectedHandle || "Not configured";
 
   const statsContext = stats
@@ -469,9 +454,7 @@ export const userStatistics = async (c: AdminContext) => {
           {defaultHandle && !viewingSelf && (
             <Button
               variant="secondary"
-              href={`/admin/users/statistics?handle=${encodeURIComponent(
-                defaultHandle
-              )}`}
+              href={`/admin/users/statistics?handle=${encodeURIComponent(defaultHandle)}`}
             >
               Jump to my stats
             </Button>
@@ -501,9 +484,7 @@ export const userStatistics = async (c: AdminContext) => {
           class="search-form"
           style="margin-bottom: var(--space-m);"
         >
-          {selectedHandle && (
-            <input type="hidden" name="handle" value={selectedHandle} />
-          )}
+          {selectedHandle && <input type="hidden" name="handle" value={selectedHandle} />}
           <label class="form-label" for="user-search">
             Contributor name or handle
           </label>
@@ -524,7 +505,7 @@ export const userStatistics = async (c: AdminContext) => {
                 data-clear-search
                 aria-label="Clear search"
               >
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                <i class="fa-solid fa-xmark" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -533,7 +514,7 @@ export const userStatistics = async (c: AdminContext) => {
         {suggestionsError && (
           <div class="notification notification--error">
             <div class="notification__icon">
-              <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+              <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
             </div>
             <div class="notification__content">
               <p class="notification__title">Suggestions unavailable</p>
@@ -546,9 +527,7 @@ export const userStatistics = async (c: AdminContext) => {
           <>
             <div style="margin-bottom: var(--space-xs); display: flex; justify-content: space-between; align-items: center;">
               <strong>
-                {searchTerm
-                  ? `Matches for “${searchTerm}”`
-                  : "Recently active contributors"}
+                {searchTerm ? `Matches for “${searchTerm}”` : "Recently active contributors"}
               </strong>
               <span class="muted-text">
                 {suggestions.length
@@ -560,9 +539,7 @@ export const userStatistics = async (c: AdminContext) => {
               <ul class="suggestions-list">
                 {suggestionLinks.map((entry) => (
                   <li
-                    class={`suggestions-item${
-                      entry.isActive ? " suggestions-item--active" : ""
-                    }`}
+                    class={`suggestions-item${entry.isActive ? " suggestions-item--active" : ""}`}
                     key={entry.handle}
                   >
                     <div>
@@ -589,17 +566,12 @@ export const userStatistics = async (c: AdminContext) => {
       </CollapsibleCard>
 
       {statsError && (
-        <div
-          class="notification notification--error"
-          style="margin-bottom: var(--space-l);"
-        >
+        <div class="notification notification--error" style="margin-bottom: var(--space-l);">
           <div class="notification__icon">
-            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
           </div>
           <div class="notification__content">
-            <p class="notification__title">
-              Contributor statistics unavailable
-            </p>
+            <p class="notification__title">Contributor statistics unavailable</p>
             <p class="notification__message">{statsError}</p>
           </div>
         </div>
@@ -607,7 +579,7 @@ export const userStatistics = async (c: AdminContext) => {
 
       {!stats && !statsError && (
         <div class="empty-state">
-          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true" />
           <p>Select a contributor to load detailed statistics.</p>
         </div>
       )}
@@ -627,34 +599,22 @@ export const userStatistics = async (c: AdminContext) => {
             <div class="metrics-grid">
               <div class="metric-card">
                 <p class="metric-label">Unique loos touched</p>
-                <p class="metric-value">
-                  {formatNumber(stats.summary.totalLoos)}
-                </p>
+                <p class="metric-value">{formatNumber(stats.summary.totalLoos)}</p>
                 <p class="metric-meta">All-time distinct loos</p>
               </div>
               <div class="metric-card">
                 <p class="metric-label">Total audit events</p>
-                <p class="metric-value">
-                  {formatNumber(stats.summary.totalEvents)}
-                </p>
-                <p class="metric-meta">
-                  First seen: {formatDate(stats.summary.firstSeenAt)}
-                </p>
+                <p class="metric-value">{formatNumber(stats.summary.totalEvents)}</p>
+                <p class="metric-meta">First seen: {formatDate(stats.summary.firstSeenAt)}</p>
               </div>
               <div class="metric-card">
                 <p class="metric-label">Active loos</p>
-                <p class="metric-value">
-                  {formatNumber(stats.summary.activeLoos)}
-                </p>
-                <p class="metric-meta">
-                  Verified: {formatNumber(stats.summary.verifiedLoos)}
-                </p>
+                <p class="metric-value">{formatNumber(stats.summary.activeLoos)}</p>
+                <p class="metric-meta">Verified: {formatNumber(stats.summary.verifiedLoos)}</p>
               </div>
               <div class="metric-card">
                 <p class="metric-label">Recently updated</p>
-                <p class="metric-value">
-                  {formatNumber(stats.summary.recentLoos)}
-                </p>
+                <p class="metric-value">{formatNumber(stats.summary.recentLoos)}</p>
                 <p class="metric-meta">within {RECENT_WINDOW_DAYS} days</p>
               </div>
             </div>
@@ -668,27 +628,17 @@ export const userStatistics = async (c: AdminContext) => {
               <summary>
                 <div class="insights-section__label">
                   <span>Coverage</span>
-                  <span class="insights-section__hint">
-                    Top areas touched by this contributor
-                  </span>
+                  <span class="insights-section__hint">Top areas touched by this contributor</span>
                 </div>
               </summary>
               {stats.areas.length ? (
                 <ul class="area-list">
                   {stats.areas.map((area) => (
-                    <li
-                      key={`${area.areaId ?? "unassigned"}-${
-                        area.name ?? "unknown"
-                      }`}
-                    >
+                    <li key={`${area.areaId ?? "unassigned"}-${area.name ?? "unknown"}`}>
                       <span>
                         {area.name || "Unassigned"}{" "}
                         <span class="muted-text">
-                          (
-                          {area.areaId
-                            ? `#${area.areaId.slice(-6)}`
-                            : "no-area"}
-                          )
+                          ({area.areaId ? `#${area.areaId.slice(-6)}` : "no-area"})
                         </span>
                       </span>
                       <strong>{formatNumber(area.count)}</strong>
@@ -706,9 +656,7 @@ export const userStatistics = async (c: AdminContext) => {
               <summary>
                 <div class="insights-section__label">
                   <span>Places they touch</span>
-                  <span class="insights-section__hint">
-                    Most recently updated loos
-                  </span>
+                  <span class="insights-section__hint">Most recently updated loos</span>
                 </div>
               </summary>
               {stats.loos.length ? (
@@ -725,15 +673,11 @@ export const userStatistics = async (c: AdminContext) => {
                           </a>
                         </strong>
                         <p class="muted-text" style="margin: 0;">
-                          {loo.areaName || "Area unknown"} • Updated{" "}
-                          {formatDateTime(loo.updatedAt)}
+                          {loo.areaName || "Area unknown"} • Updated {formatDateTime(loo.updatedAt)}
                         </p>
                       </div>
                       <div style="display: flex; gap: var(--space-2xs); flex-wrap: wrap;">
-                        <a
-                          class="button button--secondary"
-                          href={`/admin/loos/${loo.id}`}
-                        >
+                        <a class="button button--secondary" href={`/admin/loos/${loo.id}`}>
                           Open admin view
                         </a>
                         <a
@@ -759,34 +703,22 @@ export const userStatistics = async (c: AdminContext) => {
               <summary>
                 <div class="insights-section__label">
                   <span>Audit trail</span>
-                  <span class="insights-section__hint">
-                    Latest 20 recorded edits
-                  </span>
+                  <span class="insights-section__hint">Latest 20 recorded edits</span>
                 </div>
               </summary>
               {stats.recentReports.length ? (
                 <div class="timeline-stack">
                   {stats.recentReports.map((report, index) => {
                     const diffPreview = buildReportDiffPreview(report);
-                    const eventTime = formatDateTime(
-                      report.occurredAt || report.createdAt
-                    );
+                    const eventTime = formatDateTime(report.occurredAt || report.createdAt);
                     return (
-                      <details
-                        class="timeline-node"
-                        key={report.id}
-                        open={index === 0}
-                      >
+                      <details class="timeline-node" key={report.id} open={index === 0}>
                         <summary>
                           <div class="timeline-summary">
                             <div>
-                              <p class="timeline-summary__heading">
-                                {eventTime}
-                              </p>
+                              <p class="timeline-summary__heading">{eventTime}</p>
                               <span class="timeline-summary__meta">
-                                {report.looId
-                                  ? `Loo #${report.looId.slice(-6)}`
-                                  : "Snapshot"}
+                                {report.looId ? `Loo #${report.looId.slice(-6)}` : "Snapshot"}
                               </span>
                             </div>
                             {diffPreview && (
@@ -828,31 +760,18 @@ export const userStatistics = async (c: AdminContext) => {
                           </div>
                           {report.diff ? (
                             <ul class="diff-list">
-                              {Object.entries(report.diff).map(
-                                ([field, value]) => (
-                                  <li class="diff-entry" key={field}>
-                                    <div class="diff-entry__field">
-                                      {formatDiffLabel(field)}
-                                    </div>
-                                    <div class="diff-entry__values">
-                                      {renderDiffValue(
-                                        value.previous,
-                                        "previous"
-                                      )}
-                                      <span
-                                        class="diff-arrow"
-                                        aria-hidden="true"
-                                      >
-                                        &rarr;
-                                      </span>
-                                      {renderDiffValue(
-                                        value.current,
-                                        "current"
-                                      )}
-                                    </div>
-                                  </li>
-                                )
-                              )}
+                              {Object.entries(report.diff).map(([field, value]) => (
+                                <li class="diff-entry" key={field}>
+                                  <div class="diff-entry__field">{formatDiffLabel(field)}</div>
+                                  <div class="diff-entry__values">
+                                    {renderDiffValue(value.previous, "previous")}
+                                    <span class="diff-arrow" aria-hidden="true">
+                                      &rarr;
+                                    </span>
+                                    {renderDiffValue(value.current, "current")}
+                                  </div>
+                                </li>
+                              ))}
                             </ul>
                           ) : (
                             <p class="muted-text" style="margin: 0;">
@@ -861,9 +780,7 @@ export const userStatistics = async (c: AdminContext) => {
                           )}
                           {report.looId && (
                             <div class="timeline-links">
-                              <a href={`/admin/loos/${report.looId}`}>
-                                View in admin
-                              </a>
+                              <a href={`/admin/loos/${report.looId}`}>View in admin</a>
                               <a
                                 href={`/api/loos/${report.looId}`}
                                 target="_blank"
@@ -896,8 +813,7 @@ export const userStatistics = async (c: AdminContext) => {
               {buildUserName(requestUser)}
             </h2>
             <p class="section-description">
-              Private reference only – lets you confirm how your edits are
-              attributed.
+              Private reference only – lets you confirm how your edits are attributed.
             </p>
           </div>
           {defaultHandle && (
@@ -921,16 +837,13 @@ export const userStatistics = async (c: AdminContext) => {
           </div>
         </dl>
         {!defaultHandle && (
-          <p
-            class="notification notification--info"
-            style="margin-top: var(--space-m);"
-          >
-            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>&nbsp; Set{" "}
-            <code>AUTH0_PROFILE_KEY</code> or ensure your Auth0 profile has a
-            nickname to automatically attribute your edits.
+          <p class="notification notification--info" style="margin-top: var(--space-m);">
+            <i class="fa-solid fa-circle-info" aria-hidden="true" />
+            &nbsp; Set <code>AUTH0_PROFILE_KEY</code> or ensure your Auth0 profile has a nickname to
+            automatically attribute your edits.
           </p>
         )}
       </section>
-    </Layout>
+    </Layout>,
   );
 };

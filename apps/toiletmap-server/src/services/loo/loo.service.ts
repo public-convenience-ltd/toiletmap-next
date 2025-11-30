@@ -1,13 +1,13 @@
-import { PrismaClientInstance, toilets, Prisma } from "../../prisma";
-import { RECENT_WINDOW_DAYS, MIN_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from "../../common/constants";
+import { MAX_SEARCH_LIMIT, MIN_SEARCH_LIMIT, RECENT_WINDOW_DAYS } from "../../common/constants";
+import { Prisma, type PrismaClientInstance } from "../../prisma";
 import {
   areaSelection,
   buildAreaFromJoin,
+  genLooFilterBitmask,
   mapAuditRecordToReport,
   mapLoo,
   mapNearbyLoo,
   rawLooToToilets,
-  genLooFilterBitmask,
 } from "./mappers";
 import { mapMutationToPrismaData } from "./mutation";
 import { insertLoo, updateLoo } from "./persistence";
@@ -18,22 +18,21 @@ import {
   createSearchWhereBuilder,
 } from "./sql";
 import type {
+  CompressedLoo,
+  LooMetricsResponse,
   LooMutationAttributes,
   LooResponse,
+  LooSearchParams,
   NearbyLooResponse,
   ReportResponse,
   ReportSummaryResponse,
-  LooSearchParams,
-  LooMetricsResponse,
-  CompressedLoo,
 } from "./types";
 import {
-  RawLooRowSchema,
-  RawNearbyLooRowSchema,
   type RawLooRow,
+  RawLooRowSchema,
   type RawNearbyLooRow,
+  RawNearbyLooRowSchema,
 } from "./types";
-
 
 /**
  * Service for managing Loo (toilet) data.
@@ -50,7 +49,15 @@ export class LooService {
   private looCache = new Map<string, LooResponse>();
   private readonly MAX_CACHE_SIZE = 100;
 
-  constructor(private readonly prisma: PrismaClientInstance) { }
+  constructor(private readonly prisma: PrismaClientInstance) {}
+
+  /**
+   * Performs a database health check.
+   * @returns Promise that resolves if database is healthy, rejects otherwise.
+   */
+  async healthCheck(): Promise<void> {
+    await this.prisma.$queryRaw`SELECT 1 as health_check`;
+  }
 
   // ===========================================================================
   // READ OPERATIONS
@@ -61,8 +68,9 @@ export class LooService {
    * Returns null if the loo does not exist.
    */
   async getById(id: string): Promise<LooResponse | null> {
-    if (this.looCache.has(id)) {
-      return this.looCache.get(id)!;
+    const cached = this.looCache.get(id);
+    if (cached) {
+      return cached;
     }
 
     const row = await this.prisma.toilets.findUnique({
@@ -110,9 +118,7 @@ export class LooService {
    * Searches for loos based on various criteria (text search, filters, etc.).
    * Supports pagination.
    */
-  async search(
-    params: LooSearchParams
-  ): Promise<{ data: LooResponse[]; total: number }> {
+  async search(params: LooSearchParams): Promise<{ data: LooResponse[]; total: number }> {
     const limit = Math.max(MIN_SEARCH_LIMIT, Math.min(params.limit, MAX_SEARCH_LIMIT));
     const page = Math.max(1, params.page);
     const offset = (page - 1) * limit;
@@ -126,14 +132,10 @@ export class LooService {
     const rows = (await this.prisma.$queryRaw<RawLooRow[]>(dataQuery)) ?? [];
 
     const countRows =
-      (await this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery
-      )) ?? [];
+      (await this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(countQuery)) ?? [];
 
     const total =
-      countRows.length > 0 && countRows[0]?.count !== undefined
-        ? Number(countRows[0].count)
-        : 0;
+      countRows.length > 0 && countRows[0]?.count !== undefined ? Number(countRows[0].count) : 0;
 
     const data = rows.map((loo) => {
       const validated = RawLooRowSchema.parse(loo);
@@ -154,12 +156,10 @@ export class LooService {
    */
   async getSearchMetrics(
     params: LooSearchParams,
-    options: { recentWindowDays?: number } = {}
+    options: { recentWindowDays?: number } = {},
   ): Promise<LooMetricsResponse> {
     const recentWindowDays = options.recentWindowDays ?? RECENT_WINDOW_DAYS;
-    const recentThreshold = new Date(
-      Date.now() - recentWindowDays * 24 * 60 * 60 * 1000
-    );
+    const recentThreshold = new Date(Date.now() - recentWindowDays * 24 * 60 * 60 * 1000);
     const buildWhere = createSearchWhereBuilder(params);
     const fromClause = Prisma.sql`
       FROM toilets loo
@@ -195,29 +195,27 @@ export class LooService {
       recentRows,
       areaRows,
     ] = await this.prisma.$transaction([
+      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(countQuery()),
       this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery()
+        countQuery(Prisma.sql`loo.active = TRUE`),
       ),
       this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery(Prisma.sql`loo.active = TRUE`)
+        countQuery(Prisma.sql`loo.verified_at IS NOT NULL`),
       ),
       this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery(Prisma.sql`loo.verified_at IS NOT NULL`)
+        countQuery(Prisma.sql`loo.accessible = TRUE`),
       ),
       this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery(Prisma.sql`loo.accessible = TRUE`)
+        countQuery(Prisma.sql`loo.baby_change = TRUE`),
       ),
       this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery(Prisma.sql`loo.baby_change = TRUE`)
+        countQuery(Prisma.sql`loo.radar = TRUE`),
       ),
       this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery(Prisma.sql`loo.radar = TRUE`)
+        countQuery(Prisma.sql`loo.no_payment = TRUE`),
       ),
       this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery(Prisma.sql`loo.no_payment = TRUE`)
-      ),
-      this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
-        countQuery(Prisma.sql`loo.updated_at >= ${recentThreshold}`)
+        countQuery(Prisma.sql`loo.updated_at >= ${recentThreshold}`),
       ),
       this.prisma.$queryRaw<
         Array<{
@@ -228,9 +226,7 @@ export class LooService {
       >(areaQuery),
     ]);
 
-    const toNumber = (
-      rows?: Array<{ count: bigint | number | string }> | null
-    ) => {
+    const toNumber = (rows?: Array<{ count: bigint | number | string }> | null) => {
       const list = rows ?? [];
       const raw = list[0]?.count ?? 0;
       return typeof raw === "bigint" ? Number(raw) : Number(raw ?? 0);
@@ -242,12 +238,8 @@ export class LooService {
       count: bigint | number | string;
     }) => ({
       areaId: row.area_id,
-      name:
-        row.area_name ?? (row.area_id ? "Unknown area" : "Unassigned area"),
-      count:
-        typeof row.count === "bigint"
-          ? Number(row.count)
-          : Number(row.count ?? 0),
+      name: row.area_name ?? (row.area_id ? "Unknown area" : "Unassigned area"),
+      count: typeof row.count === "bigint" ? Number(row.count) : Number(row.count ?? 0),
     });
 
     return {
@@ -270,10 +262,7 @@ export class LooService {
    * Finds loos whose geohash starts with the given string.
    * Useful for map-based tiling or broad area searches.
    */
-  async getWithinGeohash(
-    geohash: string,
-    active?: boolean | null
-  ): Promise<LooResponse[]> {
+  async getWithinGeohash(geohash: string, active?: boolean | null): Promise<LooResponse[]> {
     const where = {
       geohash: { startsWith: geohash },
       ...(typeof active === "boolean" ? { active: { equals: active } } : {}),
@@ -292,7 +281,7 @@ export class LooService {
    */
   async getWithinGeohashCompressed(
     geohash: string,
-    active?: boolean | null
+    active?: boolean | null,
   ): Promise<CompressedLoo[]> {
     const where = {
       geohash: { startsWith: geohash },
@@ -316,7 +305,7 @@ export class LooService {
     return rows.map((row) => {
       return [
         row.id,
-        row.geohash ?? '',
+        row.geohash ?? "",
         genLooFilterBitmask({
           noPayment: row.no_payment,
           allGender: row.all_gender,
@@ -333,11 +322,7 @@ export class LooService {
    * Finds loos within a specified radius (in meters) of a coordinate.
    * Uses PostGIS spherical distance calculation.
    */
-  async getByProximity(
-    lat: number,
-    lng: number,
-    radius: number
-  ): Promise<NearbyLooResponse[]> {
+  async getByProximity(lat: number, lng: number, radius: number): Promise<NearbyLooResponse[]> {
     const query = buildProximityQuery(lat, lng, radius);
     const loos = (await this.prisma.$queryRaw<RawNearbyLooRow[]>(query)) ?? [];
 
@@ -362,10 +347,7 @@ export class LooService {
     id: string,
     options: { hydrate?: boolean; includeContributors?: boolean } = {},
   ): Promise<ReportResponse[] | ReportSummaryResponse[]> {
-    const {
-      hydrate = false,
-      includeContributors = false,
-    } = options;
+    const { hydrate = false, includeContributors = false } = options;
     const reportRecords = await this.prisma.record_version.findMany({
       where: { record: { path: ["id"], equals: id } },
       select: { record: true, old_record: true, id: true },
@@ -377,11 +359,7 @@ export class LooService {
     // location report for each loo.
     const mapped = reportRecords
       .map((entry) => mapAuditRecordToReport(entry))
-      .filter(
-        (report) =>
-          !report.contributor ||
-          !report.contributor.endsWith("-location"),
-      );
+      .filter((report) => !report.contributor || !report.contributor.endsWith("-location"));
 
     const sortedReports = [...mapped].sort((a, b) => {
       const timeA = Date.parse(a.createdAt);
@@ -400,14 +378,12 @@ export class LooService {
 
     if (hydrate) return sanitizedReports;
 
-    return sanitizedReports.map(
-      ({ id: reportId, contributor, createdAt, diff }) => ({
-        id: reportId,
-        contributor,
-        createdAt,
-        diff,
-      }),
-    );
+    return sanitizedReports.map(({ id: reportId, contributor, createdAt, diff }) => ({
+      id: reportId,
+      contributor,
+      createdAt,
+      diff,
+    }));
   }
 
   // ===========================================================================
@@ -424,7 +400,7 @@ export class LooService {
   async create(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null
+    contributor: string | null,
   ): Promise<LooResponse | null> {
     const now = new Date();
     const dataForCreate = mapMutationToPrismaData(mutation, {
@@ -459,7 +435,7 @@ export class LooService {
   async upsert(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null
+    contributor: string | null,
   ): Promise<LooResponse | null> {
     const now = new Date();
     const dataForCreate = mapMutationToPrismaData(mutation, {

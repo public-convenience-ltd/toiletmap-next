@@ -6,22 +6,24 @@ export const callApi = async (path: string, init?: RequestInit) => {
   const request = new Request(`${baseUrl}${path}`, init);
   // Create a mock ExecutionContext for Node.js environment
   const ctx = {
-    waitUntil: () => {},
-    passThroughOnException: () => {},
+    waitUntil: () => {
+      // No-op mock
+    },
+    passThroughOnException: () => {
+      // No-op mock
+    },
   };
   // Use process.env instead of cloudflare:test env
   const env = {
     ...process.env,
     TEST_HYPERDRIVE: {
       connectionString:
-        process.env
-          .CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ||
+        process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ||
         "postgresql://postgres:postgres@localhost:54322/postgres",
     },
     HYPERDRIVE: {
       connectionString:
-        process.env
-          .CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ||
+        process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ||
         "postgresql://postgres:postgres@localhost:54322/postgres",
     },
   } as any;
@@ -32,7 +34,7 @@ export const callApi = async (path: string, init?: RequestInit) => {
 export const jsonRequest = (
   method: string,
   body: unknown,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
 ): RequestInit => ({
   method,
   headers: {

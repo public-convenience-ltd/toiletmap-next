@@ -1,4 +1,4 @@
-.PHONY: help dev-server dev-client build-server build-client deploy-server deploy-client deploy-server-preview deploy-client-preview test-server-e2e db-start db-stop db-reset prisma-generate
+.PHONY: help dev-server dev-client build-server build-client deploy-server deploy-client deploy-server-preview deploy-client-preview test-server-e2e db-start db-stop db-reset prisma-generate lint lint-fix format format-fix check-style fix-style
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -46,7 +46,25 @@ db-reset: ## Reset the local Supabase database
 prisma-generate: ## Generate Prisma client
 	pnpm --filter toiletmap-server prisma:generate
 
-check: ## Run typecheck and dry-run deployment
+lint: ## Run Biome linter check
+	pnpm lint
+
+lint-fix: ## Run Biome linter with auto-fix
+	pnpm lint:fix
+
+format: ## Run Biome formatter check
+	pnpm format
+
+format-fix: ## Run Biome formatter with auto-fix
+	pnpm format:fix
+
+check-style: ## Run Biome checks (lint + format)
+	pnpm check
+
+fix-style: ## Run Biome fixes (lint + format)
+	pnpm check:fix
+
+check: check-style ## Run style check, typecheck, and dry-run deployment
 	pnpm --filter toiletmap-server check
 
 cf-typegen: ## Generate Cloudflare Worker types

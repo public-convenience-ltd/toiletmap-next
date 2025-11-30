@@ -6,8 +6,7 @@ import { Prisma } from "./generated/prisma/client";
 export { Prisma };
 
 // Use test-compatible client in Node.js test environment, Cloudflare client otherwise
-const isTestEnv =
-  process.env.NODE_ENV === "test" || process.env.VITEST === "true";
+const isTestEnv = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 const clientModule = isTestEnv
   ? await import("../test/integration/generated/client/client")
   : await import("./generated/prisma/client");
@@ -34,4 +33,4 @@ export const createPrismaClient = (databaseUrl: string): PrismaClientType => {
 
 export type PrismaClientInstance = ReturnType<typeof createPrismaClient>;
 
-export type { toilets, areas } from "./generated/prisma/client";
+export type { areas, toilets } from "./generated/prisma/client";

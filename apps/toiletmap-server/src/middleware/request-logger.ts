@@ -1,6 +1,6 @@
-import { MiddlewareHandler } from 'hono';
-import { Env, AppVariables } from '../types';
-import { createLogger } from '../utils/logger';
+import type { MiddlewareHandler } from "hono";
+import type { AppVariables, Env } from "../types";
+import { createLogger } from "../utils/logger";
 
 /**
  * Request logging middleware
@@ -11,7 +11,9 @@ import { createLogger } from '../utils/logger';
  * - User information (if authenticated)
  * - Error details (if any)
  */
-export const requestLogger = (env?: 'production' | 'preview' | 'development'): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
+export const requestLogger = (
+  env?: "production" | "preview" | "development",
+): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
   const logger = createLogger(env);
 
   return async (c, next) => {
@@ -21,12 +23,12 @@ export const requestLogger = (env?: 'production' | 'preview' | 'development'): M
     const path = c.req.path;
 
     // Log incoming request
-    logger.info('Incoming request', {
+    logger.info("Incoming request", {
       requestId,
       method,
       path,
-      userAgent: c.req.header('user-agent'),
-      ip: c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for'),
+      userAgent: c.req.header("user-agent"),
+      ip: c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for"),
     });
 
     try {
@@ -36,32 +38,35 @@ export const requestLogger = (env?: 'production' | 'preview' | 'development'): M
       const duration = Date.now() - startTime;
       const status = c.res.status;
 
-      logger.info('Request completed', {
+      logger.info("Request completed", {
         requestId,
         method,
         path,
         status,
         duration,
-        userId: c.get('user')?.sub,
+        userId: c.get("user")?.sub,
       });
     } catch (error) {
       // Log error
       const duration = Date.now() - startTime;
 
-      logger.error('Request failed', {
+      logger.error("Request failed", {
         requestId,
         method,
         path,
         duration,
-        userId: c.get('user')?.sub,
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        } : {
-          name: 'UnknownError',
-          message: String(error),
-        },
+        userId: c.get("user")?.sub,
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+              }
+            : {
+                name: "UnknownError",
+                message: String(error),
+              },
       });
 
       // Re-throw to let error handler deal with it

@@ -1,23 +1,16 @@
-import { Context } from 'hono';
-import { createMiddleware } from 'hono/factory';
-import { ADMIN_PERMISSION } from '../common/permissions';
-import { clearSessionCookies } from '../auth/session';
-import { AppVariables, Env, RequestUser } from '../types';
-import {
-  Auth0ManagementClient,
-  hasAuth0ManagementConfig,
-} from '../services/auth0/management';
-import { logger } from '../utils/logger';
+import type { Context } from "hono";
+import { createMiddleware } from "hono/factory";
+import { clearSessionCookies } from "../auth/session";
+import { ADMIN_PERMISSION } from "../common/permissions";
+import { Auth0ManagementClient, hasAuth0ManagementConfig } from "../services/auth0/management";
+import type { AppVariables, Env, RequestUser } from "../types";
+import { logger } from "../utils/logger";
 
 export const ADMIN_ROLE_ID = ADMIN_PERMISSION;
 
-export const hasAdminRole = (
-  user?: RequestUser | null,
-): boolean => {
+export const hasAdminRole = (user?: RequestUser | null): boolean => {
   if (!user) return false;
-  const permissions = Array.isArray(user.permissions)
-    ? user.permissions
-    : [];
+  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   return permissions.includes(ADMIN_PERMISSION);
 };
 
@@ -32,8 +25,7 @@ const adminPermissionCache = new Map<string, AdminPermissionCacheEntry>();
 
 const managementClientCache = new Map<string, Auth0ManagementClient>();
 
-const getCacheKey = (env: Env) =>
-  `${env.AUTH0_ISSUER_BASE_URL}|${env.AUTH0_MANAGEMENT_CLIENT_ID}`;
+const getCacheKey = (env: Env) => `${env.AUTH0_ISSUER_BASE_URL}|${env.AUTH0_MANAGEMENT_CLIENT_ID}`;
 
 const getManagementClient = (env: Env): Auth0ManagementClient | null => {
   if (!hasAuth0ManagementConfig(env)) {
@@ -51,7 +43,7 @@ const getManagementClient = (env: Env): Auth0ManagementClient | null => {
     }
     return client;
   } catch (error) {
-    logger.error('Failed to initialize Auth0 management client', {
+    logger.error("Failed to initialize Auth0 management client", {
       errorMessage: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -75,10 +67,7 @@ const setCachedAdminPermission = (userId: string, hasPermission: boolean) => {
   });
 };
 
-const refreshAdminPermission = async (
-  env: Env,
-  userId: string,
-): Promise<boolean | null> => {
+const refreshAdminPermission = async (env: Env, userId: string): Promise<boolean | null> => {
   const client = getManagementClient(env);
   if (!client) {
     return null;
@@ -91,7 +80,7 @@ const refreshAdminPermission = async (
     setCachedAdminPermission(userId, hasPermission);
     return hasPermission;
   } catch (error) {
-    logger.warn('Failed to refresh admin permissions', {
+    logger.warn("Failed to refresh admin permissions", {
       userId,
       errorMessage: error instanceof Error ? error.message : String(error),
     });
@@ -120,7 +109,9 @@ const ensureCurrentAdminPermission = async (
   return refreshed;
 };
 
-type UnauthorizedHandler = (c: Context<{ Variables: AppVariables; Bindings: Env }>) => Response | Promise<Response>;
+type UnauthorizedHandler = (
+  c: Context<{ Variables: AppVariables; Bindings: Env }>,
+) => Response | Promise<Response>;
 
 interface AdminRoleOptions {
   unauthorizedResponse?: UnauthorizedHandler;
@@ -130,12 +121,12 @@ interface AdminRoleOptions {
  * Middleware to require admin role permissions.
  * Must be used after requireAuth middleware.
  */
-export const requireAdminRole = (options?: AdminRoleOptions) => createMiddleware<{ Variables: AppVariables; Bindings: Env }>(
-  async (c, next) => {
-    const user = c.get('user');
+export const requireAdminRole = (options?: AdminRoleOptions) =>
+  createMiddleware<{ Variables: AppVariables; Bindings: Env }>(async (c, next) => {
+    const user = c.get("user");
 
     if (!user) {
-      return c.json({ message: 'Unauthorized' }, 401);
+      return c.json({ message: "Unauthorized" }, 401);
     }
 
     const hasPermission = await ensureCurrentAdminPermission(c, user);
@@ -145,15 +136,11 @@ export const requireAdminRole = (options?: AdminRoleOptions) => createMiddleware
       if (options?.unauthorizedResponse) {
         return options.unauthorizedResponse(c);
       }
-      return c.json(
-        { message: 'Forbidden: Admin role required' },
-        403,
-      );
+      return c.json({ message: "Forbidden: Admin role required" }, 403);
     }
 
     return next();
-  },
-);
+  });
 
 export const __adminRoleTestUtils = {
   clearPermissionCache: () => adminPermissionCache.clear(),

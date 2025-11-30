@@ -1,4 +1,4 @@
-export { loosList } from './list';
-export { loosCreate } from './create';
-export { looDetail } from './detail';
-export { looEdit } from './edit';
+export { loosCreate } from "./create";
+export { looDetail } from "./detail";
+export { looEdit } from "./edit";
+export { loosList } from "./list";
