@@ -140,7 +140,7 @@ Before you begin, ensure you have:
 4. **Generate Prisma clients:**
 
    ```bash
-   pnpm prisma:generate
+   make prisma-generate
    ```
 
    This generates two Prisma clients:
@@ -151,7 +151,7 @@ Before you begin, ensure you have:
 5. **Start local database:**
 
    ```bash
-   pnpm supabase:start
+   make db-start
    ```
 
    This command:
@@ -164,7 +164,7 @@ Before you begin, ensure you have:
 6. **Start development server:**
 
    ```bash
-   pnpm dev
+   make dev-server
    ```
 
    The server starts on [http://localhost:8787](http://localhost:8787)
@@ -186,22 +186,22 @@ The project includes a **test auth server** that eliminates the need for Auth0 c
 
 ```bash
 # Terminal 1: start the dev stack (includes auth server)
-pnpm dev
+make dev-server
 #   (or run pnpm auth:server if you're connecting to a deployed worker)
 
 # Terminal 2: generate tokens
-pnpm token:issue
+make token-issue
 
 # Use the token in API requests
-curl -H "Authorization: Bearer $(pnpm token:issue)" http://localhost:8787/api/loos/search
+curl -H "Authorization: Bearer $(make token-issue)" http://localhost:8787/api/loos/search
 ```
 
-> **Note**: `pnpm token:issue` connects to the running auth server on port 44555 to generate tokens with valid keys.
+> **Note**: `make token-issue` connects to the running auth server on port 44555 to generate tokens with valid keys.
 
 **Run the test auth server:**
 
 ```bash
-pnpm dev          # Full dev stack (Wrangler + Vite + auth server)
+make dev-server          # Full dev stack (Wrangler + Vite + auth server)
 # or, for auth server only:
 pnpm auth:server
 
@@ -231,7 +231,7 @@ Let's make a simple change to verify everything works:
 1. **Run the test suite:**
 
    ```bash
-   pnpm test:e2e
+   make test-server-e2e
    ```
 
    All tests should pass ✅
@@ -258,7 +258,7 @@ Let's make a simple change to verify everything works:
 
 4. **Run type checking:**
    ```bash
-   pnpm check
+   make check
    ```
 
 Congratulations! You've successfully set up your development environment and made your first change.

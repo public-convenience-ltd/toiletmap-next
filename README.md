@@ -50,21 +50,21 @@ cp apps/toiletmap-server/.dev.vars.example apps/toiletmap-server/.dev.vars
 To work with real data and run the API locally, start the Supabase development stack (loads 5,000 mock loos plus UK areas):
 
 ```bash
-pnpm --filter toiletmap-server supabase:start
+make db-start
 ```
 
 Now launch the API/admin worker:
 
 ```bash
-pnpm --filter toiletmap-server dev
+make dev-server
 ```
 
-This script concurrently runs the Vite build, Wrangler dev server, and mock Auth0 server so you can visit your local Toilet Map immediately (default: `http://localhost:8787`).
+This command first generates the Prisma client and builds the admin interface assets, then concurrently runs the Vite build (watch mode), Wrangler dev server, and mock Auth0 server so you can visit your local Toilet Map immediately (default: `http://localhost:8787`).
 
 Want to see the client worker placeholder?
 
 ```bash
-pnpm --filter toiletmap-client dev
+make dev-client
 ```
 
 ## Common Tasks
@@ -72,22 +72,30 @@ pnpm --filter toiletmap-client dev
 ### Building
 
 ```bash
-pnpm --filter toiletmap-server build      # client assets + worker bundle
-pnpm --filter toiletmap-client build      # frontend worker bundle
-pnpm run build                           # runs both via workspace recursion
+make build-server      # client assets + worker bundle
+make build-client      # frontend worker bundle
 ```
 
-### Testing
+### Testing & Verification
 
-- `pnpm --filter toiletmap-server typecheck`
-- `pnpm --filter toiletmap-server test:e2e`
+```bash
+make test-server-e2e                         # run end-to-end tests
+make check                                   # typecheck + wrangler dry-run
+```
+
 - Frontend tests will land once the client worker grows beyond static HTML.
+
+### Development Helpers
+
+```bash
+make cf-typegen                              # generate cloudflare types
+make token-issue                             # issue a test token
+```
 
 ### Deployment
 
-```bash
-pnpm --filter toiletmap-server check      # typecheck + wrangler dry-run
-pnpm run deploy                           # deploys server then client worker
+make deploy-server                           # deploys server
+make deploy-client                           # deploys client
 ```
 
 The combined deploy script stops if either worker fails, keeping environments in sync.
