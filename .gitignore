@@ -6,5 +6,6 @@ dist
 .env.local
 .env.test
 .env.test.local
+.dev.vars
 .wrangler
 prisma/src/generated
