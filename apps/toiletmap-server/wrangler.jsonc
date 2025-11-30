@@ -32,28 +32,6 @@
     "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
     "AUTH0_SCOPE": "openid profile email offline_access roles access:admin"
   },
-  "ratelimits": [
-    {
-      "name": "RATE_LIMIT_READ",
-      "namespace_id": "1000",
-      "simple": { "limit": 100, "period": 60 }
-    },
-    {
-      "name": "RATE_LIMIT_WRITE",
-      "namespace_id": "1001",
-      "simple": { "limit": 20, "period": 60 }
-    },
-    {
-      "name": "RATE_LIMIT_ADMIN",
-      "namespace_id": "1002",
-      "simple": { "limit": 60, "period": 60 }
-    },
-    {
-      "name": "RATE_LIMIT_AUTH",
-      "namespace_id": "1003",
-      "simple": { "limit": 5, "period": 60 }
-    }
-  ],
   "env": {
     "production": {
       "name": "toiletmap-server",
@@ -71,6 +49,28 @@
         {
           "binding": "HYPERDRIVE",
           "id": "2bd669c375c645ff9f22fe6418adecc3"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "RATE_LIMIT_READ",
+          "namespace_id": "1000",
+          "simple": { "limit": 100, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_WRITE",
+          "namespace_id": "1001",
+          "simple": { "limit": 20, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_ADMIN",
+          "namespace_id": "1002",
+          "simple": { "limit": 60, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_AUTH",
+          "namespace_id": "1003",
+          "simple": { "limit": 5, "period": 60 }
         }
       ]
     },
@@ -90,6 +90,28 @@
         {
           "binding": "HYPERDRIVE",
           "id": "76495702444d42eabef517af22808967"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "RATE_LIMIT_READ",
+          "namespace_id": "1000",
+          "simple": { "limit": 100, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_WRITE",
+          "namespace_id": "1001",
+          "simple": { "limit": 20, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_ADMIN",
+          "namespace_id": "1002",
+          "simple": { "limit": 60, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_AUTH",
+          "namespace_id": "1003",
+          "simple": { "limit": 5, "period": 60 }
         }
       ]
     }
