@@ -45,7 +45,7 @@ export interface Env {
   AUTH0_MANAGEMENT_AUDIENCE?: string;
 
   // Environment configuration
-  ENVIRONMENT?: "production" | "development";
+  ENVIRONMENT?: "production" | "preview" | "development";
   ALLOWED_ORIGINS?: string; // Comma-separated list of allowed CORS origins
 
   // Cloudflare Rate Limiting API bindings

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { Env, AppVariables } from "../types";
 import { createPrismaClient } from "../prisma";
+import { sanitizeHealthCheckError } from "../utils/error-sanitizer";
 
 /**
  * Health check routes
@@ -64,12 +65,19 @@ healthRouter.get("/ready", async (c) => {
       responseTime: Date.now() - dbCheckStart,
     });
   } catch (error) {
+    // Sanitize error for client response
+    const sanitized = sanitizeHealthCheckError(
+      c.env,
+      "database",
+      error,
+      Date.now() - dbCheckStart
+    );
+
     checks.push({
       name: "database",
       status: "error",
-      message:
-        error instanceof Error ? error.message : "Database connection failed",
-      responseTime: Date.now() - dbCheckStart,
+      message: sanitized.message,
+      responseTime: sanitized.responseTime,
     });
   }
 

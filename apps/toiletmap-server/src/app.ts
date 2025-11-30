@@ -15,13 +15,14 @@ import { rateLimiters } from './middleware/cloudflare-rate-limit';
 import { requestLogger } from './middleware/request-logger';
 import { services } from './middleware/services';
 import { createLogger } from './utils/logger';
+import { isPublicEnvironment } from './utils/environment';
 
 export const createApp = (env: Env) => {
   const app = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
-  // Determine if we're in production
-  const isProduction = env.ENVIRONMENT === 'production';
-  const environment = isProduction ? 'production' : 'development';
+  // Determine if we're in a public-facing environment (production or preview)
+  const isPublic = isPublicEnvironment(env);
+  const environment = env.ENVIRONMENT || 'development';
 
   // Create logger for error handling
   const logger = createLogger(environment);
@@ -29,8 +30,8 @@ export const createApp = (env: Env) => {
   // Configure allowed CORS origins
   const allowedOrigins = env.ALLOWED_ORIGINS
     ? env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : isProduction
-      ? [] // No origins allowed by default in production (must be configured)
+    : isPublic
+      ? [] // No origins allowed by default in public environments (must be configured)
       : ['*']; // Allow all in development
 
   // Apply request logging globally (except for health checks)
@@ -49,7 +50,7 @@ export const createApp = (env: Env) => {
   app.use('*', securityHeaders({
     corsOrigins: allowedOrigins,
     corsCredentials: true,
-    enableHSTS: isProduction,
+    enableHSTS: isPublic,
   }));
 
   // Apply rate limiting to admin routes
@@ -59,11 +60,33 @@ export const createApp = (env: Env) => {
   app.route('/health', healthRouter);
 
   // Root endpoint with user info (for backward compatibility)
-  app.get('/', optionalAuth, (c) => {
+  app.get('/', optionalAuth, async (c) => {
     const user = c.get('user');
     const isAdmin = hasAdminRole(user);
+
+    // Check database health to determine overall status
+    let dbHealthy = true;
+    try {
+      const looService = c.get('looService');
+      // Quick health check - just verify the service can access the database
+      // This uses the same underlying connection as the health check
+      await looService['prisma'].$queryRaw`SELECT 1 as health_check`;
+    } catch (error) {
+      dbHealthy = false;
+      logger.warn('Database health check failed on root endpoint', {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        } : {
+          name: 'UnknownError',
+          message: String(error),
+        },
+      });
+    }
+
     return c.json({
-      status: 'ok',
+      status: dbHealthy ? 'ok' : 'degraded',
       service: 'toiletmap-server',
       timestamp: new Date().toISOString(),
       user: user ? {
@@ -116,8 +139,8 @@ export const createApp = (env: Env) => {
       userId: c.get('user')?.sub,
     });
 
-    // Return sanitized error response (no stack traces or sensitive info in production)
-    if (isProduction) {
+    // Return sanitized error response (no stack traces or sensitive info in public environments)
+    if (isPublic) {
       return c.json(
         {
           message: 'Internal Server Error',

@@ -14,7 +14,10 @@ Cloudflare Workers handle zero-downtime deployments automatically. New versions 
 
 ### Environment Configuration
 
-- [ ] Set `ENVIRONMENT=production` in Cloudflare Workers environment variables
+- [ ] Verify `ENVIRONMENT` is set correctly in `wrangler.jsonc`:
+  - Production: `"ENVIRONMENT": "production"`
+  - Preview: `"ENVIRONMENT": "preview"`
+  - This controls error sanitization and security features
 - [ ] Configure `ALLOWED_ORIGINS` with production domains (comma-separated):
   ```bash
   ALLOWED_ORIGINS=https://www.toiletmap.org,https://toiletmap.org
@@ -251,10 +254,14 @@ After pushing to `postgres-staging` or `main`:
 
 ## Environment Variables
 
-Required in Cloudflare Workers dashboard. The worker derives the Auth0 redirect URI from the request origin at runtime (covering preview + alias URLs), so keep the fallback variable below primarily for Auth0’s allow-list.
+Environment variables are configured in `wrangler.jsonc` under the `env.production.vars` and `env.preview.vars` sections. The worker derives the Auth0 redirect URI from the request origin at runtime (covering preview + alias URLs), so keep the fallback variable below primarily for Auth0's allow-list.
+
+### Production Environment
+
+Set in `wrangler.jsonc` under `env.production.vars`:
 
 ```bash
-ENVIRONMENT=production
+ENVIRONMENT=production  # Controls error sanitization and security features
 ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://admin.toiletmap.org.uk
 AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
@@ -265,6 +272,22 @@ AUTH0_CLIENT_SECRET=production_client_secret
 AUTH0_SCOPE=openid profile email offline_access roles access:admin
 AUTH0_PROFILE_KEY=name
 ```
+
+### Preview Environment
+
+Set in `wrangler.jsonc` under `env.preview.vars`:
+
+```bash
+ENVIRONMENT=preview  # Treats preview as production for error sanitization
+# Same Auth0 and other config as production
+```
+
+### Environment Variable Effects
+
+The `ENVIRONMENT` variable controls:
+- **Error Sanitization**: In `production` and `preview`, error messages are sanitized to prevent information leakage. Generic messages like "An unexpected error occurred" or "database check failed" are returned to clients. Full error details are only logged server-side.
+- **Development Mode**: In `development` (or when `ENVIRONMENT` is not set), detailed error messages and stack traces are returned to help with debugging.
+- **Security Features**: CORS configuration, HSTS headers, and other security features are enabled in public environments (`production` and `preview`).
 
 ## Cloudflare Hyperdrive Configuration
 
@@ -377,16 +400,19 @@ If a database migration needs to be rolled back:
 {
   "status": "degraded",
   "checks": [
-    {"name": "database", "status": "error", "message": "Connection failed"}
+    {"name": "database", "status": "error", "message": "database check failed"}
   ]
 }
 ```
 
+**Note**: In production and preview environments, error messages are sanitized to prevent information leakage. The generic message "database check failed" is returned instead of specific error details. Full error details are logged server-side for debugging.
+
 **Solutions**:
 1. Check database is running
-2. Verify Hyperdrive configuration in Cloudflare dashboard
-3. Check firewall rules allow Cloudflare Workers
-4. Verify database user has permissions
+2. Review Cloudflare Workers logs for detailed error information
+3. Verify Hyperdrive configuration in Cloudflare dashboard
+4. Check firewall rules allow Cloudflare Workers
+5. Verify database user has permissions
 
 ### CORS errors in browser
 

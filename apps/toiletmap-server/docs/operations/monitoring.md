@@ -68,6 +68,8 @@ All logs use JSON format with consistent structure:
 }
 ```
 
+**Important**: Error details including stack traces are logged server-side for debugging but are NEVER exposed to clients in production/preview environments. Client-facing error responses are sanitized to prevent information leakage.
+
 **Log Levels**:
 - `error`: Errors requiring immediate attention
 - `warn`: Warning conditions
@@ -177,7 +179,7 @@ curl https://your-worker.workers.dev/health/ready
     {
       "name": "database",
       "status": "error",
-      "message": "Connection timeout",
+      "message": "database check failed",
       "responseTime": 5000
     }
   ],
@@ -185,7 +187,30 @@ curl https://your-worker.workers.dev/health/ready
 }
 ```
 
+**Note**: Error messages in health checks are sanitized in production/preview environments. The generic message "database check failed" is returned instead of specific error details to prevent information leakage. Full error details are logged server-side in Cloudflare Workers logs.
+
 **Use for**: Load balancer health checks, readiness probes
+
+### Error Message Sanitization
+
+Health check endpoints follow environment-specific error handling:
+
+| Environment | Error Message Behavior | Example Message |
+|-------------|----------------------|-----------------|
+| **Production** | Generic, sanitized | `"database check failed"` |
+| **Preview** | Generic, sanitized | `"database check failed"` |
+| **Development** | Detailed for debugging | `"Invalid \`prisma.$queryRaw()\` invocation: Server connection attempt failed: e=Wrong password"` |
+
+**Security Note**: In production and preview environments, error messages never expose:
+- Database credentials or passwords
+- Connection strings or internal URLs
+- Stack traces
+- Implementation details (e.g., Prisma errors, driver names)
+
+**Debugging**: To investigate health check failures in production:
+1. Check Cloudflare Workers logs for full error details
+2. Review Hyperdrive metrics for database connectivity issues
+3. Verify database status with your database provider
 
 ## Setting Up Alerts
 
