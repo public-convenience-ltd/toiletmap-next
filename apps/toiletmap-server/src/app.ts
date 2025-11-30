@@ -64,7 +64,7 @@ export const createApp = (env: Env) => {
     const isAdmin = hasAdminRole(user);
     return c.json({
       status: 'ok',
-      service: 'toiletmap-hono-api',
+      service: 'toiletmap-server',
       timestamp: new Date().toISOString(),
       user: user ? {
         sub: user.sub,

@@ -24,7 +24,7 @@ export const healthRouter = new Hono<{
 healthRouter.get("/live", (c) => {
   return c.json({
     status: "ok",
-    service: "toiletmap-hono-api",
+    service: "toiletmap-server",
     timestamp: new Date().toISOString(),
   });
 });
@@ -80,7 +80,7 @@ healthRouter.get("/ready", async (c) => {
   return c.json(
     {
       status: allHealthy ? "ok" : "degraded",
-      service: "toiletmap-hono-api",
+      service: "toiletmap-server",
       timestamp: new Date().toISOString(),
       checks,
     },
