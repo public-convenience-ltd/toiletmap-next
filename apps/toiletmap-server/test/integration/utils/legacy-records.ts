@@ -72,9 +72,7 @@ const normaliseId = (value: string | null): string | null => {
   return trimmed.length ? trimmed : null;
 };
 
-export const legacyRecordToMutation = (
-  record: LegacyToiletRecord
-): LooMutationAttributes => {
+export const legacyRecordToMutation = (record: LegacyToiletRecord): LooMutationAttributes => {
   const mutation: LooMutationAttributes = {
     name: record.name,
     areaId: normaliseId(record.area_id),

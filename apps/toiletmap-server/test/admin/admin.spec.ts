@@ -1,46 +1,34 @@
 import { randomUUID } from "node:crypto";
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../src/app";
-import { Env } from "../../src/types";
-import { getTestContext } from "../integration/setup";
+import { __adminRoleTestUtils, ADMIN_ROLE_ID } from "../../src/middleware/require-admin-role";
 import * as prismaModule from "../../src/prisma";
-import {
-  ContributorStats,
-  UserInsightsService,
-} from "../../src/services/contributor";
 import { Auth0ManagementClient } from "../../src/services/auth0/management";
-import {
-  ADMIN_ROLE_ID,
-  __adminRoleTestUtils,
-} from "../../src/middleware/require-admin-role";
+import { type ContributorStats, UserInsightsService } from "../../src/services/contributor";
 import { LooService } from "../../src/services/loo";
-import type { LooResponse, ReportResponse } from "../../src/services/loo/types";
-import type { OpeningTimes } from "../../src/services/loo/types";
+import type { LooResponse, OpeningTimes, ReportResponse } from "../../src/services/loo/types";
+import type { Env } from "../../src/types";
+import { getTestContext } from "../integration/setup";
 
 const buildEnv = (): Env => ({
   TEST_HYPERDRIVE: {
     connectionString:
-      process.env
-        .CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ??
+      process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ??
       "postgresql://postgres:postgres@localhost:54322/postgres",
   },
   HYPERDRIVE: {
     connectionString:
-      process.env
-        .CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ??
+      process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ??
       "postgresql://postgres:postgres@localhost:54322/postgres",
   },
-  AUTH0_ISSUER_BASE_URL:
-    process.env.AUTH0_ISSUER_BASE_URL ?? "https://example.auth0.com/",
+  AUTH0_ISSUER_BASE_URL: process.env.AUTH0_ISSUER_BASE_URL ?? "https://example.auth0.com/",
   AUTH0_AUDIENCE: process.env.AUTH0_AUDIENCE ?? "https://api.toiletmap.org.uk",
   AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID ?? "test-client-id",
   AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET ?? "test-client-secret",
   AUTH0_SCOPE: process.env.AUTH0_SCOPE ?? "openid profile email",
-  AUTH0_REDIRECT_URI:
-    process.env.AUTH0_REDIRECT_URI ?? "http://localhost:8787/admin/callback",
+  AUTH0_REDIRECT_URI: process.env.AUTH0_REDIRECT_URI ?? "http://localhost:8787/admin/callback",
   AUTH0_MANAGEMENT_CLIENT_ID:
-    process.env.AUTH0_MANAGEMENT_CLIENT_ID ??
-    `test-management-client-${randomUUID()}`,
+    process.env.AUTH0_MANAGEMENT_CLIENT_ID ?? `test-management-client-${randomUUID()}`,
   AUTH0_MANAGEMENT_CLIENT_SECRET:
     process.env.AUTH0_MANAGEMENT_CLIENT_SECRET ?? "test-management-secret",
   RATE_LIMIT_READ: { limit: vi.fn().mockResolvedValue({ success: true }) },
@@ -58,20 +46,13 @@ type SessionOptions = {
   sub?: string;
 };
 
-const buildSessionCookie = (
-  options?: SessionOptions,
-  activeEnv: Env | undefined = env
-) => {
+const buildSessionCookie = (options?: SessionOptions, activeEnv: Env | undefined = env) => {
   if (!activeEnv) {
     throw new Error("Test env is not initialised");
   }
   const { issueToken } = getTestContext();
-  const hasCustomPermissions = options
-    ? Object.prototype.hasOwnProperty.call(options, "permissions")
-    : false;
-  const permissions = hasCustomPermissions
-    ? options?.permissions ?? null
-    : [ADMIN_ROLE_ID];
+  const hasCustomPermissions = options ? Object.hasOwn(options, "permissions") : false;
+  const permissions = hasCustomPermissions ? (options?.permissions ?? null) : [ADMIN_ROLE_ID];
   const sub = options?.sub ?? "auth0|test-user";
   const claims: Record<string, unknown> = { sub };
   if (permissions !== null) {
@@ -113,12 +94,11 @@ const resolveUrl = (input: Parameters<typeof fetch>[0]) => {
   return String(input);
 };
 
-const escapeRegExp = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const extractJsonConfig = <T>(html: string, scriptId: string): T => {
   const pattern = new RegExp(
-    `<script[^>]*id="${escapeRegExp(scriptId)}"[^>]*>([\\s\\S]*?)</script>`
+    `<script[^>]*id="${escapeRegExp(scriptId)}"[^>]*>([\\s\\S]*?)</script>`,
   );
   const match = pattern.exec(html);
   if (!match) {
@@ -176,7 +156,7 @@ const mockApiResponses = () => {
   // Store original fetch to pass through JWKS requests
   const originalFetch = globalThis.fetch;
 
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init?) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input, init?) => {
     const url = resolveUrl(input);
 
     // Pass through JWKS requests to the test auth server
@@ -185,12 +165,12 @@ const mockApiResponses = () => {
     }
 
     if (url.includes("/api/loos/search")) {
-      return jsonResponse(searchResponse);
+      return Promise.resolve(jsonResponse(searchResponse));
     }
     if (url.includes("/api/loos/metrics")) {
-      return jsonResponse(metricsResponse);
+      return Promise.resolve(jsonResponse(metricsResponse));
     }
-    return jsonResponse({ message: "Not found" }, 404);
+    return Promise.resolve(jsonResponse({ message: "Not found" }, 404));
   });
 };
 
@@ -215,31 +195,22 @@ afterEach(() => {
 });
 
 describe("Admin Routes", () => {
-it("should redirect to Auth0 login page when accessing /admin/login", async () => {
-  const previewOrigin =
-    "https://preview-123-toiletmap-server.gbtoiletmap.workers.dev";
-  const res = await app.request(`${previewOrigin}/admin/login`, {}, env);
-  expect(res.status).toBe(302);
-  const location = res.headers.get("Location");
-  expect(location).toBeTruthy();
-  const redirectLocation = new URL(location as string);
-  expect(redirectLocation.origin).toBe(
-    new URL(env.AUTH0_ISSUER_BASE_URL).origin
-  );
-  expect(redirectLocation.searchParams.get("client_id")).toBe(
-    env.AUTH0_CLIENT_ID
-  );
-  expect(redirectLocation.searchParams.get("redirect_uri")).toBe(
-    `${previewOrigin}/admin/callback`
-  );
-});
+  it("should redirect to Auth0 login page when accessing /admin/login", async () => {
+    const previewOrigin = "https://preview-123-toiletmap-server.gbtoiletmap.workers.dev";
+    const res = await app.request(`${previewOrigin}/admin/login`, {}, env);
+    expect(res.status).toBe(302);
+    const location = res.headers.get("Location");
+    expect(location).toBeTruthy();
+    const redirectLocation = new URL(location as string);
+    expect(redirectLocation.origin).toBe(new URL(env.AUTH0_ISSUER_BASE_URL).origin);
+    expect(redirectLocation.searchParams.get("client_id")).toBe(env.AUTH0_CLIENT_ID);
+    expect(redirectLocation.searchParams.get("redirect_uri")).toBe(
+      `${previewOrigin}/admin/callback`,
+    );
+  });
 
   it("should render dataset explorer at /admin when session cookies are present", async () => {
-    const res = await app.request(
-      "/admin",
-      { headers: authenticatedHeaders() },
-      env
-    );
+    const res = await app.request("/admin", { headers: authenticatedHeaders() }, env);
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("Dataset Explorer");
@@ -250,7 +221,7 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
     const res = await app.request(
       "/admin",
       { headers: authenticatedHeaders({ permissions: [] }) },
-      env
+      env,
     );
     expect(res.status).toBe(403);
     const text = await res.text();
@@ -265,7 +236,7 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
     const res = await app.request(
       "/admin",
       { headers: authenticatedHeaders({ sub: revokedSub }) },
-      env
+      env,
     );
 
     expect(mockGetUserPermissions).toHaveBeenCalledWith(revokedSub);
@@ -281,11 +252,7 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
 
   it("should render loos list at /admin/loos when session cookies are present", async () => {
     mockApiResponses();
-    const res = await app.request(
-      "/admin/loos",
-      { headers: authenticatedHeaders() },
-      env
-    );
+    const res = await app.request("/admin/loos", { headers: authenticatedHeaders() }, env);
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("Loos");
@@ -351,22 +318,18 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
     ];
 
     vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
-    const getById = vi
-      .spyOn(LooService.prototype, "getById")
-      .mockResolvedValue(mockLoo);
-    const getReports = vi
-      .spyOn(LooService.prototype, "getReports")
-      .mockResolvedValue(mockReports);
+    const getById = vi.spyOn(LooService.prototype, "getById").mockResolvedValue(mockLoo);
+    const getReports = vi.spyOn(LooService.prototype, "getReports").mockResolvedValue(mockReports);
 
     const res = await app.request(
       `/admin/loos/${mockLoo.id}`,
       { headers: authenticatedHeaders() },
-      env
+      env,
     );
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("Loo details");
-    expect(text).toContain(mockLoo.name!);
+    expect(text).toContain(mockLoo.name ?? "");
     expect(getById).toHaveBeenCalledWith(mockLoo.id);
     expect(getReports).toHaveBeenCalled();
   });
@@ -412,14 +375,12 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
     };
 
     vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
-    const getById = vi
-      .spyOn(LooService.prototype, "getById")
-      .mockResolvedValue(mockLoo);
+    const getById = vi.spyOn(LooService.prototype, "getById").mockResolvedValue(mockLoo);
 
     const res = await app.request(
       `/admin/loos/${mockLoo.id}/edit`,
       { headers: authenticatedHeaders() },
-      env
+      env,
     );
     expect(res.status).toBe(200);
     expect(getById).toHaveBeenCalledWith(mockLoo.id);
@@ -434,8 +395,8 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
     expect(config.looId).toBe(mockLoo.id);
     expect(config.api.update).toBe(`/api/loos/${mockLoo.id}`);
     expect(config.defaults.openingTimes).toEqual(openingTimes);
-    expect(config.defaults.lat).toBe(mockLoo.location!.lat.toString());
-    expect(config.defaults.lng).toBe(mockLoo.location!.lng.toString());
+    expect(config.defaults.lat).toBe(mockLoo.location?.lat.toString());
+    expect(config.defaults.lng).toBe(mockLoo.location?.lng.toString());
     expect(config.defaults.name).toBe(mockLoo.name);
     expect(config.defaults.noPayment).toBe("true");
     expect(config.defaults.women).toBe("false");
@@ -443,14 +404,12 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
 
   it("should render a helpful state when trying to edit a missing loo", async () => {
     vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
-    const getById = vi
-      .spyOn(LooService.prototype, "getById")
-      .mockResolvedValue(null);
+    const getById = vi.spyOn(LooService.prototype, "getById").mockResolvedValue(null);
 
     const res = await app.request(
       "/admin/loos/missing/edit",
       { headers: authenticatedHeaders() },
-      env
+      env,
     );
     expect(res.status).toBe(200);
     expect(getById).toHaveBeenCalledWith("missing");
@@ -460,11 +419,7 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
   });
 
   it("should redirect to home when hitting /admin/logout", async () => {
-    const res = await app.request(
-      "/admin/logout",
-      { headers: authenticatedHeaders() },
-      env
-    );
+    const res = await app.request("/admin/logout", { headers: authenticatedHeaders() }, env);
     expect(res.status).toBe(302);
     const location = res.headers.get("Location");
     expect(location).toBe("/");
@@ -529,27 +484,21 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
     };
 
     vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
-    vi.spyOn(
-      UserInsightsService.prototype,
-      "getPopularContributors"
-    ).mockResolvedValue([{ handle: "Testy", contributions: 3 }]);
-    vi.spyOn(
-      UserInsightsService.prototype,
-      "getContributorStats"
-    ).mockResolvedValue(stats);
+    vi.spyOn(UserInsightsService.prototype, "getPopularContributors").mockResolvedValue([
+      { handle: "Testy", contributions: 3 },
+    ]);
+    vi.spyOn(UserInsightsService.prototype, "getContributorStats").mockResolvedValue(stats);
 
     const res = await app.request(
       "/admin/users/statistics",
       { headers: authenticatedHeaders() },
-      env
+      env,
     );
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toContain("User statistics");
     expect(text).toContain("Testy");
-    expect(
-      UserInsightsService.prototype.getContributorStats
-    ).toHaveBeenCalled();
+    expect(UserInsightsService.prototype.getContributorStats).toHaveBeenCalled();
   });
 
   it("should render the user administration page even when management credentials are missing", async () => {
@@ -560,13 +509,13 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
     };
     __adminRoleTestUtils.clearManagementClientCache();
     vi.mocked(Auth0ManagementClient.fromEnv).mockReturnValue(
-      null as unknown as Auth0ManagementClient
+      null as unknown as Auth0ManagementClient,
     );
     const appWithoutMgmt = createApp(envWithoutMgmt);
     const res = await appWithoutMgmt.request(
       "/admin/users/admin",
       { headers: authenticatedHeaders(undefined, envWithoutMgmt) },
-      envWithoutMgmt
+      envWithoutMgmt,
     );
     expect(res.status).toBe(200);
     const text = await res.text();
@@ -581,7 +530,7 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
       removePermissions: vi.fn(),
     };
     vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue(
-      mockClient as unknown as Auth0ManagementClient
+      mockClient as unknown as Auth0ManagementClient,
     );
 
     const body = new URLSearchParams({
@@ -601,13 +550,11 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
         },
         body,
       },
-      env
+      env,
     );
 
     expect(res.status).toBe(303);
-    expect(addPermissions).toHaveBeenCalledWith("auth0|user123", [
-      "access:admin",
-    ]);
+    expect(addPermissions).toHaveBeenCalledWith("auth0|user123", ["access:admin"]);
   });
 
   it("should revoke permissions via the Auth0 management client", async () => {
@@ -617,7 +564,7 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
       removePermissions,
     };
     vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue(
-      mockClient as unknown as Auth0ManagementClient
+      mockClient as unknown as Auth0ManagementClient,
     );
 
     const body = new URLSearchParams({
@@ -637,12 +584,10 @@ it("should redirect to Auth0 login page when accessing /admin/login", async () =
         },
         body,
       },
-      env
+      env,
     );
 
     expect(res.status).toBe(303);
-    expect(removePermissions).toHaveBeenCalledWith("auth0|user456", [
-      "report:loo",
-    ]);
+    expect(removePermissions).toHaveBeenCalledWith("auth0|user456", ["report:loo"]);
   });
 });

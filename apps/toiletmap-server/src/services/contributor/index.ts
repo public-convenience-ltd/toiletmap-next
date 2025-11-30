@@ -1,6 +1,6 @@
-export { UserInsightsService } from './user-insights.service';
 export type {
   ContributorReport,
   ContributorStats,
   ContributorSuggestion,
-} from './types';
+} from "./types";
+export { UserInsightsService } from "./user-insights.service";

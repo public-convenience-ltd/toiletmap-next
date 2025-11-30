@@ -5,7 +5,7 @@
  * and log aggregation services.
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogContext {
   /** Request ID for correlation */
@@ -67,8 +67,8 @@ class Logger {
 
   constructor(config: Partial<LoggerConfig> = {}) {
     this.config = {
-      minLevel: config.minLevel || 'info',
-      service: config.service || 'toiletmap-api',
+      minLevel: config.minLevel || "info",
+      service: config.service || "toiletmap-api",
       jsonFormat: config.jsonFormat ?? true,
     };
   }
@@ -101,21 +101,21 @@ class Logger {
       const output = JSON.stringify(entry);
 
       // Use appropriate console method for visibility
-      if (level === 'error') {
+      if (level === "error") {
         console.error(output);
-      } else if (level === 'warn') {
+      } else if (level === "warn") {
         console.warn(output);
       } else {
         console.log(output);
       }
     } else {
       // Human-readable format for development
-      const contextStr = context ? ` ${JSON.stringify(context)}` : '';
+      const contextStr = context ? ` ${JSON.stringify(context)}` : "";
       const output = `[${entry.timestamp}] ${level.toUpperCase()}: ${message}${contextStr}`;
 
-      if (level === 'error') {
+      if (level === "error") {
         console.error(output);
-      } else if (level === 'warn') {
+      } else if (level === "warn") {
         console.warn(output);
       } else {
         console.log(output);
@@ -127,28 +127,28 @@ class Logger {
    * Log a debug message
    */
   debug(message: string, context?: LogContext): void {
-    this.log('debug', message, context);
+    this.log("debug", message, context);
   }
 
   /**
    * Log an info message
    */
   info(message: string, context?: LogContext): void {
-    this.log('info', message, context);
+    this.log("info", message, context);
   }
 
   /**
    * Log a warning message
    */
   warn(message: string, context?: LogContext): void {
-    this.log('warn', message, context);
+    this.log("warn", message, context);
   }
 
   /**
    * Log an error message
    */
   error(message: string, context?: LogContext): void {
-    this.log('error', message, context);
+    this.log("error", message, context);
   }
 
   /**
@@ -183,13 +183,13 @@ class Logger {
 /**
  * Create a logger instance based on environment
  */
-export function createLogger(env?: 'production' | 'preview' | 'development'): Logger {
+export function createLogger(env?: "production" | "preview" | "development"): Logger {
   // Treat preview as production for logging purposes
-  const isProduction = env === 'production' || env === 'preview';
+  const isProduction = env === "production" || env === "preview";
 
   return new Logger({
-    minLevel: isProduction ? 'info' : 'debug',
-    service: 'toiletmap-api',
+    minLevel: isProduction ? "info" : "debug",
+    service: "toiletmap-api",
     jsonFormat: isProduction,
   });
 }

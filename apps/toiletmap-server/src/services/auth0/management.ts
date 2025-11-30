@@ -1,4 +1,4 @@
-import { Env } from "../../types";
+import type { Env } from "../../types";
 
 type Auth0ManagementClientConfig = {
   issuerBaseUrl: string;
@@ -51,15 +51,14 @@ export class Auth0ManagementError extends Error {
   constructor(
     message: string,
     public readonly status?: number,
-    public readonly details?: unknown
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = "Auth0ManagementError";
   }
 }
 
-const sanitizeSearchTerm = (term: string) =>
-  term.replace(/["']/g, "").replace(/\s+/g, " ").trim();
+const sanitizeSearchTerm = (term: string) => term.replace(/["']/g, "").replace(/\s+/g, " ").trim();
 
 const buildWildcard = (term: string) => {
   if (!term) return "";
@@ -76,15 +75,8 @@ const buildSearchQuery = (term: string) => {
     return "";
   }
   const wildcard = buildWildcard(sanitized);
-  const exactId = sanitized.includes("|")
-    ? `user_id:"${sanitized}"`
-    : `user_id:${sanitized}`;
-  return [
-    `email:${wildcard}`,
-    `name:${wildcard}`,
-    `nickname:${wildcard}`,
-    exactId,
-  ].join(" OR ");
+  const exactId = sanitized.includes("|") ? `user_id:"${sanitized}"` : `user_id:${sanitized}`;
+  return [`email:${wildcard}`, `name:${wildcard}`, `nickname:${wildcard}`, exactId].join(" OR ");
 };
 
 const defaultFetch: typeof fetch = (input, init) => fetch(input, init);
@@ -139,11 +131,7 @@ export class Auth0ManagementClient {
     return new URL(trimmed, this.apiBaseUrl).toString();
   }
 
-  private async request(
-    path: string,
-    init: RequestInit = {},
-    retry = true
-  ): Promise<Response> {
+  private async request(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
     const token = await this.getAccessToken();
     const headers = new Headers(init.headers ?? {});
     if (!headers.has("Authorization")) {
@@ -170,7 +158,7 @@ export class Auth0ManagementClient {
       throw new Auth0ManagementError(
         `Auth0 Management API request failed with status ${response.status}`,
         response.status,
-        details
+        details,
       );
     }
     return response;
@@ -207,19 +195,15 @@ export class Auth0ManagementClient {
       throw new Auth0ManagementError(
         `Failed to obtain Auth0 management token (status ${response.status})`,
         response.status,
-        errorDetails
+        errorDetails,
       );
     }
 
-    const payload: { access_token?: string; expires_in?: number } =
-      await response.json();
+    const payload: { access_token?: string; expires_in?: number } = await response.json();
     if (!payload.access_token) {
-      throw new Auth0ManagementError(
-        "Auth0 management token response missing access_token"
-      );
+      throw new Auth0ManagementError("Auth0 management token response missing access_token");
     }
-    const expiresIn =
-      typeof payload.expires_in === "number" ? payload.expires_in : 60;
+    const expiresIn = typeof payload.expires_in === "number" ? payload.expires_in : 60;
     tokenCache.set(this.cacheKey, {
       token: payload.access_token,
       expiresAt: Date.now() + Math.max(expiresIn - 30, 30) * 1000,
@@ -255,10 +239,7 @@ export class Auth0ManagementClient {
       return null;
     }
     try {
-      const response = await this.request(
-        `users/${encodeURIComponent(userId)}`,
-        { method: "GET" }
-      );
+      const response = await this.request(`users/${encodeURIComponent(userId)}`, { method: "GET" });
       return (await response.json()) as Auth0ManagementUser;
     } catch (error) {
       if (error instanceof Auth0ManagementError && error.status === 404) {
@@ -272,19 +253,16 @@ export class Auth0ManagementClient {
     if (!userId) {
       return [];
     }
-    const response = await this.request(
-      `users/${encodeURIComponent(userId)}/permissions`,
-      { method: "GET" }
-    );
+    const response = await this.request(`users/${encodeURIComponent(userId)}/permissions`, {
+      method: "GET",
+    });
     const results = (await response.json()) as Auth0PermissionRecord[];
     return Array.isArray(results) ? results : [];
   }
 
   async addPermissions(userId: string, permissions: string[]): Promise<void> {
     const payload = permissions
-      .filter(
-        (permission) => typeof permission === "string" && permission.trim()
-      )
+      .filter((permission) => typeof permission === "string" && permission.trim())
       .map((permission_name) => ({
         permission_name,
         resource_server_identifier: this.resourceServerIdentifier,
@@ -301,14 +279,9 @@ export class Auth0ManagementClient {
     });
   }
 
-  async removePermissions(
-    userId: string,
-    permissions: string[]
-  ): Promise<void> {
+  async removePermissions(userId: string, permissions: string[]): Promise<void> {
     const payload = permissions
-      .filter(
-        (permission) => typeof permission === "string" && permission.trim()
-      )
+      .filter((permission) => typeof permission === "string" && permission.trim())
       .map((permission_name) => ({
         permission_name,
         resource_server_identifier: this.resourceServerIdentifier,
@@ -327,6 +300,4 @@ export class Auth0ManagementClient {
 }
 
 export const hasAuth0ManagementConfig = (env: Env): boolean =>
-  Boolean(
-    env.AUTH0_MANAGEMENT_CLIENT_ID && env.AUTH0_MANAGEMENT_CLIENT_SECRET
-  );
+  Boolean(env.AUTH0_MANAGEMENT_CLIENT_ID && env.AUTH0_MANAGEMENT_CLIENT_SECRET);

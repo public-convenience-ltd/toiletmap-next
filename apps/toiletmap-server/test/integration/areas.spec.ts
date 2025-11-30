@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { callApi } from './utils/test-client';
-import { getTestContext } from './setup';
+import { describe, expect, it } from "vitest";
+import { getTestContext } from "./setup";
+import { callApi } from "./utils/test-client";
 
 const authHeaders = () => {
   const { issueToken } = getTestContext();
@@ -9,9 +9,9 @@ const authHeaders = () => {
   };
 };
 
-describe('GET /api/areas', () => {
-  it('returns persisted areas with count metadata', async () => {
-    const response = await callApi('/api/areas', { headers: authHeaders() });
+describe("GET /api/areas", () => {
+  it("returns persisted areas with count metadata", async () => {
+    const response = await callApi("/api/areas", { headers: authHeaders() });
     expect(response.status).toBe(200);
 
     const body = await response.json();

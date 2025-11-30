@@ -67,6 +67,51 @@ Want to see the client worker placeholder?
 make dev-client
 ```
 
+## Code Quality
+
+This project uses [Biome](https://biomejs.dev/) for linting and formatting. Biome is a fast, all-in-one toolchain that replaces ESLint and Prettier.
+
+### Quick Commands
+
+```bash
+# Check code style (lint + format)
+pnpm check
+
+# Auto-fix issues
+pnpm check:fix
+
+# Only lint
+pnpm lint
+
+# Only format
+pnpm format
+```
+
+Or use the Makefile shortcuts:
+
+```bash
+make check-style    # check lint + format
+make fix-style      # auto-fix lint + format
+make lint           # check linting only
+make format         # check formatting only
+```
+
+### Editor Setup
+
+**VSCode**: Install the [Biome extension](https://marketplace.visualstudio.com/items?itemName=biomejs.biome)
+
+The workspace is already configured in `.vscode/settings.json` to:
+- Use Biome as the default formatter
+- Format on save
+- Organize imports automatically
+- Apply quick fixes on save
+
+**Other editors**: See [Biome editor integrations](https://biomejs.dev/guides/integrate-in-editor/)
+
+### CI Integration
+
+All pull requests automatically run Biome checks via GitHub Actions. Make sure to run `pnpm check:fix` before pushing to avoid CI failures.
+
 ## Common Tasks
 
 ### Building
@@ -80,7 +125,7 @@ make build-client      # frontend worker bundle
 
 ```bash
 make test-server-e2e                         # run end-to-end tests
-make check                                   # typecheck + wrangler dry-run
+make check                                   # style check + typecheck + wrangler dry-run
 ```
 
 - Frontend tests will land once the client worker grows beyond static HTML.

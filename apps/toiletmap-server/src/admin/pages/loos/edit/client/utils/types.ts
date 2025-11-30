@@ -1,9 +1,9 @@
-import type { LooFormState } from '../../../shared/utils/types';
+import type { LooFormState } from "../../../shared/utils/types";
 
 export type EditPageConfig = {
-    api: {
-        update: string;
-    };
-    looId: string;
-    defaults: Partial<LooFormState>;
+  api: {
+    update: string;
+  };
+  looId: string;
+  defaults: Partial<LooFormState>;
 };

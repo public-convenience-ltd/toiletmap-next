@@ -1,31 +1,31 @@
 #!/usr/bin/env tsx
-import { parseArgs } from 'node:util';
+import { parseArgs } from "node:util";
 
-const AUTH_SERVER_URL = 'http://127.0.0.1:44555';
+const AUTH_SERVER_URL = "http://127.0.0.1:44555";
 
 /**
  * Generates a test JWT token for local development.
- * 
+ *
  * IMPORTANT: This requires the auth server to be running on port 44555.
  * Start it with: pnpm dev (default) or pnpm auth:server
- * 
+ *
  * Usage:
  *   pnpm token:issue
  *   pnpm token:issue --name="Jane Doe" --email="jane@example.com"
  *   pnpm token:issue --admin
- * 
+ *
  * The token can be used with the Authorization header:
  *   curl -H "Authorization: Bearer <token>" http://localhost:8787/api/loos
  */
 async function main() {
   const { values } = parseArgs({
     options: {
-      name: { type: 'string', default: 'Local Developer' },
-      email: { type: 'string', default: 'dev@localhost' },
-      nickname: { type: 'string', default: 'dev' },
-      admin: { type: 'boolean', default: false },
-      sub: { type: 'string', default: 'auth0|local-dev-user' },
-      help: { type: 'boolean', short: 'h', default: false },
+      name: { type: "string", default: "Local Developer" },
+      email: { type: "string", default: "dev@localhost" },
+      nickname: { type: "string", default: "dev" },
+      admin: { type: "boolean", default: false },
+      sub: { type: "string", default: "auth0|local-dev-user" },
+      help: { type: "boolean", short: "h", default: false },
     },
     allowPositionals: false,
   });
@@ -65,9 +65,9 @@ Use the token with curl:
   try {
     const testResponse = await fetch(`${AUTH_SERVER_URL}/.well-known/jwks.json`);
     if (!testResponse.ok) {
-      throw new Error('Auth server not responding');
+      throw new Error("Auth server not responding");
     }
-  } catch (error) {
+  } catch (_error) {
     console.error(`
 ❌ Error: Auth server is not running on ${AUTH_SERVER_URL}
 
@@ -80,66 +80,66 @@ Please start the auth server first:
   }
 
   // Build OAuth2 authorize URL with auto-login
-  const audience = process.env.AUTH0_AUDIENCE || 'https://toiletmap.org.uk';
-  const state = 'cli-token-generator';
-  const nonce = 'cli-nonce-' + Date.now();
-  const redirectUri = 'http://localhost:9999/callback'; // Dummy callback
+  const audience = process.env.AUTH0_AUDIENCE || "https://toiletmap.org.uk";
+  const state = "cli-token-generator";
+  const nonce = `cli-nonce-${Date.now()}`;
+  const redirectUri = "http://localhost:9999/callback"; // Dummy callback
 
   const authorizeUrl = new URL(`${AUTH_SERVER_URL}/authorize`);
-  authorizeUrl.searchParams.set('client_id', 'test_client_id');
-  authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-  authorizeUrl.searchParams.set('response_type', 'code');
-  authorizeUrl.searchParams.set('scope', 'openid profile email');
-  authorizeUrl.searchParams.set('audience', audience);
-  authorizeUrl.searchParams.set('state', state);
-  authorizeUrl.searchParams.set('nonce', nonce);
-  authorizeUrl.searchParams.set('auto', '1');
+  authorizeUrl.searchParams.set("client_id", "test_client_id");
+  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
+  authorizeUrl.searchParams.set("response_type", "code");
+  authorizeUrl.searchParams.set("scope", "openid profile email");
+  authorizeUrl.searchParams.set("audience", audience);
+  authorizeUrl.searchParams.set("state", state);
+  authorizeUrl.searchParams.set("nonce", nonce);
+  authorizeUrl.searchParams.set("auto", "1");
 
   // Follow redirect to get authorization code
   const authorizeResponse = await fetch(authorizeUrl.toString(), {
-    redirect: 'manual',
+    redirect: "manual",
   });
 
   if (authorizeResponse.status !== 302) {
-    console.error('❌ Failed to get authorization code from auth server');
+    console.error("❌ Failed to get authorization code from auth server");
     process.exit(1);
   }
 
-  const location = authorizeResponse.headers.get('location');
+  const location = authorizeResponse.headers.get("location");
   if (!location) {
-    console.error('❌ No redirect location from auth server');
+    console.error("❌ No redirect location from auth server");
     process.exit(1);
   }
 
   const callbackUrl = new URL(location);
-  const code = callbackUrl.searchParams.get('code');
+  const code = callbackUrl.searchParams.get("code");
 
   if (!code) {
-    console.error('❌ No authorization code in callback');
+    console.error("❌ No authorization code in callback");
     process.exit(1);
   }
 
   // Exchange code for token
   const tokenResponse = await fetch(`${AUTH_SERVER_URL}/oauth/token`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      grant_type: 'authorization_code',
+      grant_type: "authorization_code",
       code,
-      client_id: 'test_client_id',
-      client_secret: 'test_client_secret',
+      client_id: "test_client_id",
+      client_secret: "test_client_secret",
       redirect_uri: redirectUri,
     }),
   });
 
   if (!tokenResponse.ok) {
-    console.error('❌ Failed to exchange code for token');
+    console.error("❌ Failed to exchange code for token");
     process.exit(1);
   }
 
-  const tokenData = await tokenResponse.json() as {
+  const tokenData = (await tokenResponse.json()) as {
     access_token: string;
     id_token: string;
   };
@@ -149,6 +149,6 @@ Please start the auth server first:
 }
 
 main().catch((error) => {
-  console.error('❌ Failed to generate token:', error);
+  console.error("❌ Failed to generate token:", error);
   process.exit(1);
 });

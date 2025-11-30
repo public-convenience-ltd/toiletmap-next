@@ -1,14 +1,9 @@
 import { z } from "zod";
-import { LOO_ID_LENGTH } from "../../services/loo";
 import {
-  RECENT_WINDOW_DAYS,
   DEFAULT_PROXIMITY_RADIUS,
   MAX_PROXIMITY_RADIUS,
+  RECENT_WINDOW_DAYS,
 } from "../../common/constants";
-import {
-  CoordinatesSchema,
-  LooSearchSortOptions,
-} from "../../services/loo/types";
 import {
   booleanField,
   booleanFilterSchema,
@@ -16,10 +11,12 @@ import {
   normalizeOptionalOption,
   normalizeOptionalString,
   nullableTrimmed,
+  openingTimesSchema,
   optionalTrimmedFilter,
   triStateFilterSchema,
-  openingTimesSchema,
 } from "../../common/schemas";
+import { LOO_ID_LENGTH } from "../../services/loo";
+import { CoordinatesSchema, LooSearchSortOptions } from "../../services/loo/types";
 
 export const proximitySchema = z
   .object({
@@ -88,10 +85,7 @@ export const searchQuerySchema = z.object({
   verified: booleanFilterSchema,
   hasLocation: booleanFilterSchema,
   sort: z
-    .preprocess(
-      normalizeOptionalOption,
-      z.enum(LooSearchSortOptions).default("updated-desc")
-    )
+    .preprocess(normalizeOptionalOption, z.enum(LooSearchSortOptions).default("updated-desc"))
     .default("updated-desc"),
   limit: createNumberParam(1, 200, 50),
   page: createNumberParam(1, null, 1),
@@ -102,50 +96,66 @@ export const metricsQuerySchema = searchQuerySchema.extend({
 });
 
 // Path parameter validation schemas
-export const looIdParamSchema = z.object({
-  id: z.string().length(LOO_ID_LENGTH, `id must be exactly ${LOO_ID_LENGTH} characters`),
-}).strict();
+export const looIdParamSchema = z
+  .object({
+    id: z.string().length(LOO_ID_LENGTH, `id must be exactly ${LOO_ID_LENGTH} characters`),
+  })
+  .strict();
 
-export const geohashParamSchema = z.object({
-  geohash: z.string().min(1, 'geohash path parameter is required'),
-}).strict();
+export const geohashParamSchema = z
+  .object({
+    geohash: z.string().min(1, "geohash path parameter is required"),
+  })
+  .strict();
 
 // Query parameter validation schemas
 export const geohashQuerySchema = z.object({
-  active: z.preprocess((value) => {
-    if (typeof value !== 'string') return value;
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true') return 'true';
-    if (normalized === 'false') return 'false';
-    if (normalized === 'any' || normalized === 'all') return 'any';
-    return 'true';
-  }, z.enum(['true', 'false', 'any']).default('true'))
-    .transform((value) => value === 'any' ? null : value === 'true'),
-  compressed: z.preprocess((value) => {
-    if (typeof value !== 'string') return value;
-    return value.trim().toLowerCase();
-  }, z.enum(['true', 'false']).optional())
-    .transform((value) => value === 'true'),
+  active: z
+    .preprocess(
+      (value) => {
+        if (typeof value !== "string") return value;
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true") return "true";
+        if (normalized === "false") return "false";
+        if (normalized === "any" || normalized === "all") return "any";
+        return "true";
+      },
+      z.enum(["true", "false", "any"]).default("true"),
+    )
+    .transform((value) => (value === "any" ? null : value === "true")),
+  compressed: z
+    .preprocess((value) => {
+      if (typeof value !== "string") return value;
+      return value.trim().toLowerCase();
+    }, z.enum(["true", "false"]).optional())
+    .transform((value) => value === "true"),
 });
 
 export const reportsQuerySchema = z.object({
-  hydrate: z.preprocess((value) => {
-    if (typeof value !== 'string') return value;
-    return value.trim().toLowerCase();
-  }, z.enum(['true', 'false']).optional())
-    .transform((value) => value === 'true'),
+  hydrate: z
+    .preprocess((value) => {
+      if (typeof value !== "string") return value;
+      return value.trim().toLowerCase();
+    }, z.enum(["true", "false"]).optional())
+    .transform((value) => value === "true"),
 });
 
-export const idsQuerySchema = z.object({
-  ids: z.union([z.string(), z.array(z.string())])
-    .transform((value) => {
-      const rawIds = Array.isArray(value) ? value : [value];
-      return rawIds.flatMap((v) => v.split(',')).map((v) => v.trim()).filter((v) => v.length > 0);
-    })
-    .refine((ids) => ids.length > 0, {
-      message: 'Provide ids query parameter (comma separated or repeated) to fetch loos',
-    }),
-}).strict();
+export const idsQuerySchema = z
+  .object({
+    ids: z
+      .union([z.string(), z.array(z.string())])
+      .transform((value) => {
+        const rawIds = Array.isArray(value) ? value : [value];
+        return rawIds
+          .flatMap((v) => v.split(","))
+          .map((v) => v.trim())
+          .filter((v) => v.length > 0);
+      })
+      .refine((ids) => ids.length > 0, {
+        message: "Provide ids query parameter (comma separated or repeated) to fetch loos",
+      }),
+  })
+  .strict();
 
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export type MetricsQuery = z.infer<typeof metricsQuerySchema>;

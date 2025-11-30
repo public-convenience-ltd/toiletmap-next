@@ -1,5 +1,5 @@
-import { LooService } from './loo.service';
+import { LooService } from "./loo.service";
 
 export { LooService };
 
-export { LOO_ID_LENGTH, generateLooId } from './persistence';
+export { generateLooId, LOO_ID_LENGTH } from "./persistence";

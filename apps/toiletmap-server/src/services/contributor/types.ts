@@ -1,4 +1,4 @@
-import type { ReportResponse } from '../loo/types';
+import type { ReportResponse } from "../loo/types";
 
 export type ContributorSuggestion = {
   handle: string;

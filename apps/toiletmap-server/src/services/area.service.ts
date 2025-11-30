@@ -1,4 +1,4 @@
-import type { PrismaClientInstance } from '../prisma';
+import type { PrismaClientInstance } from "../prisma";
 
 /**
  * Fetches all administrative areas that can be associated with loos.

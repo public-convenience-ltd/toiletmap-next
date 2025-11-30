@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { decode } from "hono/jwt";
+import { describe, expect, it } from "vitest";
 import { startAuthServer } from "./auth-server";
 
 const audience = "https://example.test/api";
@@ -26,9 +26,12 @@ describe("local auth server customization", () => {
       form.set("extra_permissions", "beta:feature,ops:read");
       form.append("permissions", "report:loo");
       form.append("permissions", "access:admin");
-      form.set("custom_claims", JSON.stringify({
-        "https://claims.example/roles": ["editor"],
-      }));
+      form.set(
+        "custom_claims",
+        JSON.stringify({
+          "https://claims.example/roles": ["editor"],
+        }),
+      );
 
       const authorizeResponse = await fetch(authorizeUrl, {
         method: "POST",
@@ -40,7 +43,7 @@ describe("local auth server customization", () => {
       expect(authorizeResponse.status).toBe(302);
       const location = authorizeResponse.headers.get("location");
       expect(location).toBeTruthy();
-      const code = new URL(location!).searchParams.get("code");
+      const code = new URL(location ?? "").searchParams.get("code");
       expect(code).toBeTruthy();
 
       const tokenResponse = await fetch(new URL("oauth/token", server.issuer), {
@@ -56,7 +59,7 @@ describe("local auth server customization", () => {
       });
 
       expect(tokenResponse.status).toBe(200);
-      const tokens = await tokenResponse.json() as {
+      const tokens = (await tokenResponse.json()) as {
         access_token: string;
         id_token: string;
       };

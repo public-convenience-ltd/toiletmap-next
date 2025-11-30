@@ -22,12 +22,12 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 export default {
-  async fetch() {
+  fetch() {
     return new Response(html, {
       headers: {
-        'content-type': 'text/html; charset=UTF-8',
-        'cache-control': 'no-store'
-      }
+        "content-type": "text/html; charset=UTF-8",
+        "cache-control": "no-store",
+      },
     });
-  }
+  },
 };

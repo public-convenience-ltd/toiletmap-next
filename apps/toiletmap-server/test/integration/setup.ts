@@ -1,14 +1,7 @@
 import "dotenv/config";
-import { beforeAll, afterAll } from "vitest";
-import {
-  createPrismaClient,
-  type PrismaClientInstance,
-} from "../../src/prisma";
-import {
-  startAuthServer,
-  type AuthServer,
-  type IssueTokenFn,
-} from "./utils/auth-server";
+import { afterAll, beforeAll } from "vitest";
+import { createPrismaClient, type PrismaClientInstance } from "../../src/prisma";
+import { type AuthServer, type IssueTokenFn, startAuthServer } from "./utils/auth-server";
 
 const state: {
   issueToken: IssueTokenFn | null;
@@ -35,8 +28,7 @@ const getDatabaseUrl = () => {
 beforeAll(async () => {
   const databaseUrl = getDatabaseUrl();
 
-  const audience =
-    process.env.AUTH0_AUDIENCE ?? "https://integration.toiletmap/api";
+  const audience = process.env.AUTH0_AUDIENCE ?? "https://integration.toiletmap/api";
   process.env.AUTH0_AUDIENCE = audience;
 
   const authServer: AuthServer = await startAuthServer({ audience });

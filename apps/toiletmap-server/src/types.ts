@@ -62,7 +62,7 @@ interface RateLimiter {
   }>;
 }
 
-import { LooService } from "./services/loo";
+import type { LooService } from "./services/loo";
 
 export type AppVariables = {
   user?: RequestUser;

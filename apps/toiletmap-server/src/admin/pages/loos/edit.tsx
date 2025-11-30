@@ -1,10 +1,10 @@
-import { Context } from "hono";
-import { Layout } from "../../components/Layout";
-import { Button } from "../../components/DesignSystem";
-import { Env } from "../../../types";
-import { serializeConfig } from "./helpers";
+import type { Context } from "hono";
 import { createPrismaClient } from "../../../prisma";
 import { LooService } from "../../../services/loo";
+import type { Env } from "../../../types";
+import { Button } from "../../components/DesignSystem";
+import { Layout } from "../../components/Layout";
+import { serializeConfig } from "./helpers";
 import type { TriStateValue } from "./shared/utils/types";
 
 const booleanToTriState = (value: boolean | null): TriStateValue => {
@@ -17,8 +17,7 @@ export const looEdit = async (c: Context<{ Bindings: Env }>) => {
   const { id } = c.req.param();
 
   const connectionString =
-    c.env.HYPERDRIVE?.connectionString ??
-    c.env.TEST_HYPERDRIVE?.connectionString;
+    c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_HYPERDRIVE?.connectionString;
   if (!connectionString) {
     throw new Error("No database connection string available");
   }
@@ -34,13 +33,11 @@ export const looEdit = async (c: Context<{ Bindings: Env }>) => {
           <Button href="/admin/loos">Back to dataset</Button>
         </div>
         <div class="empty-state">
-          <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+          <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
           <h3>Loo not found</h3>
-          <p>
-            The loo you're trying to edit doesn't exist or has been removed.
-          </p>
+          <p>The loo you're trying to edit doesn't exist or has been removed.</p>
         </div>
-      </Layout>
+      </Layout>,
     );
   }
 
@@ -80,12 +77,9 @@ export const looEdit = async (c: Context<{ Bindings: Env }>) => {
     <Layout title={`Edit: ${loo.name || "Unnamed Loo"}`}>
       <noscript>
         <div class="empty-state" style="margin-bottom: var(--space-l);">
-          <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+          <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
           <h3>JavaScript is required</h3>
-          <p>
-            This page now renders fully in the browser. Please enable JavaScript
-            to edit loos.
-          </p>
+          <p>This page now renders fully in the browser. Please enable JavaScript to edit loos.</p>
         </div>
       </noscript>
 
@@ -107,7 +101,7 @@ export const looEdit = async (c: Context<{ Bindings: Env }>) => {
       <section class="create-shell" data-loo-edit-shell>
         <div class="form-card">
           <div class="loading-indicator">
-            <span class="loading-spinner" aria-hidden="true"></span>
+            <span class="loading-spinner" aria-hidden="true" />
             <p>Loading edit form…</p>
           </div>
         </div>
@@ -117,9 +111,9 @@ export const looEdit = async (c: Context<{ Bindings: Env }>) => {
         type="application/json"
         id="loo-edit-config"
         dangerouslySetInnerHTML={{ __html: serializedConfig }}
-      ></script>
-      <div id="loo-edit-root"></div>
-      <script type="module" src="/admin/loos-edit.js"></script>
-    </Layout>
+      />
+      <div id="loo-edit-root" />
+      <script type="module" src="/admin/loos-edit.js" />
+    </Layout>,
   );
 };

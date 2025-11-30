@@ -1,8 +1,7 @@
 import { randomBytes } from "crypto";
+import { LOO_ID_LENGTH } from "../../common/constants";
 import { Prisma } from "../../prisma";
 import type { LooMutationAttributes } from "./types";
-
-import { LOO_ID_LENGTH } from "../../common/constants";
 
 export { LOO_ID_LENGTH };
 
@@ -26,9 +25,7 @@ const emptyTextArray = Prisma.sql`ARRAY[]::text[]`;
 const buildContributorsInsertValue = (contributor: string | null | undefined) =>
   contributor ? Prisma.sql`ARRAY[${contributor}]` : emptyTextArray;
 
-const buildContributorsUpdateClause = (
-  contributor: string | null | undefined
-) =>
+const buildContributorsUpdateClause = (contributor: string | null | undefined) =>
   contributor
     ? Prisma.sql`
         contributors = CASE
@@ -75,14 +72,7 @@ type InsertArgs = {
  * Raw SQL is used to handle PostGIS geography types and array operations
  * that are cumbersome or impossible with standard Prisma create.
  */
-export const insertLoo = async ({
-  tx,
-  id,
-  data,
-  mutation,
-  contributor,
-  now,
-}: InsertArgs) => {
+export const insertLoo = async ({ tx, id, data, mutation, contributor, now }: InsertArgs) => {
   const keys = Object.keys(data);
   const columns = [
     Prisma.raw("id"),
@@ -128,20 +118,11 @@ type UpdateArgs = {
  * Handles appending contributors and updating geography fields.
  * Returns the number of affected rows (0 or 1).
  */
-export const updateLoo = async ({
-  tx,
-  id,
-  data,
-  mutation,
-  contributor,
-  now,
-}: UpdateArgs) => {
+export const updateLoo = async ({ tx, id, data, mutation, contributor, now }: UpdateArgs) => {
   const assignments: Prisma.Sql[] = [Prisma.sql`updated_at = ${now}`];
 
   for (const [key, value] of Object.entries(data)) {
-    assignments.push(
-      Prisma.sql`${Prisma.raw(key)} = ${toColumnValueSql(key, value)}`
-    );
+    assignments.push(Prisma.sql`${Prisma.raw(key)} = ${toColumnValueSql(key, value)}`);
   }
 
   const geographySql = geographyExpression(mutation.location);

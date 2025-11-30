@@ -1,6 +1,6 @@
-import { Context, MiddlewareHandler } from "hono";
-import { Env, AppVariables } from "../types";
+import type { Context, MiddlewareHandler } from "hono";
 import { MAX_RATE_LIMIT_STORE_SIZE } from "../common/constants";
+import type { AppVariables, Env } from "../types";
 
 /**
  * Rate limiting configuration
@@ -40,7 +40,7 @@ class RateLimitStore {
   check(
     key: string,
     maxRequests: number,
-    windowSeconds: number
+    windowSeconds: number,
   ): {
     allowed: boolean;
     remaining: number;
@@ -109,15 +109,13 @@ const rateLimitStore = new RateLimitStore();
  * ```
  */
 export const rateLimit = (
-  config: RateLimitConfig
+  config: RateLimitConfig,
 ): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
   const {
     maxRequests,
     windowSeconds,
     keyGenerator = (c) =>
-      c.req.header("cf-connecting-ip") ||
-      c.req.header("x-forwarded-for") ||
-      "unknown",
+      c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "unknown",
     message = "Too many requests, please try again later",
   } = config;
 
@@ -138,7 +136,7 @@ export const rateLimit = (
           message,
           retryAfter,
         },
-        429
+        429,
       );
     }
 

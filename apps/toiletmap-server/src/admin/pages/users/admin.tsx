@@ -1,22 +1,22 @@
-import { Context } from "hono";
-import { Layout } from "../../components/Layout";
-import { Badge, Button, CollapsibleCard } from "../../components/DesignSystem";
-import { AppVariables, Env } from "../../../types";
-import {
-  Auth0ManagementClient,
-  Auth0ManagementError,
-  Auth0ManagementUser,
-  Auth0PermissionRecord,
-} from "../../../services/auth0/management";
+import type { Context } from "hono";
 import {
   ADMIN_PERMISSION,
   KNOWN_PERMISSIONS,
-  KnownPermission,
+  type KnownPermission,
   PERMISSION_LABELS,
   permissionDescription,
   REPORT_LOO_PERMISSION,
 } from "../../../common/permissions";
+import {
+  Auth0ManagementClient,
+  Auth0ManagementError,
+  type Auth0ManagementUser,
+  type Auth0PermissionRecord,
+} from "../../../services/auth0/management";
+import type { AppVariables, Env } from "../../../types";
 import { logger } from "../../../utils/logger";
+import { Badge, Button, CollapsibleCard } from "../../components/DesignSystem";
+import { Layout } from "../../components/Layout";
 
 type AdminContext = Context<{ Bindings: Env; Variables: AppVariables }>;
 
@@ -36,8 +36,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
 
 const numberFormatter = new Intl.NumberFormat("en-GB");
 
-const formatDate = (value?: string | null) =>
-  value ? dateFormatter.format(new Date(value)) : "—";
+const formatDate = (value?: string | null) => (value ? dateFormatter.format(new Date(value)) : "—");
 
 const formatDateTime = (value?: string | null) =>
   value ? dateTimeFormatter.format(new Date(value)) : "—";
@@ -82,10 +81,7 @@ const buildRedirectUrl = (input: string | null, fallbackUser?: string) => {
   return fallback;
 };
 
-const userPermissionOrder: KnownPermission[] = [
-  ADMIN_PERMISSION,
-  REPORT_LOO_PERMISSION,
-];
+const userPermissionOrder: KnownPermission[] = [ADMIN_PERMISSION, REPORT_LOO_PERMISSION];
 
 export const userAdministration = async (c: AdminContext) => {
   const managementClient = Auth0ManagementClient.fromEnv(c.env);
@@ -118,15 +114,13 @@ export const userAdministration = async (c: AdminContext) => {
       if (error instanceof Error) {
         logger.logError(error, { searchTerm });
       } else {
-        logger.error('Failed to search Auth0 users in admin page', {
+        logger.error("Failed to search Auth0 users in admin page", {
           searchTerm,
           errorMessage: String(error),
         });
       }
       state.searchError =
-        error instanceof Auth0ManagementError
-          ? error.message
-          : "Unable to search Auth0 users.";
+        error instanceof Auth0ManagementError ? error.message : "Unable to search Auth0 users.";
     }
   }
 
@@ -136,14 +130,15 @@ export const userAdministration = async (c: AdminContext) => {
       if (!state.selectedUser) {
         state.selectedUserError = "Auth0 user not found.";
       } else {
-        state.selectedUserPermissions =
-          await managementClient.getUserPermissions(state.selectedUser.user_id);
+        state.selectedUserPermissions = await managementClient.getUserPermissions(
+          state.selectedUser.user_id,
+        );
       }
     } catch (error) {
       if (error instanceof Error) {
         logger.logError(error, { userId: selectedUserId });
       } else {
-        logger.error('Failed to load Auth0 user profile in admin page', {
+        logger.error("Failed to load Auth0 user profile in admin page", {
           userId: selectedUserId,
           errorMessage: String(error),
         });
@@ -164,9 +159,7 @@ export const userAdministration = async (c: AdminContext) => {
 
   const selectedUserName = summarizeUser(selectedUser);
   const permissionsByName = new Set(
-    selectedUserPermissions.map(
-      (permission) => permission.permission_name
-    )
+    selectedUserPermissions.map((permission) => permission.permission_name),
   );
 
   const permissionNotice =
@@ -174,22 +167,18 @@ export const userAdministration = async (c: AdminContext) => {
       ? {
           variant: "error" as const,
           message: `Unable to update ${formatPermissionLabel(
-            permissionCode
+            permissionCode,
           )}: ${permissionErrorMsg}`,
         }
       : permissionStatus && permissionCode
-      ? {
-          variant: "success" as const,
-          message:
-            permissionStatus === "revoke"
-              ? `${formatPermissionLabel(
-                  permissionCode
-                )} removed for ${selectedUserName}.`
-              : `${formatPermissionLabel(
-                  permissionCode
-                )} granted for ${selectedUserName}.`,
-        }
-      : null;
+        ? {
+            variant: "success" as const,
+            message:
+              permissionStatus === "revoke"
+                ? `${formatPermissionLabel(permissionCode)} removed for ${selectedUserName}.`
+                : `${formatPermissionLabel(permissionCode)} granted for ${selectedUserName}.`,
+          }
+        : null;
 
   return c.html(
     <Layout title="User administration">
@@ -294,8 +283,8 @@ export const userAdministration = async (c: AdminContext) => {
           </p>
           <h1 style="margin: var(--space-3xs) 0;">User administration</h1>
           <p style="color: var(--color-neutral-grey); margin: 0;">
-            Search Auth0 users, view their permissions, and manage access
-            without leaving the dashboard.
+            Search Auth0 users, view their permissions, and manage access without leaving the
+            dashboard.
           </p>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: var(--space-s);">
@@ -309,19 +298,15 @@ export const userAdministration = async (c: AdminContext) => {
       </div>
 
       {!state.managementConfigured && (
-        <div
-          class="notification notification--error"
-          style="margin-bottom: var(--space-l);"
-        >
+        <div class="notification notification--error" style="margin-bottom: var(--space-l);">
           <div class="notification__icon">
-            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
           </div>
           <div class="notification__content">
             <p class="notification__title">Auth0 management disabled</p>
             <p class="notification__message">
               Provide <code>AUTH0_MANAGEMENT_CLIENT_ID</code> and{" "}
-              <code>AUTH0_MANAGEMENT_CLIENT_SECRET</code> to enable user
-              administration tools.
+              <code>AUTH0_MANAGEMENT_CLIENT_SECRET</code> to enable user administration tools.
             </p>
           </div>
         </div>
@@ -335,12 +320,10 @@ export const userAdministration = async (c: AdminContext) => {
           <div class="notification__icon">
             <i
               class={`fa-solid ${
-                permissionNotice.variant === "error"
-                  ? "fa-circle-exclamation"
-                  : "fa-circle-check"
+                permissionNotice.variant === "error" ? "fa-circle-exclamation" : "fa-circle-check"
               }`}
               aria-hidden="true"
-            ></i>
+            />
           </div>
           <div class="notification__content">
             <p class="notification__title">
@@ -369,9 +352,7 @@ export const userAdministration = async (c: AdminContext) => {
           class="search-form"
           style="margin-bottom: var(--space-m);"
         >
-          {selectedUserId && (
-            <input type="hidden" name="user" value={selectedUserId} />
-          )}
+          {selectedUserId && <input type="hidden" name="user" value={selectedUserId} />}
           <label class="form-label" for="user-admin-search-input">
             Email, name, or Auth0 ID
           </label>
@@ -392,7 +373,7 @@ export const userAdministration = async (c: AdminContext) => {
                 data-clear-search
                 aria-label="Clear search"
               >
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                <i class="fa-solid fa-xmark" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -401,7 +382,7 @@ export const userAdministration = async (c: AdminContext) => {
         {state.searchError && (
           <div class="notification notification--error">
             <div class="notification__icon">
-              <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+              <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
             </div>
             <div class="notification__content">
               <p class="notification__title">Search unavailable</p>
@@ -412,8 +393,7 @@ export const userAdministration = async (c: AdminContext) => {
 
         {!state.managementConfigured && searchTerm && (
           <p class="muted-text" style="margin: 0;">
-            Search results are unavailable until Auth0 management credentials
-            are configured.
+            Search results are unavailable until Auth0 management credentials are configured.
           </p>
         )}
 
@@ -432,20 +412,12 @@ export const userAdministration = async (c: AdminContext) => {
                 {state.searchResults.map((user) => (
                   <li class="user-results__item" key={user.user_id}>
                     <div>
-                      <strong>
-                        {user.name ||
-                          user.nickname ||
-                          user.email ||
-                          user.user_id}
-                      </strong>
+                      <strong>{user.name || user.nickname || user.email || user.user_id}</strong>
                       <p class="user-results__meta">
                         {user.email || "No email"} · {user.user_id}
                       </p>
                     </div>
-                    <a
-                      class="button"
-                      href={buildManageLink(user.user_id, searchTerm)}
-                    >
+                    <a class="button" href={buildManageLink(user.user_id, searchTerm)}>
                       Manage
                     </a>
                   </li>
@@ -461,12 +433,9 @@ export const userAdministration = async (c: AdminContext) => {
       </CollapsibleCard>
 
       {selectedUserId && !selectedUser && (
-        <div
-          class="notification notification--error"
-          style="margin-bottom: var(--space-l);"
-        >
+        <div class="notification notification--error" style="margin-bottom: var(--space-l);">
           <div class="notification__icon">
-            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
           </div>
           <div class="notification__content">
             <p class="notification__title">Unable to load user</p>
@@ -489,10 +458,7 @@ export const userAdministration = async (c: AdminContext) => {
                     selectedUser.email ||
                     selectedUser.user_id}
                 </h2>
-                <p
-                  class="section-description"
-                  style="margin-top: var(--space-3xs);"
-                >
+                <p class="section-description" style="margin-top: var(--space-3xs);">
                   Auth0 ID: <code>{selectedUser.user_id}</code>
                 </p>
               </div>
@@ -515,9 +481,7 @@ export const userAdministration = async (c: AdminContext) => {
               </div>
               <div>
                 <dt>Logins</dt>
-                <dd>
-                  {numberFormatter.format(selectedUser.logins_count ?? 0)}
-                </dd>
+                <dd>{numberFormatter.format(selectedUser.logins_count ?? 0)}</dd>
               </div>
             </dl>
 
@@ -561,36 +525,21 @@ export const userAdministration = async (c: AdminContext) => {
                   <article class="permission-card" key={permissionKey}>
                     <div class="permission-card__header">
                       <div>
-                        <h3 class="permission-card__title">
-                          {PERMISSION_LABELS[permissionKey]}
-                        </h3>
-                        <p class="permission-card__hint">
-                          {permissionDescription[permissionKey]}
-                        </p>
+                        <h3 class="permission-card__title">{PERMISSION_LABELS[permissionKey]}</h3>
+                        <p class="permission-card__hint">{permissionDescription[permissionKey]}</p>
                       </div>
                       <Badge variant={isGranted ? "yes" : "no"}>
                         {isGranted ? "Granted" : "Not granted"}
                       </Badge>
                     </div>
                     <form method="post" action="/admin/users/admin/permissions">
-                      <input
-                        type="hidden"
-                        name="user_id"
-                        value={selectedUser.user_id}
-                      />
-                      <input
-                        type="hidden"
-                        name="permission"
-                        value={permissionKey}
-                      />
+                      <input type="hidden" name="user_id" value={selectedUser.user_id} />
+                      <input type="hidden" name="permission" value={permissionKey} />
                       <input type="hidden" name="intent" value={intent} />
                       <input
                         type="hidden"
                         name="redirect_to"
-                        value={buildManageLink(
-                          selectedUser.user_id,
-                          searchTerm
-                        )}
+                        value={buildManageLink(selectedUser.user_id, searchTerm)}
                       />
                       <Button type="submit">
                         {isGranted
@@ -605,7 +554,7 @@ export const userAdministration = async (c: AdminContext) => {
           </section>
         </>
       )}
-    </Layout>
+    </Layout>,
   );
 };
 
@@ -632,7 +581,7 @@ export const updateUserPermissions = async (c: AdminContext) => {
 
   if (!managementClient) {
     return addError(
-      "Auth0 management credentials are not configured. Ask an engineer to set AUTH0_MANAGEMENT_CLIENT_ID and AUTH0_MANAGEMENT_CLIENT_SECRET."
+      "Auth0 management credentials are not configured. Ask an engineer to set AUTH0_MANAGEMENT_CLIENT_ID and AUTH0_MANAGEMENT_CLIENT_SECRET.",
     );
   }
 
@@ -663,8 +612,7 @@ export const updateUserPermissions = async (c: AdminContext) => {
     redirectUrl.searchParams.delete("permissionError");
     return c.redirect(`${redirectUrl.pathname}${redirectUrl.search}`, 303);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to update permission.";
+    const message = error instanceof Error ? error.message : "Failed to update permission.";
     return addError(message);
   }
 };

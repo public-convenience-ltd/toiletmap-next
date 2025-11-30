@@ -1,16 +1,15 @@
-import type { areas, record_version, toilets } from '../../generated/prisma/client';
+import { openingTimesSchema } from "../../common/schemas";
+import type { areas, record_version, toilets } from "../../generated/prisma/client";
 import type {
   AdminGeo,
   Coordinates,
   LooCommon,
   LooResponse,
   NearbyLooResponse,
-  ReportResponse,
-  OpeningTimes,
   RawLooRow,
-} from './types';
-import { ToiletsRecordSchema } from './types';
-import { openingTimesSchema } from '../../common/schemas';
+  ReportResponse,
+} from "./types";
+import { ToiletsRecordSchema } from "./types";
 
 /**
  * Converts a validated RawLooRow to a toilets object by extracting only toilets fields.
@@ -55,11 +54,11 @@ export const areaSelection = {
  * Expects { coordinates: [lng, lat] }.
  */
 const extractCoordinates = (value: unknown): Coordinates | null => {
-  if (!value || typeof value !== 'object') return null;
+  if (!value || typeof value !== "object") return null;
   const coordinates = (value as { coordinates?: unknown }).coordinates;
   if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
   const [lng, lat] = coordinates;
-  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
   return { lat, lng };
 };
 
@@ -71,7 +70,7 @@ const valuesEqual = (a: unknown, b: unknown) => {
 const toDateISOString = (value: Date | string | null | undefined) => {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
   }
@@ -81,9 +80,7 @@ const toDateISOString = (value: Date | string | null | undefined) => {
 /**
  * Maps raw database fields to the common Loo interface.
  */
-const mapSharedLooFields = (
-  source: Partial<toilets> | null | undefined,
-): LooCommon => ({
+const mapSharedLooFields = (source: Partial<toilets> | null | undefined): LooCommon => ({
   geohash: source?.geohash ?? null,
   accessible: source?.accessible ?? null,
   active: source?.active ?? null,
@@ -117,16 +114,12 @@ export const buildAreaFromJoin = (
   name?: string | null,
   type?: string | null,
 ): Partial<areas> | null =>
-  name == null && type == null
-    ? null
-    : { name: name ?? null, type: type ?? null };
+  name == null && type == null ? null : { name: name ?? null, type: type ?? null };
 
 /**
  * Maps a raw Prisma Loo result to the public API response format.
  */
-export const mapLoo = (
-  loo: toilets & { areas?: Partial<areas> | null },
-): LooResponse => ({
+export const mapLoo = (loo: toilets & { areas?: Partial<areas> | null }): LooResponse => ({
   id: loo.id.toString(),
   name: loo.name ?? null,
   area: mapArea(loo.areas),
@@ -134,9 +127,7 @@ export const mapLoo = (
   updatedAt: toDateISOString(loo.updated_at),
   verifiedAt: toDateISOString(loo.verified_at),
   reports: [],
-  contributorsCount: Array.isArray(loo.contributors)
-    ? loo.contributors.length
-    : 0,
+  contributorsCount: Array.isArray(loo.contributors) ? loo.contributors.length : 0,
   ...mapSharedLooFields(loo),
 });
 
@@ -190,11 +181,9 @@ export const genLooFilterBitmask = (loo: {
   );
 };
 
-type AuditRecord = Pick<record_version, 'id' | 'record' | 'old_record'>;
+type AuditRecord = Pick<record_version, "id" | "record" | "old_record">;
 
-const buildReportSnapshot = (
-  source: Partial<toilets> | null | undefined,
-) => ({
+const buildReportSnapshot = (source: Partial<toilets> | null | undefined) => ({
   name: source?.name ?? null,
   verifiedAt: toDateISOString(source?.verified_at),
   ...mapSharedLooFields(source),
@@ -211,10 +200,7 @@ const calculateReportDiff = (
   const diff: Record<string, { previous: unknown; current: unknown }> = {};
 
   if (previousSnapshot) {
-    const keys = new Set([
-      ...Object.keys(previousSnapshot),
-      ...Object.keys(currentSnapshot),
-    ]);
+    const keys = new Set([...Object.keys(previousSnapshot), ...Object.keys(currentSnapshot)]);
     for (const key of keys) {
       const nextValue = currentSnapshot[key];
       const prevValue = previousSnapshot[key];
@@ -251,17 +237,15 @@ export const mapAuditRecordToReport = ({
 }: AuditRecord): ReportResponse => {
   const typed = ToiletsRecordSchema.parse(record ?? {});
   const previous = oldRecord ? ToiletsRecordSchema.parse(oldRecord) : null;
-  const contributors = Array.isArray(typed.contributors)
-    ? typed.contributors
-    : [];
-  const latestContributor =
-    contributors.length > 0 ? contributors[contributors.length - 1] : null;
+  const contributors = Array.isArray(typed.contributors) ? typed.contributors : [];
+  const latestContributor = contributors.length > 0 ? contributors[contributors.length - 1] : null;
 
   // For the first report (genesis), use the loo's created_at timestamp.
   // For subsequent reports, use the loo's updated_at timestamp.
-  const createdAt = previous === null
-    ? toDateISOString(typed.created_at) ?? new Date().toISOString()
-    : toDateISOString(typed.updated_at) ?? new Date().toISOString();
+  const createdAt =
+    previous === null
+      ? (toDateISOString(typed.created_at) ?? new Date().toISOString())
+      : (toDateISOString(typed.updated_at) ?? new Date().toISOString());
 
   const shared = mapSharedLooFields(typed);
   const currentSnapshot = buildReportSnapshot(typed);
@@ -271,7 +255,7 @@ export const mapAuditRecordToReport = ({
 
   return {
     id: id.toString(),
-    contributor: latestContributor ?? 'Anonymous',
+    contributor: latestContributor ?? "Anonymous",
     createdAt,
     verifiedAt: toDateISOString(typed.verified_at),
     diff: Object.keys(diff).length ? diff : null,
