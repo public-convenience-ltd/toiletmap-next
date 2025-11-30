@@ -1,60 +1,60 @@
-import { Context } from 'hono';
-import { Layout } from '../../components/Layout';
-import { Button, Badge, CollapsibleCard } from '../../components/DesignSystem';
-import { AppVariables, Env, RequestUser } from '../../../types';
-import { extractContributor } from '../../../utils/auth-utils';
-import { createPrismaClient } from '../../../prisma';
+import { Context } from "hono";
+import { Layout } from "../../components/Layout";
+import { Button, Badge, CollapsibleCard } from "../../components/DesignSystem";
+import { AppVariables, Env, RequestUser } from "../../../types";
+import { extractContributor } from "../../../utils/auth-utils";
+import { createPrismaClient } from "../../../prisma";
 import {
   ContributorReport,
   ContributorStats,
   ContributorSuggestion,
   UserInsightsService,
-} from '../../../services/contributor';
-import { RECENT_WINDOW_DAYS } from '../../../common/constants';
-import { logger } from '../../../utils/logger';
+} from "../../../services/contributor";
+import { RECENT_WINDOW_DAYS } from "../../../common/constants";
+import { logger } from "../../../utils/logger";
 
 type AdminContext = Context<{ Bindings: Env; Variables: AppVariables }>;
 
-const numberFormatter = new Intl.NumberFormat('en-GB');
-const dateFormatter = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
+const numberFormatter = new Intl.NumberFormat("en-GB");
+const dateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
 });
-const dateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
+const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
 });
 
 const formatNumber = (value: number) => numberFormatter.format(value);
 const formatDate = (value: string | null) =>
-  value ? dateFormatter.format(new Date(value)) : '—';
+  value ? dateFormatter.format(new Date(value)) : "—";
 const formatDateTime = (value: string | null) =>
-  value ? dateTimeFormatter.format(new Date(value)) : '—';
+  value ? dateTimeFormatter.format(new Date(value)) : "—";
 
 const formatDiffValue = (value: unknown) => {
-  if (value === null || value === undefined) return '—';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'number') return numberFormatter.format(value);
-  if (Array.isArray(value)) return value.join(', ');
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return numberFormatter.format(value);
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 };
 
 const buildUserName = (user: RequestUser | undefined) =>
-  user?.name || user?.nickname || user?.email || user?.sub || 'Signed-in user';
+  user?.name || user?.nickname || user?.email || user?.sub || "Signed-in user";
 
 const buildAffordanceMessage = (
-  summary: ContributorStats['summary'],
+  summary: ContributorStats["summary"]
 ): string => {
   if (summary.totalEvents === 0 && summary.totalLoos === 0) {
-    return 'We have not recorded any edits for this contributor yet.';
+    return "We have not recorded any edits for this contributor yet.";
   }
   if (!summary.lastSeenAt) {
-    return 'Edits detected, but we have no timestamp available.';
+    return "Edits detected, but we have no timestamp available.";
   }
   return `Latest activity recorded on ${formatDateTime(summary.lastSeenAt)}.`;
 };
@@ -62,13 +62,13 @@ const buildAffordanceMessage = (
 const buildSuggestionLinks = (
   suggestions: ContributorSuggestion[],
   selectedHandle: string,
-  searchTerm: string,
+  searchTerm: string
 ) =>
   suggestions.map((entry) => {
-    const link = new URL('/admin/users/statistics', 'http://localhost');
-    link.searchParams.set('handle', entry.handle);
+    const link = new URL("/admin/users/statistics", "http://localhost");
+    link.searchParams.set("handle", entry.handle);
     if (searchTerm) {
-      link.searchParams.set('search', searchTerm);
+      link.searchParams.set("search", searchTerm);
     }
     return {
       ...entry,
@@ -88,56 +88,55 @@ const buildReportDiffPreview = (report: ContributorReport) => {
 };
 
 const diffLabelMap: Record<string, string> = {
-  accessible: 'Accessible',
-  active: 'Active status',
-  notes: 'Public notes',
-  paymentDetails: 'Payment details',
-  payment_details: 'Payment details',
-  removalReason: 'Removal reason',
-  removal_reason: 'Removal reason',
-  verifiedAt: 'Verification date',
-  verified_at: 'Verification date',
-  updated_at: 'Last updated',
-  openingTimes: 'Opening hours',
-  opening_times: 'Opening hours',
-  noPayment: 'Free to use',
-  no_payment: 'Free to use',
-  babyChange: 'Baby change',
-  baby_change: 'Baby change',
-  radar: 'Radar key',
-  area_id: 'Area',
+  accessible: "Accessible",
+  active: "Active status",
+  notes: "Public notes",
+  paymentDetails: "Payment details",
+  payment_details: "Payment details",
+  removalReason: "Removal reason",
+  removal_reason: "Removal reason",
+  verifiedAt: "Verification date",
+  verified_at: "Verification date",
+  updated_at: "Last updated",
+  openingTimes: "Opening hours",
+  opening_times: "Opening hours",
+  noPayment: "Free to use",
+  no_payment: "Free to use",
+  babyChange: "Baby change",
+  baby_change: "Baby change",
+  radar: "Radar key",
+  area_id: "Area",
 };
 
 const formatDiffLabel = (field: string) => {
   if (diffLabelMap[field]) return diffLabelMap[field];
   return field
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-const renderDiffValue = (
-  value: unknown,
-  variant: 'previous' | 'current',
-) => (
+const renderDiffValue = (value: unknown, variant: "previous" | "current") => (
   <span class={`diff-chip diff-chip--${variant}`}>
     <span class="diff-chip__label">
-      {variant === 'previous' ? 'Was' : 'Now'}
+      {variant === "previous" ? "Was" : "Now"}
     </span>
     <span class="diff-chip__value">{formatDiffValue(value)}</span>
   </span>
 );
 
 export const userStatistics = async (c: AdminContext) => {
-  const requestUser = c.get('user');
+  const requestUser = c.get("user");
   const defaultHandle =
-    extractContributor(requestUser, c.env.AUTH0_PROFILE_KEY) ?? '';
-  const selectedHandleParam = (c.req.query('handle') ?? '').trim();
+    extractContributor(requestUser, c.env.AUTH0_PROFILE_KEY) ?? "";
+  const selectedHandleParam = (c.req.query("handle") ?? "").trim();
   const selectedHandle = selectedHandleParam || defaultHandle;
-  const searchTerm = (c.req.query('search') ?? '').trim();
-  const connectionString = c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_DB?.connectionString;
+  const searchTerm = (c.req.query("search") ?? "").trim();
+  const connectionString =
+    c.env.HYPERDRIVE?.connectionString ??
+    c.env.TEST_HYPERDRIVE?.connectionString;
   if (!connectionString) {
-    throw new Error('No database connection string available');
+    throw new Error("No database connection string available");
   }
   const prisma = createPrismaClient(connectionString);
   const insightsService = new UserInsightsService(prisma);
@@ -152,13 +151,13 @@ export const userStatistics = async (c: AdminContext) => {
     if (error instanceof Error) {
       logger.logError(error, { searchTerm });
     } else {
-      logger.error('Failed to load contributor suggestions in admin page', {
+      logger.error("Failed to load contributor suggestions in admin page", {
         searchTerm,
         errorMessage: String(error),
       });
     }
     suggestionsError =
-      error instanceof Error ? error.message : 'Unable to load suggestions.';
+      error instanceof Error ? error.message : "Unable to load suggestions.";
   }
 
   let stats: ContributorStats | null = null;
@@ -170,7 +169,7 @@ export const userStatistics = async (c: AdminContext) => {
       if (error instanceof Error) {
         logger.logError(error, { contributor: selectedHandle });
       } else {
-        logger.error('Failed to load contributor stats in admin page', {
+        logger.error("Failed to load contributor stats in admin page", {
           contributor: selectedHandle,
           errorMessage: String(error),
         });
@@ -178,7 +177,7 @@ export const userStatistics = async (c: AdminContext) => {
       statsError =
         error instanceof Error
           ? error.message
-          : 'Unable to load contributor statistics.';
+          : "Unable to load contributor statistics.";
     }
   }
 
@@ -187,13 +186,13 @@ export const userStatistics = async (c: AdminContext) => {
   const suggestionLinks = buildSuggestionLinks(
     suggestions,
     selectedHandle,
-    searchTerm,
+    searchTerm
   );
-  const handleDisplay = selectedHandle || 'Not configured';
+  const handleDisplay = selectedHandle || "Not configured";
 
   const statsContext = stats
     ? buildAffordanceMessage(stats.summary)
-    : 'Select a contributor to see their details.';
+    : "Select a contributor to see their details.";
 
   return c.html(
     <Layout title="User Statistics">
@@ -455,7 +454,9 @@ export const userStatistics = async (c: AdminContext) => {
 
       <div class="page-header">
         <div>
-          <p class="form-label" style="margin: 0;">Contributor statistics</p>
+          <p class="form-label" style="margin: 0;">
+            Contributor statistics
+          </p>
           <h1 style="margin: var(--space-3xs) 0;">User statistics</h1>
           <p style="color: var(--color-neutral-grey); margin: 0;">
             Viewing contributions recorded for <strong>{handleDisplay}</strong>
@@ -468,7 +469,9 @@ export const userStatistics = async (c: AdminContext) => {
           {defaultHandle && !viewingSelf && (
             <Button
               variant="secondary"
-              href={`/admin/users/statistics?handle=${encodeURIComponent(defaultHandle)}`}
+              href={`/admin/users/statistics?handle=${encodeURIComponent(
+                defaultHandle
+              )}`}
             >
               Jump to my stats
             </Button>
@@ -545,12 +548,12 @@ export const userStatistics = async (c: AdminContext) => {
               <strong>
                 {searchTerm
                   ? `Matches for “${searchTerm}”`
-                  : 'Recently active contributors'}
+                  : "Recently active contributors"}
               </strong>
               <span class="muted-text">
                 {suggestions.length
-                  ? 'Select a contributor to load their statistics'
-                  : 'No contributors to show'}
+                  ? "Select a contributor to load their statistics"
+                  : "No contributors to show"}
               </span>
             </div>
             {suggestions.length ? (
@@ -558,7 +561,7 @@ export const userStatistics = async (c: AdminContext) => {
                 {suggestionLinks.map((entry) => (
                   <li
                     class={`suggestions-item${
-                      entry.isActive ? ' suggestions-item--active' : ''
+                      entry.isActive ? " suggestions-item--active" : ""
                     }`}
                     key={entry.handle}
                   >
@@ -577,8 +580,8 @@ export const userStatistics = async (c: AdminContext) => {
             ) : (
               <p class="muted-text" style="margin: 0;">
                 {searchTerm
-                  ? 'No contributors match this search.'
-                  : 'We have not recorded any contributors yet.'}
+                  ? "No contributors match this search."
+                  : "We have not recorded any contributors yet."}
               </p>
             )}
           </>
@@ -586,12 +589,17 @@ export const userStatistics = async (c: AdminContext) => {
       </CollapsibleCard>
 
       {statsError && (
-        <div class="notification notification--error" style="margin-bottom: var(--space-l);">
+        <div
+          class="notification notification--error"
+          style="margin-bottom: var(--space-l);"
+        >
           <div class="notification__icon">
             <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
           </div>
           <div class="notification__content">
-            <p class="notification__title">Contributor statistics unavailable</p>
+            <p class="notification__title">
+              Contributor statistics unavailable
+            </p>
             <p class="notification__message">{statsError}</p>
           </div>
         </div>
@@ -647,9 +655,7 @@ export const userStatistics = async (c: AdminContext) => {
                 <p class="metric-value">
                   {formatNumber(stats.summary.recentLoos)}
                 </p>
-                <p class="metric-meta">
-                  within {RECENT_WINDOW_DAYS} days
-                </p>
+                <p class="metric-meta">within {RECENT_WINDOW_DAYS} days</p>
               </div>
             </div>
             <p style="margin-top: var(--space-m); color: var(--color-neutral-grey);">
@@ -670,11 +676,19 @@ export const userStatistics = async (c: AdminContext) => {
               {stats.areas.length ? (
                 <ul class="area-list">
                   {stats.areas.map((area) => (
-                    <li key={`${area.areaId ?? 'unassigned'}-${area.name ?? 'unknown'}`}>
+                    <li
+                      key={`${area.areaId ?? "unassigned"}-${
+                        area.name ?? "unknown"
+                      }`}
+                    >
                       <span>
-                        {area.name || 'Unassigned'}{' '}
+                        {area.name || "Unassigned"}{" "}
                         <span class="muted-text">
-                          ({area.areaId ? `#${area.areaId.slice(-6)}` : 'no-area'})
+                          (
+                          {area.areaId
+                            ? `#${area.areaId.slice(-6)}`
+                            : "no-area"}
+                          )
                         </span>
                       </span>
                       <strong>{formatNumber(area.count)}</strong>
@@ -707,11 +721,11 @@ export const userStatistics = async (c: AdminContext) => {
                             href={`/admin/loos/${loo.id}`}
                             style="text-decoration: none; color: inherit;"
                           >
-                            {loo.name || 'Unnamed loo'}
+                            {loo.name || "Unnamed loo"}
                           </a>
                         </strong>
                         <p class="muted-text" style="margin: 0;">
-                          {loo.areaName || 'Area unknown'} • Updated{' '}
+                          {loo.areaName || "Area unknown"} • Updated{" "}
                           {formatDateTime(loo.updatedAt)}
                         </p>
                       </div>
@@ -755,7 +769,7 @@ export const userStatistics = async (c: AdminContext) => {
                   {stats.recentReports.map((report, index) => {
                     const diffPreview = buildReportDiffPreview(report);
                     const eventTime = formatDateTime(
-                      report.occurredAt || report.createdAt,
+                      report.occurredAt || report.createdAt
                     );
                     return (
                       <details
@@ -772,13 +786,13 @@ export const userStatistics = async (c: AdminContext) => {
                               <span class="timeline-summary__meta">
                                 {report.looId
                                   ? `Loo #${report.looId.slice(-6)}`
-                                  : 'Snapshot'}
+                                  : "Snapshot"}
                               </span>
                             </div>
                             {diffPreview && (
                               <span class="timeline-summary__meta">
                                 {diffPreview.total} field
-                                {diffPreview.total > 1 ? 's' : ''} changed
+                                {diffPreview.total > 1 ? "s" : ""} changed
                               </span>
                             )}
                           </div>
@@ -804,30 +818,41 @@ export const userStatistics = async (c: AdminContext) => {
                                 href={`/admin/loos/${report.looId}`}
                                 style="font-weight: 600; text-decoration: none; color: var(--color-primary-navy);"
                               >
-                                {report.looName || 'Unnamed loo'}
+                                {report.looName || "Unnamed loo"}
                               </a>
                             ) : (
                               <span style="font-weight: 600;">
-                                {report.looName || 'Unnamed loo'}
+                                {report.looName || "Unnamed loo"}
                               </span>
                             )}
                           </div>
                           {report.diff ? (
                             <ul class="diff-list">
-                              {Object.entries(report.diff).map(([field, value]) => (
-                                <li class="diff-entry" key={field}>
-                                  <div class="diff-entry__field">
-                                    {formatDiffLabel(field)}
-                                  </div>
-                                  <div class="diff-entry__values">
-                                    {renderDiffValue(value.previous, 'previous')}
-                                    <span class="diff-arrow" aria-hidden="true">
-                                      &rarr;
-                                    </span>
-                                    {renderDiffValue(value.current, 'current')}
-                                  </div>
-                                </li>
-                              ))}
+                              {Object.entries(report.diff).map(
+                                ([field, value]) => (
+                                  <li class="diff-entry" key={field}>
+                                    <div class="diff-entry__field">
+                                      {formatDiffLabel(field)}
+                                    </div>
+                                    <div class="diff-entry__values">
+                                      {renderDiffValue(
+                                        value.previous,
+                                        "previous"
+                                      )}
+                                      <span
+                                        class="diff-arrow"
+                                        aria-hidden="true"
+                                      >
+                                        &rarr;
+                                      </span>
+                                      {renderDiffValue(
+                                        value.current,
+                                        "current"
+                                      )}
+                                    </div>
+                                  </li>
+                                )
+                              )}
                             </ul>
                           ) : (
                             <p class="muted-text" style="margin: 0;">
@@ -884,27 +909,28 @@ export const userStatistics = async (c: AdminContext) => {
         <dl class="profile-grid">
           <div>
             <dt>Email</dt>
-            <dd>{requestUser?.email || '—'}</dd>
+            <dd>{requestUser?.email || "—"}</dd>
           </div>
           <div>
             <dt>Auth0 subject</dt>
-            <dd style="word-break: break-all;">
-              {requestUser?.sub || '—'}
-            </dd>
+            <dd style="word-break: break-all;">{requestUser?.sub || "—"}</dd>
           </div>
           <div>
             <dt>Nickname</dt>
-            <dd>{requestUser?.nickname || '—'}</dd>
+            <dd>{requestUser?.nickname || "—"}</dd>
           </div>
         </dl>
         {!defaultHandle && (
-          <p class="notification notification--info" style="margin-top: var(--space-m);">
-            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>&nbsp;
-            Set <code>AUTH0_PROFILE_KEY</code> or ensure your Auth0 profile has a
+          <p
+            class="notification notification--info"
+            style="margin-top: var(--space-m);"
+          >
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>&nbsp; Set{" "}
+            <code>AUTH0_PROFILE_KEY</code> or ensure your Auth0 profile has a
             nickname to automatically attribute your edits.
           </p>
         )}
       </section>
-    </Layout>,
+    </Layout>
   );
 };

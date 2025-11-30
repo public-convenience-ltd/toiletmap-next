@@ -4,16 +4,13 @@
   "version": "0.1.0",
   "description": "Monorepo for Toilet Map workers",
   "scripts": {
-    "dev": "pnpm run dev:server",
     "dev:server": "pnpm --filter toiletmap-server dev",
     "dev:client": "pnpm --filter toiletmap-client dev",
-    "build": "pnpm run build:server && pnpm run build:client",
     "build:server": "pnpm --filter toiletmap-server build",
     "build:client": "pnpm --filter toiletmap-client build",
-    "deploy": "pnpm run deploy:server && pnpm run deploy:client",
     "deploy:server": "pnpm --filter toiletmap-server run deploy",
     "deploy:client": "pnpm --filter toiletmap-client run deploy",
-    "test:e2e": "pnpm --filter toiletmap-server test:e2e"
+    "test:server:e2e": "pnpm --filter toiletmap-server test:e2e"
   },
   "pnpm": {
     "overrides": {

@@ -11,6 +11,7 @@ The application uses **Cloudflare Hyperdrive bindings** for all runtime database
 ### Runtime Connections (Application Code)
 
 **Production:**
+
 - Uses the `HYPERDRIVE` binding configured in Cloudflare dashboard
 - Provides:
   - Fast connection setup at the edge (reduces 7 round trips to 1)
@@ -19,19 +20,22 @@ The application uses **Cloudflare Hyperdrive bindings** for all runtime database
 - Configured via wrangler.jsonc: `hyperdrive[].binding = "HYPERDRIVE"`
 
 **Development:**
-- Uses the `TEST_DB` binding for local development
+
+- Uses the `TEST_HYPERDRIVE` binding for local development
 - Connects to local Supabase instance by default (port 54322)
 - Same Hyperdrive architecture, but with `localConnectionString` for local database
 - Configured via wrangler.jsonc: `env.development.hyperdrive[].localConnectionString`
 
 **Key Difference:**
+
 - `HYPERDRIVE` (production) points to the remote production database via Cloudflare dashboard configuration
-- `TEST_DB` (development) points to your local database via `localConnectionString` in wrangler.jsonc
+- `TEST_HYPERDRIVE` (development) points to your local database via `localConnectionString` in wrangler.jsonc
 
 > **Learn More**: See [Hyperdrive architecture documentation](../architecture/hyperdrive.md) for comprehensive details on how Hyperdrive accelerates database queries.
 
 **Override Variable:**
-- `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB` - Override TEST_DB's local connection without modifying wrangler.jsonc
+
+- `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE` - Override TEST_HYPERDRIVE's local connection without modifying wrangler.jsonc
 - Useful for:
   - Testing against a remote database
   - Running multiple Supabase instances on different ports
@@ -39,26 +43,31 @@ The application uses **Cloudflare Hyperdrive bindings** for all runtime database
   - Different local PostgreSQL setups per developer
 
 **Connection Priority:**
+
 ```typescript
 // Application runtime connection logic (src/middleware/services.ts)
-const connectionString = c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_DB?.connectionString;
+const connectionString =
+  c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_HYPERDRIVE?.connectionString;
 ```
 
 This fallback logic ensures:
+
 1. Production uses `HYPERDRIVE` binding
-2. Development uses `TEST_DB` binding
-3. If `HYPERDRIVE` is missing (local dev), fall back to `TEST_DB`
+2. Development uses `TEST_HYPERDRIVE` binding
+3. If `HYPERDRIVE` is missing (local dev), fall back to `TEST_HYPERDRIVE`
 
 ### Database Migrations
 
 **Important:** We do NOT use Prisma migrations because Prisma doesn't fully support our database schema (PostGIS extensions, custom functions, etc.).
 
 Our migration process is:
+
 1. **Create Supabase migration file** in `supabase/migrations/`
 2. **Update Prisma schema** in `prisma/schema.prisma` to reflect the changes
 3. **Generate Prisma client** with `pnpm prisma:generate`
 
 Example workflow:
+
 ```bash
 # 1. Create a new Supabase migration
 pnpm supabase migration new add_new_column
@@ -78,30 +87,35 @@ pnpm prisma:generate
 ### Common Scenarios
 
 **Scenario 1: Standard local development**
+
 ```bash
-# wrangler.jsonc handles TEST_DB binding automatically
+# wrangler.jsonc handles TEST_HYPERDRIVE binding automatically
 # Just run: pnpm dev
 ```
 
 **Scenario 2: Test against remote database**
+
 ```bash
 # In .env
-CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=postgresql://user:pass@remote-host:5432/db
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE=postgresql://user:pass@remote-host:5432/db
 
 # Runtime uses remote database
 ```
 
 **Scenario 3: Multiple Supabase instances**
+
 ```bash
 # Terminal 2: Different project (port 54323)
-CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=postgresql://postgres:postgres@localhost:54323/postgres
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE=postgresql://postgres:postgres@localhost:54323/postgres
 ```
 
 **Scenario 4: CI/CD environment**
+
 ```bash
 # GitHub Actions sets the connection string
-CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=${{ secrets.TEST_DATABASE_URL }}
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE=${{ secrets.TEST_DATABASE_URL }}
 ```
+
 2. Run `pnpm install` (workspace root).
 3. Generate the Prisma client with `pnpm prisma:generate` whenever the schema changes.
 
@@ -125,6 +139,7 @@ By default, local development uses a **test auth server** instead of production 
 ```
 
 **Benefits:**
+
 - No Auth0 account required
 - Consistent with integration test environment
 - Fast setup for new developers
@@ -160,6 +175,7 @@ pnpm auth:server  # Auth server only (use with pnpm dev:api or remote workers)
 ```
 
 **Supported endpoints:**
+
 - `/.well-known/jwks.json` - JWKS for JWT validation
 - `/authorize` - OAuth2 authorization endpoint (admin UI login)
 - `/oauth/token` - OAuth2 token exchange

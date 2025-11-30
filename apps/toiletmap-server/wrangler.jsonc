@@ -8,10 +8,26 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  // Development runtime database connection
+  // localConnectionString is used for local dev and can be overridden with
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE environment variable
+  "hyperdrive": [
+    {
+      "binding": "TEST_HYPERDRIVE",
+      "id": "c020574a-5623-407b-be0c-cd192bab9545",
+      "localConnectionString": "postgresql://toiletmap_web:toiletmap_web@localhost:54322/postgres"
+    }
+  ],
+  // Test auth server configuration for local development
+  // This allows development without Auth0 credentials
+  // Override these in .env to test against production Auth0
   "vars": {
-    "AUTH0_ISSUER_BASE_URL": "https://gbptm.eu.auth0.com/",
-    "AUTH0_AUDIENCE": "https://www.toiletmap.org.uk/api",
-    "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
+    "AUTH0_REDIRECT_URI": "http://localhost:8787/admin/callback",
+    "AUTH0_ISSUER_BASE_URL": "http://127.0.0.1:44555/",
+    "AUTH0_AUDIENCE": "https://toiletmap.org.uk",
+    "AUTH0_CLIENT_ID": "test_client_id",
+    "AUTH0_CLIENT_SECRET": "test_client_secret",
+    "AUTH0_PROFILE_KEY": "name",
     "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
     "AUTH0_SCOPE": "openid profile email offline_access roles access:admin"
   },
@@ -24,7 +40,7 @@
         "AUTH0_AUDIENCE": "https://www.toiletmap.org.uk/api",
         "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
         "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
-        "AUTH0_SCOPE": "openid profile email offline_access roles access:admin"
+        "AUTH0_SCOPE": "openid profile email offline_access roles"
       },
       // Production runtime database connection via Hyperdrive
       // Provides connection pooling, caching, and optimized database access
@@ -56,31 +72,6 @@
           "simple": { "limit": 5, "period": 60 }
         }
       ]
-    },
-    "development": {
-      // Development runtime database connection
-      // localConnectionString is used for local dev and can be overridden with
-      // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB environment variable
-      "hyperdrive": [
-        {
-          "binding": "TEST_DB",
-          "id": "c020574a-5623-407b-be0c-cd192bab9545",
-          "localConnectionString": "postgresql://toiletmap_web:toiletmap_web@localhost:54322/postgres"
-        }
-      ],
-      // Test auth server configuration for local development
-      // This allows development without Auth0 credentials
-      // Override these in .env to test against production Auth0
-      "vars": {
-        "AUTH0_REDIRECT_URI": "http://localhost:8787/admin/callback",
-        "AUTH0_ISSUER_BASE_URL": "http://127.0.0.1:44555/",
-        "AUTH0_AUDIENCE": "https://toiletmap.org.uk",
-        "AUTH0_CLIENT_ID": "test_client_id",
-        "AUTH0_CLIENT_SECRET": "test_client_secret",
-        "AUTH0_PROFILE_KEY": "name",
-        "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
-        "AUTH0_SCOPE": "openid profile email offline_access roles access:admin"
-      }
     }
   },
   "observability": {

@@ -26,7 +26,7 @@ export type RequestUser = Auth0User & {
  */
 export interface Env {
   // Required environment variables
-  TEST_DB: Hyperdrive;
+  TEST_HYPERDRIVE: Hyperdrive;
   HYPERDRIVE: Hyperdrive;
   AUTH0_ISSUER_BASE_URL: string;
   AUTH0_AUDIENCE: string;
@@ -45,7 +45,7 @@ export interface Env {
   AUTH0_MANAGEMENT_AUDIENCE?: string;
 
   // Environment configuration
-  ENVIRONMENT?: 'production' | 'development';
+  ENVIRONMENT?: "production" | "development";
   ALLOWED_ORIGINS?: string; // Comma-separated list of allowed CORS origins
 
   // Cloudflare Rate Limiting API bindings
@@ -62,7 +62,7 @@ interface RateLimiter {
   }>;
 }
 
-import { LooService } from './services/loo';
+import { LooService } from "./services/loo";
 
 export type AppVariables = {
   user?: RequestUser;

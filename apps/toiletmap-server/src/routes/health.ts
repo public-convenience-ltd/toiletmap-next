@@ -47,9 +47,11 @@ healthRouter.get("/ready", async (c) => {
   // Check database connectivity
   const dbCheckStart = Date.now();
   try {
-    const connectionString = c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_DB?.connectionString;
+    const connectionString =
+      c.env.HYPERDRIVE?.connectionString ??
+      c.env.TEST_HYPERDRIVE?.connectionString;
     if (!connectionString) {
-      throw new Error('No database connection string available');
+      throw new Error("No database connection string available");
     }
     const db = createPrismaClient(connectionString);
 

@@ -17,6 +17,7 @@ Hyperdrive accelerates database queries through three key mechanisms:
 ### 1. Edge Connection Setup
 
 **Without Hyperdrive**, every Worker invocation establishes a connection directly to the origin database, incurring multiple round trips:
+
 - TCP handshake (1 round trip)
 - TLS negotiation (3 round trips)
 - Database authentication (3 round trips)
@@ -31,16 +32,16 @@ graph LR
         Worker[Worker]
         HD[Hyperdrive Edge]
     end
-    
+
     subgraph "Database Region"
         Pool[Connection Pool]
         DB[(PostgreSQL)]
     end
-    
+
     Worker -->|Fast local setup| HD
     HD -->|Single round trip| Pool
     Pool -->|Reuse connection| DB
-    
+
     style Worker fill:#f9f,stroke:#333,stroke-width:2px
     style HD fill:#ff9,stroke:#333,stroke-width:2px
     style DB fill:#b8e6ff,stroke:#333,stroke-width:2px
@@ -51,12 +52,14 @@ graph LR
 Hyperdrive maintains a pool of persistent connections to your database, placed in regions closest to your origin database. This minimizes latency and maximizes connection reuse.
 
 **Key features:**
+
 - **Connection reuse**: Pre-existing connections are reused across multiple Worker invocations
 - **Optimal placement**: The pool is located near your database to minimize network latency for uncached queries
 - **Automatic management**: Hyperdrive automatically manages pool size and connection lifecycle
 - **Soft limits**: The `max_size` parameter acts as a soft limit; Hyperdrive may temporarily create additional connections during high traffic or network issues
 
 **Configuration:**
+
 ```jsonc
 // wrangler.jsonc
 {
@@ -70,35 +73,40 @@ Hyperdrive maintains a pool of persistent connections to your database, placed i
 ```
 
 In toiletmap-server, we use:
+
 - **Production**: `HYPERDRIVE` binding configured in Cloudflare dashboard
-- **Development**: `TEST_DB` binding with `localConnectionString` for local Supabase
+- **Development**: `TEST_HYPERDRIVE` binding with `localConnectionString` for local Supabase
 
 ### 3. Query Caching
 
 Hyperdrive automatically caches non-mutating (read) queries to reduce load on your database and accelerate response times.
 
 **How it works:**
+
 1. Hyperdrive parses the database wire protocol to differentiate between mutating and non-mutating queries
 2. For `SELECT` and other read-only queries, Hyperdrive caches the response
 3. Subsequent identical queries are served from cache, bypassing the database entirely
 4. Mutating queries (`INSERT`, `UPDATE`, `DELETE`, etc.) are never cached
 
 **Cache settings:**
+
 - `max_age`: 60 seconds (default) - Maximum time a cached response is considered fresh
 - `stale_while_revalidate`: 15 seconds (default) - Time to serve stale results while revalidating
 
 **Cacheable queries:**
+
 ```sql
 -- ✅ Cached: Simple read query
 SELECT * FROM loos WHERE id = 'abc123';
 
 -- ✅ Cached: Complex read query
-SELECT * FROM loos 
+SELECT * FROM loos
 WHERE ST_DWithin(location, ST_SetSRID(ST_MakePoint(-0.1278, 51.5074), 4326), 1000)
 ORDER BY updated_at DESC LIMIT 50;
 ```
 
 **Non-cacheable queries:**
+
 ```sql
 -- ❌ Not cached: Mutating query
 INSERT INTO loos (id, name, location) VALUES (...);
@@ -120,11 +128,11 @@ sequenceDiagram
     participant Edge as Hyperdrive Edge
     participant Pool as Connection Pool
     participant DB as PostgreSQL
-    
+
     Note over Worker: Worker invocation starts
     Worker->>Edge: Connect (fast, local)
     Edge->>Pool: Request connection
-    
+
     alt Pool has available connection
         Pool-->>Edge: Reuse existing connection
     else No available connection
@@ -132,11 +140,11 @@ sequenceDiagram
         DB-->>Pool: Connection established
         Pool-->>Edge: Return new connection
     end
-    
+
     Edge->>DB: Execute query
     DB-->>Edge: Query results
     Edge-->>Worker: Return results
-    
+
     Note over Worker: Worker invocation ends
     Worker->>Edge: Close client connection
     Note over Pool: Connection stays in pool
@@ -156,6 +164,7 @@ Hyperdrive operates in **transaction pooling mode**, where a connection is held 
 ### Transaction Pooling Behavior
 
 **Single transaction:**
+
 ```typescript
 // Each transaction may use different connections from the pool
 await prisma.loos.create({...});  // Transaction 1 (Connection A)
@@ -163,6 +172,7 @@ await prisma.loos.update({...});  // Transaction 2 (Connection B)
 ```
 
 **Explicit transaction:**
+
 ```typescript
 // Explicit transactions hold a single connection
 await prisma.$transaction(async (tx) => {
@@ -196,6 +206,7 @@ When a connection is returned to the pool, it is `RESET` so that `SET` commands 
 ### Named Prepared Statements
 
 Hyperdrive supports named prepared statements as implemented in:
+
 - `postgres.js` driver ✅
 - `node-postgres` driver ✅
 
@@ -228,7 +239,7 @@ The Hyperdrive configuration (including database connection details) is managed 
     "development": {
       "hyperdrive": [
         {
-          "binding": "TEST_DB",
+          "binding": "TEST_HYPERDRIVE",
           "id": "c020574a-5623-407b-be0c-cd192bab9545",
           "localConnectionString": "postgresql://toiletmap_web:toiletmap_web@localhost:54322/postgres"
         }
@@ -238,7 +249,7 @@ The Hyperdrive configuration (including database connection details) is managed 
 }
 ```
 
-For local development, we use a separate `TEST_DB` binding that connects to the local Supabase instance.
+For local development, we use a separate `TEST_HYPERDRIVE` binding that connects to the local Supabase instance.
 
 ### Connection String Priority
 
@@ -246,12 +257,11 @@ Our application resolves the connection string with this priority:
 
 ```typescript
 // src/middleware/services.ts
-const connectionString = 
-  c.env.HYPERDRIVE?.connectionString ?? 
-  c.env.TEST_DB?.connectionString;
+const connectionString =
+  c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_HYPERDRIVE?.connectionString;
 ```
 
-This allows seamless fallback from production (`HYPERDRIVE`) to development (`TEST_DB`) environments.
+This allows seamless fallback from production (`HYPERDRIVE`) to development (`TEST_HYPERDRIVE`) environments.
 
 ### Environment Variable Override
 
@@ -259,10 +269,11 @@ You can override the local connection string without modifying `wrangler.jsonc`:
 
 ```bash
 # .env or .env.local
-CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=postgresql://user:pass@localhost:5432/db
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE=postgresql://user:pass@localhost:5432/db
 ```
 
 This is useful for:
+
 - Testing against remote databases
 - Running multiple Supabase instances on different ports
 - CI/CD environments with custom database URLs
@@ -292,6 +303,7 @@ Unlike regular Workers, Durable Objects can maintain state across requests. If y
 **Warning**: Each Durable Object with an open connection consumes pool resources. This can impact other parts of your application.
 
 **Recommendations**:
+
 - Close connections when not actively in use
 - Use connection timeouts
 - Limit the number of Durable Objects with database connections
@@ -299,6 +311,7 @@ Unlike regular Workers, Durable Objects can maintain state across requests. If y
 ### Long-Running Transactions
 
 In transaction pooling mode, a connection is held for the entire transaction duration. Long transactions can:
+
 - Exhaust available connections quickly
 - Block other Worker invocations
 - Reduce overall throughput
@@ -338,12 +351,12 @@ Or configure multiple Hyperdrive connections—one with caching enabled, one wit
 
 Hyperdrive significantly reduces latency for database operations:
 
-| Operation | Without Hyperdrive | With Hyperdrive | Improvement |
-|-----------|-------------------|-----------------|-------------|
-| Connection setup | 7 round trips | 1 round trip (local) | ~85% faster |
-| Read query (cached) | Full database round trip | Edge cache | ~95% faster |
-| Read query (uncached) | Full database round trip | Pooled connection | ~40% faster |
-| Write query | Full database round trip | Pooled connection | ~40% faster |
+| Operation             | Without Hyperdrive       | With Hyperdrive      | Improvement |
+| --------------------- | ------------------------ | -------------------- | ----------- |
+| Connection setup      | 7 round trips            | 1 round trip (local) | ~85% faster |
+| Read query (cached)   | Full database round trip | Edge cache           | ~95% faster |
+| Read query (uncached) | Full database round trip | Pooled connection    | ~40% faster |
+| Write query           | Full database round trip | Pooled connection    | ~40% faster |
 
 ### Scalability
 
@@ -365,6 +378,7 @@ Monitor these metrics in production:
 ### Cloudflare Analytics
 
 View Hyperdrive metrics in the Cloudflare dashboard:
+
 - Request count by cache status (hit/miss)
 - Database query latency distribution
 - Connection pool statistics

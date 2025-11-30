@@ -6,10 +6,10 @@
 #
 # Runtime connections use Hyperdrive bindings (configured in wrangler.jsonc):
 # - Production: HYPERDRIVE binding (configured in Cloudflare dashboard)
-# - Development: TEST_DB binding with localConnectionString
+# - Development: TEST_HYPERDRIVE binding with localConnectionString
 #
-# You can override TEST_DB's localConnectionString without editing wrangler.jsonc:
-# CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=postgresql://user:pass@host:port/db
+# You can override TEST_HYPERDRIVE's localConnectionString without editing wrangler.jsonc:
+# CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE=postgresql://user:pass@host:port/db
 
 # Ensure that supabase can read in our seed data.
 SUPABASE_SCANNER_BUFFER_SIZE=100mb

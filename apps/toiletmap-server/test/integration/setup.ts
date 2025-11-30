@@ -4,7 +4,11 @@ import {
   createPrismaClient,
   type PrismaClientInstance,
 } from "../../src/prisma";
-import { startAuthServer, type AuthServer, type IssueTokenFn } from "./utils/auth-server";
+import {
+  startAuthServer,
+  type AuthServer,
+  type IssueTokenFn,
+} from "./utils/auth-server";
 
 const state: {
   issueToken: IssueTokenFn | null;
@@ -18,12 +22,14 @@ const state: {
 
 /**
  * Gets database URL for tests.
- * Uses CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB (matches TEST_DB binding)
+ * Uses CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE (matches TEST_HYPERDRIVE binding)
  * Falls back to default local Supabase connection.
  */
 const getDatabaseUrl = () => {
-  return process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB
-    || 'postgresql://postgres:postgres@localhost:54322/postgres';
+  return (
+    process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ||
+    "postgresql://postgres:postgres@localhost:54322/postgres"
+  );
 };
 
 beforeAll(async () => {
@@ -56,8 +62,8 @@ afterAll(async () => {
     // Create a privileged client for cleanup
     const databaseUrl = getDatabaseUrl();
     const adminUrl = new URL(databaseUrl);
-    adminUrl.username = 'postgres';
-    adminUrl.password = 'postgres';
+    adminUrl.username = "postgres";
+    adminUrl.password = "postgres";
 
     const adminPrisma = createPrismaClient(adminUrl.toString());
     await adminPrisma.$connect();

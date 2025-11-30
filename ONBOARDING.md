@@ -107,24 +107,26 @@ Before you begin, ensure you have:
 ### Initial Setup
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/public-convenience-ltd/toiletmap-server.git
    cd toiletmap-server
    ```
 
 2. **Install dependencies:**
+
    ```bash
    pnpm install
    ```
 
 3. **Set up environment variables (optional):**
-   
+
    The default configuration in `wrangler.jsonc` is sufficient for local development. You can optionally create a `.env` file to override defaults:
 
    ```bash
    # Optional: Override database connection
-   # CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=postgresql://postgres:postgres@localhost:54322/postgres
-   
+   # CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE=postgresql://postgres:postgres@localhost:54322/postgres
+
    # Optional: Override Auth0 settings to test against production Auth0
    # By default, local development uses test auth server (http://127.0.0.1:44555/)
    # AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
@@ -136,26 +138,31 @@ Before you begin, ensure you have:
    > **Note**: Auth0 credentials are **not required** for local development. The project uses a test auth server by default (see [Authentication for Development](#authentication-for-development) below).
 
 4. **Generate Prisma clients:**
+
    ```bash
    pnpm prisma:generate
    ```
 
    This generates two Prisma clients:
+
    - `src/generated/prisma/` - Cloudflare Workers runtime
    - `test/integration/generated/client/` - Node.js test runtime
 
 5. **Start local database:**
+
    ```bash
    pnpm supabase:start
    ```
 
    This command:
+
    - Starts PostgreSQL 15 with PostGIS in Docker
    - Runs all migrations from `supabase/migrations/`
    - Seeds the database with test data from `supabase/seed.sql`
    - Exposes PostgreSQL on port `54322`
 
 6. **Start development server:**
+
    ```bash
    pnpm dev
    ```
@@ -163,6 +170,7 @@ Before you begin, ensure you have:
    The server starts on [http://localhost:8787](http://localhost:8787)
 
 7. **Verify setup:**
+
    ```bash
    # Health check
    curl http://localhost:8787/
@@ -175,6 +183,7 @@ Before you begin, ensure you have:
 The project includes a **test auth server** that eliminates the need for Auth0 credentials during local development. `pnpm dev` starts it automatically alongside Wrangler and Vite.
 
 **Generate test tokens for API testing:**
+
 ```bash
 # Terminal 1: start the dev stack (includes auth server)
 pnpm dev
@@ -190,6 +199,7 @@ curl -H "Authorization: Bearer $(pnpm token:issue)" http://localhost:8787/api/lo
 > **Note**: `pnpm token:issue` connects to the running auth server on port 44555 to generate tokens with valid keys.
 
 **Run the test auth server:**
+
 ```bash
 pnpm dev          # Full dev stack (Wrangler + Vite + auth server)
 # or, for auth server only:
@@ -200,6 +210,7 @@ pnpm auth:server
 ```
 
 The test auth server provides:
+
 - JWKS endpoint compatible with Auth0 middleware
 - **Full OAuth2 authorization code flow**
 - Valid RS256 JWT tokens
@@ -218,6 +229,7 @@ To test against real Auth0, create a `.env` file with your Auth0 credentials. Th
 Let's make a simple change to verify everything works:
 
 1. **Run the test suite:**
+
    ```bash
    pnpm test:e2e
    ```
@@ -226,16 +238,19 @@ Let's make a simple change to verify everything works:
 
 2. **Make a small change:**
    Open `src/app.ts` and find the health check handler:
+
    ```typescript
-   app.get('/', (c) => c.json({ status: 'ok' }))
+   app.get("/", (c) => c.json({ status: "ok" }));
    ```
 
    Change it to:
+
    ```typescript
-   app.get('/', (c) => c.json({ status: 'ok', version: '1.0.0' }))
+   app.get("/", (c) => c.json({ status: "ok", version: "1.0.0" }));
    ```
 
 3. **Test your change:**
+
    ```bash
    curl http://localhost:8787/
    # Should return: {"status":"ok","version":"1.0.0"}
@@ -299,25 +314,32 @@ Let's trace a typical API request through the system:
 #### `src/routes/`
 
 Route handlers are thin layers that:
+
 - Validate incoming requests with Zod schemas
 - Delegate to service layer
 - Return responses
 
 **Example**: `src/routes/loos/index.ts`
+
 ```typescript
-app.get('/:id', zValidator('param', z.object({ id: z.string() })), async (c) => {
-  const { id } = c.req.valid('param')
-  const loo = await looService.getById(id)
+app.get(
+  "/:id",
+  zValidator("param", z.object({ id: z.string() })),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const loo = await looService.getById(id);
 
-  if (!loo) {
-    return c.json({ message: 'Not found' }, 404)
+    if (!loo) {
+      return c.json({ message: "Not found" }, 404);
+    }
+
+    return c.json(mapLoo(loo));
   }
-
-  return c.json(mapLoo(loo))
-})
+);
 ```
 
 **Key principles**:
+
 - Keep handlers thin (5-10 lines)
 - No business logic in handlers
 - Always validate inputs
@@ -328,6 +350,7 @@ app.get('/:id', zValidator('param', z.object({ id: z.string() })), async (c) => 
 Service layer contains business logic and data access:
 
 **`loo/loo.service.ts`**: Main service class
+
 - `getById(id)` - Fetch single loo
 - `getByIds(ids)` - Batch fetch
 - `search(params)` - Filtered search with pagination
@@ -339,28 +362,33 @@ Service layer contains business logic and data access:
 - `upsert(id, data, contributor)` - Update or insert
 
 **`loo/sql.ts`**: Complex SQL queries
+
 - PostGIS spatial queries
 - Full-text search
 - Dynamic WHERE clause building
 - Raw SQL with Prisma tagged templates
 
 **`loo/mappers.ts`**: Data transformers
+
 - `mapLoo()` - DB record → API response
 - `mapNearbyLoo()` - DB record → Proximity response (with distance)
 - `mapAuditRecordToReport()` - Audit log → Report response
 - Pure functions, no side effects
 
 **`loo/mutation.ts`**: Mutation field mapping
+
 - Maps API request fields to database fields
 - Handles special cases (opening hours, coordinates)
 
 **`loo/persistence.ts`**: Low-level database operations
+
 - `insertLoo()` - Raw INSERT with PostGIS functions
 - `updateLoo()` - Raw UPDATE with array operations
 
 #### `src/middleware/`
 
 **`require-auth.ts`**: Authentication middleware
+
 - Checks `Authorization` header for Bearer token
 - Falls back to `access_token` cookie
 - Verifies JWT with Auth0 JWKS
@@ -368,6 +396,7 @@ Service layer contains business logic and data access:
 - Returns 401 if no valid auth
 
 **`require-admin-role.ts`**: Authorization middleware
+
 - Checks for `access:admin` permission
 - Used to reveal contributor info in reports
 
@@ -376,21 +405,25 @@ Service layer contains business logic and data access:
 Server-side rendered admin interface using Hono JSX:
 
 **`index.tsx`**: Admin router
+
 - Registers all admin routes
 - Applies session middleware
 
 **`auth.ts`**: OAuth2 flow handlers
+
 - `/admin/login` - Redirects to Auth0
 - `/admin/callback` - Exchanges code for tokens
 - `/admin/logout` - Clears session
 
 **`pages/`**: Admin pages
+
 - `Dashboard.tsx` - Admin home
 - `loos/list.tsx` - Dataset explorer
 - `loos/create.tsx` - Loo creation form
 - `Contributors.tsx` - Contributor management
 
 **`components/`**: Reusable UI components
+
 - `Layout.tsx` - Page layout wrapper
 - `Header.tsx` - Navigation header
 - Form components, buttons, etc.
@@ -400,12 +433,14 @@ Server-side rendered admin interface using Hono JSX:
 #### `src/auth/`
 
 **`verify.ts`**: JWT verification logic
+
 - Downloads JWKS from Auth0
 - Verifies RS256 signatures
 - Validates audience and issuer
 - Caches signing keys (5 entries, 10 min TTL)
 
 **`session.ts`**: Cookie session management
+
 - Creates HTTP-only cookies
 - Extracts tokens from cookies
 - Encodes/decodes user info
@@ -423,6 +458,7 @@ E2E integration tests covering all endpoints:
 - `admin/admin.spec.ts` - Admin UI
 
 **`utils/`**: Test helpers
+
 - `auth-server.ts` - Mock JWKS server
 - `test-client.ts` - Direct Worker invocation
 - `fixtures.ts` - Test data factories
@@ -435,6 +471,7 @@ E2E integration tests covering all endpoints:
 The project uses two Prisma clients to support different runtime environments:
 
 1. **Cloudflare Workers client** (`src/generated/prisma/`):
+
    - Uses `@prisma/adapter-pg` for edge runtime
    - No filesystem access (WASM engine)
    - Used in application code
@@ -444,12 +481,13 @@ The project uses two Prisma clients to support different runtime environments:
    - Used only in tests
 
 **Important**: Always import from the correct location:
+
 ```typescript
 // In src/**/*.ts (application code)
-import { PrismaClient } from '@/generated/prisma/client'
+import { PrismaClient } from "@/generated/prisma/client";
 
 // In test/**/*.ts (test code)
-import { PrismaClient } from '../generated/client'
+import { PrismaClient } from "../generated/client";
 ```
 
 #### Opening Hours Special Case
@@ -458,14 +496,14 @@ Opening hours are represented as a 7-element JSON array (Monday through Sunday):
 
 ```typescript
 [
-  ["09:00", "17:00"],  // Monday: 9am-5pm
-  ["09:00", "17:00"],  // Tuesday: 9am-5pm
-  [],                  // Wednesday: Closed
-  ["00:00", "00:00"],  // Thursday: 24 hours (special case!)
-  ["09:00", "17:00"],  // Friday: 9am-5pm
-  ["10:00", "16:00"],  // Saturday: 10am-4pm
-  []                   // Sunday: Closed
-]
+  ["09:00", "17:00"], // Monday: 9am-5pm
+  ["09:00", "17:00"], // Tuesday: 9am-5pm
+  [], // Wednesday: Closed
+  ["00:00", "00:00"], // Thursday: 24 hours (special case!)
+  ["09:00", "17:00"], // Friday: 9am-5pm
+  ["10:00", "16:00"], // Saturday: 10am-4pm
+  [], // Sunday: Closed
+];
 ```
 
 **Important**: `["00:00", "00:00"]` means "open 24 hours", not "closed" or "invalid"! This is handled specially in validation schemas.
@@ -484,7 +522,7 @@ Geohashes enable efficient map tiling queries:
 
 ```typescript
 // Get all toilets in a geohash region
-const loos = await looService.getWithinGeohash('gcpuv')
+const loos = await looService.getWithinGeohash("gcpuv");
 
 // This uses a simple prefix match:
 // WHERE geohash LIKE 'gcpuv%'
@@ -510,6 +548,7 @@ await looService.upsert(id, data, contributor)
 ```
 
 The audit trail is used for:
+
 - Viewing change history (`GET /api/loos/:id/reports`)
 - Tracking contributors
 - Debugging data issues
@@ -520,96 +559,109 @@ The audit trail is used for:
 ### JWT Flow (API Clients)
 
 1. **Client obtains JWT from Auth0:**
+
    ```
    Client → Auth0: Request token
    Auth0 → Client: Returns JWT
    ```
 
 2. **Client makes API request:**
+
    ```bash
    curl -H "Authorization: Bearer eyJhbGc..." \
      http://localhost:8787/api/loos
    ```
 
 3. **Server validates JWT:**
+
    ```typescript
    // src/auth/auth-context.ts
-   const auth = await authenticateRequest(c)
-   if (!auth) throw new HTTPException(401)
-   c.set('user', auth.user) // includes name/email via user.profile
+   const auth = await authenticateRequest(c);
+   if (!auth) throw new HTTPException(401);
+   c.set("user", auth.user); // includes name/email via user.profile
    ```
 
 4. **JWT verification process:**
+
    ```typescript
    // src/auth/verify.ts
 
    // 1. Download JWKS from Auth0
-   const jwks = await fetchJwks(issuerUrl)
+   const jwks = await fetchJwks(issuerUrl);
 
    // 2. Find signing key for JWT
-   const key = jwks.keys.find(k => k.kid === jwt.header.kid)
+   const key = jwks.keys.find((k) => k.kid === jwt.header.kid);
 
    // 3. Verify RS256 signature
-   const valid = crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, payload)
+   const valid = crypto.subtle.verify(
+     "RSASSA-PKCS1-v1_5",
+     key,
+     signature,
+     payload
+   );
 
    // 4. Validate claims
-   assert(jwt.aud === env.AUTH0_AUDIENCE)
-   assert(jwt.iss === env.AUTH0_ISSUER_BASE_URL)
-   assert(jwt.exp > Date.now() / 1000)
+   assert(jwt.aud === env.AUTH0_AUDIENCE);
+   assert(jwt.iss === env.AUTH0_ISSUER_BASE_URL);
+   assert(jwt.exp > Date.now() / 1000);
 
    // 5. Return decoded token
-   return jwt.payload
+   return jwt.payload;
    ```
 
 ### OAuth2 Flow (Admin Interface)
 
 1. **User visits `/admin/login`:**
+
    ```typescript
    // src/admin/auth.ts
-   const authUrl = `${issuer}/authorize?` +
+   const authUrl =
+     `${issuer}/authorize?` +
      `client_id=${clientId}&` +
      `redirect_uri=${redirectUri}&` +
      `response_type=code&` +
-     `scope=${scope}`
+     `scope=${scope}`;
 
-   return c.redirect(authUrl)
+   return c.redirect(authUrl);
    ```
 
 2. **User authenticates on Auth0**
 
 3. **Auth0 redirects back to `/admin/callback`:**
+
    ```typescript
-   const code = c.req.query('code')
+   const code = c.req.query("code");
 
    // Exchange code for tokens
    const response = await fetch(`${issuer}/oauth/token`, {
-     method: 'POST',
+     method: "POST",
      body: JSON.stringify({
-       grant_type: 'authorization_code',
+       grant_type: "authorization_code",
        client_id: clientId,
        client_secret: clientSecret,
        code: code,
-       redirect_uri: redirectUri
-     })
-   })
+       redirect_uri: redirectUri,
+     }),
+   });
 
-   const { access_token, id_token } = await response.json()
+   const { access_token, id_token } = await response.json();
    ```
 
 4. **Server sets HTTP-only cookies:**
-   ```typescript
-   setCookie(c, 'access_token', access_token, { httpOnly: true })
-   setCookie(c, 'id_token', id_token, { httpOnly: true })
-   setCookie(c, 'user_info', base64(userInfo), { httpOnly: true })
 
-   return c.redirect('/admin')
+   ```typescript
+   setCookie(c, "access_token", access_token, { httpOnly: true });
+   setCookie(c, "id_token", id_token, { httpOnly: true });
+   setCookie(c, "user_info", base64(userInfo), { httpOnly: true });
+
+   return c.redirect("/admin");
    ```
 
 5. **Subsequent requests use cookies:**
    ```typescript
    // src/auth/auth-context.ts
-   const auth = await authenticateRequest(c)
-   const user = auth?.user // falls back to id_token if needed
+   const auth = await authenticateRequest(c);
+   const user = auth?.user; // falls back to id_token if needed
    ```
 
 ### Contributor Extraction
@@ -619,11 +671,10 @@ Contributor names are extracted from JWT claims:
 ```typescript
 // src/services/loo/loo.service.ts
 
-const contributorPath = env.AUTH0_PROFILE_KEY || 'name'
-const contributor = contributorPath.split('.').reduce(
-  (obj, key) => obj?.[key],
-  user
-) as string
+const contributorPath = env.AUTH0_PROFILE_KEY || "name";
+const contributor = contributorPath
+  .split(".")
+  .reduce((obj, key) => obj?.[key], user) as string;
 
 // Examples:
 // AUTH0_PROFILE_KEY="name" → user.name
@@ -655,16 +706,17 @@ export function Dashboard() {
         <p>Welcome to the Toilet Map Admin Interface</p>
       </div>
     </Layout>
-  )
+  );
 }
 
 // src/admin/index.tsx
-app.get('/admin', requireAdminAuth, (c) => {
-  return c.html(<Dashboard />)
-})
+app.get("/admin", requireAdminAuth, (c) => {
+  return c.html(<Dashboard />);
+});
 ```
 
 **Key points**:
+
 - JSX compiles to HTML strings (not React)
 - No client-side framework
 - Fast, lightweight pages
@@ -697,7 +749,7 @@ export function LoosList() {
         fetchLoos()
       `}</script>
     </Layout>
-  )
+  );
 }
 ```
 
@@ -706,6 +758,7 @@ export function LoosList() {
 The dataset explorer (`/admin/loos`) is the most complex admin page:
 
 **Features**:
+
 1. Real-time metrics panel
 2. Advanced filtering (status, accessibility, payment, etc.)
 3. Full-text search
@@ -714,6 +767,7 @@ The dataset explorer (`/admin/loos`) is the most complex admin page:
 6. Feature coverage visualization
 
 **Implementation**:
+
 - Fetches data from `/api/loos/search` and `/api/loos/metrics`
 - Vanilla JS manages state and renders table
 - URL query params store filter/sort state
@@ -829,11 +883,13 @@ CREATE TABLE record_version (
 Common PostGIS operations used in the project:
 
 **Create a point from coordinates:**
+
 ```sql
 ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography
 ```
 
 **Distance query (proximity search):**
+
 ```sql
 SELECT *,
   ST_Distance(
@@ -850,12 +906,14 @@ ORDER BY distance
 ```
 
 **Geohash generation:**
+
 ```sql
 SELECT st_geohash(geography, 10) as geohash
 FROM toilets
 ```
 
 **Nearest neighbor search:**
+
 ```sql
 SELECT *
 FROM toilets
@@ -911,27 +969,27 @@ Before each test run:
 
 beforeAll(async () => {
   // 1. Start mock JWKS server
-  await startAuthServer()
+  await startAuthServer();
 
   // 2. Start Supabase if not running
   if (!isSupabaseRunning()) {
-    await execAsync('pnpm supabase:start')
+    await execAsync("pnpm supabase:start");
   }
 
   // 3. Generate test Prisma client
-  await execAsync('pnpm prisma:generate')
+  await execAsync("pnpm prisma:generate");
 
   // 4. Get test client
-  testClient = createTestClient()
-})
+  testClient = createTestClient();
+});
 
 afterAll(async () => {
   // Cleanup (unless KEEP_SUPABASE=1)
-  await stopAuthServer()
+  await stopAuthServer();
   if (!process.env.KEEP_SUPABASE) {
-    await execAsync('pnpm supabase:stop')
+    await execAsync("pnpm supabase:stop");
   }
-})
+});
 ```
 
 ### Writing Tests
@@ -941,91 +999,94 @@ afterAll(async () => {
 ```typescript
 // test/integration/loos.read.spec.ts
 
-import { describe, it, expect, beforeAll } from 'vitest'
-import { testClient } from './context'
-import { issueTestToken } from './utils/auth-server'
-import { createTestLoo } from './utils/fixtures'
+import { describe, it, expect, beforeAll } from "vitest";
+import { testClient } from "./context";
+import { issueTestToken } from "./utils/auth-server";
+import { createTestLoo } from "./utils/fixtures";
 
-describe('GET /api/loos/:id', () => {
-  let token: string
-  let looId: string
+describe("GET /api/loos/:id", () => {
+  let token: string;
+  let looId: string;
 
   beforeAll(async () => {
     // Issue test JWT
-    token = issueTestToken({ sub: 'user123', name: 'Test User' })
+    token = issueTestToken({ sub: "user123", name: "Test User" });
 
     // Create test loo
     const loo = await createTestLoo({
-      name: 'Test Toilet',
+      name: "Test Toilet",
       lat: 51.5074,
-      lng: -0.1278
-    })
-    looId = loo.id
-  })
+      lng: -0.1278,
+    });
+    looId = loo.id;
+  });
 
-  it('returns loo by ID', async () => {
-    const response = await testClient.request('/api/loos/' + looId, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+  it("returns loo by ID", async () => {
+    const response = await testClient.request("/api/loos/" + looId, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(200);
 
-    const body = await response.json()
-    expect(body.id).toBe(looId)
-    expect(body.name).toBe('Test Toilet')
+    const body = await response.json();
+    expect(body.id).toBe(looId);
+    expect(body.name).toBe("Test Toilet");
     expect(body.location).toEqual({
       lat: expect.closeTo(51.5074, 4),
-      lng: expect.closeTo(-0.1278, 4)
-    })
-  })
+      lng: expect.closeTo(-0.1278, 4),
+    });
+  });
 
-  it('returns 404 for unknown ID', async () => {
-    const response = await testClient.request('/api/loos/unknown', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+  it("returns 404 for unknown ID", async () => {
+    const response = await testClient.request("/api/loos/unknown", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-    expect(response.status).toBe(404)
-  })
-})
+    expect(response.status).toBe(404);
+  });
+});
 ```
 
 ### Test Utilities
 
 **`issueTestToken(payload)`**: Create test JWT
+
 ```typescript
-import { issueTestToken } from './utils/auth-server'
+import { issueTestToken } from "./utils/auth-server";
 
 const token = issueTestToken({
-  sub: 'user123',
-  name: 'Test User',
-  permissions: ['access:admin']
-})
+  sub: "user123",
+  name: "Test User",
+  permissions: ["access:admin"],
+});
 ```
 
 **`createTestLoo(data)`**: Create test toilet record
+
 ```typescript
-import { createTestLoo } from './utils/fixtures'
+import { createTestLoo } from "./utils/fixtures";
 
 const loo = await createTestLoo({
-  name: 'Test Toilet',
+  name: "Test Toilet",
   lat: 51.5074,
   lng: -0.1278,
-  accessible: true
-})
+  accessible: true,
+});
 ```
 
 **`testClient.request(path, options)`**: Make test request
-```typescript
-import { testClient } from './context'
 
-const response = await testClient.request('/api/loos', {
-  method: 'POST',
+```typescript
+import { testClient } from "./context";
+
+const response = await testClient.request("/api/loos", {
+  method: "POST",
   headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
   },
-  body: JSON.stringify({ name: 'New Toilet' })
-})
+  body: JSON.stringify({ name: "New Toilet" }),
+});
 ```
 
 ### Running Tests
@@ -1051,14 +1112,16 @@ KEEP_SUPABASE=1 pnpm test:e2e
 Let's add a `GET /api/loos/count` endpoint:
 
 1. **Define Zod schema** (if needed):
+
    ```typescript
    // src/routes/loos/schemas.ts
    export const CountQuerySchema = z.object({
-     active: z.enum(['true', 'false', 'any']).optional()
-   })
+     active: z.enum(["true", "false", "any"]).optional(),
+   });
    ```
 
 2. **Add service method**:
+
    ```typescript
    // src/services/loo/loo.service.ts
    async count(active?: boolean): Promise<number> {
@@ -1069,39 +1132,41 @@ Let's add a `GET /api/loos/count` endpoint:
    ```
 
 3. **Create route handler**:
+
    ```typescript
    // src/routes/loos/index.ts
-   import { zValidator } from '@hono/zod-validator'
-   import { CountQuerySchema } from './schemas'
+   import { zValidator } from "@hono/zod-validator";
+   import { CountQuerySchema } from "./schemas";
 
    app.get(
-     '/count',
+     "/count",
      requireAuth,
-     zValidator('query', CountQuerySchema),
+     zValidator("query", CountQuerySchema),
      async (c) => {
-       const { active } = c.req.valid('query')
+       const { active } = c.req.valid("query");
        const count = await looService.count(
-         active === 'true' ? true : active === 'false' ? false : undefined
-       )
-       return c.json({ count })
+         active === "true" ? true : active === "false" ? false : undefined
+       );
+       return c.json({ count });
      }
-   )
+   );
    ```
 
 4. **Write tests**:
+
    ```typescript
    // test/integration/loos.read.spec.ts
-   describe('GET /api/loos/count', () => {
-     it('returns total count', async () => {
-       const response = await testClient.request('/api/loos/count', {
-         headers: { Authorization: `Bearer ${token}` }
-       })
+   describe("GET /api/loos/count", () => {
+     it("returns total count", async () => {
+       const response = await testClient.request("/api/loos/count", {
+         headers: { Authorization: `Bearer ${token}` },
+       });
 
-       expect(response.status).toBe(200)
-       const body = await response.json()
-       expect(body.count).toBeGreaterThan(0)
-     })
-   })
+       expect(response.status).toBe(200);
+       const body = await response.json();
+       expect(body.count).toBeGreaterThan(0);
+     });
+   });
    ```
 
 5. **Run tests and verify**:
@@ -1114,6 +1179,7 @@ Let's add a `GET /api/loos/count` endpoint:
 Let's add a `rating` field to toilets:
 
 1. **Update Prisma schema**:
+
    ```prisma
    // prisma/schema.prisma
    model toilets {
@@ -1123,6 +1189,7 @@ Let's add a `rating` field to toilets:
    ```
 
 2. **Create migration**:
+
    ```bash
    # Create SQL migration
    supabase db diff -f add_rating_field
@@ -1131,39 +1198,44 @@ Let's add a `rating` field to toilets:
    ```
 
 3. **Review migration**:
+
    ```sql
    -- supabase/migrations/20241129000000_add_rating_field.sql
    ALTER TABLE toilets ADD COLUMN rating FLOAT;
    ```
 
 4. **Test migration**:
+
    ```bash
    pnpm supabase:reset
    ```
 
 5. **Generate Prisma clients**:
+
    ```bash
    pnpm prisma:generate
    ```
 
 6. **Update mappers**:
+
    ```typescript
    // src/services/loo/mappers.ts
    export function mapLoo(loo: Toilet): LooResponse {
      return {
        // ... existing fields
-       rating: loo.rating
-     }
+       rating: loo.rating,
+     };
    }
    ```
 
 7. **Update mutation types**:
+
    ```typescript
    // src/services/loo/mutation.ts
    export const MutationFieldMap = {
      // ... existing fields
-     rating: 'rating'
-   }
+     rating: "rating",
+   };
    ```
 
 8. **Add validation**:
@@ -1171,8 +1243,8 @@ Let's add a `rating` field to toilets:
    // src/routes/loos/schemas.ts
    export const CreateLooSchema = z.object({
      // ... existing fields
-     rating: z.number().min(0).max(5).optional()
-   })
+     rating: z.number().min(0).max(5).optional(),
+   });
    ```
 
 ### Adding Admin Interface Page
@@ -1180,9 +1252,10 @@ Let's add a `rating` field to toilets:
 Let's add a `/admin/stats` page:
 
 1. **Create page component**:
+
    ```typescript
    // src/admin/pages/Stats.tsx
-   import { Layout } from '../components/Layout'
+   import { Layout } from "../components/Layout";
 
    export function Stats() {
      return (
@@ -1195,7 +1268,7 @@ Let's add a `/admin/stats` page:
              async function loadStats() {
                const response = await fetch('/api/loos/metrics')
                const data = await response.json()
-
+   
                document.getElementById('stats-container').innerHTML = \`
                  <div>
                    <p>Total: \${data.total}</p>
@@ -1204,26 +1277,28 @@ Let's add a `/admin/stats` page:
                  </div>
                \`
              }
-
+   
              loadStats()
            `}</script>
          </div>
        </Layout>
-     )
+     );
    }
    ```
 
 2. **Register route**:
+
    ```typescript
    // src/admin/index.tsx
-   import { Stats } from './pages/Stats'
+   import { Stats } from "./pages/Stats";
 
-   app.get('/admin/stats', requireAuth, (c) => {
-     return c.html(<Stats />)
-   })
+   app.get("/admin/stats", requireAuth, (c) => {
+     return c.html(<Stats />);
+   });
    ```
 
 3. **Add navigation link**:
+
    ```typescript
    // src/admin/components/Header.tsx
    export function Header() {
@@ -1233,7 +1308,7 @@ Let's add a `/admin/stats` page:
          <a href="/admin/loos">Loos</a>
          <a href="/admin/stats">Statistics</a>
        </nav>
-     )
+     );
    }
    ```
 
@@ -1244,14 +1319,17 @@ Let's add a `/admin/stats` page:
 ### Debugging Production Issues
 
 1. **Access Cloudflare logs**:
+
    ```bash
    wrangler tail
    ```
 
 2. **View logs in dashboard**:
+
    - Go to Cloudflare dashboard → Workers → toiletmap-server → Logs
 
 3. **Add debug logging**:
+
    ```typescript
    // src/services/loo/loo.service.ts
    async getById(id: string) {
@@ -1268,15 +1346,17 @@ Let's add a `/admin/stats` page:
 4. **Test locally with production config**:
 
    Option 1: Use wrangler dev with remote bindings:
+
    ```bash
    # Test with production HYPERDRIVE binding
    pnpm wrangler dev --remote
    ```
 
-   Option 2: Override TEST_DB locally:
+   Option 2: Override TEST_HYPERDRIVE locally:
+
    ```bash
    # In .env, temporarily set the override to point to production database
-   CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_DB=<production-database-url>
+   CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE=<production-database-url>
    AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 
    # Start dev server
@@ -1292,12 +1372,13 @@ Let's add a `/admin/stats` page:
 **Problem**: Using wrong Prisma client for runtime
 
 **Solution**: Import from correct location
+
 ```typescript
 // In src/**/*.ts
-import { PrismaClient } from '@/generated/prisma/client'
+import { PrismaClient } from "@/generated/prisma/client";
 
 // In test/**/*.ts
-import { PrismaClient } from '../generated/client'
+import { PrismaClient } from "../generated/client";
 ```
 
 #### "JWKS endpoint not accessible"
@@ -1305,6 +1386,7 @@ import { PrismaClient } from '../generated/client'
 **Problem**: Auth0 JWKS endpoint unreachable
 
 **Solution**: Check `AUTH0_ISSUER_BASE_URL` is correct
+
 ```bash
 # Test JWKS endpoint
 curl https://your-tenant.auth0.com/.well-known/jwks.json
@@ -1315,6 +1397,7 @@ curl https://your-tenant.auth0.com/.well-known/jwks.json
 **Problem**: Database not started
 
 **Solution**: Start Supabase manually
+
 ```bash
 pnpm supabase:start
 
@@ -1332,17 +1415,16 @@ pnpm supabase:start
 **Problem**: Treating `["00:00", "00:00"]` as invalid
 
 **Solution**: Remember this means "24 hours open"
+
 ```typescript
 // Validation schema handles this:
-z.array(z.tuple([z.string(), z.string()])).refine(
-  ([open, close]) => {
-    // Allow 00:00-00:00 (24 hours)
-    if (open === '00:00' && close === '00:00') return true
+z.array(z.tuple([z.string(), z.string()])).refine(([open, close]) => {
+  // Allow 00:00-00:00 (24 hours)
+  if (open === "00:00" && close === "00:00") return true;
 
-    // Otherwise open must be before close
-    return open < close
-  }
-)
+  // Otherwise open must be before close
+  return open < close;
+});
 ```
 
 #### "401 Unauthorized in tests"
@@ -1350,24 +1432,27 @@ z.array(z.tuple([z.string(), z.string()])).refine(
 **Problem**: Missing or invalid test token
 
 **Solution**: Use `issueTestToken()` helper
+
 ```typescript
-import { issueTestToken } from './utils/auth-server'
+import { issueTestToken } from "./utils/auth-server";
 
-const token = issueTestToken({ sub: 'test-user' })
+const token = issueTestToken({ sub: "test-user" });
 
-const response = await testClient.request('/api/loos', {
-  headers: { Authorization: `Bearer ${token}` }
-})
+const response = await testClient.request("/api/loos", {
+  headers: { Authorization: `Bearer ${token}` },
+});
 ```
 
 ### Getting Help
 
 1. **Check documentation**:
+
    - [AGENTS.md](./AGENTS.md) - Project overview
    - [README.md](./README.md) - Quick start guide
    - This file - Comprehensive onboarding
 
 2. **Search existing code**:
+
    ```bash
    # Find similar patterns
    grep -r "similar pattern" src/
@@ -1377,12 +1462,15 @@ const response = await testClient.request('/api/loos', {
    ```
 
 3. **Run tests**:
+
    ```bash
    pnpm test:e2e
    ```
+
    Tests are executable documentation!
 
 4. **Check Cloudflare Workers docs**:
+
    - https://developers.cloudflare.com/workers/
 
 5. **Ask maintainers**:
@@ -1394,36 +1482,39 @@ const response = await testClient.request('/api/loos', {
 ### Code Style
 
 1. **Use TypeScript strictly**:
+
    ```typescript
    // ✅ Good
    function getUser(id: string): Promise<User | null> {
-     return prisma.users.findUnique({ where: { id } })
+     return prisma.users.findUnique({ where: { id } });
    }
 
    // ❌ Bad
    function getUser(id: any): any {
-     return prisma.users.findUnique({ where: { id } })
+     return prisma.users.findUnique({ where: { id } });
    }
    ```
 
 2. **Validate inputs with Zod**:
+
    ```typescript
    // ✅ Good
-   const schema = z.object({ name: z.string().min(1) })
-   const data = schema.parse(input)
+   const schema = z.object({ name: z.string().min(1) });
+   const data = schema.parse(input);
 
    // ❌ Bad
-   const data = input as { name: string }
+   const data = input as { name: string };
    ```
 
 3. **Keep functions small**:
+
    ```typescript
    // ✅ Good (single responsibility)
    async function createLoo(data: LooInput) {
-     validateLooData(data)
-     const loo = await insertLoo(data)
-     await createAuditRecord(loo)
-     return loo
+     validateLooData(data);
+     const loo = await insertLoo(data);
+     await createAuditRecord(loo);
+     return loo;
    }
 
    // ❌ Bad (too much in one function)
@@ -1436,65 +1527,74 @@ const response = await testClient.request('/api/loos', {
    ```
 
 4. **Use mappers consistently**:
+
    ```typescript
    // ✅ Good
-   const loo = await prisma.toilets.findUnique({ where: { id } })
-   return mapLoo(loo)
+   const loo = await prisma.toilets.findUnique({ where: { id } });
+   return mapLoo(loo);
 
    // ❌ Bad
-   const loo = await prisma.toilets.findUnique({ where: { id } })
+   const loo = await prisma.toilets.findUnique({ where: { id } });
    return {
      id: loo.id,
      name: loo.name,
      // ... manual mapping
-   }
+   };
    ```
 
 ### Security
 
 1. **Never log sensitive data**:
+
    ```typescript
    // ✅ Good
-   console.log('User authenticated:', user.id)
+   console.log("User authenticated:", user.id);
 
    // ❌ Bad
-   console.log('Token:', token)
-   console.log('Full user:', user)
+   console.log("Token:", token);
+   console.log("Full user:", user);
    ```
 
 2. **Enforce auth on mutation endpoints**:
+
    ```typescript
    // ✅ Good
-   app.post('/api/loos', requireAuth, async (c) => { /* ... */ })
+   app.post("/api/loos", requireAuth, async (c) => {
+     /* ... */
+   });
 
    // ❌ Bad
-   app.post('/api/loos', async (c) => {
+   app.post("/api/loos", async (c) => {
      // No auth check!
-   })
+   });
    ```
+
    Read endpoints stay public—wrap them in `optionalAuth` only when you need user context (e.g., revealing contributor names for admins).
 
 3. **Use environment variables for secrets**:
+
    ```typescript
    // ✅ Good
-   const secret = env.AUTH0_CLIENT_SECRET
+   const secret = env.AUTH0_CLIENT_SECRET;
 
    // ❌ Bad
-   const secret = 'hardcoded_secret'
+   const secret = "hardcoded_secret";
    ```
 
 4. **Sanitize user input**:
+
    ```typescript
    // ✅ Good
-   const name = z.string().max(100).parse(input.name)
+   const name = z.string().max(100).parse(input.name);
 
    // ❌ Bad
-   const name = input.name // Could be malicious
+   const name = input.name; // Could be malicious
    ```
 
 ### Performance
 
 1. **Use database indexes**:
+
    ```sql
    -- Create index for common queries
    CREATE INDEX idx_toilets_active ON toilets(active);
@@ -1502,42 +1602,45 @@ const response = await testClient.request('/api/loos', {
    ```
 
 2. **Batch database queries**:
+
    ```typescript
    // ✅ Good
    const loos = await prisma.toilets.findMany({
-     where: { id: { in: ids } }
-   })
+     where: { id: { in: ids } },
+   });
 
    // ❌ Bad
    const loos = await Promise.all(
-     ids.map(id => prisma.toilets.findUnique({ where: { id } }))
-   )
+     ids.map((id) => prisma.toilets.findUnique({ where: { id } }))
+   );
    ```
 
 3. **Cache expensive operations**:
+
    ```typescript
    // ✅ Good
-   let cachedJwks: JWK[] | null = null
-   let cacheExpiry = 0
+   let cachedJwks: JWK[] | null = null;
+   let cacheExpiry = 0;
 
    async function getJwks() {
      if (cachedJwks && Date.now() < cacheExpiry) {
-       return cachedJwks
+       return cachedJwks;
      }
 
-     cachedJwks = await fetchJwks()
-     cacheExpiry = Date.now() + 10 * 60 * 1000 // 10 min
-     return cachedJwks
+     cachedJwks = await fetchJwks();
+     cacheExpiry = Date.now() + 10 * 60 * 1000; // 10 min
+     return cachedJwks;
    }
    ```
 
 4. **Minimize response payload**:
+
    ```typescript
    // ✅ Good
-   return c.json(mapLoo(loo)) // Only necessary fields
+   return c.json(mapLoo(loo)); // Only necessary fields
 
    // ❌ Bad
-   return c.json(loo) // Includes internal fields
+   return c.json(loo); // Includes internal fields
    ```
 
 ## Contributing Guidelines
@@ -1552,16 +1655,19 @@ const response = await testClient.request('/api/loos', {
 ### Development Workflow
 
 1. **Create feature branch**:
+
    ```bash
    git checkout -b feature/my-feature
    ```
 
 2. **Make changes**:
+
    - Write code following style guide
    - Add tests for new functionality
    - Update documentation if needed
 
 3. **Test locally**:
+
    ```bash
    pnpm check        # Type checking
    pnpm test:e2e     # Run tests
@@ -1569,12 +1675,14 @@ const response = await testClient.request('/api/loos', {
    ```
 
 4. **Commit changes**:
+
    ```bash
    git add .
    git commit -m "feat: add new feature"
    ```
 
    Use conventional commit messages:
+
    - `feat:` New feature
    - `fix:` Bug fix
    - `docs:` Documentation changes
@@ -1583,11 +1691,13 @@ const response = await testClient.request('/api/loos', {
    - `chore:` Build/tooling changes
 
 5. **Push and create PR**:
+
    ```bash
    git push origin feature/my-feature
    ```
 
    In PR description:
+
    - Describe what changed and why
    - Link related issues
    - Include screenshots if UI changes
@@ -1625,14 +1735,17 @@ Congratulations! You've completed the onboarding guide. You should now have:
 ### Next Steps
 
 1. **Pick your first issue**:
+
    - Look for `good first issue` label on GitHub
    - Start with documentation or test improvements
 
 2. **Explore the codebase**:
+
    - Read through `src/services/loo/` to understand core logic
    - Review `test/integration/` to see how things work
 
 3. **Make your first contribution**:
+
    - Fix a small bug
    - Add a test
    - Improve documentation

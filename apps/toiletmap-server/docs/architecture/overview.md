@@ -221,9 +221,9 @@ Routes → Middleware → Services → Prisma → Database
 ```
 
 **Key Difference**:
-- **Production**: Uses `HYPERDRIVE` binding to connect to remote Supabase via Cloudflare's global network.
-- **Development**: Uses `TEST_DB` binding to connect directly to the local Docker database.
 
+- **Production**: Uses `HYPERDRIVE` binding to connect to remote Supabase via Cloudflare's global network.
+- **Development**: Uses `TEST_HYPERDRIVE` binding to connect directly to the local Docker database.
 
 ## Scalability & Performance
 
@@ -279,8 +279,13 @@ All user input validated with Zod schemas:
 Structured JSON logs with contextual metadata:
 
 ```typescript
-logger.info('Request completed', {
-  requestId, method, path, status, duration, userId
+logger.info("Request completed", {
+  requestId,
+  method,
+  path,
+  status,
+  duration,
+  userId,
 });
 ```
 

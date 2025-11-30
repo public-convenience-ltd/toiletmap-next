@@ -8,20 +8,21 @@ export const services = createMiddleware<{
   Variables: AppVariables;
 }>(async (c, next) => {
   // Debug logging for Hyperdrive binding
-  if (!c.env.HYPERDRIVE && !c.env.TEST_DB) {
+  if (!c.env.HYPERDRIVE && !c.env.TEST_HYPERDRIVE) {
     console.warn(
-      "⚠️ HYPERDRIVE / TEST_DB binding is missing from environment!"
+      "⚠️ HYPERDRIVE / TEST_HYPERDRIVE binding is missing from environment!"
     );
     console.log("Available bindings:", Object.keys(c.env));
   }
 
-  // Fallback to TEST_DB if HYPERDRIVE is missing (e.g. in local dev if binding fails)
+  // Fallback to TEST_HYPERDRIVE if HYPERDRIVE is missing (e.g. in local dev if binding fails)
   const connectionString =
-    c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_DB?.connectionString;
+    c.env.HYPERDRIVE?.connectionString ??
+    c.env.TEST_HYPERDRIVE?.connectionString;
 
   if (!connectionString) {
     throw new Error(
-      "No database connection string available. Check HYPERDRIVE or TEST_DB binding."
+      "No database connection string available. Check HYPERDRIVE or TEST_HYPERDRIVE binding."
     );
   }
 
