@@ -194,11 +194,14 @@ AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=your_production_client_id
 AUTH0_CLIENT_SECRET=your_production_client_secret
-AUTH0_REDIRECT_URI=http://localhost:8787/admin/callback
+# Optional fallback; runtime derives redirect URI automatically
+# AUTH0_REDIRECT_URI=http://localhost:8787/admin/callback
 AUTH0_SCOPE=openid profile email offline_access roles access:admin
 ```
 
 These `.env` values will override the test auth server defaults in `wrangler.jsonc`.
+
+The worker now inspects the current request origin (e.g., preview URLs like `https://743a6af5-toiletmap-server...`) to build the Auth0 redirect URI dynamically. Keeping the fallback value configured ensures Auth0 still recognises the callback, but you no longer need to edit environment variables for each deployment URL.
 
 When running against real Auth0, start the worker without the bundled auth server:
 

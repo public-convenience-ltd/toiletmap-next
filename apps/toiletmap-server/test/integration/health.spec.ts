@@ -8,7 +8,7 @@ describe('Root routes', () => {
     const body = await response.json();
     expect(body).toMatchObject({
       status: 'ok',
-      service: 'toiletmap-hono-api',
+      service: 'toiletmap-server',
     });
     expect(new Date(body.timestamp).toString()).not.toBe('Invalid Date');
   });

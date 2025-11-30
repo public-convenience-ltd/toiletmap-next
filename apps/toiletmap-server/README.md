@@ -107,7 +107,8 @@ AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=your_client_id
 AUTH0_CLIENT_SECRET=your_client_secret
-AUTH0_REDIRECT_URI=http://localhost:8787/admin/callback
+# Optional fallback; runtime derives redirect URI from the current request origin
+# AUTH0_REDIRECT_URI=http://localhost:8787/admin/callback
 AUTH0_SCOPE=openid profile email offline_access roles access:admin
 ```
 
@@ -284,7 +285,7 @@ Deployment checklist:
 
 ### Environment Variables
 
-Required in Cloudflare Workers dashboard:
+Required in Cloudflare Workers dashboard. The worker now derives the Auth0 redirect URI from the incoming request origin (so preview deployments Just Work). Keep the legacy `AUTH0_REDIRECT_URI` configured as a fallback/allow-list entry in Auth0.
 
 ```bash
 ENVIRONMENT=production
@@ -293,7 +294,8 @@ AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=production_client_id
 AUTH0_CLIENT_SECRET=production_client_secret
-AUTH0_REDIRECT_URI=https://www.toiletmap.org.uk/admin/callback
+# Optional fallback; runtime detects the origin automatically
+# AUTH0_REDIRECT_URI=https://www.toiletmap.org.uk/admin/callback
 AUTH0_SCOPE=openid profile email offline_access roles access:admin
 AUTH0_PROFILE_KEY=name
 ```

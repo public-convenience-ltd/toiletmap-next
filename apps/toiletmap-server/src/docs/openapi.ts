@@ -118,7 +118,7 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
     required: ['status', 'service', 'timestamp'],
     properties: {
       status: { type: 'string', enum: ['ok'] },
-      service: { type: 'string', example: 'toiletmap-hono-api' },
+      service: { type: 'string', example: 'toiletmap-server' },
       timestamp: { type: 'string', format: 'date-time', example: '2025-01-21T12:00:00.000Z' },
     },
   },

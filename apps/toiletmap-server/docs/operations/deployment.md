@@ -24,7 +24,7 @@ Cloudflare Workers handle zero-downtime deployments automatically. New versions 
   - `AUTH0_AUDIENCE`
   - `AUTH0_CLIENT_ID`
   - `AUTH0_CLIENT_SECRET`
-  - `AUTH0_REDIRECT_URI`
+  - `AUTH0_REDIRECT_URI` (fallback; runtime uses the current request origin)
   - `AUTH0_SCOPE`
 
 ### Database Configuration
@@ -251,7 +251,7 @@ After pushing to `postgres-staging` or `main`:
 
 ## Environment Variables
 
-Required in Cloudflare Workers dashboard:
+Required in Cloudflare Workers dashboard. The worker derives the Auth0 redirect URI from the request origin at runtime (covering preview + alias URLs), so keep the fallback variable below primarily for Auth0’s allow-list.
 
 ```bash
 ENVIRONMENT=production
@@ -260,7 +260,8 @@ AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=production_client_id
 AUTH0_CLIENT_SECRET=production_client_secret
-AUTH0_REDIRECT_URI=https://www.toiletmap.org.uk/admin/callback
+# Optional fallback; runtime detects the origin
+# AUTH0_REDIRECT_URI=https://www.toiletmap.org.uk/admin/callback
 AUTH0_SCOPE=openid profile email offline_access roles access:admin
 AUTH0_PROFILE_KEY=name
 ```

@@ -16,6 +16,18 @@ const cookieOptions = {
     sameSite: 'Lax' as const,
 };
 
+const resolveRedirectUri = (c: Context<{ Bindings: Env }>) => {
+    try {
+        const { origin } = new URL(c.req.url);
+        return `${origin}/admin/callback`;
+    } catch (error) {
+        logger.warn('Failed to derive dynamic Auth0 redirect URI, falling back to configured value', {
+            errorMessage: error instanceof Error ? error.message : String(error),
+        });
+        return c.env.AUTH0_REDIRECT_URI;
+    }
+};
+
 const generateRandomToken = () => {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -45,12 +57,13 @@ export const login = async (c: Context<{ Bindings: Env }>) => {
     const authorizationUrl = new URL(`${c.env.AUTH0_ISSUER_BASE_URL}authorize`);
     const state = generateRandomToken();
     const nonce = generateRandomToken();
+    const redirectUri = resolveRedirectUri(c);
 
     setEphemeralCookie(c, STATE_COOKIE_NAME, state);
     setEphemeralCookie(c, NONCE_COOKIE_NAME, nonce);
 
     authorizationUrl.searchParams.set('client_id', c.env.AUTH0_CLIENT_ID);
-    authorizationUrl.searchParams.set('redirect_uri', c.env.AUTH0_REDIRECT_URI);
+    authorizationUrl.searchParams.set('redirect_uri', redirectUri);
     authorizationUrl.searchParams.set('response_type', 'code');
     authorizationUrl.searchParams.set('scope', c.env.AUTH0_SCOPE);
     authorizationUrl.searchParams.set('audience', c.env.AUTH0_AUDIENCE);
@@ -65,6 +78,7 @@ export const callback = async (c: Context<{ Bindings: Env }>) => {
     const returnedState = c.req.query('state');
     const storedState = getCookie(c, STATE_COOKIE_NAME);
     const storedNonce = getCookie(c, NONCE_COOKIE_NAME);
+    const redirectUri = resolveRedirectUri(c);
 
     clearEphemeralCookie(c, STATE_COOKIE_NAME);
     clearEphemeralCookie(c, NONCE_COOKIE_NAME);
@@ -99,7 +113,7 @@ export const callback = async (c: Context<{ Bindings: Env }>) => {
                 client_id: c.env.AUTH0_CLIENT_ID,
                 client_secret: c.env.AUTH0_CLIENT_SECRET,
                 code,
-                redirect_uri: c.env.AUTH0_REDIRECT_URI,
+                redirect_uri: redirectUri,
             }),
         });
 
