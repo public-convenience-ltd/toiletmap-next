@@ -92,6 +92,15 @@ pnpm run deploy                           # deploys server then client worker
 
 The combined deploy script stops if either worker fails, keeping environments in sync.
 
+#### Database Migrations
+
+Database migrations are automatically deployed via GitHub Actions:
+
+- **Staging**: Push to `postgres-staging` branch → triggers deployment to staging Supabase
+- **Production**: Push to `main` branch → triggers deployment to production Supabase
+
+Both workflows can also be manually triggered through GitHub Actions. See [ONBOARDING.md](ONBOARDING.md#migrations) for detailed migration creation and deployment instructions.
+
 ## Repository Structure (Top Level)
 
 ```

@@ -951,6 +951,47 @@ supabase/migrations/
    pnpm prisma:generate
    ```
 
+**Deploying migrations:**
+
+The project uses GitHub Actions to automatically deploy migrations to Supabase environments:
+
+**Staging Environment:**
+
+- Triggered when code is pushed to the `postgres-staging` branch
+- Can also be manually triggered via GitHub Actions workflow dispatch
+- Deploys to the staging Supabase project
+- Workflow: [.github/workflows/supabase-migrations-stage.yml](.github/workflows/supabase-migrations-stage.yml)
+
+**Production Environment:**
+
+- Triggered automatically when code is pushed to the `main` branch
+- Can also be manually triggered via GitHub Actions workflow dispatch
+- Deploys to the production Supabase project
+- Workflow: [.github/workflows/supabase-migrations-prod.yml](.github/workflows/supabase-migrations-prod.yml)
+
+Both workflows:
+
+1. Check out the repository
+2. Install the Supabase CLI
+3. Link to the appropriate Supabase project using the project reference ID
+4. Run `supabase db push` to apply pending migrations
+
+**Required GitHub Secrets:**
+
+The following secrets must be configured in your GitHub repository settings:
+
+- `SUPABASE_ACCESS_TOKEN` - Personal access token for Supabase CLI authentication
+- `SUPABASE_STAGE_DB_PASSWORD` - Database password for the staging environment
+- `SUPABASE_PRODUCTION_DB_PASSWORD` - Database password for the production environment
+
+**Deployment workflow:**
+
+1. Create and test your migration locally (see steps above)
+2. Commit the migration file to your feature branch
+3. For staging: Merge to `postgres-staging` branch or create a PR targeting it
+4. For production: Merge to `main` branch (migrations will deploy automatically)
+5. Monitor the GitHub Actions workflow run to ensure successful deployment
+
 ## Testing Strategy
 
 ### Test Philosophy

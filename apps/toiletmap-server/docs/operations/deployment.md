@@ -31,7 +31,7 @@ Cloudflare Workers handle zero-downtime deployments automatically. New versions 
 
 - [ ] Configure `HYPERDRIVE` binding in Cloudflare dashboard
 - [ ] Test database connectivity via Hyperdrive
-- [ ] Run database migrations on production database
+- [ ] Database migrations are automatically deployed via GitHub Actions (see [Database Migration Deployment](#database-migration-deployment) below)
 - [ ] Verify database backup schedule is configured
 - [ ] Confirm connection pooling is properly configured
 
@@ -59,7 +59,12 @@ See [Hyperdrive architecture docs](../architecture/hyperdrive.md) for details on
 - [ ] Cloudflare API tokens set in GitHub Secrets:
   - `CLOUDFLARE_API_TOKEN`
   - `CLOUDFLARE_ACCOUNT_ID`
+- [ ] Supabase secrets configured in GitHub Secrets:
+  - `SUPABASE_ACCESS_TOKEN`
+  - `SUPABASE_STAGE_DB_PASSWORD`
+  - `SUPABASE_PRODUCTION_DB_PASSWORD`
 - [ ] Deployment workflow tested in staging
+- [ ] Database migration workflows tested (see [Database Migration Deployment](#database-migration-deployment))
 
 ## Deployment Options
 
@@ -109,6 +114,65 @@ See [Hyperdrive architecture docs](../architecture/hyperdrive.md) for details on
    ```bash
    curl https://your-worker.workers.dev/health/ready
    ```
+
+## Database Migration Deployment
+
+Database migrations are automatically deployed to Supabase environments via GitHub Actions:
+
+### Staging Environment
+
+Migrations are automatically deployed to the staging database when code is pushed to the `postgres-staging` branch:
+
+1. **Workflow**: [`.github/workflows/supabase-migrations-stage.yml`](../../.github/workflows/supabase-migrations-stage.yml)
+2. **Trigger**: Push to `postgres-staging` branch or manual workflow dispatch
+3. **Target**: Staging Supabase project
+4. **Process**:
+   - Checks out repository
+   - Installs Supabase CLI
+   - Links to staging project
+   - Runs `supabase db push` to apply migrations
+
+### Production Environment
+
+Migrations are automatically deployed to the production database when code is merged to `main`:
+
+1. **Workflow**: [`.github/workflows/supabase-migrations-prod.yml`](../../.github/workflows/supabase-migrations-prod.yml)
+2. **Trigger**: Push to `main` branch or manual workflow dispatch
+3. **Target**: Production Supabase project
+4. **Process**:
+   - Checks out repository
+   - Installs Supabase CLI
+   - Links to production project
+   - Runs `supabase db push` to apply migrations
+
+### Required GitHub Secrets
+
+The migration workflows require the following secrets to be configured in GitHub repository settings:
+
+- `SUPABASE_ACCESS_TOKEN` - Personal access token for Supabase CLI authentication
+- `SUPABASE_STAGE_DB_PASSWORD` - Database password for staging environment
+- `SUPABASE_PRODUCTION_DB_PASSWORD` - Database password for production environment
+
+### Manual Migration Trigger
+
+If you need to manually trigger a migration deployment:
+
+1. Go to GitHub Actions tab in your repository
+2. Select the appropriate workflow:
+   - "Deploy Staging Supabase Migrations" for staging
+   - "Deploy Production Supabase Migrations" for production
+3. Click "Run workflow"
+4. Select the branch containing your migrations
+5. Click "Run workflow" button
+
+### Monitoring Migration Deployments
+
+After pushing to `postgres-staging` or `main`:
+
+1. Navigate to the GitHub Actions tab
+2. Find the running workflow (e.g., "Deploy Production Supabase Migrations")
+3. Click on the workflow run to see detailed logs
+4. Verify that `supabase db push` completed successfully
 
 ## Post-Deployment Verification
 
@@ -267,15 +331,29 @@ curl https://your-worker.workers.dev/health/ready
 If a database migration needs to be rolled back:
 
 1. **Create rollback migration**:
+   ```bash
+   # Create a new migration that reverses the problematic changes
+   pnpm supabase migration new rollback_previous_migration
+   ```
+
    ```sql
-   -- supabase/migrations/YYYYMMDD_HHMMSS_rollback_previous.sql
+   -- supabase/migrations/YYYYMMDD_HHMMSS_rollback_previous_migration.sql
    -- Reverse the changes from previous migration
    DROP TABLE IF EXISTS new_table;
    ALTER TABLE old_table ADD COLUMN removed_column TEXT;
    ```
 
-2. **Apply rollback**:
+2. **Apply rollback via GitHub Actions**:
+   - **For staging**: Push/merge the rollback migration to `postgres-staging` branch
+   - **For production**: Push/merge the rollback migration to `main` branch
+   - The GitHub Actions workflow will automatically deploy the rollback migration
+
+3. **Manual rollback** (if immediate action needed):
    ```bash
+   # Connect to the database directly
+   supabase link --project-ref <project-id>
+
+   # Push the rollback migration manually
    supabase db push
    ```
 

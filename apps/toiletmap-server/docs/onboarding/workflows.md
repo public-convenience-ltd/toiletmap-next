@@ -7,7 +7,9 @@
     3. Apply changes to local DB: `pnpm supabase db reset`
     4. Update `prisma/schema.prisma` to match the new schema
     5. Generate Prisma client: `pnpm prisma:generate`
-    > **Note**: We do NOT use Prisma Migrate. We use Supabase for migrations and Prisma for the client.
+    6. Deploy to staging: Merge your changes to `postgres-staging` branch
+    7. Deploy to production: Merge to `main` branch (migrations auto-deploy via GitHub Actions)
+    > **Note**: We do NOT use Prisma Migrate. We use Supabase for migrations and Prisma for the client. Database migrations are automatically deployed to staging and production environments via GitHub Actions.
 - **Regenerating OpenAPI**: `pnpm docs:generate` writes `docs/openapi.json` using the schema definitions in `src/docs/openapi.ts`.
 
 ## Database Management
