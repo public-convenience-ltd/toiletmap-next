@@ -4,6 +4,7 @@
   "main": "./src/index.ts",
   "compatibility_date": "2025-11-18",
   "compatibility_flags": ["nodejs_compat"],
+  "preview_urls": true,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
