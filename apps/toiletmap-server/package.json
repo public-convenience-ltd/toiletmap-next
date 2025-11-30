@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
     "deploy": "wrangler deploy --env production",
-    "deploy:preview": "wrangler deploy --env preview",
+    "deploy:preview": "wrangler versions upload --env preview",
     "docs:generate": "tsx src/docs/generate.ts",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "supabase:start": "SUPABASE_SCANNER_BUFFER_SIZE=100mb supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
