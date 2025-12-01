@@ -139,6 +139,7 @@ make token-issue                             # issue a test token
 
 ### Deployment
 
+```bash
 make deploy-server                           # deploys server
 make deploy-client                           # deploys client
 ```
