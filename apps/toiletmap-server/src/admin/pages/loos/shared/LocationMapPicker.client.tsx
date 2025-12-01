@@ -3,6 +3,15 @@
 import { useEffect, useRef } from "hono/jsx";
 import L from "leaflet";
 
+// Fix for Leaflet default icon issues in bundlers
+// This must run before any marker creation
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
 type Props = {
   lat: number;
   lng: number;
@@ -13,16 +22,6 @@ export const LocationMapPicker = ({ lat, lng, onChange }: Props) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const markerInstance = useRef<L.Marker | null>(null);
-
-  // Fix for Leaflet default icon issues in bundlers
-  useEffect(() => {
-    (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl = undefined;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    });
-  }, []);
 
   useEffect(() => {
     if (!mapContainer.current) return;
