@@ -18,5 +18,8 @@
       "invocation_logs": true,
       "persist": true
     }
+  },
+  "vars": {
+    "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
   }
 }
