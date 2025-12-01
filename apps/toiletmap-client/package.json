@@ -8,6 +8,7 @@
     "preview": "astro preview",
     "deploy": "wrangler deploy",
     "deploy:preview": "wrangler versions upload",
+    "cf-typegen": "wrangler types",
     "astro": "astro"
   },
   "dependencies": {
