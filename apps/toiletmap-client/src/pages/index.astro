@@ -1,6 +1,7 @@
 ---
 import { Image } from "astro:assets";
 import logo from "../assets/logo.svg";
+import LooMap from "../components/LooMap";
 import Layout from "../layouts/Layout.astro";
 ---
 
@@ -8,9 +9,14 @@ import Layout from "../layouts/Layout.astro";
 	<main class="center center--gutter">
 		<div class="hero">
 			<h1>
-				<Image src={logo} alt="Toilet Map" height={60} loading="eager" />
+				<Image
+					src={logo}
+					alt="Toilet Map"
+					height={60}
+					loading="eager"
+				/>
 			</h1>
-			<p>This will be a map...</p>
+			<LooMap client:only="preact" />
 		</div>
 	</main>
 </Layout>
