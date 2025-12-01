@@ -1,0 +1,44 @@
+---
+import { Image } from "astro:assets";
+import logo from "../assets/logo.svg";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout>
+	<main class="center center--gutter">
+		<div class="hero">
+			<h1>
+				<Image src={logo} alt="Toilet Map" height={60} loading="eager" />
+			</h1>
+			<p>This will be a map...</p>
+		</div>
+	</main>
+</Layout>
+
+<style>
+	.hero {
+		padding: var(--space-xl) 0;
+		text-align: center;
+	}
+
+	h1 {
+		font-size: var(--text-4);
+		color: var(--color-primary-navy);
+		margin-bottom: var(--space-m);
+	}
+
+	p {
+		font-size: var(--text-1);
+		color: var(--color-neutral-grey);
+	}
+
+	.center {
+		box-sizing: content-box;
+		margin-inline: auto;
+		max-inline-size: var(--toilet-max-width);
+	}
+
+	.center--gutter {
+		padding-inline: var(--toilet-gutter);
+	}
+</style>

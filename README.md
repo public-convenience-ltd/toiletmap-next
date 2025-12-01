@@ -15,7 +15,7 @@ This repository contains the code that powers both the public API and the admin 
 | Workspace          | Path                    | Purpose                                                                                                                        |
 | ------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `toiletmap-server` | `apps/toiletmap-server` | The original API + admin Cloudflare Worker. Houses all routing, services, Prisma schema, Supabase migrations, docs, and tests. |
-| `toiletmap-client` | `apps/toiletmap-client` | Frontend worker placeholder. Returns static HTML today while we design the client experience.                                  |
+| `toiletmap-client` | `apps/toiletmap-client` | Public-facing frontend built with Astro and Preact (SSR).                                      |
 
 Each workspace keeps its own `package.json` and configuration files, but all dependencies are managed through pnpm at the repository root.
 
