@@ -36,6 +36,9 @@ importers:
       preact:
         specifier: ^10.27.2
         version: 10.27.2
+      toiletmap-design-system:
+        specifier: workspace:*
+        version: link:../toiletmap-design-system
 
   apps/toiletmap-design-system: {}
 
@@ -71,6 +74,9 @@ importers:
       prisma:
         specifier: ^7.0.1
         version: 7.0.1(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      toiletmap-design-system:
+        specifier: workspace:*
+        version: link:../toiletmap-design-system
       zod:
         specifier: ^4.1.13
         version: 4.1.13

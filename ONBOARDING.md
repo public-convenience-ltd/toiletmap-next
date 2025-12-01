@@ -815,7 +815,7 @@ cd apps/toiletmap-client
 pnpm run dev
 ```
 
-See `docs/architecture/client.md` for more details.
+See `apps/toiletmap-client/docs/architecture.md` for more details.
 
 ## Database & PostGIS
 
