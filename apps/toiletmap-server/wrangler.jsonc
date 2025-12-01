@@ -31,7 +31,8 @@
     "AUTH0_PROFILE_KEY": "name",
     "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
     "AUTH0_SCOPE": "openid profile email offline_access roles",
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
+    "ALLOWED_ORIGINS": "http://localhost:8787,http://localhost:4321"
   },
   "env": {
     "production": {
@@ -43,7 +44,8 @@
         "AUTH0_AUDIENCE": "https://www.toiletmap.org.uk/api",
         "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
         "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
-        "AUTH0_SCOPE": "openid profile email offline_access roles"
+        "AUTH0_SCOPE": "openid profile email offline_access roles",
+        "ALLOWED_ORIGINS": "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,*.gbtoiletmap.workers.dev"
       },
       // Production runtime database connection via Hyperdrive
       // Provides connection pooling, caching, and optimized database access
@@ -86,7 +88,8 @@
         "AUTH0_AUDIENCE": "https://www.toiletmap.org.uk/api",
         "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
         "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
-        "AUTH0_SCOPE": "openid profile email offline_access roles"
+        "AUTH0_SCOPE": "openid profile email offline_access roles",
+        "ALLOWED_ORIGINS": "https://toiletmap-client.gbtoiletmap.workers.dev,*.gbtoiletmap.workers.dev"
       },
       // Preview runtime database connection via Hyperdrive
       "hyperdrive": [
