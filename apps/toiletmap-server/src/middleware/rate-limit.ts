@@ -94,7 +94,7 @@ class RateLimitStore {
   }
 }
 
-const rateLimitStore = new RateLimitStore();
+const _rateLimitStore = new RateLimitStore();
 
 /**
  * Rate limiting middleware
@@ -119,26 +119,26 @@ export const rateLimit = (
     message = "Too many requests, please try again later",
   } = config;
 
-  return async (c, next) => {
-    const key = keyGenerator(c);
-    const result = rateLimitStore.check(key, maxRequests, windowSeconds);
+  return async (_c, next) => {
+    // const key = keyGenerator(c);
+    // const result = rateLimitStore.check(key, maxRequests, windowSeconds);
 
-    // Add rate limit headers
-    c.header("X-RateLimit-Limit", maxRequests.toString());
-    c.header("X-RateLimit-Remaining", result.remaining.toString());
-    c.header("X-RateLimit-Reset", Math.floor(result.resetAt / 1000).toString());
+    // // Add rate limit headers
+    // c.header("X-RateLimit-Limit", maxRequests.toString());
+    // c.header("X-RateLimit-Remaining", result.remaining.toString());
+    // c.header("X-RateLimit-Reset", Math.floor(result.resetAt / 1000).toString());
 
-    if (!result.allowed) {
-      const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
-      c.header("Retry-After", retryAfter.toString());
-      return c.json(
-        {
-          message,
-          retryAfter,
-        },
-        429,
-      );
-    }
+    // if (!result.allowed) {
+    //   const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
+    //   c.header("Retry-After", retryAfter.toString());
+    //   return c.json(
+    //     {
+    //       message,
+    //       retryAfter,
+    //     },
+    //     429,
+    //   );
+    // }
 
     await next();
   };

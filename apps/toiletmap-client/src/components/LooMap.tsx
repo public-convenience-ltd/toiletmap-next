@@ -1,276 +1,76 @@
-import type { LatLngBounds, LayerGroup, Map as LeafletMap, MarkerClusterGroup } from "leaflet";
-import iconUrl from "leaflet/dist/images/marker-icon.png";
-import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
-import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+import { get, set } from "idb-keyval";
+import type * as L from "leaflet";
+import type { LayerGroup, Map as LeafletMap, MarkerClusterGroup } from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
 import type {} from "leaflet.markercluster";
 import ngeohash from "ngeohash";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-
-type LeafletModule = typeof import("leaflet")["default"];
-
-type CompressedLooTuple = [string, string, number];
-
-type LooFeatureFlags = {
-  accessible: boolean;
-  babyChange: boolean;
-  radar: boolean;
-  automatic: boolean;
-  allGender: boolean;
-  noPayment: boolean;
-};
-
-type MapLoo = {
-  id: string;
-  geohash: string;
-  lat: number;
-  lng: number;
-  features: LooFeatureFlags;
-};
-
-type TileCacheEntry = {
-  fetchedAt: number;
-  data: MapLoo[];
-};
-
-type StatusState = {
-  isLoading: boolean;
-  looCount: number;
-  tileCount: number;
-  precision: number;
-  error: string | null;
-};
-
-interface LooMapProps {
-  apiUrl: string;
-}
-
-type FetchMetrics = {
-  markersAdded: number;
-  markersRemoved: number;
-  totalMarkers: number;
-  tilesRequested: number;
-  cacheHits: number;
-  fetchedTiles: number;
-  fetchDurationMs: number;
-};
-
-const DEFAULT_CENTER: [number, number] = [54.559, -2.11];
-const DEFAULT_ZOOM = 6;
-const TILE_TTL_MS = 5 * 60 * 1000;
-const FETCH_BATCH_SIZE = 4;
-const MAX_TILE_REQUESTS = 200;
-const MIN_PRECISION = 2;
-const VIEWPORT_PADDING = 0.15;
-const FETCH_DEBOUNCE_MS = 260;
-
-const PRECISION_BY_ZOOM = [
-  { maxZoom: 4, precision: 2 },
-  { maxZoom: 6, precision: 3 },
-  { maxZoom: 9, precision: 4 },
-  { maxZoom: 12, precision: 5 },
-  { maxZoom: Number.POSITIVE_INFINITY, precision: 6 },
-] as const;
-
-const DEBUG_COLORS = ["#FF8A5B", "#F4B23E", "#06D6A0", "#118AB2", "#9B5DE5"] as const;
-
-const FILTER_MASKS = {
-  noPayment: 0b00000001,
-  allGender: 0b00000010,
-  automatic: 0b00000100,
-  accessible: 0b00001000,
-  babyChange: 0b00010000,
-  radar: 0b00100000,
-} as const;
-
-const decodeFilterMask = (mask: number): LooFeatureFlags => ({
-  noPayment: Boolean(mask & FILTER_MASKS.noPayment),
-  allGender: Boolean(mask & FILTER_MASKS.allGender),
-  automatic: Boolean(mask & FILTER_MASKS.automatic),
-  accessible: Boolean(mask & FILTER_MASKS.accessible),
-  babyChange: Boolean(mask & FILTER_MASKS.babyChange),
-  radar: Boolean(mask & FILTER_MASKS.radar),
-});
-
-const isEntryFresh = (entry: TileCacheEntry | undefined, now: number) =>
-  Boolean(entry && now - entry.fetchedAt <= TILE_TTL_MS);
-
-const deriveFromAncestor = (
-  tile: string,
-  now: number,
-  cache: Map<string, TileCacheEntry>,
-): TileCacheEntry | null => {
-  for (let prefixLength = tile.length - 1; prefixLength >= MIN_PRECISION; prefixLength -= 1) {
-    const ancestor = tile.slice(0, prefixLength);
-    const ancestorEntry = cache.get(ancestor);
-    if (!isEntryFresh(ancestorEntry, now)) continue;
-    const subset = ancestorEntry.data.filter((loo) => loo.geohash.startsWith(tile));
-    const derivedEntry: TileCacheEntry = {
-      fetchedAt: ancestorEntry.fetchedAt,
-      data: subset,
-    };
-    cache.set(tile, derivedEntry);
-    return derivedEntry;
-  }
-  return null;
-};
-
-const getTileCacheEntry = (
-  tile: string,
-  now: number,
-  cache: Map<string, TileCacheEntry>,
-): TileCacheEntry | null => {
-  const entry = cache.get(tile);
-  if (entry && isEntryFresh(entry, now)) return entry;
-  if (entry) cache.delete(tile);
-  return deriveFromAncestor(tile, now, cache);
-};
-
-const describeFeatures = (flags: LooFeatureFlags) => {
-  const labels = [] as string[];
-  if (flags.accessible) labels.push("Accessible");
-  if (flags.noPayment) labels.push("Free");
-  if (flags.radar) labels.push("RADAR");
-  if (flags.babyChange) labels.push("Baby change");
-  if (flags.allGender) labels.push("All gender");
-  if (flags.automatic) labels.push("Automatic");
-  return labels.join(" · ") || "No feature data";
-};
-
-const sanitizeId = (value: string) => value.replace(/[^a-zA-Z0-9-_:.]/g, "");
-
-const getDebugColor = (tile: string) =>
-  DEBUG_COLORS[tile.length % DEBUG_COLORS.length] ?? DEBUG_COLORS[0];
-
-const renderPopupHtml = (loo: MapLoo) => {
-  const escapedId = sanitizeId(loo.id);
-  const featureSummary = describeFeatures(loo.features);
-  return `<div class="loo-popup">
-    <strong>Loo ${escapedId}</strong>
-    <div style="margin-top: 0.25rem; font-size: 0.85rem;">${featureSummary}</div>
-    <div style="margin-top: 0.15rem; font-size: 0.75rem; color: #5c6b7c;">Geohash: ${
-      loo.geohash
-    }</div>
-  </div>`;
-};
-
-const buildIconSvg = (isHighlighted: boolean) => {
-  const glyph = isHighlighted
-    ? '<path d="M10 4L11.7634 7.57295L15.7063 8.1459L12.8532 10.9271L13.5267 14.8541L10 13L6.47329 14.8541L7.14683 10.9271L4.29366 8.1459L8.23664 7.57295L10 4Z" fill="white"/>'
-    : '<circle cx="10" cy="10" r="5" fill="white"/>';
-  return `<svg viewBox="-1 -1 21 33" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
-      <path d="M10 0C4.47632 0 0 4.47529 0 10C0 19.5501 10 32 10 32C10 32 20 19.5501 20 10C20 4.47529 15.5237 0 10 0Z" fill="#ED3D63" stroke="white"/>
-      ${glyph}
-    </svg>`;
-};
-
-const createToiletIcon = (leaflet: LeafletModule, isHighlighted: boolean) =>
-  leaflet.divIcon({
-    html: buildIconSvg(isHighlighted),
-    className: "toilet-marker",
-    iconSize: [32, 42],
-    iconAnchor: [16, 40],
-  });
-
-const getPrecisionForZoom = (zoom: number) => {
-  for (const bucket of PRECISION_BY_ZOOM) {
-    if (zoom <= bucket.maxZoom) return bucket.precision;
-  }
-  return PRECISION_BY_ZOOM[PRECISION_BY_ZOOM.length - 1]?.precision ?? 5;
-};
-
-const computeTilesForBounds = (bounds: LatLngBounds, zoom: number) => {
-  let precision = getPrecisionForZoom(zoom);
-
-  const uniqueTiles = (prec: number) => {
-    const southWest = bounds.getSouthWest();
-    const northEast = bounds.getNorthEast();
-    const rawTiles = ngeohash.bboxes(
-      southWest.lat,
-      southWest.lng,
-      northEast.lat,
-      northEast.lng,
-      prec,
-    );
-    return Array.from(new Set(rawTiles));
-  };
-
-  let tiles = uniqueTiles(precision);
-  while (tiles.length > MAX_TILE_REQUESTS && precision > MIN_PRECISION) {
-    precision -= 1;
-    tiles = uniqueTiles(precision);
-  }
-
-  return { tiles, precision };
-};
-
-const getClusterRadius = (zoom: number) => {
-  if (zoom >= 16) return 18;
-  if (zoom >= 15) return 28;
-  if (zoom >= 13) return 50;
-  if (zoom >= 11) return 80;
-  return 130;
-};
-
-const inflateTileData = (tuples: CompressedLooTuple[]): MapLoo[] =>
-  tuples.map(([id, geohash, mask]) => {
-    const { latitude, longitude } = ngeohash.decode(geohash);
-    return {
-      id,
-      geohash,
-      lat: latitude,
-      lng: longitude,
-      features: decodeFilterMask(mask),
-    };
-  });
-
-const parseCompressedResponse = (payload: unknown): CompressedLooTuple[] => {
-  if (!payload || typeof payload !== "object") throw new Error("Unexpected API response");
-  const data = (payload as { data?: unknown }).data;
-  if (!Array.isArray(data)) throw new Error("Malformed compressed payload");
-
-  return data.map((entry) => {
-    if (!Array.isArray(entry) || entry.length < 3) throw new Error("Invalid compressed entry");
-    const [id, geohash, mask] = entry;
-    if (typeof id !== "string" || typeof geohash !== "string" || typeof mask !== "number") {
-      throw new Error("Invalid compressed tuple contents");
-    }
-    return [id, geohash, mask];
-  });
-};
-
-const loadLeaflet = async (): Promise<LeafletModule> => {
-  const [{ default: leaflet }] = await Promise.all([
-    import("leaflet"),
-    import("leaflet/dist/leaflet.css"),
-    import("leaflet.markercluster/dist/MarkerCluster.css"),
-    import("leaflet.markercluster/dist/MarkerCluster.Default.css"),
-  ]);
-  await import("leaflet.markercluster");
-  // Fix default icon lookups for bundlers
-  // @ts-expect-error - private Leaflet internals
-  leaflet.Icon.Default.prototype._getIconUrl = undefined;
-  leaflet.Icon.Default.mergeOptions({
-    iconRetinaUrl,
-    iconUrl,
-    shadowUrl,
-  });
-  return leaflet;
-};
+import type {
+  ApiLooResponse,
+  CacheTreeStats,
+  FetchMetrics,
+  LooMapProps,
+  MapLoo,
+  StatusState,
+} from "./LooMap/types";
+import type { CacheTree, CacheTreeSnapshot } from "./LooMap/cache-tree";
+import {
+  CACHE_TREE_STORAGE_KEY,
+  computeCacheTreeStats,
+  createCacheTree,
+  fromSnapshot,
+  getCachedTileData,
+  replaceTileData,
+  shouldHydrateTile,
+  toSnapshot,
+} from "./LooMap/cache-tree";
+import {
+  computeTilesForBounds,
+  createToiletIcon,
+  DEFAULT_CENTER,
+  DEFAULT_ZOOM,
+  FETCH_BATCH_SIZE,
+  FETCH_DEBOUNCE_MS,
+  HYDRATION_BATCH_SIZE,
+  HYDRATION_LOW_DENSITY_THRESHOLD,
+  HYDRATION_LOW_DENSITY_TILE_LIMIT,
+  HYDRATION_MAX_TILES,
+  HYDRATION_MIN_PRECISION,
+  HYDRATION_MIN_ZOOM,
+  describeFeatures,
+  getClusterRadius,
+  getDebugColor,
+  getPrecisionForZoom,
+  inflateTileData,
+  mapFullLooResponse,
+  loadLeaflet,
+  parseCompressedResponse,
+  VIEWPORT_PADDING,
+} from "./LooMap/utils";
 
 export default function LooMap({ apiUrl }: LooMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<MarkerClusterGroup | null>(null);
-  const leafletRef = useRef<LeafletModule | null>(null);
+  const leafletRef = useRef<typeof L | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const tileCacheRef = useRef<Map<string, TileCacheEntry>>(new Map());
+  const hydrationAbortControllerRef = useRef<AbortController | null>(null);
+  const cacheTreeRef = useRef<CacheTree>(createCacheTree());
+  const cacheHydratedRef = useRef(false);
+  const cacheLoadPromiseRef = useRef<Promise<void> | null>(null);
   const fetchTimeoutRef = useRef<number | null>(null);
+  const persistTimeoutRef = useRef<number | null>(null);
   const fetchViewportRef = useRef<() => void>();
   const isUnmountedRef = useRef(false);
   const debugLayerRef = useRef<LayerGroup | null>(null);
   const lastTilesRef = useRef<string[]>([]);
-  const markerIndexRef = useRef<Map<string, ReturnType<LeafletModule["marker"]>>>(new Map());
+  const markerIndexRef = useRef<Map<string, L.Marker>>(new Map());
   const debugMetricsRef = useRef(false);
+  const looDataRef = useRef<Map<string, MapLoo>>(new Map());
+  const selectedLooRef = useRef<MapLoo | null>(null);
+  const pendingLooHydrationsRef = useRef<Map<string, Promise<void>>>(new Map());
 
   const [status, setStatus] = useState<StatusState>({
     isLoading: true,
@@ -282,6 +82,13 @@ export default function LooMap({ apiUrl }: LooMapProps) {
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugMetricsEnabled, setDebugMetricsEnabled] = useState(false);
   const [lastMetrics, setLastMetrics] = useState<FetchMetrics | null>(null);
+  const [cacheStats, setCacheStats] = useState<CacheTreeStats>(() =>
+    computeCacheTreeStats(cacheTreeRef.current, Date.now()),
+  );
+  const [selectedLoo, setSelectedLoo] = useState<MapLoo | null>(null);
+  const [drawerCollapsed, setDrawerCollapsed] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
 
   const toggleDebugLayer = useCallback(() => {
     setDebugEnabled((prev) => !prev);
@@ -344,6 +151,16 @@ export default function LooMap({ apiUrl }: LooMapProps) {
     [debugEnabled],
   );
 
+  const toggleDrawerCollapsed = useCallback(() => {
+    setDrawerCollapsed((prev) => !prev);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setSelectedLoo(null);
+    setDrawerLoading(false);
+    setDrawerError(null);
+  }, []);
+
   const scheduleFetch = useCallback(() => {
     if (fetchTimeoutRef.current) {
       window.clearTimeout(fetchTimeoutRef.current);
@@ -353,11 +170,217 @@ export default function LooMap({ apiUrl }: LooMapProps) {
     }, FETCH_DEBOUNCE_MS);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPromise = (async () => {
+      try {
+        const snapshot = await get<CacheTreeSnapshot>(CACHE_TREE_STORAGE_KEY);
+        if (snapshot) {
+          cacheTreeRef.current = fromSnapshot(snapshot);
+          if (!cancelled) {
+            setCacheStats(computeCacheTreeStats(cacheTreeRef.current, Date.now()));
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to load cached tile tree", error);
+      } finally {
+        cacheHydratedRef.current = true;
+        cacheLoadPromiseRef.current = null;
+      }
+    })();
+
+    cacheLoadPromiseRef.current = loadPromise;
+    loadPromise
+      .then(() => {
+        if (!cancelled && mapRef.current) {
+          scheduleFetch();
+        }
+      })
+      .catch(() => {
+        // Already logged in the inner try/catch
+      });
+
+    return () => {
+      cancelled = true;
+      if (persistTimeoutRef.current) {
+        window.clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+      hydrationAbortControllerRef.current?.abort();
+    };
+  }, [scheduleFetch]);
+
+  const persistTree = useCallback(() => {
+    if (persistTimeoutRef.current) return;
+    persistTimeoutRef.current = window.setTimeout(() => {
+      persistTimeoutRef.current = null;
+      const snapshot = toSnapshot(cacheTreeRef.current);
+      set(CACHE_TREE_STORAGE_KEY, snapshot).catch((error) => {
+        console.warn("Failed to persist tile cache tree", error);
+      });
+    }, 300);
+  }, []);
+
+  const hydrateLooById = useCallback(
+    (id: string): Promise<void> => {
+      const existing = pendingLooHydrationsRef.current.get(id);
+      if (existing) {
+        return existing;
+      }
+      const promise = (async () => {
+        try {
+          setDrawerLoading(true);
+          setDrawerError(null);
+          const response = await fetch(`${apiUrl}/api/loos/${id}`);
+          if (!response.ok) {
+            throw new Error(`Failed to load loo ${id} (${response.status})`);
+          }
+          const payload = (await response.json()) as ApiLooResponse;
+          const mapped = mapFullLooResponse(payload);
+          looDataRef.current.set(mapped.id, mapped);
+          setSelectedLoo((prev) => (prev && prev.id === mapped.id ? mapped : prev));
+        } catch (error) {
+          console.error("JIT hydration failed", error);
+          setDrawerError((error as Error).message ?? "Failed to load details");
+        } finally {
+          setDrawerLoading(false);
+          pendingLooHydrationsRef.current.delete(id);
+        }
+      })();
+      pendingLooHydrationsRef.current.set(id, promise);
+      return promise;
+    },
+    [apiUrl],
+  );
+
+  const handleMarkerSelect = useCallback(
+    (id: string) => {
+      const next = looDataRef.current.get(id);
+      if (!next) return;
+      setSelectedLoo(next);
+      setDrawerCollapsed(false);
+      setDrawerError(null);
+      setDrawerLoading(next.detailLevel === "compressed");
+      if (next.detailLevel === "compressed") {
+        hydrateLooById(id);
+      } else {
+        setDrawerLoading(false);
+      }
+    },
+    [hydrateLooById],
+  );
+
+  const hydrateTiles = useCallback(
+    async (tiles: string[]) => {
+      if (!tiles.length) return;
+      hydrationAbortControllerRef.current?.abort();
+      const controller = new AbortController();
+      hydrationAbortControllerRef.current = controller;
+
+      const now = Date.now();
+      const actionable = tiles.filter((tile) => shouldHydrateTile(cacheTreeRef.current, tile, now));
+      if (!actionable.length) {
+        hydrationAbortControllerRef.current = null;
+        return;
+      }
+
+      let treeUpdated = false;
+      const hydratedLoos = new Map<string, MapLoo>();
+
+      try {
+        for (let i = 0; i < actionable.length; i += HYDRATION_BATCH_SIZE) {
+          const batch = actionable.slice(i, i + HYDRATION_BATCH_SIZE);
+          const responses = await Promise.all(
+            batch.map(async (tile) => {
+              try {
+                const response = await fetch(`${apiUrl}/api/loos/geohash/${tile}?active=true`, {
+                  signal: controller.signal,
+                });
+                if (!response.ok) {
+                  throw new Error(`Failed to hydrate tile ${tile} (${response.status})`);
+                }
+                const payload = (await response.json()) as { data?: unknown };
+                const rawData = Array.isArray(payload?.data) ? payload.data : [];
+                const mapped = (rawData as ApiLooResponse[])
+                  .map((record) => {
+                    try {
+                      return mapFullLooResponse(record);
+                    } catch (error) {
+                      console.warn(`Skipping malformed loo ${record.id}`, error);
+                      return null;
+                    }
+                  })
+                  .filter((entry): entry is MapLoo => entry !== null);
+                mapped.forEach((entry) => {
+                  hydratedLoos.set(entry.id, entry);
+                });
+                return { tile, data: mapped };
+              } catch (error) {
+                if ((error as DOMException).name === "AbortError") {
+                  throw error;
+                }
+                console.warn(`Hydration request failed for tile ${tile}`, error);
+                return null;
+              }
+            }),
+          );
+          const fetchedAt = Date.now();
+          for (const result of responses) {
+            if (!result) continue;
+            replaceTileData(cacheTreeRef.current, result.tile, result.data, fetchedAt, "full");
+            treeUpdated = true;
+          }
+        }
+      } catch (error) {
+        if ((error as DOMException).name !== "AbortError") {
+          console.error("Error hydrating tiles", error);
+        }
+      } finally {
+        if (hydrationAbortControllerRef.current === controller) {
+          hydrationAbortControllerRef.current = null;
+        }
+      }
+
+      if (hydratedLoos.size) {
+        hydratedLoos.forEach((loo) => {
+          looDataRef.current.set(loo.id, loo);
+        });
+        const selectedId = selectedLooRef.current?.id;
+        if (selectedId) {
+          const updated = hydratedLoos.get(selectedId);
+          if (updated) {
+            setSelectedLoo(updated);
+            setDrawerLoading(false);
+            setDrawerError(null);
+          }
+        }
+      }
+
+      if (treeUpdated) {
+        persistTree();
+        if (!isUnmountedRef.current) {
+          setCacheStats(computeCacheTreeStats(cacheTreeRef.current, Date.now()));
+        }
+      }
+    },
+    [apiUrl, persistTree],
+  );
+
   const fetchViewportLoos = useCallback(async () => {
     const map = mapRef.current;
     const markers = markersRef.current;
     const leaflet = leafletRef.current;
     if (!map || !markers || !leaflet) return;
+    hydrationAbortControllerRef.current?.abort();
+
+    if (!cacheHydratedRef.current && cacheLoadPromiseRef.current) {
+      try {
+        await cacheLoadPromiseRef.current;
+      } catch {
+        // Already logged during hydration
+      }
+    }
 
     const { tiles, precision } = computeTilesForBounds(map.getBounds(), map.getZoom());
     if (!tiles.length) return;
@@ -377,17 +400,30 @@ export default function LooMap({ apiUrl }: LooMapProps) {
     const now = Date.now();
     const tileData = new Map<string, MapLoo[]>();
     const tilesToFetch: string[] = [];
+    const hydrationCandidates = new Set<string>();
+    const sparseTileCandidates = new Set<string>();
     let cacheHits = 0;
+    let treeUpdated = false;
 
-    tiles.forEach((tile) => {
-      const entry = getTileCacheEntry(tile, now, tileCacheRef.current);
-      if (entry) {
-        tileData.set(tile, entry.data);
+    const markSparseIfNeeded = (tile: string, data: MapLoo[]) => {
+      if (data.length <= HYDRATION_LOW_DENSITY_THRESHOLD) {
+        sparseTileCandidates.add(tile);
+      }
+    };
+
+    for (const tile of tiles) {
+      const cached = getCachedTileData(cacheTreeRef.current, tile, now);
+      if (cached) {
+        tileData.set(tile, cached.data);
+        markSparseIfNeeded(tile, cached.data);
         cacheHits += 1;
+        if (cached.coverageKind !== "full" || cached.sourcePrefix !== tile) {
+          hydrationCandidates.add(tile);
+        }
       } else {
         tilesToFetch.push(tile);
       }
-    });
+    }
 
     if (tilesToFetch.length) {
       abortControllerRef.current?.abort();
@@ -412,11 +448,13 @@ export default function LooMap({ apiUrl }: LooMapProps) {
           );
 
           const fetchedAt = Date.now();
-          responses.forEach(({ tile, data }) => {
-            const entry: TileCacheEntry = { fetchedAt, data };
-            tileCacheRef.current.set(tile, entry);
+          for (const { tile, data } of responses) {
+            replaceTileData(cacheTreeRef.current, tile, data, fetchedAt, "compressed");
             tileData.set(tile, data);
-          });
+            markSparseIfNeeded(tile, data);
+            hydrationCandidates.add(tile);
+            treeUpdated = true;
+          }
         }
       } catch (error) {
         if ((error as DOMException).name === "AbortError") {
@@ -435,19 +473,33 @@ export default function LooMap({ apiUrl }: LooMapProps) {
         abortControllerRef.current = null;
       }
     }
+    if (treeUpdated) {
+      persistTree();
+      if (!isUnmountedRef.current) {
+        setCacheStats(computeCacheTreeStats(cacheTreeRef.current, Date.now()));
+      }
+    }
 
     const aggregated = new Map<string, MapLoo>();
     tileData.forEach((loos) => {
       loos.forEach((loo) => {
         aggregated.set(loo.id, loo);
+        looDataRef.current.set(loo.id, loo);
       });
     });
+    const activeSelectionId = selectedLooRef.current?.id;
+    if (activeSelectionId) {
+      const refreshed = aggregated.get(activeSelectionId);
+      if (refreshed) {
+        setSelectedLoo((prev) => (prev && prev.id === refreshed.id ? refreshed : prev));
+      }
+    }
 
     const markerIndex = markerIndexRef.current;
     const viewportBounds = map.getBounds().pad(VIEWPORT_PADDING);
     const nextVisibleIds = new Set<string>();
-    const markersToAdd: ReturnType<LeafletModule["marker"]>[] = [];
-    const markersToRemove: ReturnType<LeafletModule["marker"]>[] = [];
+    const markersToAdd: L.Marker[] = [];
+    const markersToRemove: L.Marker[] = [];
 
     aggregated.forEach((loo) => {
       if (!viewportBounds.contains([loo.lat, loo.lng])) return;
@@ -455,12 +507,18 @@ export default function LooMap({ apiUrl }: LooMapProps) {
 
       if (markerIndex.has(loo.id)) return;
 
-      const marker = leaflet
-        .marker([loo.lat, loo.lng], {
-          icon: createToiletIcon(leaflet, Boolean(loo.features.accessible)),
-          title: `Loo ${loo.id}`,
-        })
-        .bindPopup(renderPopupHtml(loo));
+      const marker = leaflet.marker([loo.lat, loo.lng], {
+        icon: createToiletIcon(leaflet, Boolean(loo.features.accessible)),
+        title: `Loo ${loo.id}`,
+        alt: `Loo ${loo.id}`,
+        keyboard: true,
+      });
+      marker.on("click", () => handleMarkerSelect(loo.id));
+      marker.on("keypress", (event: L.LeafletEvent & { originalEvent?: KeyboardEvent }) => {
+        if ((event.originalEvent as KeyboardEvent | undefined)?.key === "Enter") {
+          handleMarkerSelect(loo.id);
+        }
+      });
 
       markerIndex.set(loo.id, marker);
       markersToAdd.push(marker);
@@ -473,7 +531,6 @@ export default function LooMap({ apiUrl }: LooMapProps) {
     });
 
     if (markersToRemove.length) {
-      // @ts-expect-error upstream typings miss removeLayers
       markers.removeLayers?.(markersToRemove) ??
         markersToRemove.forEach((layer) => {
           markers.removeLayer(layer);
@@ -511,11 +568,57 @@ export default function LooMap({ apiUrl }: LooMapProps) {
         precision,
       });
     }
-  }, [apiUrl, updateDebugTiles]);
+
+    const allowZoomHydration =
+      map.getZoom() >= HYDRATION_MIN_ZOOM &&
+      precision >= HYDRATION_MIN_PRECISION &&
+      tiles.length <= HYDRATION_MAX_TILES;
+
+    const allowSparseHydration =
+      sparseTileCandidates.size > 0 &&
+      sparseTileCandidates.size <= HYDRATION_LOW_DENSITY_TILE_LIMIT;
+
+    if (
+      (allowZoomHydration || allowSparseHydration) &&
+      (hydrationCandidates.size || sparseTileCandidates.size)
+    ) {
+      const combined = new Set<string>(allowZoomHydration ? hydrationCandidates : []);
+      if (allowSparseHydration) {
+        sparseTileCandidates.forEach((tile) => {
+          combined.add(tile);
+        });
+      }
+      if (combined.size) {
+        hydrateTiles(Array.from(combined));
+      }
+    }
+  }, [apiUrl, handleMarkerSelect, hydrateTiles, persistTree, updateDebugTiles]);
 
   useEffect(() => {
     debugMetricsRef.current = debugMetricsEnabled;
   }, [debugMetricsEnabled]);
+
+  useEffect(() => {
+    selectedLooRef.current = selectedLoo;
+  }, [selectedLoo]);
+
+  useEffect(() => {
+    if (!selectedLoo) {
+      setDrawerCollapsed(false);
+    }
+  }, [selectedLoo]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.querySelector('link[data-loo-fa="true"]')) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css";
+    link.crossOrigin = "anonymous";
+    link.referrerPolicy = "no-referrer";
+    link.dataset.looFa = "true";
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     fetchViewportRef.current = () => {
@@ -601,6 +704,7 @@ export default function LooMap({ apiUrl }: LooMapProps) {
       disposed = true;
       isUnmountedRef.current = true;
       abortControllerRef.current?.abort();
+      hydrationAbortControllerRef.current?.abort();
       if (fetchTimeoutRef.current) window.clearTimeout(fetchTimeoutRef.current);
       const map = mapRef.current;
       if (map) {
@@ -623,12 +727,16 @@ export default function LooMap({ apiUrl }: LooMapProps) {
         debugLayerRef.current = null;
       }
       lastTilesRef.current = [];
-      tileCacheRef.current.clear();
+      cacheTreeRef.current = createCacheTree();
     };
   }, [scheduleFetch]);
 
   useEffect(() => {
-    tileCacheRef.current.clear();
+    hydrationAbortControllerRef.current?.abort();
+    cacheTreeRef.current = createCacheTree();
+    cacheHydratedRef.current = true;
+    cacheLoadPromiseRef.current = null;
+    setCacheStats(computeCacheTreeStats(cacheTreeRef.current, Date.now()));
     lastTilesRef.current = [];
     debugLayerRef.current?.clearLayers();
     markerIndexRef.current.forEach((marker) => {
@@ -648,13 +756,14 @@ export default function LooMap({ apiUrl }: LooMapProps) {
       : `${status.looCount} loos · ${status.tileCount} tiles · /${status.precision}`;
 
   return (
-    <div
+    <section
       style={{
         position: "relative",
         width: "100%",
         height: "100vh",
         minHeight: "480px",
       }}
+      aria-label="Toilet Map"
     >
       <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
       <div
@@ -741,7 +850,7 @@ export default function LooMap({ apiUrl }: LooMapProps) {
               </button>
             </div>
           </div>
-          {debugMetricsEnabled && lastMetrics ? (
+          {debugMetricsEnabled ? (
             <div
               style={{
                 display: "grid",
@@ -750,27 +859,383 @@ export default function LooMap({ apiUrl }: LooMapProps) {
                 fontSize: "0.75rem",
               }}
             >
+              {lastMetrics ? (
+                <>
+                  <div>
+                    <strong style={{ display: "block", fontWeight: 500 }}>Markers</strong>+
+                    {lastMetrics.markersAdded} / -{lastMetrics.markersRemoved}
+                  </div>
+                  <div>
+                    <strong style={{ display: "block", fontWeight: 500 }}>Total</strong>
+                    {lastMetrics.totalMarkers.toLocaleString()}
+                  </div>
+                  <div>
+                    <strong style={{ display: "block", fontWeight: 500 }}>Tiles</strong>
+                    {lastMetrics.tilesRequested} (cache {lastMetrics.cacheHits}, fetch{" "}
+                    {lastMetrics.fetchedTiles})
+                  </div>
+                  <div>
+                    <strong style={{ display: "block", fontWeight: 500 }}>Fetch</strong>
+                    {lastMetrics.fetchDurationMs} ms
+                  </div>
+                </>
+              ) : null}
               <div>
-                <strong style={{ display: "block", fontWeight: 500 }}>Markers</strong>+
-                {lastMetrics.markersAdded} / -{lastMetrics.markersRemoved}
+                <strong style={{ display: "block", fontWeight: 500 }}>Cache nodes</strong>
+                {cacheStats.nodeCount.toLocaleString()} (depth {cacheStats.maxDepth})
               </div>
               <div>
-                <strong style={{ display: "block", fontWeight: 500 }}>Total</strong>
-                {lastMetrics.totalMarkers.toLocaleString()}
+                <strong style={{ display: "block", fontWeight: 500 }}>Fresh tiles</strong>
+                {cacheStats.freshCoverageNodes}/{cacheStats.coverageNodes}
               </div>
               <div>
-                <strong style={{ display: "block", fontWeight: 500 }}>Tiles</strong>
-                {lastMetrics.tilesRequested} (cache {lastMetrics.cacheHits}, fetch{" "}
-                {lastMetrics.fetchedTiles})
+                <strong style={{ display: "block", fontWeight: 500 }}>Unique loos</strong>
+                {cacheStats.uniqueLoos.toLocaleString()}
               </div>
               <div>
-                <strong style={{ display: "block", fontWeight: 500 }}>Fetch</strong>
-                {lastMetrics.fetchDurationMs} ms
+                <strong style={{ display: "block", fontWeight: 500 }}>Hydrated tiles</strong>
+                {cacheStats.fullCoverageNodes}
+              </div>
+              <div>
+                <strong style={{ display: "block", fontWeight: 500 }}>Hydrated loos</strong>
+                {cacheStats.hydratedLoos.toLocaleString()}
               </div>
             </div>
           ) : null}
         </div>
       </div>
-    </div>
+      {selectedLoo ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: "none",
+            padding: "0 1rem 1rem",
+            zIndex: 1100,
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <LooDetailsDrawer
+            loo={selectedLoo}
+            collapsed={drawerCollapsed}
+            onCollapseToggle={toggleDrawerCollapsed}
+            onClose={closeDrawer}
+            loading={drawerLoading}
+            error={drawerError}
+          />
+        </div>
+      ) : null}
+    </section>
   );
 }
+
+type LooDetailsDrawerProps = {
+  loo: MapLoo;
+  collapsed: boolean;
+  onCollapseToggle: () => void;
+  onClose: () => void;
+  loading: boolean;
+  error: string | null;
+};
+
+const featureIconMap: Array<{ key: keyof MapLoo["features"]; label: string; icon: string }> = [
+  { key: "accessible", label: "Accessible", icon: "fa-solid fa-wheelchair" },
+  { key: "noPayment", label: "Free", icon: "fa-solid fa-sterling-sign" },
+  { key: "radar", label: "RADAR", icon: "fa-solid fa-key" },
+  { key: "babyChange", label: "Baby change", icon: "fa-solid fa-baby" },
+  { key: "allGender", label: "All gender", icon: "fa-solid fa-venus-mars" },
+  { key: "automatic", label: "Automatic", icon: "fa-solid fa-robot" },
+];
+
+const formatDateLabel = (value: string | null | undefined) => {
+  if (!value) return "Not verified";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString();
+};
+
+const LooDetailsDrawer = ({
+  loo,
+  collapsed,
+  onCollapseToggle,
+  onClose,
+  loading,
+  error,
+}: LooDetailsDrawerProps) => {
+  const summary = describeFeatures(loo.features) || "No feature data";
+  const area = loo.full?.area?.[0];
+  const areaLabel = area?.name ?? "Unassigned area";
+  const areaType = area?.type ? ` (${area.type})` : "";
+  const statusLabel =
+    typeof loo.full?.active === "boolean"
+      ? loo.full.active
+        ? "Active"
+        : "Inactive"
+      : "Unknown status";
+  const verifiedLabel = formatDateLabel(loo.full?.verifiedAt);
+  const paymentLabel =
+    loo.full?.paymentDetails ??
+    (loo.features.noPayment ? "No payment required" : "Payment unknown");
+  const drawerStatusBanner = loading
+    ? {
+        text: "Loading details…",
+        color: "var(--color-primary-navy, #0a165e)",
+        bg: "rgba(10,22,94,0.08)",
+      }
+    : error
+      ? { text: error, color: "#fff", bg: "var(--color-accent-pink, #ed3d62)" }
+      : null;
+  const hydrationChip =
+    loo.detailLevel === "full" ? (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.25rem",
+          borderRadius: "999px",
+          padding: "0.1rem 0.65rem",
+          fontSize: "0.7rem",
+          background: "var(--color-accent-turquoise, #92f9db)",
+          color: "var(--color-primary-navy, #0a165e)",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        <i className="fa-solid fa-droplet" aria-hidden="true" />
+        Hydrated
+      </span>
+    ) : null;
+
+  const infoItems = [
+    { icon: "fa-solid fa-location-dot", label: "Area", value: `${areaLabel}${areaType}` },
+    { icon: "fa-solid fa-hashtag", label: "Geohash", value: loo.geohash },
+    {
+      icon: "fa-solid fa-location-crosshairs",
+      label: "Coordinates",
+      value: `${loo.lat.toFixed(4)}, ${loo.lng.toFixed(4)}`,
+    },
+    { icon: "fa-solid fa-circle-check", label: "Verification", value: verifiedLabel },
+    { icon: "fa-solid fa-circle-info", label: "Status", value: statusLabel },
+    { icon: "fa-solid fa-sterling-sign", label: "Payment", value: paymentLabel },
+  ].filter((item) => Boolean(item.value));
+
+  return (
+    <aside
+      aria-live="polite"
+      style={{
+        pointerEvents: "auto",
+        margin: "0 auto",
+        width: "min(860px, 92vw)",
+      }}
+    >
+      <div
+        style={{
+          background: "var(--color-base-white, #ffffff)",
+          borderRadius: "20px 20px 12px 12px",
+          boxShadow: "0 -12px 32px rgba(10, 22, 94, 0.25)",
+          padding: collapsed ? "0.65rem 1rem" : "0.9rem 1.5rem",
+          transition: "padding 0.2s ease",
+          maxHeight: collapsed ? "4.5rem" : "32vh",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "0.75rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "1.1rem",
+                  color: "var(--color-primary-navy, #0a165e)",
+                }}
+              >
+                {loo.full?.name ?? `Loo ${loo.id}`}
+              </h3>
+              {hydrationChip}
+            </div>
+            <div
+              style={{
+                marginTop: "0.25rem",
+                fontSize: "0.85rem",
+                color: "var(--color-neutral-grey, #5c6b7c)",
+              }}
+            >
+              {summary || "Feature info unavailable"}
+            </div>
+            {drawerStatusBanner ? (
+              <div
+                style={{
+                  marginTop: "0.35rem",
+                  fontSize: "0.75rem",
+                  borderRadius: "999px",
+                  padding: "0.2rem 0.75rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  background: drawerStatusBanner.bg,
+                  color: drawerStatusBanner.color,
+                }}
+              >
+                {loading ? (
+                  <i className="fa-solid fa-circle-notch fa-spin" aria-hidden="true" />
+                ) : (
+                  <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+                )}
+                {drawerStatusBanner.text}
+              </div>
+            ) : null}
+          </div>
+          <div style={{ display: "flex", gap: "0.35rem" }}>
+            <button
+              type="button"
+              onClick={onCollapseToggle}
+              aria-label={collapsed ? "Expand details" : "Collapse details"}
+              style={{
+                border: "none",
+                background: "var(--color-light-grey, #f4f4f4)",
+                borderRadius: "999px",
+                width: "36px",
+                height: "36px",
+                cursor: "pointer",
+                color: "var(--color-primary-navy, #0a165e)",
+              }}
+            >
+              <i
+                className={`fa-solid ${collapsed ? "fa-chevron-up" : "fa-chevron-down"}`}
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close loo details"
+              style={{
+                border: "none",
+                background: "var(--color-accent-pink, #ed3d62)",
+                borderRadius: "999px",
+                width: "36px",
+                height: "36px",
+                cursor: "pointer",
+                color: "#fff",
+              }}
+            >
+              <i className="fa-solid fa-xmark" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        {!collapsed ? (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "0.65rem",
+                marginTop: "0.85rem",
+              }}
+            >
+              {infoItems.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.2rem",
+                    background: "var(--color-light-grey, #f4f4f4)",
+                    borderRadius: "12px",
+                    padding: "0.65rem 0.75rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "0.7rem",
+                      color: "var(--color-neutral-grey, #5c6b7c)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    <i
+                      className={item.icon}
+                      aria-hidden="true"
+                      style={{ marginRight: "0.35rem" }}
+                    />
+                    {item.label}
+                  </span>
+                  <span style={{ fontSize: "0.9rem", color: "var(--color-primary-navy, #0a165e)" }}>
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: "1rem",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                gap: "0.5rem",
+              }}
+            >
+              {featureIconMap.map((feature) => {
+                const isActive = Boolean(loo.features[feature.key]);
+                return (
+                  <span
+                    key={feature.key}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      padding: "0.5rem 0.65rem",
+                      borderRadius: "999px",
+                      fontSize: "0.8rem",
+                      background: isActive ? "rgba(98, 195, 112, 0.15)" : "rgba(10, 22, 94, 0.08)",
+                      color: isActive
+                        ? "var(--color-primary-navy, #0a165e)"
+                        : "rgba(10, 22, 94, 0.55)",
+                    }}
+                  >
+                    <i className={feature.icon} aria-hidden="true" />
+                    {feature.label}
+                  </span>
+                );
+              })}
+            </div>
+            {loo.full?.notes ? (
+              <p
+                style={{
+                  marginTop: "1rem",
+                  fontSize: "0.85rem",
+                  color: "var(--color-primary-navy, #0a165e)",
+                  background: "var(--color-light-grey, #f4f4f4)",
+                  borderRadius: "12px",
+                  padding: "0.85rem",
+                }}
+              >
+                {loo.full.notes}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <div
+            style={{
+              marginTop: "0.35rem",
+              fontSize: "0.8rem",
+              color: "var(--color-neutral-grey, #5c6b7c)",
+            }}
+          >
+            {summary || "Feature info unavailable"}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+};
