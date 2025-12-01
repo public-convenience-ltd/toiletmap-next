@@ -10,13 +10,14 @@ export default defineConfig({
       input: {
         'loos-list': path.resolve(__dirname, 'src/admin/pages/loos/client/index.client.tsx'),
         'loos-create': path.resolve(__dirname, 'src/admin/pages/loos/create/client/index.client.tsx'),
-        'loos-edit': path.resolve(__dirname, 'src/admin/pages/loos/edit/client/index.client.tsx')
+        'loos-edit': path.resolve(__dirname, 'src/admin/pages/loos/edit/client/index.client.tsx'),
+        'styles': path.resolve(__dirname, 'src/admin/styles.ts')
       },
       output: {
         // Use fixed names for easier development, can add hashing later for production
         entryFileNames: '[name].js',
         chunkFileNames: '[name]-[hash].js',
-        assetFileNames: '[name]-[hash].[ext]'
+        assetFileNames: '[name].[ext]'
       }
     },
     // Generate source maps for debugging

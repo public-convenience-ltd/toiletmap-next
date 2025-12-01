@@ -1,13 +1,24 @@
 # Toilet Map Client
 
-This package hosts the frontend worker for the Toilet Map project. It is currently a placeholder worker that returns a simple HTML page so we can wire up routing, deployment, and CI independently from the API worker.
+The public-facing frontend for the Toilet Map, built with Astro and Preact.
 
-## Commands
+## Stack
+
+- **Framework**: [Astro](https://astro.build)
+- **UI Library**: [Preact](https://preactjs.com)
+- **Deployment**: Cloudflare Workers
+- **Styling**: CSS Modules
+
+## Development
 
 ```bash
-pnpm --filter toiletmap-client dev     # Start wrangler dev server
-pnpm --filter toiletmap-client build   # Build the worker bundle
-pnpm --filter toiletmap-client deploy  # Deploy using wrangler
+pnpm install
+pnpm run dev
 ```
 
-Replace `src/index.ts` with your UI or static asset pipeline when you're ready to build the frontend experience.
+## Deployment
+
+```bash
+pnpm run build
+pnpm run deploy
+```

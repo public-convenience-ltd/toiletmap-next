@@ -795,6 +795,28 @@ Two dedicated pages keep contributor analytics separate from Auth0 account manag
 - Requires a dedicated Auth0 M2M application (`AUTH0_MANAGEMENT_CLIENT_ID` / `AUTH0_MANAGEMENT_CLIENT_SECRET`). Optionally override the default audience via `AUTH0_MANAGEMENT_AUDIENCE`.
 - When credentials are missing, the page renders a warning banner and disables live search/updates so it is safe to deploy without the secrets.
 
+## Toilet Map Client Architecture
+
+The client application (`apps/toiletmap-client`) is built with **Astro** and **Preact**, deployed to Cloudflare Workers.
+
+### Key Features
+
+- **SSR**: Server-side rendering for performance and SEO.
+- **Island Architecture**: Interactive components (Preact) are hydrated only where needed.
+- **CSS Modules**: Scoped styling for components.
+
+### Development
+
+The client runs on a separate worker from the API.
+
+```bash
+# Start client dev server
+cd apps/toiletmap-client
+pnpm run dev
+```
+
+See `apps/toiletmap-client/docs/architecture.md` for more details.
+
 ## Database & PostGIS
 
 ### Schema Overview

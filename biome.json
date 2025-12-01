@@ -11,6 +11,8 @@
     "includes": [
       "**/apps/**/*/src/**/*.ts",
       "**/apps/**/*/src/**/*.tsx",
+      "**/apps/**/*/src/**/*.astro",
+      "**/apps/**/*/src/**/*.css",
       "**/apps/toiletmap-server/test/**/*.ts",
       "**/apps/toiletmap-server/scripts/**/*.ts",
       "**/apps/**/*.config.ts",
@@ -214,6 +216,20 @@
         "rules": {
           "suspicious": {
             "noExplicitAny": "warn"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.astro"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off"
+          },
+          "style": {
+            "useConst": "off",
+            "useImportType": "off"
           }
         }
       }
