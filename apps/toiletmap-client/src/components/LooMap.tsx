@@ -3,6 +3,7 @@ import { useEffect, useRef } from "preact/hooks";
 import "leaflet/dist/leaflet.css";
 import { get, set } from "idb-keyval";
 import Supercluster from "supercluster";
+import { getLooById } from "../api/loos";
 
 const CACHE_KEY = "loos-cache";
 const CACHE_TIME_KEY = "loos-cache-time";
@@ -119,7 +120,24 @@ export default function LooMap() {
             mapInstance.flyTo([lat, lng], expansionZoom);
           });
       } else {
-        L.marker([lat, lng]).addTo(markerLayer).bindPopup(`Loo ID: ${cluster.properties.id}`);
+        const marker = L.marker([lat, lng]).addTo(markerLayer);
+        marker.on("click", async () => {
+          const id = cluster.properties.id as string;
+          console.log(`Clicked loo: ${id}`);
+          const details = await getLooById(id);
+          console.log("Loo details:", details);
+          if (details) {
+            marker
+              .bindPopup(`
+                   <div>
+                     <strong>${details.name || "Toilet"}</strong><br/>
+                     ID: ${details.id}<br/>
+                     <small>Data fetched & cached!</small>
+                   </div>
+                 `)
+              .openPopup();
+          }
+        });
       }
     });
   };
