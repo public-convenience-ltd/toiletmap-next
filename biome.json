@@ -13,6 +13,7 @@
       "**/apps/**/*/src/**/*.tsx",
       "**/apps/toiletmap-server/test/**/*.ts",
       "**/apps/toiletmap-server/scripts/**/*.ts",
+      "**/apps/**/*.config.ts",
       "!**/node_modules",
       "!**/dist",
       "!**/.wrangler",
