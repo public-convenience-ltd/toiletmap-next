@@ -1,7 +1,7 @@
 import L from "leaflet";
+import "leaflet.markercluster";
 import ngeohash from "ngeohash";
 import { useEffect, useRef } from "preact/hooks";
-import Supercluster from "supercluster";
 import { getLooById } from "../../api/loos";
 import type { CompressedLoo } from "./useMapData";
 
@@ -12,112 +12,94 @@ interface MapMarkersProps {
 }
 
 export default function MapMarkers({ map, data, apiUrl }: MapMarkersProps) {
-  const markers = useRef<L.LayerGroup | null>(null);
-  const index = useRef<Supercluster | null>(null);
+  const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null);
 
   useEffect(() => {
     if (!map) return;
 
-    markers.current = L.layerGroup().addTo(map);
-    index.current = new Supercluster({
-      radius: 40,
-      maxZoom: 16,
-    });
+    // Initialize MarkerClusterGroup
+    markerClusterGroup.current = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 80, // More aggressive clustering
+      animate: true,
+      animateAddingMarkers: true,
+      iconCreateFunction: (cluster) => {
+        const count = cluster.getChildCount();
+        let size = "small";
+        if (count > 100) size = "medium";
+        if (count > 1000) size = "large";
 
-    map.on("moveend", updateMap);
-
-    return () => {
-      map.off("moveend", updateMap);
-      markers.current?.clearLayers();
-      markers.current = null;
-    };
-  }, [map]);
-
-  useEffect(() => {
-    if (!data.length || !index.current) return;
-
-    const points = data.map((loo) => {
-      const { latitude, longitude } = ngeohash.decode(loo[1]);
-      return {
-        type: "Feature" as const,
-        properties: { id: loo[0], mask: loo[2] },
-        geometry: {
-          type: "Point" as const,
-          coordinates: [longitude, latitude],
-        },
-      };
-    });
-
-    index.current.load(points);
-    updateMap();
-  }, [data]);
-
-  const updateMap = () => {
-    const mapInstance = map;
-    const clusterIndex = index.current;
-    const markerLayer = markers.current;
-
-    if (!mapInstance || !clusterIndex || !markerLayer) return;
-
-    const bounds = mapInstance.getBounds();
-    const bbox: [number, number, number, number] = [
-      bounds.getWest(),
-      bounds.getSouth(),
-      bounds.getEast(),
-      bounds.getNorth(),
-    ];
-    const zoom = Math.floor(mapInstance.getZoom());
-
-    const clusters = clusterIndex.getClusters(bbox, zoom);
-    markerLayer.clearLayers();
-
-    clusters.forEach((cluster) => {
-      const [lng, lat] = cluster.geometry.coordinates;
-      const isCluster = cluster.properties.cluster;
-
-      if (isCluster) {
-        const count = cluster.properties.point_count as number;
-        const size = count < 100 ? "small" : count < 1000 ? "medium" : "large";
-
-        // Use design system colors/styles via classes if possible, or inline styles matching tokens
-        // Since we can't easily use CSS modules or styled-components here without setup,
-        // we'll use the classNames and ensure global CSS (or a new CSS file) covers them.
-        // We'll also add some inline styles for the dynamic parts or fallback.
-
-        const icon = L.divIcon({
+        return L.divIcon({
           html: `<div><span>${count}</span></div>`,
           className: `marker-cluster marker-cluster-${size}`,
           iconSize: new L.Point(40, 40),
         });
+      },
+    });
 
-        L.marker([lat, lng], { icon })
-          .addTo(markerLayer)
-          .on("click", () => {
-            const expansionZoom = clusterIndex.getClusterExpansionZoom(cluster.id as number);
-            mapInstance.flyTo([lat, lng], expansionZoom);
-          });
-      } else {
-        const marker = L.marker([lat, lng]).addTo(markerLayer);
-        marker.on("click", async () => {
-          const id = cluster.properties.id as string;
-          console.log(`Clicked loo: ${id}`);
-          const details = await getLooById(apiUrl, id);
-          console.log("Loo details:", details);
-          if (details) {
-            marker
-              .bindPopup(`
+    map.addLayer(markerClusterGroup.current);
+
+    return () => {
+      if (markerClusterGroup.current) {
+        map.removeLayer(markerClusterGroup.current);
+        markerClusterGroup.current = null;
+      }
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (!data.length || !markerClusterGroup.current) return;
+
+    const markers: L.Marker[] = [];
+
+    data.forEach((loo) => {
+      const { latitude, longitude } = ngeohash.decode(loo[1]);
+      const id = loo[0];
+
+      const getIconString = (isHighlighted: boolean) => `
+          <svg viewBox="-1 -1 21 33" height="33" width="21" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 0C4.47632 0 0 4.47529 0 10C0 19.5501 10 32 10 32C10 32 20 19.5501 20 10C20 4.47529 15.5237 0 10 0Z" fill="#ED3D63" stroke="white"/>
+            ${
+              isHighlighted
+                ? '<path d="M10 4L11.7634 7.57295L15.7063 8.1459L12.8532 10.9271L13.5267 14.8541L10 13L6.47329 14.8541L7.14683 10.9271L4.29366 8.1459L8.23664 7.57295L10 4Z" fill="white"/>'
+                : '<circle cx="10" cy="10" r="5" fill="white"/>'
+            }
+          </svg>
+        `;
+
+      const icon = L.divIcon({
+        html: getIconString(false),
+        className: "loo-marker",
+        iconSize: [21, 33],
+        iconAnchor: [10.5, 33],
+        popupAnchor: [0, -33],
+      });
+
+      const marker = L.marker([latitude, longitude], { icon });
+
+      marker.on("click", async () => {
+        console.log(`Clicked loo: ${id}`);
+        const details = await getLooById(apiUrl, id);
+        console.log("Loo details:", details);
+        if (details) {
+          marker
+            .bindPopup(`
                    <div>
                      <strong>${details.name || "Toilet"}</strong><br/>
                      ID: ${details.id}<br/>
                      <small>Data fetched & cached!</small>
                    </div>
                  `)
-              .openPopup();
-          }
-        });
-      }
+            .openPopup();
+        }
+      });
+
+      markers.push(marker);
     });
-  };
+
+    markerClusterGroup.current.clearLayers();
+    markerClusterGroup.current.addLayers(markers);
+  }, [data, apiUrl]);
 
   return null;
 }
