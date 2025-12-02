@@ -45,7 +45,7 @@
         "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
         "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
         "AUTH0_SCOPE": "openid profile email offline_access roles",
-        "ALLOWED_ORIGINS": "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev,http://localhost:4322"
+        "ALLOWED_ORIGINS": "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev,http://localhost:4321"
       },
       // Production runtime database connection via Hyperdrive
       // Provides connection pooling, caching, and optimized database access

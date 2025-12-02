@@ -7,4 +7,7 @@ export default defineConfig({
   output: "server",
   adapter: cloudflare(),
   integrations: [preact()],
+  server: {
+    port: 4321,
+  },
 });
