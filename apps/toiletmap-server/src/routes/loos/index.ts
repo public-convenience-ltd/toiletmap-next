@@ -48,6 +48,16 @@ loosRouter.get(
     }),
 );
 
+/** GET /loos/dump */
+loosRouter.get("/dump", (c) =>
+  handleRoute(c, "loos.dump", async () => {
+    const looService = c.get("looService");
+    const loos = await looService.getAllCompressed();
+    c.header("Cache-Control", "public, max-age=3600"); // 1 hour
+    return c.json({ data: loos, count: loos.length });
+  }),
+);
+
 /** GET /loos/proximity */
 loosRouter.get("/proximity", validate("query", proximitySchema, "Invalid proximity query"), (c) =>
   handleRoute(c, "loos.proximity", async () => {

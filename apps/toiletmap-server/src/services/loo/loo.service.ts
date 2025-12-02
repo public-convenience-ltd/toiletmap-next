@@ -319,6 +319,44 @@ export class LooService {
   }
 
   /**
+   * Retrieves all loos in a compressed format.
+   * Optimized for bulk map rendering.
+   */
+  async getAllCompressed(): Promise<CompressedLoo[]> {
+    const rows = await this.prisma.toilets.findMany({
+      where: {
+        active: true,
+        geohash: { not: null },
+      },
+      select: {
+        id: true,
+        geohash: true,
+        no_payment: true,
+        all_gender: true,
+        automatic: true,
+        accessible: true,
+        baby_change: true,
+        radar: true,
+      },
+    });
+
+    return rows.map((row) => {
+      return [
+        row.id,
+        row.geohash ?? "",
+        genLooFilterBitmask({
+          noPayment: row.no_payment,
+          allGender: row.all_gender,
+          automatic: row.automatic,
+          accessible: row.accessible,
+          babyChange: row.baby_change,
+          radar: row.radar,
+        }),
+      ];
+    });
+  }
+
+  /**
    * Finds loos within a specified radius (in meters) of a coordinate.
    * Uses PostGIS spherical distance calculation.
    */

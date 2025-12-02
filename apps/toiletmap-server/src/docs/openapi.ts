@@ -823,6 +823,20 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
+    "/api/loos/dump": {
+      get: {
+        tags: ["Loos"],
+        summary: "Dump all active loos",
+        description:
+          "Returns a compressed list of all active loos. Optimized for initial map loading. Cached for 1 hour.",
+        responses: {
+          200: {
+            description: "Compressed list of all active loos.",
+            content: jsonContent("CompressedLooListResponse"),
+          },
+        },
+      },
+    },
     "/api/loos/geohash/{geohash}": {
       get: {
         tags: ["Loos"],
