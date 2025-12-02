@@ -46,14 +46,18 @@ const defaultConfig: Required<SecurityHeadersConfig> = {
 /**
  * Check if origin is allowed based on CORS configuration
  */
-function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
+export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
   if (!origin) return false;
   if (allowedOrigins.includes("*")) return true;
   return allowedOrigins.some((allowed) => {
-    // Support wildcard subdomains like *.example.com
-    if (allowed.startsWith("*.")) {
-      const domain = allowed.slice(1); // Remove the *
-      return origin.endsWith(domain);
+    // Support wildcards
+    if (allowed.includes("*")) {
+      const parts = allowed.split("*");
+      // Only support single wildcard for now
+      if (parts.length === 2) {
+        const [prefix, suffix] = parts;
+        return origin.startsWith(prefix) && origin.endsWith(suffix);
+      }
     }
     return origin === allowed;
   });
