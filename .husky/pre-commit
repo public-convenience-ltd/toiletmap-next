@@ -1,0 +1,2 @@
+# Run Biome check on staged files with auto-fix
+pnpm exec biome check --staged --write --no-errors-on-unmatched
