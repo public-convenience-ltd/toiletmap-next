@@ -3,15 +3,17 @@ import { useEffect, useRef } from "preact/hooks";
 import "leaflet/dist/leaflet.css";
 import { get, set } from "idb-keyval";
 import Supercluster from "supercluster";
+import { getApiUrl } from "../api/config";
+import { CACHE_DURATION, CACHE_KEYS } from "../api/constants";
 import { getLooById } from "../api/loos";
-
-const CACHE_KEY = "loos-cache";
-const CACHE_TIME_KEY = "loos-cache-time";
-const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
 type CompressedLoo = [string, string, number]; // id, geohash, filterMask
 
-export default function LooMap() {
+interface LooMapProps {
+  apiUrl: string;
+}
+
+export default function LooMap({ apiUrl }: LooMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<L.LayerGroup | null>(null);
@@ -45,21 +47,21 @@ export default function LooMap() {
       map.current?.remove();
       map.current = null;
     };
-  }, []);
+  }, [apiUrl]);
 
   const loadData = async () => {
     try {
-      let data: CompressedLoo[] | undefined = await get(CACHE_KEY);
-      const cacheTime = await get(CACHE_TIME_KEY);
+      let data: CompressedLoo[] | undefined = await get(CACHE_KEYS.LOOS_LIST);
+      const cacheTime = await get(CACHE_KEYS.LOOS_LIST_TIME);
       const now = Date.now();
 
       if (!data || !cacheTime || now - cacheTime > CACHE_DURATION) {
         console.log("Fetching fresh data...");
-        const response = await fetch("http://localhost:8787/api/loos/dump");
-        const json = await response.json();
+        const response = await fetch(getApiUrl(apiUrl, "/api/loos/dump"));
+        const json = (await response.json()) as { data: CompressedLoo[] };
         data = json.data;
-        await set(CACHE_KEY, data);
-        await set(CACHE_TIME_KEY, now);
+        await set(CACHE_KEYS.LOOS_LIST, data);
+        await set(CACHE_KEYS.LOOS_LIST_TIME, now);
       } else {
         console.log("Using cached data");
       }
@@ -105,7 +107,7 @@ export default function LooMap() {
       const isCluster = cluster.properties.cluster;
 
       if (isCluster) {
-        const count = cluster.properties.point_count;
+        const count = cluster.properties.point_count as number;
         const size = count < 100 ? "small" : count < 1000 ? "medium" : "large";
         const icon = L.divIcon({
           html: `<div><span>${count}</span></div>`,
@@ -124,7 +126,7 @@ export default function LooMap() {
         marker.on("click", async () => {
           const id = cluster.properties.id as string;
           console.log(`Clicked loo: ${id}`);
-          const details = await getLooById(id);
+          const details = await getLooById(apiUrl, id);
           console.log("Loo details:", details);
           if (details) {
             marker

@@ -18,5 +18,6 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
   "makefile.configureOnOpen": false,
-  "java.configuration.updateBuildConfiguration": "interactive"
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "typescript.tsdk": "node_modules/typescript/lib"
 }
