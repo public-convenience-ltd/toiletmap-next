@@ -113,6 +113,32 @@ The workspace is already configured in `.vscode/settings.json` to:
 
 All pull requests automatically run Biome checks via GitHub Actions. Make sure to run `pnpm check:fix` before pushing to avoid CI failures.
 
+### Pre-commit Hooks
+
+This project uses [Husky](https://typicode.github.io/husky/) to automatically run Biome checks on staged files before each commit.
+
+**What runs on pre-commit:**
+- Biome check with auto-fix (linting + formatting)
+- Only runs on files you're committing (not the entire codebase)
+- Automatically fixes what it can, blocks commit if unfixable errors exist
+
+**First-time setup:**
+The hooks are installed automatically when you run `pnpm install` (via the `prepare` script).
+
+**Skipping hooks (use sparingly):**
+If you need to bypass the pre-commit hook:
+```bash
+git commit --no-verify -m "your message"
+# or
+HUSKY=0 git commit -m "your message"
+```
+
+**Troubleshooting:**
+If hooks aren't working:
+1. Run `pnpm install` to reinstall hooks
+2. Check that `.husky/pre-commit` exists and is executable
+3. Ensure you're using Node 24 (`fnm use`)
+
 ## Common Tasks
 
 ### Building
