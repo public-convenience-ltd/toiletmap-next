@@ -18,7 +18,7 @@
     "preview": {
       "vars": {
         "ENVIRONMENT": "preview",
-        "PUBLIC_API_URL": "https://feat-setup-map-toiletmap-server.gbtoiletmap.workers.dev"
+        "PUBLIC_API_URL":"https://toiletmap-server.gbtoiletmap.workers.dev"
       }
     },
     "production": {
