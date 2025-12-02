@@ -1,5 +1,6 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
 import { useEffect, useRef } from "preact/hooks";
 import "./LooMap.css";
 import MapMarkers from "./MapMarkers";
