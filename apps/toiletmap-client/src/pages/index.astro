@@ -8,40 +8,38 @@ const apiUrl = Astro.locals.runtime.env.PUBLIC_API_URL;
 ---
 
 <Layout>
-  <main class="center center--gutter">
-    <div class="hero">
+  <main>
+    <div class="logo-overlay">
       <h1>
-        <Image src={logo} alt="Toilet Map" height={60} loading="eager" />
+        <Image src={logo} alt="Toilet Map" height={40} loading="eager" />
       </h1>
-      <LooMap client:only="preact" apiUrl={apiUrl} />
     </div>
+    <LooMap client:only="preact" apiUrl={apiUrl} />
   </main>
 </Layout>
 
 <style>
-  .hero {
-    padding: var(--space-xl) 0;
-    text-align: center;
+  main {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+
+  .logo-overlay {
+    position: absolute;
+    top: var(--space-m);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: var(--space-xs) var(--space-m);
+    border-radius: var(--space-s);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   }
 
   h1 {
-    font-size: var(--text-4);
-    color: var(--color-primary-navy);
-    margin-bottom: var(--space-m);
-  }
-
-  p {
-    font-size: var(--text-1);
-    color: var(--color-neutral-grey);
-  }
-
-  .center {
-    box-sizing: content-box;
-    margin-inline: auto;
-    max-inline-size: var(--toilet-max-width);
-  }
-
-  .center--gutter {
-    padding-inline: var(--toilet-gutter);
+    margin: 0;
+    line-height: 1;
   }
 </style>
