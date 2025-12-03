@@ -48,6 +48,38 @@ sequenceDiagram
     end
 ```
 
+## Cached Read Request
+
+Flow for cached API requests (e.g., `GET /api/loos/dump` or `GET /api/loos/geohash/:geohash`):
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant CF as Cloudflare Edge
+    participant Cache as Cache API
+    participant Worker
+    participant Service as LooService
+    participant DB as Database
+
+    Client->>CF: GET /api/loos/dump
+    CF->>Worker: Route request
+    Worker->>Cache: cache.match(request)
+    alt Cache Hit
+        Cache-->>Worker: Return cached Response
+        Worker-->>CF: Return cached Response
+        CF-->>Client: 200 OK (from cache)
+    else Cache Miss
+        Worker->>Service: getAllCompressed()
+        Service->>DB: Fetch data
+        DB-->>Service: Return data
+        Service-->>Worker: Return DTOs
+        Worker->>Worker: Create Response with Cache-Control
+        Worker->>Cache: ctx.waitUntil(cache.put(request, response))
+        Worker-->>CF: Return fresh Response
+        CF-->>Client: 200 OK (fresh)
+    end
+```
+
 ## Authenticated Write Request
 
 Flow for authenticated write requests (e.g., `POST /api/loos`):

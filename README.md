@@ -8,6 +8,7 @@ This repository contains the code that powers both the public API and the admin 
 
 - **What we ship**: REST API, geospatial queries, authentication, admin dashboard, soon a dedicated client worker
 - **Runtime**: Cloudflare Workers with Hono, Prisma, and Supabase/PostGIS
+- **Edge Caching**: High-performance caching for toilet data and map tiles at the edge
 - **Why a monorepo**: keeps the API/admin worker and the frontend worker aligned, sharing tooling, CI, and documentation
 
 ## Workspace Layout

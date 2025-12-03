@@ -243,7 +243,12 @@ See [hyperdrive.md](./hyperdrive.md) for comprehensive details on connection lif
 ### Caching Strategy
 
 - **Static Assets**: Cached at edge with long TTL
-- **API Responses**: No caching (always fresh data)
+- **API Responses**:
+  - **/dump**: Cached for 1 hour (`max-age=3600`) at the edge.
+  - **/geohash**: Variable cache duration:
+    - Short geohashes (length <= 3): 1 hour (`max-age=3600`).
+    - Long geohashes (length > 3): 5 minutes (`max-age=300`).
+  - **Other Endpoints**: No caching (always fresh data).
 - **JWKS Keys**: Cached for 1 hour, refreshed on miss
 
 ### Rate Limiting
