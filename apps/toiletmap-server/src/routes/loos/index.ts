@@ -24,76 +24,54 @@ import {
 
 const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
+import { cacheResponse } from "../../middleware/cache";
+
 /** GET /loos/geohash/:geohash */
 loosRouter.get(
   "/geohash/:geohash",
   validate("param", geohashParamSchema, "Invalid geohash path parameter"),
   validate("query", geohashQuerySchema, "Invalid geohash query parameter"),
-  async (c) => {
-    // biome-ignore lint/suspicious/noExplicitAny: Cloudflare caches type is not available in standard DOM types
-    const cache = typeof caches !== "undefined" ? (caches as any).default : undefined;
-    const match = cache ? await cache.match(c.req.raw) : undefined;
-    if (match) {
-      return match;
-    }
-
-    return handleRoute(c, "loos.geohash", async () => {
+  cacheResponse((c) => {
+    const geohash = c.req.param("geohash");
+    return geohash.length <= 3 ? 3600 : 300;
+  }),
+  (c) =>
+    handleRoute(c, "loos.geohash", async () => {
       const { geohash } = c.req.valid("param");
       const { active, compressed } = c.req.valid("query");
       const looService = c.get("looService");
 
-      const maxAge = geohash.length <= 3 ? 3600 : 300; // 1 hour for short, 5 mins for long
-
-      let response: Response;
       if (compressed) {
         const loos = await looService.getWithinGeohashCompressed(geohash, active);
-        c.header("Cache-Control", `public, max-age=${maxAge}`);
-        response = c.json({ data: loos, count: loos.length });
-      } else {
-        const loos = await looService.getWithinGeohash(geohash, active);
-        c.header("Cache-Control", `public, max-age=${maxAge}`);
-        response = c.json({ data: loos, count: loos.length });
+        return c.json({ data: loos, count: loos.length });
       }
 
-      if (cache) {
-        c.executionCtx.waitUntil(cache.put(c.req.raw, response.clone()));
-      }
-      return response;
-    });
-  },
+      const loos = await looService.getWithinGeohash(geohash, active);
+      return c.json({ data: loos, count: loos.length });
+    }),
 );
 
 /** GET /loos/dump */
-loosRouter.get("/dump", async (c) => {
-  // biome-ignore lint/suspicious/noExplicitAny: Cloudflare caches type is not available in standard DOM types
-  const cache = typeof caches !== "undefined" ? (caches as any).default : undefined;
-  const match = cache ? await cache.match(c.req.raw) : undefined;
-  if (match) {
-    return match;
-  }
-
-  return handleRoute(c, "loos.dump", async () => {
+loosRouter.get("/dump", cacheResponse(3600), (c) =>
+  handleRoute(c, "loos.dump", async () => {
     const looService = c.get("looService");
     const loos = await looService.getAllCompressed();
-    c.header("Cache-Control", "public, max-age=3600"); // 1 hour
-    const response = c.json({ data: loos, count: loos.length });
-    if (cache) {
-      c.executionCtx.waitUntil(cache.put(c.req.raw, response.clone()));
-    }
-    return response;
-  });
-});
-
-/** GET /loos/proximity */
-loosRouter.get("/proximity", validate("query", proximitySchema, "Invalid proximity query"), (c) =>
-  handleRoute(c, "loos.proximity", async () => {
-    const { lat, lng, radius } = c.req.valid("query");
-    const looService = c.get("looService");
-    const loos = await looService.getByProximity(lat, lng, radius);
-
-    c.header("Cache-Control", "public, max-age=300"); // 5 minutes
     return c.json({ data: loos, count: loos.length });
   }),
+);
+
+/** GET /loos/proximity */
+loosRouter.get(
+  "/proximity",
+  validate("query", proximitySchema, "Invalid proximity query"),
+  cacheResponse(300),
+  (c) =>
+    handleRoute(c, "loos.proximity", async () => {
+      const { lat, lng, radius } = c.req.valid("query");
+      const looService = c.get("looService");
+      const loos = await looService.getByProximity(lat, lng, radius);
+      return c.json({ data: loos, count: loos.length });
+    }),
 );
 
 /** GET /loos/search */

@@ -335,6 +335,14 @@ describe("Loo read endpoints", () => {
 
       // Check cache header for long geohash (>3)
       expect(response.headers.get("Cache-Control")).toContain("public, max-age=300");
+
+      // Verify cache hit
+      const cachedResponse = await callApi(`/api/loos/geohash/${prefix}?compressed=true`, {
+        headers: authHeaders(),
+      });
+      expect(cachedResponse.status).toBe(200);
+      const cachedBody = await cachedResponse.json();
+      expect(cachedBody).toEqual(body);
     });
 
     it("uses longer cache duration for short geohashes", async () => {

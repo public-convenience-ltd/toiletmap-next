@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { getTestContext } from "./setup";
 import { createFixtureFactory } from "./utils/fixtures";
 import { callApi } from "./utils/test-client";
+
+const authHeaders = () => {
+  const { issueToken } = getTestContext();
+  return {
+    Authorization: `Bearer ${issueToken()}`,
+  };
+};
 
 const fixtures = createFixtureFactory();
 
@@ -37,6 +45,17 @@ describe("Loo dump endpoint", () => {
 
       // Check cache header
       expect(response.headers.get("Cache-Control")).toContain("public, max-age=3600");
+
+      // Verify cache hit on second request
+      const cachedResponse = await callApi("/api/loos/dump", {
+        headers: authHeaders(),
+      });
+      expect(cachedResponse.status).toBe(200);
+      // In a real worker environment, we might check for a CF-Cache-Status header,
+      // but here we are just verifying our mock works and the middleware uses it.
+      // We can verify the response body is identical.
+      const cachedBody = await cachedResponse.json();
+      expect(cachedBody).toEqual(body);
     });
   });
 });

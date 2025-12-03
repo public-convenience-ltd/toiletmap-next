@@ -36,6 +36,27 @@ beforeAll(async () => {
   process.env.AUTH0_PROFILE_KEY = "app_metadata";
   process.env.AUTH0_CLIENT_ID = "integration-test-client-id";
 
+  // Mock Cloudflare Cache API
+  const cacheStore = new Map<string, Response>();
+  // @ts-expect-error
+  global.caches = {
+    default: {
+      match: async (request: Request | string) => {
+        const url = typeof request === "string" ? request : request.url;
+        const cached = cacheStore.get(url);
+        return cached ? cached.clone() : undefined;
+      },
+      put: async (request: Request | string, response: Response) => {
+        const url = typeof request === "string" ? request : request.url;
+        cacheStore.set(url, response.clone());
+      },
+      delete: async (request: Request | string) => {
+        const url = typeof request === "string" ? request : request.url;
+        return cacheStore.delete(url);
+      },
+    },
+  };
+
   const prisma = createPrismaClient(databaseUrl);
   await prisma.$connect();
   state.prisma = prisma;

@@ -5,7 +5,9 @@
 - **Framework**: [Hono](https://hono.dev/) drives HTTP routing (`src/app.ts`).
 - **Database**: Postgres/PostGIS managed through Prisma. The Prisma client is generated into `prisma/src/generated/prisma/client` and re-exported via `src/generated/prisma-client.ts` so application code can avoid brittle relative paths.
 - **Authentication**: Auth0-issued JWTs validated via `src/auth/middleware.ts`, which centralises header + cookie auth and enriches `c.get('user')` with Auth0 `/userinfo`. Tests spin up a local JWKS server so tokens can be minted without external calls.
-- **Edge Caching**: High-traffic read endpoints (`/dump`, `/geohash`) are cached at the Cloudflare edge using the Cache API to improve performance and reduce database load.
+- **Authentication**: Auth0-issued JWTs validated via `src/auth/middleware.ts`, which centralises header + cookie auth and enriches `c.get('user')` with Auth0 `/userinfo`. Tests spin up a local JWKS server so tokens can be minted without external calls.
+- **Edge Caching**: High-traffic read endpoints are cached using the `src/middleware/cache.ts` middleware, which wraps the Cloudflare Cache API.
+- **Domain focus**: Everything interesting lives under `src/services/loo`. Routes marshal requests, defer to this service, and shape responses through `src/services/loo/mappers.ts` and `src/services/loo/types.ts`.
 - **Domain focus**: Everything interesting lives under `src/services/loo`. Routes marshal requests, defer to this service, and shape responses through `src/services/loo/mappers.ts` and `src/services/loo/types.ts`.
 
 ## Recommended Reading Order
