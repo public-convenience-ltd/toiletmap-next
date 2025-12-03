@@ -127,7 +127,7 @@ const getUserIdOrIp = (c: Context<{ Bindings: Env; Variables: AppVariables }>): 
  * Pre-configured rate limiters matching existing behavior
  */
 export const rateLimiters = {
-  /** Public read operations (100 req/min, IP-based) */
+  /** Public read operations (400 req/min, IP-based) */
   read: cloudflareRateLimit({
     binding: "RATE_LIMIT_READ",
     keyGenerator: (c) => `read:${getClientIp(c)}`,

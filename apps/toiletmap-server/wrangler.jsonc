@@ -59,7 +59,7 @@
         {
           "name": "RATE_LIMIT_READ",
           "namespace_id": "1000",
-          "simple": { "limit": 100, "period": 60 }
+          "simple": { "limit": 400, "period": 60 }
         },
         {
           "name": "RATE_LIMIT_WRITE",
@@ -102,7 +102,7 @@
         {
           "name": "RATE_LIMIT_READ",
           "namespace_id": "1000",
-          "simple": { "limit": 100, "period": 60 }
+          "simple": { "limit": 400, "period": 60 }
         },
         {
           "name": "RATE_LIMIT_WRITE",
