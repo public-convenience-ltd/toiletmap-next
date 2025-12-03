@@ -33,6 +33,14 @@ loosRouter.get(
   validate("query", geohashQuerySchema, "Invalid geohash query parameter"),
   cacheResponse((c) => {
     const geohash = c.req.param("geohash");
+    const resultCount = c.get("resultCount");
+
+    // If we have a result count, use it to decide caching
+    if (typeof resultCount === "number") {
+      return resultCount > 100 ? (geohash.length <= 3 ? 3600 : 300) : 0;
+    }
+
+    // Fallback for cases where resultCount might not be set (shouldn't happen in this route)
     return geohash.length <= 3 ? 3600 : 300;
   }),
   (c) =>
@@ -43,10 +51,12 @@ loosRouter.get(
 
       if (compressed) {
         const loos = await looService.getWithinGeohashCompressed(geohash, active);
+        c.set("resultCount", loos.length);
         return c.json({ data: loos, count: loos.length });
       }
 
       const loos = await looService.getWithinGeohash(geohash, active);
+      c.set("resultCount", loos.length);
       return c.json({ data: loos, count: loos.length });
     }),
 );

@@ -21,10 +21,13 @@ export const cacheResponse = (ttl: TtlResolver): MiddlewareHandler => {
 
     if (c.res.ok) {
       const maxAge = typeof ttl === "function" ? ttl(c) : ttl;
-      c.res.headers.set("Cache-Control", `public, max-age=${maxAge}`);
 
-      if (cache) {
-        c.executionCtx.waitUntil(cache.put(c.req.raw, c.res.clone()));
+      if (maxAge >= 0) {
+        c.res.headers.set("Cache-Control", `public, max-age=${maxAge}`);
+
+        if (cache && maxAge > 0) {
+          c.executionCtx.waitUntil(cache.put(c.req.raw, c.res.clone()));
+        }
       }
     }
   };

@@ -334,7 +334,7 @@ describe("Loo read endpoints", () => {
       expect(filter).toBe(3);
 
       // Check cache header for long geohash (>3)
-      expect(response.headers.get("Cache-Control")).toContain("public, max-age=300");
+      expect(response.headers.get("Cache-Control")).toContain("public, max-age=0");
 
       // Verify cache hit
       const cachedResponse = await callApi(`/api/loos/geohash/${prefix}?compressed=true`, {
@@ -345,8 +345,14 @@ describe("Loo read endpoints", () => {
       expect(cachedBody).toEqual(body);
     });
 
-    it("uses longer cache duration for short geohashes", async () => {
-      const loo = await fixtures.loos.create({ active: true });
+    it("uses longer cache duration for short geohashes with many results", async () => {
+      // Create enough loos to trigger caching (>100)
+      const loos = await Promise.all(
+        Array.from({ length: 101 }).map(() =>
+          fixtures.loos.create({ active: true, location: { lat: 51.5, lng: -0.1 } }),
+        ),
+      );
+      const loo = loos[0];
       const shortPrefix = loo.geohash?.slice(0, 3);
       if (!shortPrefix) throw new Error("Fixture geohash was not generated");
 
@@ -355,6 +361,19 @@ describe("Loo read endpoints", () => {
       });
       expect(response.status).toBe(200);
       expect(response.headers.get("Cache-Control")).toContain("public, max-age=3600");
+    });
+
+    it("does not cache responses with few results", async () => {
+      const loo = await fixtures.loos.create({ active: true });
+      const prefix = loo.geohash?.slice(0, 6);
+      if (!prefix) throw new Error("Fixture geohash was not generated");
+
+      const response = await callApi(`/api/loos/geohash/${prefix}`, {
+        headers: authHeaders(),
+      });
+      expect(response.status).toBe(200);
+      // Should have public max-age=0
+      expect(response.headers.get("Cache-Control")).toContain("public, max-age=0");
     });
   });
 

@@ -248,6 +248,7 @@ See [hyperdrive.md](./hyperdrive.md) for comprehensive details on connection lif
   - **/geohash**: Variable cache duration:
     - Short geohashes (length <= 3): 1 hour (`max-age=3600`).
     - Long geohashes (length > 3): 5 minutes (`max-age=300`).
+    - **Note**: Tiles with few results (<= 100) are NOT cached (`max-age=0`) to ensure fast updates.
   - **Other Endpoints**: No caching (always fresh data).
 - **JWKS Keys**: Cached for 1 hour, refreshed on miss
 

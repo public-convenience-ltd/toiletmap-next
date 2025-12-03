@@ -73,8 +73,14 @@ sequenceDiagram
         Service->>DB: Fetch data
         DB-->>Service: Return data
         Service-->>Worker: Return DTOs
-        Worker->>Worker: Create Response with Cache-Control
-        Worker->>Cache: ctx.waitUntil(cache.put(request, response))
+        Worker->>Worker: Create Response
+        alt Large Result Set (>100)
+            Worker->>Worker: Set Cache-Control (300s/3600s)
+            Worker->>Cache: ctx.waitUntil(cache.put(request, response))
+        else Small Result Set
+            Worker->>Worker: Set Cache-Control (max-age=0)
+            Note over Worker: Do not cache small results<br/>for faster updates
+        end
         Worker-->>CF: Return fresh Response
         CF-->>Client: 200 OK (fresh)
     end
