@@ -332,6 +332,21 @@ describe("Loo read endpoints", () => {
       // Check filter bitmask
       // NO_PAYMENT (1) | ALL_GENDER (2) = 3
       expect(filter).toBe(3);
+
+      // Check cache header for long geohash (>3)
+      expect(response.headers.get("Cache-Control")).toContain("public, max-age=300");
+    });
+
+    it("uses longer cache duration for short geohashes", async () => {
+      const loo = await fixtures.loos.create({ active: true });
+      const shortPrefix = loo.geohash?.slice(0, 3);
+      if (!shortPrefix) throw new Error("Fixture geohash was not generated");
+
+      const response = await callApi(`/api/loos/geohash/${shortPrefix}`, {
+        headers: authHeaders(),
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toContain("public, max-age=3600");
     });
   });
 
