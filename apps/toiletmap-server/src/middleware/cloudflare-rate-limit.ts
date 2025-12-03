@@ -1,7 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { AppVariables, Env } from "../types";
 import { logger } from "../utils/logger";
-import { rateLimit } from "./rate-limit";
 
 /**
  * Rate limiting configuration for Cloudflare Rate Limiting API
@@ -11,18 +10,13 @@ interface CloudflareRateLimitConfig {
   keyGenerator: (c: Context<{ Bindings: Env; Variables: AppVariables }>) => string;
   message?: string;
   name?: string;
-  fallback?: {
-    maxRequests: number;
-    windowSeconds: number;
-  };
 }
 
 /**
  * Cloudflare Rate Limiting middleware
  *
  * Uses Cloudflare's native Rate Limiting API for datacenter-level rate limiting.
- * Rate limits are per Cloudflare location, providing better protection than per-isolate
- * in-memory limiting.
+ * Rate limits are per Cloudflare location.
  *
  * @see https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
  *
@@ -49,17 +43,7 @@ const cloudflareRateLimit = (
     keyGenerator,
     message = "Too many requests, please try again later",
     name = binding,
-    fallback,
   } = config;
-
-  const fallbackLimiter = fallback
-    ? rateLimit({
-        maxRequests: fallback.maxRequests,
-        windowSeconds: fallback.windowSeconds,
-        keyGenerator,
-        message,
-      })
-    : null;
 
   return async (c, next) => {
     const rateLimiter = c.env[binding];
@@ -70,15 +54,7 @@ const cloudflareRateLimit = (
         path: c.req.path,
         method: c.req.method,
       });
-      if (fallbackLimiter) {
-        logger.warn("Falling back to in-memory rate limiter", {
-          rateLimiter: name,
-          binding,
-          path: c.req.path,
-          method: c.req.method,
-        });
-        return fallbackLimiter(c, next);
-      }
+      // Fail open if binding is missing
       return next();
     }
 
@@ -117,17 +93,7 @@ const cloudflareRateLimit = (
           errorMessage: String(error),
         });
       }
-      // Fallback to in-memory limiter if available, otherwise allow request
-      if (fallbackLimiter) {
-        logger.warn("Rate limiter error, falling back to in-memory limiter", {
-          rateLimiter: name,
-          binding,
-          path: c.req.path,
-          method: c.req.method,
-        });
-        return fallbackLimiter(c, next);
-      }
-      // Fail open if no fallback configured
+      // Fail open on error
       return next();
     }
 
@@ -167,10 +133,6 @@ export const rateLimiters = {
     keyGenerator: (c) => `read:${getClientIp(c)}`,
     message: "Too many requests, please try again later",
     name: "read",
-    fallback: {
-      maxRequests: 100,
-      windowSeconds: 60,
-    },
   }),
 
   /** Write operations (20 req/min, user or IP-based) */
@@ -179,10 +141,6 @@ export const rateLimiters = {
     keyGenerator: (c) => `write:${getUserIdOrIp(c)}`,
     message: "Too many requests, please slow down",
     name: "write",
-    fallback: {
-      maxRequests: 20,
-      windowSeconds: 60,
-    },
   }),
 
   /** Admin operations (60 req/min, user or IP-based) */
@@ -191,10 +149,6 @@ export const rateLimiters = {
     keyGenerator: (c) => `admin:${getUserIdOrIp(c)}`,
     message: "Too many admin requests, please try again later",
     name: "admin",
-    fallback: {
-      maxRequests: 60,
-      windowSeconds: 60,
-    },
   }),
 
   /** Authentication attempts (5 req/min, IP-based) */
@@ -203,9 +157,5 @@ export const rateLimiters = {
     keyGenerator: (c) => `auth:${getClientIp(c)}`,
     message: "Too many authentication attempts, please try again later",
     name: "auth",
-    fallback: {
-      maxRequests: 5,
-      windowSeconds: 60,
-    },
   }),
 };

@@ -232,14 +232,7 @@ flowchart TD
 
 Workers keep a small in‑memory cache (2‑minute TTL, keyed by a SHA‑256 digest of the access token) for Auth0 `/userinfo` responses. Although isolates are ephemeral, this cache significantly reduces repeated upstream calls during bursts (e.g., multiple admin requests in a short window) and limits the blast radius if Auth0 temporarily rate limits us. If an isolate is recycled the cache naturally evaporates with no persistence.
 
-### Rate limiting fallback rationale
 
-Primary throttling is enforced via Cloudflare’s Rate Limiting API bindings. Each middleware instance also ships with a like‑for‑like in‑memory fallback so that:
-
-- Local development and CI (where bindings are unavailable) still exercise realistic budgets.
-- Production gracefully degrades if a binding is misconfigured instead of failing wide open.
-
-The fallback uses the same key derivation (IP or user) and limit window but only protects a single isolate; Cloudflare’s edge limits remain the authoritative protection in production.
 
 ## Proximity Search Flow
 
