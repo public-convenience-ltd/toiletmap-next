@@ -67,4 +67,5 @@ import type { LooService } from "./services/loo";
 export type AppVariables = {
   user?: RequestUser;
   looService: LooService;
+  resultCount?: number;
 };
