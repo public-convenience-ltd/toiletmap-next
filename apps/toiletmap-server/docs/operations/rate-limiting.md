@@ -1,8 +1,7 @@
 # Rate Limiting
 
-The application uses a **dual-strategy** system:
-1. **Cloudflare Rate Limiting API** (Production): Global, datacenter-level enforcement.
-2. **In-Memory Fallback** (Development): Per-isolate enforcement when Cloudflare bindings are missing.
+The application uses the **Cloudflare Rate Limiting API** for global, datacenter-level enforcement.
+
 
 ## Limits
 
@@ -27,5 +26,5 @@ name = "RATE_LIMIT_READ"
 
 ## Troubleshooting
 
-- **"Rate limiter binding not found"**: Expected in local development; the system fails open.
+- **"Rate limiter binding not found"**: Expected in local development if bindings are not configured; the system fails open (allows requests).
 - **429 Errors**: Increase limits in `wrangler.jsonc` or implement exponential backoff.

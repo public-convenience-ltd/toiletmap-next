@@ -15,7 +15,7 @@ A REST API and admin interface for managing public toilet data across the UK. De
 - **📝 Complete Audit Trail**: Full history tracking for all data mutations
 - **🎨 Admin Dashboard**: Server-side rendered interface for data management (Hono JSX)
 - **✅ Type-Safe**: End-to-end TypeScript with Prisma ORM and Zod validation
-- **🛡️ Rate Limiting**: Dual-strategy rate limiting (Cloudflare API + in-memory fallback)
+- **🛡️ Rate Limiting**: Datacenter-level rate limiting via Cloudflare API
 
 ## Quick Start
 

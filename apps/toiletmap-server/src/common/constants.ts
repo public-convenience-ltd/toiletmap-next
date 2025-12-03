@@ -7,12 +7,6 @@ export const RECENT_WINDOW_DAYS = 30;
 export const LOO_ID_LENGTH = 24;
 
 /**
- * Maximum number of entries allowed in the in-memory rate limiter store
- * before old entries are pruned
- */
-export const MAX_RATE_LIMIT_STORE_SIZE = 10000;
-
-/**
  * Maximum number of results that can be returned in a search query
  */
 export const MAX_SEARCH_LIMIT = 200;
