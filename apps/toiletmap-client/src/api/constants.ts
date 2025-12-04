@@ -15,6 +15,10 @@ export const CACHE_KEYS = {
   LOO_DETAIL: "loos-detail-cache",
   /** Cache key for the last time the loos list was updated */
   LAST_UPDATED: "loos-last-updated",
+  /** Cache key to track if rich dump has been downloaded */
+  RICH_DUMP_DOWNLOADED: "rich-dump-downloaded",
+  /** Cache key for the timestamp when rich dump was downloaded */
+  RICH_DUMP_TIMESTAMP: "rich-dump-timestamp",
 } as const;
 
 /**
