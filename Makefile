@@ -69,6 +69,7 @@ check: check-style ## Run style check, typecheck, and dry-run deployment
 
 cf-typegen: ## Generate Cloudflare Worker types
 	pnpm --filter toiletmap-server cf-typegen
+	pnpm --filter toiletmap-client cf-typegen
 
 token-issue: ## Issue a test token
 	pnpm --filter toiletmap-server token:issue

@@ -6,10 +6,29 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
-	"assets": {
+ "assets": {
 		"binding": "ASSETS",
 		"directory": "./dist"
 	},
+  "vars": {
+    "ENVIRONMENT": "development",
+    "PUBLIC_API_URL": "http://localhost:8787"
+  },
+  "env": {
+    "preview": {
+      "vars": {
+        "ENVIRONMENT": "preview",
+        "PUBLIC_API_URL":"https://toiletmap-server.gbtoiletmap.workers.dev"
+      }
+    },
+    "production": {
+      "name": "toiletmap-client",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
+      }
+    }
+  },
 	"observability": {
     "enabled": true,
     "logs": {
