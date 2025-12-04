@@ -129,6 +129,21 @@ export const geohashQuerySchema = z.object({
       return value.trim().toLowerCase();
     }, z.enum(["true", "false"]).optional())
     .transform((value) => value === "true"),
+  summary: z
+    .preprocess((value) => {
+      if (typeof value !== "string") return value;
+      return value.trim().toLowerCase();
+    }, z.enum(["true", "false"]).optional())
+    .transform((value) => value === "true"),
+});
+
+export const dumpQuerySchema = z.object({
+  rich: z
+    .preprocess((value) => {
+      if (typeof value !== "string") return value;
+      return value.trim().toLowerCase();
+    }, z.enum(["true", "false"]).optional())
+    .transform((value) => value === "true"),
 });
 
 export const reportsQuerySchema = z.object({
@@ -159,3 +174,7 @@ export const idsQuerySchema = z
 
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export type MetricsQuery = z.infer<typeof metricsQuerySchema>;
+
+export const updatesQuerySchema = z.object({
+  since: z.string().datetime({ message: "Invalid ISO date string for 'since' parameter" }),
+});

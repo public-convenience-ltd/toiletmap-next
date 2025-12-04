@@ -319,6 +319,27 @@ export class LooService {
   }
 
   /**
+   * Finds loos whose geohash starts with the given string and returns a summary format.
+   * Includes more details than compressed but less than full.
+   */
+  async getWithinGeohashSummary(geohash: string, active?: boolean | null): Promise<LooResponse[]> {
+    const where = {
+      geohash: { startsWith: geohash },
+      ...(typeof active === "boolean" ? { active: { equals: active } } : {}),
+    } as const;
+
+    const rows = await this.prisma.toilets.findMany({
+      where,
+      include: { areas: areaSelection },
+    });
+    // For now, we map to full LooResponse but we could optimize this to return a subset
+    // if we defined a specific LooSummary type. Given the user's request for "most useful info",
+    // returning the standard LooResponse (which is already somewhat summarized compared to raw DB)
+    // is a good starting point.
+    return rows.map(mapLoo);
+  }
+
+  /**
    * Retrieves all loos in a compressed format.
    * Optimized for bulk map rendering.
    */
@@ -354,6 +375,68 @@ export class LooService {
         }),
       ];
     });
+  }
+
+  /**
+   * Retrieves all active loos with full details.
+   * WARNING: This is a heavy operation.
+   */
+  async getAll(): Promise<LooResponse[]> {
+    const rows = await this.prisma.toilets.findMany({
+      where: {
+        active: true,
+        geohash: { not: null },
+      },
+      include: { areas: areaSelection },
+    });
+
+    return rows.map(mapLoo);
+  }
+
+  /**
+   * Retrieves updates (upserts and deletes) since a given date.
+   */
+  async getUpdates(since: Date): Promise<{ upserted: CompressedLoo[]; deleted: string[] }> {
+    const rows = await this.prisma.toilets.findMany({
+      where: {
+        updated_at: { gt: since },
+      },
+      select: {
+        id: true,
+        active: true,
+        geohash: true,
+        no_payment: true,
+        all_gender: true,
+        automatic: true,
+        accessible: true,
+        baby_change: true,
+        radar: true,
+      },
+    });
+
+    const upserted: CompressedLoo[] = [];
+    const deleted: string[] = [];
+
+    for (const row of rows) {
+      if (row.active) {
+        upserted.push([
+          row.id,
+          row.geohash ?? "",
+          genLooFilterBitmask({
+            noPayment: row.no_payment,
+            allGender: row.all_gender,
+            automatic: row.automatic,
+            accessible: row.accessible,
+            babyChange: row.baby_change,
+            radar: row.radar,
+          }),
+        ]);
+      } else {
+        deleted.push(row.id);
+      }
+    }
+
+    return { upserted, deleted };
   }
 
   /**

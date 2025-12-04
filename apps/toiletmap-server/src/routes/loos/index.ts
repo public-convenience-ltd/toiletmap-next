@@ -12,6 +12,7 @@ import type { MetricsQuery, SearchQuery } from "./schemas";
 import {
   baseMutationSchema,
   createMutationSchema,
+  dumpQuerySchema,
   geohashParamSchema,
   geohashQuerySchema,
   idsQuerySchema,
@@ -20,13 +21,29 @@ import {
   proximitySchema,
   reportsQuerySchema,
   searchQuerySchema,
+  updatesQuerySchema,
 } from "./schemas";
 
 const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
 import { cacheResponse } from "../../middleware/cache";
 
+/** GET /loos/updates */
+loosRouter.get(
+  "/updates",
+  validate("query", updatesQuerySchema, "Invalid updates query"),
+  cacheResponse(300),
+  (c) =>
+    handleRoute(c, "loos.updates", async () => {
+      const { since } = c.req.valid("query");
+      const looService = c.get("looService");
+      const updates = await looService.getUpdates(new Date(since));
+      return c.json(updates);
+    }),
+);
+
 /** GET /loos/geohash/:geohash */
+
 loosRouter.get(
   "/geohash/:geohash",
   validate("param", geohashParamSchema, "Invalid geohash path parameter"),
@@ -46,11 +63,17 @@ loosRouter.get(
   (c) =>
     handleRoute(c, "loos.geohash", async () => {
       const { geohash } = c.req.valid("param");
-      const { active, compressed } = c.req.valid("query");
+      const { active, compressed, summary } = c.req.valid("query");
       const looService = c.get("looService");
 
       if (compressed) {
         const loos = await looService.getWithinGeohashCompressed(geohash, active);
+        c.set("resultCount", loos.length);
+        return c.json({ data: loos, count: loos.length });
+      }
+
+      if (summary) {
+        const loos = await looService.getWithinGeohashSummary(geohash, active);
         c.set("resultCount", loos.length);
         return c.json({ data: loos, count: loos.length });
       }
@@ -62,12 +85,21 @@ loosRouter.get(
 );
 
 /** GET /loos/dump */
-loosRouter.get("/dump", cacheResponse(3600), (c) =>
-  handleRoute(c, "loos.dump", async () => {
-    const looService = c.get("looService");
-    const loos = await looService.getAllCompressed();
-    return c.json({ data: loos, count: loos.length });
-  }),
+loosRouter.get(
+  "/dump",
+  validate("query", dumpQuerySchema, "Invalid dump query"),
+  cacheResponse(3600),
+  (c) =>
+    handleRoute(c, "loos.dump", async () => {
+      const { rich } = c.req.valid("query");
+      const looService = c.get("looService");
+      if (rich) {
+        const loos = await looService.getAll();
+        return c.json({ data: loos, count: loos.length });
+      }
+      const loos = await looService.getAllCompressed();
+      return c.json({ data: loos, count: loos.length });
+    }),
 );
 
 /** GET /loos/proximity */
