@@ -13,6 +13,8 @@ export const CACHE_KEYS = {
   LOOS_LIST_TIME: "loos-cache-time",
   /** Cache key for individual loo details */
   LOO_DETAIL: "loos-detail-cache",
+  /** Cache key for the last time the loos list was updated */
+  LAST_UPDATED: "loos-last-updated",
 } as const;
 
 /**
