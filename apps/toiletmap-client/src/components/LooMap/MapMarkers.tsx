@@ -2,7 +2,7 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import ngeohash from "ngeohash";
 import { useEffect, useRef } from "preact/hooks";
-import { getLooById } from "../../api/loos";
+import { getLooById, getLoosByIds } from "../../api/loos";
 import type { CompressedLoo } from "./useMapData";
 
 interface MapMarkersProps {
@@ -13,6 +13,46 @@ interface MapMarkersProps {
 
 export default function MapMarkers({ map, data, apiUrl }: MapMarkersProps) {
   const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null);
+
+  // Prefetch logic
+  useEffect(() => {
+    if (!map || !data.length) return;
+
+    const onMoveEnd = async () => {
+      const bounds = map.getBounds();
+      const visibleIds: string[] = [];
+
+      // Find loos within current viewport
+      // Optimization: We could use a spatial index here, but iterating 400kb of data (approx 14k loos)
+      // is surprisingly fast in JS. If it becomes slow, we can use a quadtree.
+      // For now, simple iteration is likely sufficient given the "compressed" format is just an array.
+      for (const loo of data) {
+        const { latitude, longitude } = ngeohash.decode(loo[1]);
+        if (bounds.contains([latitude, longitude])) {
+          visibleIds.push(loo[0]);
+        }
+      }
+
+      console.log(`Found ${visibleIds.length} loos in viewport`);
+
+      // Limit to a reasonable number to prefetch (e.g., 50 closest or just first 50)
+      // For now, let's just take the first 50 to avoid hammering the API if zoomed out too far
+      const idsToFetch = visibleIds.slice(0, 50);
+
+      if (idsToFetch.length > 0) {
+        await getLoosByIds(apiUrl, idsToFetch);
+      }
+    };
+
+    map.on("moveend", onMoveEnd);
+
+    // Trigger once on initial load if data is available
+    onMoveEnd();
+
+    return () => {
+      map.off("moveend", onMoveEnd);
+    };
+  }, [map, data, apiUrl]);
 
   useEffect(() => {
     if (!map) return;
