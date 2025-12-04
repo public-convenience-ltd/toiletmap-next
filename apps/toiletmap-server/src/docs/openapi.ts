@@ -456,6 +456,24 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       count: { type: "number", example: 2 },
     },
   },
+  UpdatesResponse: {
+    type: "object",
+    required: ["upserted", "deleted"],
+    properties: {
+      upserted: {
+        type: "array",
+        items: schemaRef("CompressedLoo"),
+        description: "Loos that have been created or updated since the requested timestamp.",
+      },
+      deleted: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "IDs of loos that have been deleted or deactivated since the requested timestamp.",
+        example: ["9234", "1234"],
+      },
+    },
+  },
 };
 
 const idSchema: SchemaObject = {
@@ -742,6 +760,33 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
+    "/api/loos/updates": {
+      get: {
+        tags: ["Loos"],
+        summary: "Fetch incremental updates",
+        description:
+          "Returns a list of loos that have been created, updated, or deleted since the provided timestamp.",
+        parameters: [
+          {
+            name: "since",
+            in: "query",
+            required: true,
+            description: "ISO 8601 timestamp (e.g. 2025-01-21T12:00:00.000Z).",
+            schema: { type: "string", format: "date-time" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Incremental updates.",
+            content: jsonContent("UpdatesResponse"),
+          },
+          400: {
+            description: "Invalid timestamp.",
+            content: jsonContent("ValidationErrorResponse"),
+          },
+        },
+      },
+    },
     "/api/loos/{id}": {
       get: {
         tags: ["Loos"],
@@ -829,10 +874,26 @@ export const openApiDocument: OpenAPIObject = {
         summary: "Dump all active loos",
         description:
           "Returns a compressed list of all active loos. Optimized for initial map loading. Cached for 1 hour.",
+        parameters: [
+          {
+            name: "rich",
+            in: "query",
+            required: false,
+            description:
+              "Return full loo details instead of compressed summary. WARNING: Large response size.",
+            schema: { type: "boolean", default: false },
+          },
+        ],
         responses: {
           200: {
-            description: "Compressed list of all active loos.",
-            content: jsonContent("CompressedLooListResponse"),
+            description: "List of all active loos (compressed or full).",
+            content: {
+              "application/json": {
+                schema: {
+                  oneOf: [schemaRef("CompressedLooListResponse"), schemaRef("LooListResponse")],
+                },
+              },
+            },
           },
         },
       },
@@ -870,7 +931,19 @@ export const openApiDocument: OpenAPIObject = {
               default: false,
             },
           },
+          {
+            name: "summary",
+            in: "query",
+            required: false,
+            description:
+              "Return summary data (more detailed than compressed, less than full). If true, returns Loo objects.",
+            schema: {
+              type: "boolean",
+              default: false,
+            },
+          },
         ],
+
         responses: {
           200: {
             description: "Loos matching the supplied geohash prefix.",
