@@ -7,6 +7,10 @@
     "build": "flutter build apk",
     "build:ios": "flutter build ios",
     "test": "flutter test",
-    "lint": "flutter analyze"
+    "lint": "flutter analyze",
+    "setup": "flutter pub get"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.0"
   }
 }

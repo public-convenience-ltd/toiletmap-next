@@ -178,6 +178,50 @@ Before you begin, ensure you have:
    # Should return: {"status":"ok"}
    ```
 
+### Mobile App Development
+
+The mobile app is built with Flutter and lives in `apps/toiletmap-app`.
+
+1. **Install Flutter SDK:**
+   
+   **macOS (Homebrew):**
+   ```bash
+   brew install --cask flutter
+   ```
+
+   **Linux (Snap):**
+   ```bash
+   sudo snap install flutter --classic
+   ```
+
+   **Windows (Chocolatey):**
+   ```bash
+   choco install flutter
+   ```
+
+   **Manual Download:**
+   - Download the Flutter SDK from [flutter.dev](https://docs.flutter.dev/get-started/install).
+   - Extract the zip file to a location (e.g., `~/development/flutter`).
+   - Add the `flutter/bin` directory to your PATH:
+     ```bash
+     export PATH="$PATH:$HOME/development/flutter/bin"
+     ```
+
+2. **Setup Dependencies:**
+   ```bash
+   make setup-app
+   ```
+   This runs `flutter pub get` to install Dart dependencies.
+
+3. **Run the App:**
+   - Ensure you have an Android Emulator or iOS Simulator running.
+   - Run:
+     ```bash
+     cd apps/toiletmap-app
+     flutter run
+     ```
+
+
 ### Authentication for Development
 
 The project includes a **test auth server** that eliminates the need for Auth0 credentials during local development. `pnpm dev` starts it automatically alongside Wrangler and Vite.

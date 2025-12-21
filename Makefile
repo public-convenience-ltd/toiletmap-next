@@ -22,6 +22,9 @@ build-client: ## Build the client
 build-app: ## Build the mobile app
 	pnpm --filter toiletmap-app build
 
+setup-app: ## Setup dependencies for the mobile app
+	pnpm --filter toiletmap-app run setup
+
 deploy-server: ## Deploy the server to production
 	pnpm --filter toiletmap-server run deploy
 
