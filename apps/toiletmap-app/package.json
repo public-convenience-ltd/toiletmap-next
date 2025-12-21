@@ -1,0 +1,12 @@
+{
+  "name": "toiletmap-app",
+  "version": "1.0.0",
+  "description": "Toilet Map Mobile App (Flutter)",
+  "private": true,
+  "scripts": {
+    "build": "flutter build apk",
+    "build:ios": "flutter build ios",
+    "test": "flutter test",
+    "lint": "flutter analyze"
+  }
+}

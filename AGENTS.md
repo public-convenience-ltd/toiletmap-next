@@ -2,7 +2,7 @@
 
 > **Purpose**: This document provides AI coding assistants with essential context about the Toilet Map API project to enable effective contributions.
 
-**Workspace layout**: This repository is a pnpm monorepo. The API/Admin worker now lives in `apps/toiletmap-server` (all paths below are relative to that directory unless noted). A placeholder frontend worker is available in `apps/toiletmap-client`.
+**Workspace layout**: This repository is a pnpm monorepo. The API/Admin worker now lives in `apps/toiletmap-server` (all paths below are relative to that directory unless noted). A placeholder frontend worker is available in `apps/toiletmap-client`, and the mobile app is in `apps/toiletmap-app`.
 
 ## Project Overview
 
