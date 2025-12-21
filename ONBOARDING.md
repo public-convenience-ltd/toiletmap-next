@@ -207,19 +207,26 @@ The mobile app is built with Flutter and lives in `apps/toiletmap-app`.
      export PATH="$PATH:$HOME/development/flutter/bin"
      ```
 
-2. **Setup Dependencies:**
+2. **Setup Android SDK (Required for `build-app`):**
+   - The easiest way is to install [Android Studio](https://developer.android.com/studio).
+   - Once installed, open Android Studio and go to **Settings > Languages & Frameworks > Android SDK** to ensure the SDK is installed.
+   - Set the `ANDROID_HOME` environment variable:
+     - **macOS/Linux:** `export ANDROID_HOME=$HOME/Library/Android/sdk` (or wherever your SDK is).
+     - **Windows:** Set `%ANDROID_HOME%` to `C:\Users\YourName\AppData\Local\Android\Sdk`.
+   - Accept Android licenses:
+     ```bash
+     flutter doctor --android-licenses
+     ```
+
+3. **Setup Dependencies:**
    ```bash
    make setup-app
    ```
    This runs `flutter pub get` to install Dart dependencies.
 
-3. **Run the App:**
-   - Ensure you have an Android Emulator or iOS Simulator running.
-   - Run:
-     ```bash
-     cd apps/toiletmap-app
-     flutter run
-     ```
+4. **Run or Build the App:**
+   - **Run**: Ensure an emulator is running, then `cd apps/toiletmap-app && flutter run`.
+   - **Build**: Run `make build-app` to generate an Android APK.
 
 
 ### Authentication for Development

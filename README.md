@@ -29,7 +29,7 @@ Each workspace keeps its own `package.json` and configuration files, but all dep
 - Wrangler CLI authenticated against the Cloudflare account you deploy to
 - Docker + Supabase CLI if you plan to run the local Postgres/PostGIS stack
 - Auth0 credentials (see the server workspace README for the exact environment variables)
-- Flutter SDK (for mobile app development)
+- Flutter SDK & Android SDK (for mobile app development)
 
 Optional:
 
