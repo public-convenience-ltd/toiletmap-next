@@ -2,7 +2,7 @@
 
 Welcome to the Toilet Map API project! This guide will help you understand the architecture, set up your development environment, and become a productive contributor.
 
-> **Repository layout**: The code now lives inside a pnpm workspace. The API/Admin worker is under `apps/toiletmap-server`, while `apps/toiletmap-client` hosts a placeholder frontend worker. Unless noted, all paths in this guide refer to `apps/toiletmap-server`.
+> **Repository layout**: The code now lives inside a pnpm workspace. The API/Admin worker is under `apps/toiletmap-server`, `apps/toiletmap-client` hosts a placeholder frontend worker, and `apps/toiletmap-app` contains the mobile application. Unless noted, all paths in this guide refer to `apps/toiletmap-server`.
 
 ## Table of Contents
 
@@ -177,6 +177,57 @@ Before you begin, ensure you have:
 
    # Should return: {"status":"ok"}
    ```
+
+### Mobile App Development
+
+The mobile app is built with Flutter and lives in `apps/toiletmap-app`.
+
+1. **Install Flutter SDK:**
+   
+   **macOS (Homebrew):**
+   ```bash
+   brew install --cask flutter
+   ```
+
+   **Linux (Snap):**
+   ```bash
+   sudo snap install flutter --classic
+   ```
+
+   **Windows (Chocolatey):**
+   ```bash
+   choco install flutter
+   ```
+
+   **Manual Download:**
+   - Download the Flutter SDK from [flutter.dev](https://docs.flutter.dev/get-started/install).
+   - Extract the zip file to a location (e.g., `~/development/flutter`).
+   - Add the `flutter/bin` directory to your PATH:
+     ```bash
+     export PATH="$PATH:$HOME/development/flutter/bin"
+     ```
+
+2. **Setup Android SDK (Required for `build-app`):**
+   - The easiest way is to install [Android Studio](https://developer.android.com/studio).
+   - Once installed, open Android Studio and go to **Settings > Languages & Frameworks > Android SDK** to ensure the SDK is installed.
+   - Set the `ANDROID_HOME` environment variable:
+     - **macOS/Linux:** `export ANDROID_HOME=$HOME/Library/Android/sdk` (or wherever your SDK is).
+     - **Windows:** Set `%ANDROID_HOME%` to `C:\Users\YourName\AppData\Local\Android\Sdk`.
+   - Accept Android licenses:
+     ```bash
+     flutter doctor --android-licenses
+     ```
+
+3. **Setup Dependencies:**
+   ```bash
+   make setup-app
+   ```
+   This runs `flutter pub get` to install Dart dependencies.
+
+4. **Run or Build the App:**
+   - **Run**: Ensure an emulator is running, then `cd apps/toiletmap-app && flutter run`.
+   - **Build**: Run `make build-app` to generate an Android APK.
+
 
 ### Authentication for Development
 

@@ -1,4 +1,4 @@
-.PHONY: help dev-server dev-client build-server build-client deploy-server deploy-client deploy-server-preview deploy-client-preview test-server-e2e db-start db-stop db-reset prisma-generate lint lint-fix format format-fix check-style fix-style
+.PHONY: help dev-server dev-client build-server build-client build-app deploy-server deploy-client deploy-server-preview deploy-client-preview test-server-e2e test-app db-start db-stop db-reset prisma-generate lint lint-fix lint-app format format-fix check-style fix-style
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -19,6 +19,12 @@ build-server: ## Build the server
 build-client: ## Build the client
 	pnpm --filter toiletmap-client build
 
+build-app: ## Build the mobile app
+	pnpm --filter toiletmap-app build
+
+setup-app: ## Setup dependencies for the mobile app
+	pnpm --filter toiletmap-app run setup
+
 deploy-server: ## Deploy the server to production
 	pnpm --filter toiletmap-server run deploy
 
@@ -34,6 +40,9 @@ deploy-client-preview: ## Deploy the client to preview environment
 test-server-e2e: ## Run end-to-end tests for the server
 	pnpm --filter toiletmap-server test:e2e
 
+test-app: ## Run tests for the mobile app
+	pnpm --filter toiletmap-app test
+
 db-start: ## Start the local Supabase database
 	pnpm --filter toiletmap-server supabase:start
 
@@ -48,6 +57,9 @@ prisma-generate: ## Generate Prisma client
 
 lint: ## Run Biome linter check
 	pnpm lint
+
+lint-app: ## Run Flutter analyzer on the mobile app
+	pnpm --filter toiletmap-app lint
 
 lint-fix: ## Run Biome linter with auto-fix
 	pnpm lint:fix

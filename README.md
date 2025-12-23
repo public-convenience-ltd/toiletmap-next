@@ -17,6 +17,7 @@ This repository contains the code that powers both the public API and the admin 
 | ------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `toiletmap-server` | `apps/toiletmap-server` | The original API + admin Cloudflare Worker. Houses all routing, services, Prisma schema, Supabase migrations, docs, and tests. |
 | `toiletmap-client` | `apps/toiletmap-client` | Public-facing frontend (Astro, Preact, SSR). See [Architecture](apps/toiletmap-client/docs/architecture.md). |
+| `toiletmap-app` | `apps/toiletmap-app` | Mobile application (Flutter). |
 | `toiletmap-design-system` | `apps/toiletmap-design-system` | Shared design tokens and assets. |
 
 Each workspace keeps its own `package.json` and configuration files, but all dependencies are managed through pnpm at the repository root.
@@ -28,6 +29,7 @@ Each workspace keeps its own `package.json` and configuration files, but all dep
 - Wrangler CLI authenticated against the Cloudflare account you deploy to
 - Docker + Supabase CLI if you plan to run the local Postgres/PostGIS stack
 - Auth0 credentials (see the server workspace README for the exact environment variables)
+- Flutter SDK & Android SDK (for mobile app development)
 
 Optional:
 
@@ -147,6 +149,8 @@ If hooks aren't working:
 ```bash
 make build-server      # client assets + worker bundle
 make build-client      # frontend worker bundle
+make build-app         # mobile app (flutter build apk)
+
 ```
 
 ### Testing & Verification
@@ -196,6 +200,6 @@ pnpm-workspace.yaml   # workspace definition and onlyBuiltDependencies rules
 
 ## Contributing
 
-We love contributions! See `ONBOARDING.md` for deeper architectural context and `CONTRIBUTING.md` (inside the server workspace) for coding standards, testing expectations, and deployment guidance. Please also review the Code of Conduct before interacting with the community.
+We love contributions! See `ONBOARDING.md` for deeper architectural context and `apps/toiletmap-server/docs/onboarding/overview.md` (inside the server workspace) for coding standards, testing expectations, and deployment guidance. Please also review the Code of Conduct before interacting with the community.
 
 Have questions about the dataset or want API access without hacking on the repo? Check out Toilet Map Explorer or reach out to the maintainers. Happy mapping!
