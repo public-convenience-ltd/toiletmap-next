@@ -1,9 +1,9 @@
+// ignore_for_file: avoid_print
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toilet_map_2/util/map_util.dart';
 import 'package:toilet_map_2/model/osm_data.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:toilet_map_2/util/logging.dart' as logging;
-import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
