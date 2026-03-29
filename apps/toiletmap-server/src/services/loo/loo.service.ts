@@ -480,7 +480,7 @@ export class LooService {
     // location report for each loo.
     const mapped = reportRecords
       .map((entry) => mapAuditRecordToReport(entry))
-      .filter((report) => !report.contributor || !report.contributor.endsWith("-location"));
+      .filter((report) => !report.contributor?.endsWith("-location"));
 
     const sortedReports = [...mapped].sort((a, b) => {
       const timeA = Date.parse(a.createdAt);

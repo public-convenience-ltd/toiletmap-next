@@ -63,7 +63,7 @@ export const buildSearchParams = (
       return;
     }
     const mapping = filterMappings[key];
-    if (!mapping || !mapping.mapping) {
+    if (!mapping?.mapping) {
       return;
     }
     const mappedValue = mapping.mapping[value];

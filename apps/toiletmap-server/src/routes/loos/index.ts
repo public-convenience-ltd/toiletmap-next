@@ -52,6 +52,8 @@ loosRouter.get(
     const geohash = c.req.param("geohash");
     const resultCount = c.get("resultCount");
 
+    if (!geohash) return 0;
+
     // If we have a result count, use it to decide caching
     if (typeof resultCount === "number") {
       return resultCount > 100 ? (geohash.length <= 3 ? 3600 : 300) : 0;
