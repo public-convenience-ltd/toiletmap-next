@@ -1,7 +1,7 @@
 import type { OpeningTimes } from "../../../../../services/loo/types";
 import type { FieldErrors, TriStateValue } from "./form-helpers";
 
-export type { TriStateValue, FieldErrors };
+export type { FieldErrors, TriStateValue };
 
 export type LooFormState = {
   name: string;

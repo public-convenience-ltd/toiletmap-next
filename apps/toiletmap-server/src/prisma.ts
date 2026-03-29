@@ -3,6 +3,7 @@ import type { PrismaClient as PrismaClientType } from "./generated/prisma/client
 
 // Directly import and re-export Prisma namespace for type resolution
 import { Prisma } from "./generated/prisma/client";
+
 export { Prisma };
 
 // Use test-compatible client in Node.js test environment, Cloudflare client otherwise

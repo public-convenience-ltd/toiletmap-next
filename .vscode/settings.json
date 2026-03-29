@@ -17,5 +17,6 @@
   "[jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "makefile.configureOnOpen": false
+  "makefile.configureOnOpen": false,
+  "java.configuration.updateBuildConfiguration": "interactive"
 }

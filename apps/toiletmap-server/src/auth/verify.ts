@@ -38,6 +38,7 @@ const verifyToken = async (
     // JWKS are automatically fetched and cached
     const payload = await verifyWithJwks(token, {
       jwks_uri: `${issuerBaseUrl.replace(/\/$/, "")}/.well-known/jwks.json`,
+      allowedAlgorithms: ["RS256"],
     });
 
     // Validate audience claim (allow Auth0 multi-audience tokens)

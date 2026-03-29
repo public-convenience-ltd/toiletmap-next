@@ -27,9 +27,7 @@ export const dayOpeningHoursSchema = z.union([
         message: "Invalid opening times",
       },
     ),
-  z
-    .array(z.never())
-    .length(0), // Empty array for closed days
+  z.array(z.never()).length(0), // Empty array for closed days
 ]);
 
 export const openingTimesSchema = z.array(dayOpeningHoursSchema).length(7).nullable();
