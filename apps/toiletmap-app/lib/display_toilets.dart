@@ -223,6 +223,19 @@ Widget makeMap(
 
   if (loos.isNotEmpty) {
     children.add(makeClusterLayer(markers));
+    /*
+    if (isFound) {
+      children.add(
+        MarkerLayer(
+          markers: [
+            Marker(
+              point: userLocation.location,
+              child: const Icon(Icons.location_pin, size: 20, color: Color.fromRGBO(10, 22, 94, 0.7)),
+            ),
+          ],
+        ),
+      );
+    } */
   }
   logging.log.info("Map made with ${children.length} layers");
   logging.log.info("Map options are ${options.toString()}");

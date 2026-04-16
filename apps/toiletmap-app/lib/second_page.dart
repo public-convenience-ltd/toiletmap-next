@@ -101,7 +101,7 @@ class _SearchScreen extends State<SearchScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Location saved to DB: ${searchLocation?.formattedAddress}',
+                            'Location saved to phone: ${searchLocation?.formattedAddress}',
                           ),
                         ),
                       );
@@ -176,7 +176,7 @@ class _SearchScreen extends State<SearchScreen> {
                 _debounce?.cancel();
                 logging.log.info("Cancel debounce");
               }
-              setState(() {});
+              //setState(() {});
               _debounce = Timer(const Duration(milliseconds: 500), () async {
                 var client = UserAgentClient(
                   // 'Great British Public Toilet Map Mobile App', http.Client());
@@ -218,9 +218,12 @@ class _SearchScreen extends State<SearchScreen> {
                   } else {
                     logging.log.info("Found ${_options.length} results");
                   }
-                  setState(() {
-                    _options = _options;
-                  });
+                  if (mounted) {
+                    setState(() {
+                      _options = _options;
+                    });
+                  }
+
                   //Flexible(child: _buildListView());
                 } on Exception catch (e) {
                   logging.log.severe("something wrong $e");
@@ -289,7 +292,7 @@ class _SearchScreen extends State<SearchScreen> {
               }
 
               _options.clear();
-              setState(() {});
+              //setState(() {});
               () async {
                 logging.log.info("Fetching toilets for ${osmData.displayName}");
                 ResponseData response = await MapUtil.instance.fetchToilets(
@@ -409,6 +412,19 @@ class _SearchScreen extends State<SearchScreen> {
       _markerClusterLayerWidget = makeClusterLayer();
       children.add(_markerClusterLayerWidget);
     }
+    /*
+    children.add(MarkerLayer(
+          markers: [
+            Marker(
+              point: searchLocation != null
+                  ? LatLng(searchLocation!.location.latitude,
+                      searchLocation!.location.longitude)
+                  : userLocation!.location,
+              child: const Icon(Icons.location_pin, size: 30, color: Color.fromRGBO(10, 22, 94, 0.7)),
+            ),
+          ],
+        ));
+        */
     return Positioned.fill(
       child: FlutterMap(
         mapController: mapController,
@@ -517,7 +533,7 @@ class _SearchScreen extends State<SearchScreen> {
             child: Center(
               child: Text(
                 markers.length.toString(),
-                style: const TextStyle(color: Colors.blue),
+                style: const TextStyle(color: Color.fromARGB(255, 0x0A, 0x16, 0x5E)),
               ),
             ),
           );

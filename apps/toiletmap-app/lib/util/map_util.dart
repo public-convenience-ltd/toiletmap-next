@@ -206,6 +206,6 @@ class FilterItem {
     // here is where we should update shared preferences
     await MapUtil.instance.preferences?.setBool(key, isOn);
     logging.log.info("saving filter $key value is $isOn");
-    _isOn = isOn;
+    this._isOn = isOn;
   }
 }

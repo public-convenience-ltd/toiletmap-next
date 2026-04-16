@@ -35,7 +35,7 @@ class _ToiletAppState extends State<ToiletApp> {
     // GeolocatorPlatform.instance.checkPermission().then((isPermission) {
     //   if (isPermission == LocationPermission.denied ||
     //       isPermission == LocationPermission.deniedForever) {
-    
+
     //         logging.log.info("permissions denied");
     //   } else {
     //     logging.log.info("Permissions allowed");
@@ -63,6 +63,7 @@ class _ToiletAppState extends State<ToiletApp> {
       },
       child: MaterialApp(
         title: 'Toilet Map',
+        debugShowCheckedModeBanner: false,
         home: BottomNavigationBarController(),
         theme: getMainTheme(context),
       ),

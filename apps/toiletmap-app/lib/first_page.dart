@@ -87,7 +87,9 @@ class _FirstPageState extends State<FirstPage> {
             },
           ),
           TextButton(
-            child: Column(children: [Icon(Icons.feedback_outlined), Text("Feedback")]),
+            child: Column(
+              children: [Icon(Icons.feedback_outlined), Text("Feedback")],
+            ),
             // icon: Icon(
             //   Icons.filter_list,
             //   color: Theme.of(context).colorScheme.primary,

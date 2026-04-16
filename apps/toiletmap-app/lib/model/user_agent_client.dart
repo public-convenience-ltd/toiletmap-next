@@ -23,7 +23,8 @@ class UserAgentClient extends http.BaseClient {
     String packageName = packageInfo.packageName;
     String version = packageInfo.version;
     String buildNumber = packageInfo.buildNumber;
-    String routeText = "$appName $packageName Version: $version Build# $buildNumber";
+    String routeText =
+        "$appName $packageName Version: $version Build# $buildNumber";
     if (Platform.isAndroid) {
       // Android-specific code
       routeText += " Android";
@@ -34,10 +35,16 @@ class UserAgentClient extends http.BaseClient {
 
     // use the next line and comment out the http.post for testing when you dont want to actually send the feedback
     //var response = http.Response(routeText, 200);
-    var response = await http.post(
-      MapUtil.feedbackLink,
-      body: {'text': text, 'email': email, 'route': routeText},
-    );
-    return response;
+    try {
+      var response = await http.post(
+        MapUtil.feedbackLink,
+        body: {'text': text, 'email': email, 'route': routeText},
+      );
+      return response;
+    } catch (e) {
+      print("Error sending feedback: $e");
+      return http.Response("Error sending feedback: $e", 500);
+    }
+    //return response;
   }
 }

@@ -33,6 +33,7 @@ class _DetailScreenState extends State<DetailScreen> {
   late Loo loo;
   // Hmm, what?
   Placemark? placemark;
+  bool placemarkFound = false;
   // When we have a route to loo from current location,
   //// this is the list of points
   List<LatLng>? routePoints;
@@ -75,27 +76,32 @@ class _DetailScreenState extends State<DetailScreen> {
           routePoints![i],
         );
       }
-      setState(() {
-        distance = d;
-      });
+      //setState(() {
+      logging.log.info("Calculated distance: $d m");
+      distance = d;
+      //});
     } else {
       // distance = Geolocator.distanceBetween(userLocation!.latitude,
       //     userLocation!.longitude, loo.location.lat, loo.location.lng);
       route().then((value) {
-        setState(() {
-          routePoints = value;
-          logging.log.info("Route points: $routePoints");
-        });
+        if (routePoints == null || const DeepCollectionEquality().equals(routePoints, value) == false) {
+          setState(() {
+            routePoints = value;
+            logging.log.info("Route points: $routePoints");
+          });
+        }
       });
     }
 
-    if (placemark == null) {
+    if (placemarkFound == false) {
       loo.getGeoAddress().then((value) {
-        //setState(() {
-        if (value != null && value.isNotEmpty) {
-          placemark = value[0];
+        if (placemarkFound == false && value != null && value.isNotEmpty) {
+          setState(() {
+            logging.log.info("Got placemark: ${value[0]}");
+            placemark = value[0];
+            placemarkFound = true;
+          });
         }
-        //});
       });
     }
 
@@ -209,10 +215,15 @@ class _DetailScreenState extends State<DetailScreen> {
                       Card(
                         child: ListTile(
                           title: Text(loo.getName()),
-                          subtitle: Text(
-                            "${placemark?.street}, ${placemark?.postalCode}, ${placemark?.country}\nWalking Distance: ${distance.toStringAsFixed(0)} m",
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          subtitle: (placemark == null)
+                              ? Text(
+                                  "Loading address...",
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                )
+                              : Text(
+                                  "${placemark?.street}, ${placemark?.postalCode}, ${placemark?.country}\nWalking Distance: ${distance.toStringAsFixed(0)} m",
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                         ),
                       ),
                       Card(
@@ -279,7 +290,12 @@ class _DetailScreenState extends State<DetailScreen> {
                                                         context,
                                                       ).textTheme.bodySmall,
                                                     )
-                                                  : (e[0].compareTo("00:00") == 0 && e[1].compareTo("00:00") == 0)
+                                                  : (e[0].compareTo("00:00") ==
+                                                            0 &&
+                                                        e[1].compareTo(
+                                                              "00:00",
+                                                            ) ==
+                                                            0)
                                                   ? Text(
                                                       "Unknown",
                                                       style: Theme.of(
@@ -353,15 +369,17 @@ class _DetailScreenState extends State<DetailScreen> {
     double endLat = loo.location.lat;
     double endLng = loo.location.lng;
 
-    // Form Route between coordinates
-    final List<ORSCoordinate> routeCoordinates = await client
-        .directionsRouteCoordsGet(
-          startCoordinate: ORSCoordinate(
-            latitude: startLat,
-            longitude: startLng,
-          ),
-          endCoordinate: ORSCoordinate(latitude: endLat, longitude: endLng),
-        );
+    List<ORSCoordinate> routeCoordinates = [];
+    try {
+      // Form Route between coordinates
+      routeCoordinates = await client.directionsRouteCoordsGet(
+        startCoordinate: ORSCoordinate(latitude: startLat, longitude: startLng),
+        endCoordinate: ORSCoordinate(latitude: endLat, longitude: endLng),
+      );
+    } catch (e) {
+      logging.log.severe("Error getting route: $e");
+      routeCoordinates = [];
+    }
 
     // Print the route coordinates
     // routeCoordinates.forEach(print);
