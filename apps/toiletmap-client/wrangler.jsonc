@@ -10,8 +10,8 @@
 		"directory": "./dist"
 	},
   "vars": {
-    "ENVIRONMENT": "development",
-    "PUBLIC_API_URL": "http://localhost:8787"
+    "ENVIRONMENT": "preview",
+    "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
   },
   "env": {
     "preview": {

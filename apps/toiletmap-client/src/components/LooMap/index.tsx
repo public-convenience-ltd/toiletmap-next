@@ -3,8 +3,10 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { LooDetail } from "../../api/loos";
+import { type ActiveFilters, DEFAULT_FILTERS, type FilterKey } from "../../types/filters";
 import DevTools from "../DevTools";
 import DevToolsButton from "../DevToolsButton";
+import MapControlsPanel from "../MapControlsPanel";
 import SettingsPanel from "../SettingsPanel";
 import ToiletDetailsPanel from "../ToiletDetailsPanel";
 import "./LooMap.css";
@@ -22,6 +24,16 @@ export default function LooMap({ apiUrl }: LooMapProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
   const [selectedToilet, setSelectedToilet] = useState<LooDetail | null>(null);
+
+  const [activeFilters, setActiveFilters] = useState<ActiveFilters>(DEFAULT_FILTERS);
+
+  const handleFilterChange = (key: FilterKey, value: boolean) => {
+    setActiveFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleResetFilters = () => {
+    setActiveFilters(DEFAULT_FILTERS);
+  };
 
   const isDev = import.meta.env.DEV || import.meta.env.MODE === "preview";
 
@@ -42,6 +54,13 @@ export default function LooMap({ apiUrl }: LooMapProps) {
 
   return (
     <div className="loo-map-container">
+      <MapControlsPanel
+        mapRef={map}
+        activeFilters={activeFilters}
+        onFilterChange={handleFilterChange}
+        onResetFilters={handleResetFilters}
+      />
+
       <button
         type="button"
         className="settings-btn"
@@ -73,6 +92,7 @@ export default function LooMap({ apiUrl }: LooMapProps) {
       <MapMarkers
         map={map.current}
         data={data}
+        activeFilters={activeFilters}
         apiUrl={apiUrl}
         onToiletSelect={setSelectedToilet}
       />

@@ -3,16 +3,24 @@ import "leaflet.markercluster";
 import ngeohash from "ngeohash";
 import { useEffect, useRef } from "preact/hooks";
 import { getLooById, getLoosByIds, type LooDetail } from "../../api/loos";
+import { type ActiveFilters, FILTER_BIT, type FilterKey } from "../../types/filters";
 import type { CompressedLoo } from "./useMapData";
 
 interface MapMarkersProps {
   map: L.Map | null;
   data: CompressedLoo[];
+  activeFilters: ActiveFilters;
   apiUrl: string;
   onToiletSelect: (loo: LooDetail) => void;
 }
 
-export default function MapMarkers({ map, data, apiUrl, onToiletSelect }: MapMarkersProps) {
+export default function MapMarkers({
+  map,
+  data,
+  activeFilters,
+  apiUrl,
+  onToiletSelect,
+}: MapMarkersProps) {
   const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null);
   // Ref keeps the callback stable so the marker-creation effect never re-runs
   // just because the parent re-rendered with a new callback identity.
@@ -95,9 +103,16 @@ export default function MapMarkers({ map, data, apiUrl, onToiletSelect }: MapMar
   useEffect(() => {
     if (!data.length || !markerClusterGroup.current) return;
 
+    const requiredMask = (Object.keys(FILTER_BIT) as FilterKey[]).reduce(
+      (acc, key) => (activeFilters[key] ? acc | FILTER_BIT[key] : acc),
+      0,
+    );
+    const filteredData =
+      requiredMask === 0 ? data : data.filter((loo) => (loo[2] & requiredMask) === requiredMask);
+
     const markers: L.Marker[] = [];
 
-    data.forEach((loo) => {
+    filteredData.forEach((loo) => {
       const { latitude, longitude } = ngeohash.decode(loo[1]);
       const id = loo[0];
 
@@ -134,7 +149,7 @@ export default function MapMarkers({ map, data, apiUrl, onToiletSelect }: MapMar
 
     markerClusterGroup.current.clearLayers();
     markerClusterGroup.current.addLayers(markers);
-  }, [data, apiUrl]);
+  }, [data, apiUrl, activeFilters]);
 
   return null;
 }
