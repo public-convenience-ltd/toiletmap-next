@@ -102,19 +102,6 @@ export default function MapControlsPanel({
 
   const panelContent = (
     <div className={styles.content}>
-      {/* Logo + primary nav */}
-      <div className={styles.logoArea}>
-        <a href="/" aria-label="Toilet Map home">
-          <img src={logo} alt="Toilet Map" height={36} />
-        </a>
-        <nav className={styles.primaryNav} aria-label="Primary navigation">
-          <a href="/about">About</a>
-          <a href="/blog">Blog</a>
-          <a href="/contact">Contact</a>
-          <a href="/feedback">Feedback</a>
-        </nav>
-      </div>
-
       <h2 className={styles.title}>Search</h2>
 
       {/* Location search */}
@@ -219,10 +206,27 @@ export default function MapControlsPanel({
     </div>
   );
 
+  const primaryNavLinks = (
+    <>
+      <a href="/about">About</a>
+      <a href="/blog">Blog</a>
+      <a href="/contact">Contact</a>
+      <a href="/feedback">Feedback</a>
+    </>
+  );
+
   return (
     <>
       {/* Desktop: fixed left panel */}
       <aside className={styles.panel} aria-label="Map controls">
+        <div className={styles.panelHeader}>
+          <a href="/" aria-label="Toilet Map home">
+            <img src={logo} alt="Toilet Map" height={32} />
+          </a>
+          <nav className={styles.primaryNav} aria-label="Primary navigation">
+            {primaryNavLinks}
+          </nav>
+        </div>
         {panelContent}
       </aside>
 
@@ -231,10 +235,11 @@ export default function MapControlsPanel({
         type="button"
         className={styles.mobileToggle}
         onClick={() => setIsDrawerOpen(true)}
-        aria-label={`Open map controls${activeCount > 0 ? ` (${activeCount} filters active)` : ""}`}
+        aria-label={`Open menu${activeCount > 0 ? ` (${activeCount} filters active)` : ""}`}
         aria-expanded={isDrawerOpen}
       >
-        <i className="fa-solid fa-sliders" aria-hidden="true" />
+        <i className="fa-solid fa-bars" aria-hidden="true" />
+        <span>Menu</span>
         {activeCount > 0 && (
           <span className={styles.badge} aria-hidden="true">
             {activeCount}
@@ -247,18 +252,29 @@ export default function MapControlsPanel({
         // biome-ignore lint/a11y/useKeyWithClickEvents: Overlay backdrop closes drawer on click
         // biome-ignore lint/a11y/noStaticElementInteractions: Overlay backdrop
         <div className={styles.overlay} onClick={() => setIsDrawerOpen(false)}>
-          <div className={styles.drawer} role="dialog" aria-modal="true" aria-label="Map controls">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Stop propagation to overlay */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: Stop propagation to overlay */}
+          <div
+            className={styles.drawer}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Map controls"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.drawerHeader}>
               <img src={logo} alt="Toilet Map" height={28} />
               <button
                 type="button"
                 className={styles.drawerClose}
                 onClick={() => setIsDrawerOpen(false)}
-                aria-label="Close map controls"
+                aria-label="Close menu"
               >
                 <i className="fa-solid fa-xmark" aria-hidden="true" />
               </button>
             </div>
+            <nav className={styles.drawerNav} aria-label="Primary navigation">
+              {primaryNavLinks}
+            </nav>
             {panelContent}
           </div>
         </div>
