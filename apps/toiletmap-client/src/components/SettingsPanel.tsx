@@ -1,52 +1,12 @@
-import { get } from "idb-keyval";
-import { useEffect, useState } from "preact/hooks";
-import { CACHE_KEYS } from "../api/constants";
 import styles from "./SettingsPanel.module.css";
 
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  onDownloadOffline: () => void;
-  isDownloading: boolean;
-  downloadProgress: string;
   onOpenDevTools: () => void;
 }
 
-const SettingsPanel = ({
-  isOpen,
-  onClose,
-  onDownloadOffline,
-  isDownloading,
-  downloadProgress,
-  onOpenDevTools,
-}: SettingsPanelProps) => {
-  const [richDumpDownloaded, setRichDumpDownloaded] = useState(false);
-  const [richDumpTimestamp, setRichDumpTimestamp] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Check if rich dump has been downloaded
-    const checkRichDumpStatus = async () => {
-      const downloaded = await get<boolean>(CACHE_KEYS.RICH_DUMP_DOWNLOADED);
-      const timestamp = await get<string>(CACHE_KEYS.RICH_DUMP_TIMESTAMP);
-      setRichDumpDownloaded(!!downloaded);
-      setRichDumpTimestamp(timestamp || null);
-    };
-
-    if (isOpen) {
-      checkRichDumpStatus();
-    }
-  }, [isOpen]);
-
-  // Update rich dump status when download completes
-  useEffect(() => {
-    if (downloadProgress === "Done!") {
-      setRichDumpDownloaded(true);
-      setRichDumpTimestamp(new Date().toISOString());
-    }
-  }, [downloadProgress]);
-
-  const isToggleOn = isDownloading || richDumpDownloaded;
-
+const SettingsPanel = ({ isOpen, onClose, onOpenDevTools }: SettingsPanelProps) => {
   if (!isOpen) return null;
 
   return (
@@ -62,34 +22,6 @@ const SettingsPanel = ({
           </button>
         </div>
         <div className={styles.content}>
-          <div className={styles.section}>
-            <h3>Offline Data</h3>
-            <p>Download all toilet data for offline use.</p>
-            <div className={styles.row}>
-              <span>Enable Offline Mode</span>
-              <label className={styles.switch}>
-                <input
-                  type="checkbox"
-                  checked={isToggleOn}
-                  onChange={(e) => {
-                    if (e.currentTarget.checked && !richDumpDownloaded) {
-                      onDownloadOffline();
-                    }
-                  }}
-                  disabled={isDownloading || richDumpDownloaded}
-                />
-                <span className={styles.slider} />
-              </label>
-            </div>
-            {isDownloading && <div className={styles.progress}>{downloadProgress}</div>}
-            {richDumpDownloaded && richDumpTimestamp && (
-              <div className={styles.status}>
-                Downloaded {new Date(richDumpTimestamp).toLocaleDateString()} at{" "}
-                {new Date(richDumpTimestamp).toLocaleTimeString()}
-              </div>
-            )}
-          </div>
-
           <div className={styles.section}>
             <h3>Developer</h3>
             <button type="button" className={styles.devToolsBtn} onClick={onOpenDevTools}>

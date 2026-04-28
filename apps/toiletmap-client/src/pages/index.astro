@@ -1,10 +1,11 @@
 ---
+import { env } from "cloudflare:workers";
 import { Image } from "astro:assets";
 import logo from "../assets/logo.svg";
 import LooMap from "../components/LooMap";
 import Layout from "../layouts/Layout.astro";
 
-const apiUrl = Astro.locals.runtime.env.PUBLIC_API_URL;
+const apiUrl = env.PUBLIC_API_URL;
 ---
 
 <Layout>
