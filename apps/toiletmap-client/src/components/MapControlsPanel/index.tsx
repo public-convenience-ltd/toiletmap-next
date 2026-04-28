@@ -253,7 +253,6 @@ export default function MapControlsPanel({
         // biome-ignore lint/a11y/noStaticElementInteractions: Overlay backdrop
         <div className={styles.overlay} onClick={() => setIsDrawerOpen(false)}>
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: Stop propagation to overlay */}
-          {/* biome-ignore lint/a11y/noStaticElementInteractions: Stop propagation to overlay */}
           <div
             className={styles.drawer}
             role="dialog"
