@@ -135,7 +135,7 @@ class _FirstPageState extends State<FeedbackPage> {
                       ? null
                       : (EmailValidator.validate(value!)
                             ? null
-                            : "Please enter a valid email")),
+                            : "Please enter a valid email"),
                 ),
                 ElevatedButton(
                   onPressed: () {
