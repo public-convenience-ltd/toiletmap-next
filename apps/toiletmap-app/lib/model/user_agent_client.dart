@@ -42,7 +42,7 @@ class UserAgentClient extends http.BaseClient {
       );
       return response;
     } catch (e) {
-      print("Error sending feedback: $e");
+      //print("Error sending feedback: $e");
       return http.Response("Error sending feedback: $e", 500);
     }
     //return response;

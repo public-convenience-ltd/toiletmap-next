@@ -115,7 +115,7 @@ class _FirstPageState extends State<FeedbackPage> {
                   ),
                   // The validator receives the text that the user has entered.
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
+                    if (value == null || value.isEmpty || value.trim() == '') {
                       return 'Please enter some text';
                     }
                     return null;
@@ -131,7 +131,7 @@ class _FirstPageState extends State<FeedbackPage> {
                   style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                   ),
-                  validator: (value) => (value == ''
+                  validator: (value) => (value == null || value.isEmpty || value.trim() == '')
                       ? null
                       : (EmailValidator.validate(value!)
                             ? null

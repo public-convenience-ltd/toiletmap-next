@@ -106,5 +106,5 @@ class OsmData {
       displayName = map['address'],
       location = LatLng(map['latitude'], map['longitude']);
 
-  String get formattedAddress => '$displayName';
+  String get formattedAddress => displayName;
 }
