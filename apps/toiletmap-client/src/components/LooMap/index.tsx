@@ -77,10 +77,7 @@ export default function LooMap({ apiUrl }: LooMapProps) {
         onToiletSelect={setSelectedToilet}
       />
       {selectedToilet && (
-        <ToiletDetailsPanel
-          toilet={selectedToilet}
-          onClose={() => setSelectedToilet(null)}
-        />
+        <ToiletDetailsPanel toilet={selectedToilet} onClose={() => setSelectedToilet(null)} />
       )}
     </div>
   );

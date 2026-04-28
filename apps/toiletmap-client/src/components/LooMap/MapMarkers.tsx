@@ -12,12 +12,7 @@ interface MapMarkersProps {
   onToiletSelect: (loo: LooDetail) => void;
 }
 
-export default function MapMarkers({
-  map,
-  data,
-  apiUrl,
-  onToiletSelect,
-}: MapMarkersProps) {
+export default function MapMarkers({ map, data, apiUrl, onToiletSelect }: MapMarkersProps) {
   const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null);
   // Ref keeps the callback stable so the marker-creation effect never re-runs
   // just because the parent re-rendered with a new callback identity.

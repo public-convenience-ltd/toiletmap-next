@@ -54,13 +54,7 @@ function formatUpdatedAt(iso: string | null): string {
 
 function FeatureStatus({ value }: { value: boolean | null | undefined }) {
   if (value === true) {
-    return (
-      <i
-        role="img"
-        className={`fa-solid fa-check ${styles.featureCheck}`}
-        aria-label="Yes"
-      />
-    );
+    return <i role="img" className={`fa-solid fa-check ${styles.featureCheck}`} aria-label="Yes" />;
   }
   if (value === false) {
     return (
