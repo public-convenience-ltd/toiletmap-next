@@ -2,7 +2,20 @@ import { getApiUrl } from "./config";
 
 export interface LooDetail {
   id: string;
-  name: string;
+  name: string | null;
+  location: { lat: number; lng: number } | null;
+  accessible: boolean | null;
+  allGender: boolean | null;
+  men: boolean | null;
+  women: boolean | null;
+  children: boolean | null;
+  babyChange: boolean | null;
+  radar: boolean | null;
+  automatic: boolean | null;
+  noPayment: boolean | null;
+  paymentDetails: string | null;
+  openingTimes: ([string, string] | [])[] | null;
+  updatedAt: string | null;
   [key: string]: unknown;
 }
 

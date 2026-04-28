@@ -2,9 +2,11 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { useEffect, useRef, useState } from "preact/hooks";
+import type { LooDetail } from "../../api/loos";
 import DevTools from "../DevTools";
 import DevToolsButton from "../DevToolsButton";
 import SettingsPanel from "../SettingsPanel";
+import ToiletDetailsPanel from "../ToiletDetailsPanel";
 import "./LooMap.css";
 import MapMarkers from "./MapMarkers";
 import { useMapData } from "./useMapData";
@@ -19,6 +21,7 @@ export default function LooMap({ apiUrl }: LooMapProps) {
   const { data } = useMapData(apiUrl);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
+  const [selectedToilet, setSelectedToilet] = useState<LooDetail | null>(null);
 
   const isDev = import.meta.env.DEV || import.meta.env.MODE === "preview";
 
@@ -67,7 +70,18 @@ export default function LooMap({ apiUrl }: LooMapProps) {
       />
 
       <div id="map" ref={mapContainer} style={{ height: "100vh", width: "100%" }} />
-      <MapMarkers map={map.current} data={data} apiUrl={apiUrl} />
+      <MapMarkers
+        map={map.current}
+        data={data}
+        apiUrl={apiUrl}
+        onToiletSelect={setSelectedToilet}
+      />
+      {selectedToilet && (
+        <ToiletDetailsPanel
+          toilet={selectedToilet}
+          onClose={() => setSelectedToilet(null)}
+        />
+      )}
     </div>
   );
 }

@@ -2,17 +2,27 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import ngeohash from "ngeohash";
 import { useEffect, useRef } from "preact/hooks";
-import { getLooById, getLoosByIds } from "../../api/loos";
+import { getLooById, getLoosByIds, type LooDetail } from "../../api/loos";
 import type { CompressedLoo } from "./useMapData";
 
 interface MapMarkersProps {
   map: L.Map | null;
   data: CompressedLoo[];
   apiUrl: string;
+  onToiletSelect: (loo: LooDetail) => void;
 }
 
-export default function MapMarkers({ map, data, apiUrl }: MapMarkersProps) {
+export default function MapMarkers({
+  map,
+  data,
+  apiUrl,
+  onToiletSelect,
+}: MapMarkersProps) {
   const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null);
+  // Ref keeps the callback stable so the marker-creation effect never re-runs
+  // just because the parent re-rendered with a new callback identity.
+  const onToiletSelectRef = useRef(onToiletSelect);
+  onToiletSelectRef.current = onToiletSelect;
 
   // Prefetch logic
   useEffect(() => {
@@ -118,19 +128,9 @@ export default function MapMarkers({ map, data, apiUrl }: MapMarkersProps) {
       const marker = L.marker([latitude, longitude], { icon });
 
       marker.on("click", async () => {
-        console.log(`Clicked loo: ${id}`);
         const details = await getLooById(apiUrl, id);
-        console.log("Loo details:", details);
         if (details) {
-          marker
-            .bindPopup(`
-                   <div>
-                     <strong>${details.name || "Toilet"}</strong><br/>
-                     ID: ${details.id}<br/>
-                     <small>Data fetched & cached!</small>
-                   </div>
-                 `)
-            .openPopup();
+          onToiletSelectRef.current(details);
         }
       });
 
