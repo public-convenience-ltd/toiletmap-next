@@ -40,7 +40,7 @@ export default function LooMap({ apiUrl }: LooMapProps) {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    map.current = L.map(mapContainer.current).setView([51.505, -0.09], 13);
+    map.current = L.map(mapContainer.current, { zoomControl: false }).setView([51.505, -0.09], 13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',

@@ -97,7 +97,7 @@ importers:
         specifier: ^1.9.21
         version: 1.9.21
       hono:
-        specifier: ^4.12.15
+        specifier: ^4.10.6
         version: 4.12.15
       leaflet:
         specifier: ^1.9.4
