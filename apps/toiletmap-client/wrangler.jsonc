@@ -1,15 +1,33 @@
 {
-	"main": "dist/_worker.js/index.js",
 	"name": "toiletmap-client",
   "compatibility_date": "2025-12-01",
   "compatibility_flags": [
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
-	"assets": {
+ "assets": {
 		"binding": "ASSETS",
 		"directory": "./dist"
 	},
+  "vars": {
+    "ENVIRONMENT": "preview",
+    "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
+  },
+  "env": {
+    "preview": {
+      "vars": {
+        "ENVIRONMENT": "preview",
+        "PUBLIC_API_URL":"https://toiletmap-server.gbtoiletmap.workers.dev"
+      }
+    },
+    "production": {
+      "name": "toiletmap-client",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
+      }
+    }
+  },
 	"observability": {
     "enabled": true,
     "logs": {

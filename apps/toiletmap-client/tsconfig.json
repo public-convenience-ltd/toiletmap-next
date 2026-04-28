@@ -2,6 +2,7 @@
   "extends": "astro/tsconfigs/strict",
   "include": [
     ".astro/types.d.ts",
+    "src/env.d.ts",
     "**/*"
   ],
   "exclude": [
@@ -9,6 +10,7 @@
   ],
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsxImportSource": "preact",
+    "types": ["astro/client"]
   }
 }

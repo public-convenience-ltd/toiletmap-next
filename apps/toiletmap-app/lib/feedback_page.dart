@@ -133,7 +133,7 @@ class _FirstPageState extends State<FeedbackPage> {
                   ),
                   validator: (value) => (value == null || value.isEmpty || value.trim() == '')
                       ? null
-                      : (EmailValidator.validate(value!)
+                      : (EmailValidator.validate(value)
                             ? null
                             : "Please enter a valid email"),
                 ),

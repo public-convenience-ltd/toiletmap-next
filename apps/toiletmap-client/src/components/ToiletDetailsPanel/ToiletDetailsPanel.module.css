@@ -1,0 +1,249 @@
+/* ── Panel shell ─────────────────────────────────────────── */
+
+.panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1500; /* above Leaflet (400–1000), below settings modals */
+  background: var(--color-base-white);
+  border-radius: var(--space-s) var(--space-s) 0 0;
+  box-shadow: 0 -4px 24px rgba(10, 22, 94, 0.14);
+  font-family: var(--font-family);
+  color: var(--color-primary-navy);
+}
+
+/* ── Collapsed state ─────────────────────────────────────── */
+
+.collapsed {
+  padding: var(--space-s) var(--toilet-gutter) var(--space-m);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.collapsedHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-s);
+}
+
+.collapsedActions {
+  display: flex;
+  gap: var(--space-s);
+  flex-wrap: wrap;
+}
+
+/* ── Expanded state ──────────────────────────────────────── */
+
+.expanded {
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.expandedHeader {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-s) var(--toilet-gutter) 0;
+  flex-shrink: 0;
+}
+
+.expandedContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-s) var(--toilet-gutter) var(--space-l);
+  scrollbar-color: var(--color-primary-navy) var(--color-light-grey);
+}
+
+/* 3-col grid → 1 col on small screens */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-l);
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Shared typography ───────────────────────────────────── */
+
+.name {
+  font-size: var(--text-1);
+  font-weight: 700;
+  color: var(--color-primary-navy);
+  margin: 0;
+}
+
+.colHeading {
+  font-size: var(--text-0);
+  font-weight: 700;
+  margin: 0 0 var(--space-s);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  background: var(--color-accent-turquoise);
+  color: var(--color-primary-navy);
+  border: none;
+  border-radius: var(--space-3xs);
+  padding: var(--space-2xs) var(--space-s);
+  font-size: var(--text-0);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-family);
+  white-space: nowrap;
+}
+
+.btnPrimary:hover {
+  filter: brightness(0.93);
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  background: transparent;
+  color: var(--color-primary-navy);
+  border: 2px solid var(--color-primary-navy);
+  border-radius: var(--space-3xs);
+  padding: var(--space-2xs) var(--space-s);
+  font-size: var(--text-0);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-family);
+  white-space: nowrap;
+}
+
+.btnSecondary:hover {
+  background: var(--color-light-grey);
+}
+
+/* ── Details column ──────────────────────────────────────── */
+
+.detailsCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+}
+
+.verifyPrompt {
+  margin: 0;
+  font-size: var(--text--1);
+}
+
+.verifyActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.verifyNoSpan {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text--1);
+}
+
+.updatedAt {
+  font-size: var(--text--2);
+  color: var(--color-neutral-grey);
+  margin: 0;
+}
+
+/* ── Features column ─────────────────────────────────────── */
+
+.featureList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3xs) 0;
+  border-bottom: 1px solid var(--color-light-grey);
+  font-size: var(--text--1);
+}
+
+.featureLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.featureCheck {
+  color: #1b9c85; /* green — not in design tokens; specified explicitly in design */
+}
+
+.feeSection {
+  margin-top: var(--space-s);
+}
+
+.feeHeading {
+  font-size: var(--text--1);
+  font-weight: 700;
+  margin: 0 0 var(--space-3xs);
+}
+
+.feeDetail {
+  font-size: var(--text--1);
+  margin: 0;
+  color: var(--color-neutral-grey);
+}
+
+/* ── Opening hours column ────────────────────────────────── */
+
+.hoursList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.hoursRow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-3xs) var(--space-xs);
+  font-size: var(--text--1);
+  border-radius: var(--space-3xs);
+}
+
+.today {
+  background: var(--color-frost-ice);
+  font-weight: 700;
+}
+
+.dayName {
+  color: var(--color-primary-navy);
+}
+
+.dayHours {
+  color: var(--color-neutral-grey);
+}
+
+.hoursNote {
+  font-size: var(--text--2);
+  color: var(--color-neutral-grey);
+  margin: var(--space-xs) 0 0;
+}
+
+.hoursNote a {
+  color: var(--color-primary-navy);
+}
