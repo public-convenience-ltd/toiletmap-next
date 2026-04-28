@@ -11,6 +11,7 @@ interface MapMarkersProps {
   data: CompressedLoo[];
   activeFilters: ActiveFilters;
   apiUrl: string;
+  selectedToiletId: string | null;
   onToiletSelect: (loo: LooDetail) => void;
 }
 
@@ -19,13 +20,18 @@ export default function MapMarkers({
   data,
   activeFilters,
   apiUrl,
+  selectedToiletId,
   onToiletSelect,
 }: MapMarkersProps) {
   const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null);
+  const markersById = useRef<Map<string, L.Marker>>(new Map());
+  const prevSelectedIdRef = useRef<string | null>(null);
   // Ref keeps the callback stable so the marker-creation effect never re-runs
   // just because the parent re-rendered with a new callback identity.
   const onToiletSelectRef = useRef(onToiletSelect);
   onToiletSelectRef.current = onToiletSelect;
+  const selectedToiletIdRef = useRef(selectedToiletId);
+  selectedToiletIdRef.current = selectedToiletId;
 
   // Prefetch logic
   useEffect(() => {
@@ -100,8 +106,31 @@ export default function MapMarkers({
     };
   }, [map]);
 
+  const getIconString = (isHighlighted: boolean) => `
+    <svg viewBox="-1 -1 21 33" height="${isHighlighted ? 44 : 33}" width="${isHighlighted ? 28 : 21}" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 0C4.47632 0 0 4.47529 0 10C0 19.5501 10 32 10 32C10 32 20 19.5501 20 10C20 4.47529 15.5237 0 10 0Z" fill="#ED3D63" stroke="white"/>
+      ${
+        isHighlighted
+          ? '<path d="M10 4L11.7634 7.57295L15.7063 8.1459L12.8532 10.9271L13.5267 14.8541L10 13L6.47329 14.8541L7.14683 10.9271L4.29366 8.1459L8.23664 7.57295L10 4Z" fill="white"/>'
+          : '<circle cx="10" cy="10" r="5" fill="white"/>'
+      }
+    </svg>
+  `;
+
+  const makeIcon = (isHighlighted: boolean) =>
+    L.divIcon({
+      html: getIconString(isHighlighted),
+      className: "loo-marker",
+      iconSize: isHighlighted ? [28, 44] : [21, 33],
+      iconAnchor: isHighlighted ? [14, 44] : [10.5, 33],
+      popupAnchor: [0, isHighlighted ? -44 : -33],
+    });
+
   useEffect(() => {
     if (!data.length || !markerClusterGroup.current) return;
+
+    markersById.current.clear();
+    prevSelectedIdRef.current = null;
 
     const requiredMask = (Object.keys(FILTER_BIT) as FilterKey[]).reduce(
       (acc, key) => (activeFilters[key] ? acc | FILTER_BIT[key] : acc),
@@ -116,26 +145,10 @@ export default function MapMarkers({
       const { latitude, longitude } = ngeohash.decode(loo[1]);
       const id = loo[0];
 
-      const getIconString = (isHighlighted: boolean) => `
-          <svg viewBox="-1 -1 21 33" height="33" width="21" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 0C4.47632 0 0 4.47529 0 10C0 19.5501 10 32 10 32C10 32 20 19.5501 20 10C20 4.47529 15.5237 0 10 0Z" fill="#ED3D63" stroke="white"/>
-            ${
-              isHighlighted
-                ? '<path d="M10 4L11.7634 7.57295L15.7063 8.1459L12.8532 10.9271L13.5267 14.8541L10 13L6.47329 14.8541L7.14683 10.9271L4.29366 8.1459L8.23664 7.57295L10 4Z" fill="white"/>'
-                : '<circle cx="10" cy="10" r="5" fill="white"/>'
-            }
-          </svg>
-        `;
-
-      const icon = L.divIcon({
-        html: getIconString(false),
-        className: "loo-marker",
-        iconSize: [21, 33],
-        iconAnchor: [10.5, 33],
-        popupAnchor: [0, -33],
+      const marker = L.marker([latitude, longitude], {
+        icon: makeIcon(id === selectedToiletIdRef.current),
       });
-
-      const marker = L.marker([latitude, longitude], { icon });
+      markersById.current.set(id, marker);
 
       marker.on("click", async () => {
         const details = await getLooById(apiUrl, id);
@@ -150,6 +163,16 @@ export default function MapMarkers({
     markerClusterGroup.current.clearLayers();
     markerClusterGroup.current.addLayers(markers);
   }, [data, apiUrl, activeFilters]);
+
+  useEffect(() => {
+    if (prevSelectedIdRef.current) {
+      markersById.current.get(prevSelectedIdRef.current)?.setIcon(makeIcon(false));
+    }
+    if (selectedToiletId) {
+      markersById.current.get(selectedToiletId)?.setIcon(makeIcon(true));
+    }
+    prevSelectedIdRef.current = selectedToiletId;
+  }, [selectedToiletId]);
 
   return null;
 }

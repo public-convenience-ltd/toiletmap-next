@@ -25,7 +25,10 @@ const DevTools = ({ isOpen, onClose, mapInstance }: DevToolsProps) => {
 
   const loadCacheStats = async () => {
     const allEntries = await entries();
-    const totalBytes = allEntries.reduce((sum, [, value]) => sum + JSON.stringify(value).length, 0);
+    const totalBytes = allEntries.reduce(
+      (sum, [, value]) => sum + new Blob([JSON.stringify(value)]).size,
+      0,
+    );
     setCacheStats({ count: allEntries.length, sizeKb: Math.round(totalBytes / 1024) });
   };
 

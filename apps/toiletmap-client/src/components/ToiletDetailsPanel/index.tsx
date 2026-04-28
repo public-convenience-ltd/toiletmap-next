@@ -82,7 +82,7 @@ interface ToiletDetailsPanelProps {
 }
 
 export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const today = todayIndex();
 
   const directionsUrl = toilet.location

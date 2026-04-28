@@ -1,6 +1,7 @@
 import type L from "leaflet";
 import type { RefObject } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
+import logo from "../../assets/logo.svg?url";
 import type { ActiveFilters, FilterKey } from "../../types/filters";
 import styles from "./MapControlsPanel.module.css";
 
@@ -101,6 +102,19 @@ export default function MapControlsPanel({
 
   const panelContent = (
     <div className={styles.content}>
+      {/* Logo + primary nav */}
+      <div className={styles.logoArea}>
+        <a href="/" aria-label="Toilet Map home">
+          <img src={logo} alt="Toilet Map" height={36} />
+        </a>
+        <nav className={styles.primaryNav} aria-label="Primary navigation">
+          <a href="/about">About</a>
+          <a href="/blog">Blog</a>
+          <a href="/contact">Contact</a>
+          <a href="/feedback">Feedback</a>
+        </nav>
+      </div>
+
       <h2 className={styles.title}>Search</h2>
 
       {/* Location search */}
@@ -194,6 +208,14 @@ export default function MapControlsPanel({
         <span>Add a Toilet</span>
         <i className="fa-solid fa-angle-right" aria-hidden="true" />
       </button>
+
+      {/* Footer links */}
+      <nav className={styles.footerNav} aria-label="Footer navigation">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/dataset">Dataset</a>
+        <a href="/app">App</a>
+        <a href="/support">Support Us</a>
+      </nav>
     </div>
   );
 
@@ -227,7 +249,7 @@ export default function MapControlsPanel({
         <div className={styles.overlay} onClick={() => setIsDrawerOpen(false)}>
           <div className={styles.drawer} role="dialog" aria-modal="true" aria-label="Map controls">
             <div className={styles.drawerHeader}>
-              <span className={styles.drawerTitle}>Map Controls</span>
+              <img src={logo} alt="Toilet Map" height={28} />
               <button
                 type="button"
                 className={styles.drawerClose}
