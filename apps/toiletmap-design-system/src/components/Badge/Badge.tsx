@@ -4,8 +4,8 @@ interface BadgeProps extends JSX.HTMLAttributes<HTMLSpanElement> {
   children: ComponentChildren;
 }
 
-const Badge = ({ children, ...props }: BadgeProps) => (
-  <span class="badge" {...props}>
+const Badge = ({ children, class: className, ...props }: BadgeProps) => (
+  <span class={`badge${className ? ` ${className}` : ""}`} {...props}>
     {children}
   </span>
 );

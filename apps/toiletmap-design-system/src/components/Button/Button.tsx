@@ -8,14 +8,14 @@ interface ButtonBaseProps {
 
 export interface ButtonElementProps
   extends ButtonBaseProps,
-    Omit<JSX.HTMLAttributes<HTMLButtonElement>, "children"> {
+    Omit<JSX.IntrinsicElements["button"], "children"> {
   htmlElement: "button";
   href?: never;
 }
 
 export interface AnchorElementProps
   extends ButtonBaseProps,
-    Omit<JSX.HTMLAttributes<HTMLAnchorElement>, "children"> {
+    Omit<JSX.IntrinsicElements["a"], "children"> {
   htmlElement: "a";
   href: string;
 }

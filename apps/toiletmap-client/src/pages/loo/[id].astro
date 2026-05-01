@@ -1,10 +1,11 @@
 ---
 import { env } from "cloudflare:workers";
 import { Footer, Header } from "toiletmap-design-system";
-import logo from "../assets/logo.svg?url";
-import LooMap from "../components/LooMap";
-import Layout from "../layouts/Layout.astro";
+import logo from "../../assets/logo.svg?url";
+import LooMap from "../../components/LooMap";
+import Layout from "../../layouts/Layout.astro";
 
+const { id } = Astro.params;
 const apiUrl = env.PUBLIC_API_URL;
 
 const navLinks = [
@@ -18,7 +19,7 @@ const navLinks = [
 <Layout>
   <Header client:load logoSrc={logo} navLinks={navLinks} />
   <main>
-    <LooMap client:only="preact" apiUrl={apiUrl} />
+    <LooMap client:only="preact" apiUrl={apiUrl} initialToiletId={id} />
   </main>
   <Footer />
 </Layout>

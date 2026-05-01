@@ -2,6 +2,9 @@
 
 /* Components */
 @import "./components/Badge/Badge.css";
+@import "./components/IconButton/IconButton.css";
+@import "./components/Sheet/Sheet.css";
+@import "./components/Tag/Tag.css";
 @import "./components/Banner/Banner.css";
 @import "./components/Button/Button.css";
 @import "./components/Drawer/Drawer.css";

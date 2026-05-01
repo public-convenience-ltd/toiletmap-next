@@ -1,0 +1,35 @@
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: var(--space-2xs);
+  border-radius: var(--space-3xs);
+  color: currentColor;
+  line-height: 1;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.icon-button--ghost:hover:not(:disabled) {
+  background: var(--color-light-grey);
+}
+
+.icon-button--filled {
+  background: var(--color-turquoise);
+  color: var(--color-blue);
+  border-radius: 8px;
+}
+
+.icon-button--filled:hover:not(:disabled) {
+  background: var(--color-blue);
+  color: var(--color-turquoise);
+}

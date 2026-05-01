@@ -11,12 +11,18 @@ export type { NavLink } from "./components/Header/Header";
 export { default as Header } from "./components/Header/Header";
 export type { IconName, IconProps } from "./components/Icon/Icon";
 export { default as Icon } from "./components/Icon/Icon";
+export type { IconButtonProps } from "./components/IconButton/IconButton";
+export { default as IconButton } from "./components/IconButton/IconButton";
 export { default as InputField } from "./components/InputField/InputField";
 export { default as Logo } from "./components/Logo/Logo";
 export { default as MapOverlay } from "./components/MapOverlay/MapOverlay";
 export { default as RadioInput } from "./components/RadioInput/RadioInput";
+export type { SheetProps } from "./components/Sheet/Sheet";
+export { default as Sheet } from "./components/Sheet/Sheet";
 export { default as SiteLayout } from "./components/SiteLayout/SiteLayout";
 export { default as Switch } from "./components/Switch/Switch";
+export type { TagProps } from "./components/Tag/Tag";
+export { default as Tag } from "./components/Tag/Tag";
 export { default as TextArea } from "./components/TextArea/TextArea";
 
 // Layout

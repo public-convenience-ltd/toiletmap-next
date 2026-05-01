@@ -1,40 +1,12 @@
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
-  z-index: 2000;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.panel {
-  background: var(--color-base-white);
-  width: 300px;
-  height: 100%;
-  padding: 20px;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
+/* Interior layout — the Sheet component owns positioning and dimensions */
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-m);
+  padding: var(--space-m) var(--space-m) var(--space-s);
+  border-bottom: 1px solid var(--color-light-grey);
+  flex-shrink: 0;
 }
 
 .header h2 {
@@ -43,59 +15,30 @@
   color: var(--color-primary-navy);
 }
 
-.closeBtn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  line-height: 1;
-  color: var(--color-neutral-grey);
-  transition: color 0.2s;
-}
-
-.closeBtn:hover {
-  color: var(--color-primary-navy);
-}
-
 .content {
   flex: 1;
   overflow-y: auto;
+  padding: var(--space-m);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
 }
 
 .section {
-  margin-bottom: var(--space-l);
-  border-bottom: 1px solid var(--color-light-grey);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
   padding-bottom: var(--space-m);
+  border-bottom: 1px solid var(--color-light-grey);
 }
 
 .section:last-child {
   border-bottom: none;
+  padding-bottom: 0;
 }
 
 .section h3 {
-  margin-top: 0;
-  margin-bottom: var(--space-xs);
+  margin: 0;
   font-size: var(--text-0);
   color: var(--color-primary-navy);
-}
-
-.devToolsBtn {
-  width: 100%;
-  padding: var(--space-xs);
-  background: var(--color-light-grey);
-  border: 1px solid var(--color-neutral-grey);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: var(--text-0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2xs);
-  transition: background 0.2s;
-  color: var(--color-primary-navy);
-}
-
-.devToolsBtn:hover {
-  background: var(--color-frost-ice);
 }

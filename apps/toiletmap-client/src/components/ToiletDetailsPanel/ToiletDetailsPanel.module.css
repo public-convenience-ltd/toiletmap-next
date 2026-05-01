@@ -1,22 +1,7 @@
-/* ── Panel shell ─────────────────────────────────────────── */
-
-.panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 1500; /* above Leaflet (400–1000), below settings modals */
-  background: var(--color-base-white);
-  border-radius: var(--space-s) var(--space-s) 0 0;
-  box-shadow: 0 -4px 24px rgba(10, 22, 94, 0.14);
-  font-family: var(--font-family);
-  color: var(--color-primary-navy);
-}
-
 /* ── Collapsed state ─────────────────────────────────────── */
 
 .collapsed {
-  padding: var(--space-s) var(--toilet-gutter) var(--space-m);
+  padding: var(--space-s) var(--space-m) var(--space-m);
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -46,15 +31,20 @@
 .expandedHeader {
   display: flex;
   justify-content: flex-end;
-  padding: var(--space-s) var(--toilet-gutter) 0;
+  padding: var(--space-s) var(--space-m) 0;
   flex-shrink: 0;
 }
 
 .expandedContent {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-s) var(--toilet-gutter) var(--space-l);
+  padding: var(--space-xs) var(--space-m) var(--space-l);
   scrollbar-color: var(--color-primary-navy) var(--color-light-grey);
+}
+
+/* Directions button — prevent flex column from stretching it full-width */
+.directionsWrapper {
+  display: flex;
 }
 
 /* 3-col grid → 1 col on small screens */
@@ -71,7 +61,7 @@
   }
 }
 
-/* ── Shared typography ───────────────────────────────────── */
+/* ── Typography ──────────────────────────────────────────── */
 
 .name {
   font-size: var(--text-1);
@@ -89,57 +79,7 @@
   gap: var(--space-xs);
 }
 
-/* ── Buttons ─────────────────────────────────────────────── */
-
-.btnPrimary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  background: var(--color-accent-turquoise);
-  color: var(--color-primary-navy);
-  border: none;
-  border-radius: var(--space-3xs);
-  padding: var(--space-2xs) var(--space-s);
-  font-size: var(--text-0);
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  font-family: var(--font-family);
-  white-space: nowrap;
-}
-
-.btnPrimary:hover {
-  filter: brightness(0.93);
-}
-
-.btnSecondary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  background: transparent;
-  color: var(--color-primary-navy);
-  border: 2px solid var(--color-primary-navy);
-  border-radius: var(--space-3xs);
-  padding: var(--space-2xs) var(--space-s);
-  font-size: var(--text-0);
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  font-family: var(--font-family);
-  white-space: nowrap;
-}
-
-.btnSecondary:hover {
-  background: var(--color-light-grey);
-}
-
 /* ── Details column ──────────────────────────────────────── */
-
-.detailsCol {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s);
-}
 
 .verifyPrompt {
   margin: 0;
@@ -187,10 +127,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-}
-
-.featureCheck {
-  color: #1b9c85; /* green — not in design tokens; specified explicitly in design */
 }
 
 .feeSection {

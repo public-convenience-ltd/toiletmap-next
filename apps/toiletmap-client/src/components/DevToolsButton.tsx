@@ -1,25 +1,18 @@
-import styles from "./DevToolsButton.module.css";
+import { IconButton } from "toiletmap-design-system";
 
 interface DevToolsButtonProps {
+  class?: string;
   onClick: () => void;
 }
 
-/**
- * Floating button to open developer tools.
- * Only visible in development and preview environments.
- */
-const DevToolsButton = ({ onClick }: DevToolsButtonProps) => {
-  return (
-    <button
-      type="button"
-      className={styles.devToolsBtn}
-      onClick={onClick}
-      title="Developer Tools"
-      aria-label="Open Developer Tools"
-    >
-      <i className="fa-solid fa-code" />
-    </button>
-  );
-};
+const DevToolsButton = ({ class: className, onClick }: DevToolsButtonProps) => (
+  <IconButton
+    icon="asterisk"
+    aria-label="Developer Tools"
+    variant="filled"
+    class={className}
+    onClick={onClick}
+  />
+);
 
 export default DevToolsButton;

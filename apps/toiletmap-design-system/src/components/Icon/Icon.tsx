@@ -48,16 +48,24 @@ export interface IconProps {
   "aria-label"?: string;
 }
 
-const Icon = ({ icon, size, spin, "aria-label": ariaLabel, ...props }: IconProps) => {
+const Icon = ({
+  icon,
+  size,
+  spin,
+  "aria-label": ariaLabel,
+  class: extraClass,
+  ...props
+}: IconProps) => {
   const sizeClass = size ?? "small";
   const spinClass = spin ? " spin" : "";
   const svgClass = sizeClass + spinClass;
+  const spanClass = extraClass ? `icon ${extraClass}` : "icon";
   const useHref = `/sprites/solid.svg#${icon}`;
 
   if (ariaLabel) {
     return (
-      <span class="icon">
-        <svg fill="currentColor" class={svgClass} role="img" aria-label={ariaLabel} {...props}>
+      <span class={spanClass} {...props}>
+        <svg fill="currentColor" class={svgClass} role="img" aria-label={ariaLabel}>
           <title>{ariaLabel}</title>
           <use href={useHref} />
         </svg>
@@ -66,8 +74,8 @@ const Icon = ({ icon, size, spin, "aria-label": ariaLabel, ...props }: IconProps
   }
 
   return (
-    <span class="icon">
-      <svg fill="currentColor" class={svgClass} aria-hidden="true" {...props}>
+    <span class={spanClass} {...props}>
+      <svg fill="currentColor" class={svgClass} aria-hidden="true">
         <title>icon</title>
         <use href={useHref} />
       </svg>
