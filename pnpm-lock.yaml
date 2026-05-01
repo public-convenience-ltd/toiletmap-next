@@ -80,7 +80,11 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@25.5.0)(happy-dom@20.9.0)(msw@2.12.2(@types/node@25.5.0)(typescript@6.0.2))(vite@8.0.10(@types/node@25.5.0)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
-  apps/toiletmap-design-system: {}
+  apps/toiletmap-design-system:
+    devDependencies:
+      preact:
+        specifier: ^10.29.1
+        version: 10.29.1
 
   apps/toiletmap-server:
     dependencies:

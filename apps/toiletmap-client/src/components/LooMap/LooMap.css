@@ -2,8 +2,8 @@
 .marker-cluster {
   background-clip: padding-box;
   border-radius: 50%; /* Make it a circle */
-  border: 3px solid #ed3d63; /* Design system red border */
-  background-color: #ffffff; /* White center */
+  border: 3px solid var(--color-accent-pink);
+  background-color: var(--color-base-white);
   width: 40px;
   height: 40px;
 }
@@ -15,7 +15,7 @@
   font-family: var(--font-family, sans-serif);
   font-weight: bold;
   font-size: 14px;
-  color: #000000; /* Black text */
+  color: var(--color-primary-navy);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,8 +78,8 @@
   right: 10px;
   z-index: 1000;
   padding: 10px 15px;
-  background-color: #ed3d63;
-  color: white;
+  background-color: var(--color-accent-pink);
+  color: var(--color-base-white);
   border: none;
   border-radius: 4px;
   cursor: pointer;

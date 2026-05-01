@@ -1,0 +1,48 @@
+.icon {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.small {
+  height: 1cap;
+  width: 1cap;
+}
+
+.medium {
+  height: 1.5cap;
+  width: 1.5cap;
+}
+
+.large {
+  height: 2cap;
+  width: 2cap;
+}
+
+.x-large {
+  height: 2.5cap;
+  width: 2.5cap;
+}
+
+.spin {
+  animation-name: spin;
+  animation-direction: normal;
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: steps(8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
