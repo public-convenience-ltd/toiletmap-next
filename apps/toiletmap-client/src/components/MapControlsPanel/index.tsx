@@ -1,7 +1,8 @@
 import type L from "leaflet";
 import type { RefObject } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import logo from "../../assets/logo.svg?url";
+import type { IconName } from "toiletmap-design-system";
+import { Icon, IconButton, InputField, Sheet, Tag } from "toiletmap-design-system";
 import type { ActiveFilters, FilterKey } from "../../types/filters";
 import styles from "./MapControlsPanel.module.css";
 
@@ -19,12 +20,12 @@ interface NominatimResult {
   lon: string;
 }
 
-const FILTER_OPTIONS: Array<{ key: FilterKey; label: string; faIcon: string }> = [
-  { key: "ACCESSIBLE", label: "Accessible", faIcon: "fa-wheelchair" },
-  { key: "BABY_CHNG", label: "Baby Change", faIcon: "fa-baby" },
-  { key: "ALL_GENDER", label: "All Gender", faIcon: "fa-person-dress" },
-  { key: "NO_PAYMENT", label: "Free", faIcon: "fa-sterling-sign" },
-  { key: "RADAR", label: "Radar Key", faIcon: "fa-key" },
+const FILTER_OPTIONS: Array<{ key: FilterKey; label: string; icon: IconName }> = [
+  { key: "ACCESSIBLE", label: "Accessible", icon: "wheelchair-move" },
+  { key: "BABY_CHNG", label: "Baby Change", icon: "baby" },
+  { key: "ALL_GENDER", label: "All Gender", icon: "person-dress" },
+  { key: "NO_PAYMENT", label: "Free", icon: "sterling-sign" },
+  { key: "RADAR", label: "Radar Key", icon: "key" },
 ];
 
 export default function MapControlsPanel({
@@ -102,23 +103,19 @@ export default function MapControlsPanel({
 
   const panelContent = (
     <div className={styles.content}>
-      <h2 className={styles.title}>Search</h2>
-
       {/* Location search */}
       <div className={styles.searchWrapper}>
-        <i className={`fa-solid fa-magnifying-glass ${styles.searchIcon}`} aria-hidden="true" />
-        <input
+        <Icon icon="magnifying-glass" size="small" class={styles.searchIcon} />
+        <InputField
           type="search"
-          className={styles.searchInput}
+          class={styles.searchInput}
           value={query}
           onInput={(e) => handleSearchInput((e.target as HTMLInputElement).value)}
           placeholder="Search for a location…"
           autoComplete="off"
           aria-label="Search for a location"
         />
-        {isSearching && (
-          <i className={`fa-solid fa-spinner fa-spin ${styles.searchSpinner}`} aria-hidden="true" />
-        )}
+        {isSearching && <Icon icon="spinner" size="small" spin class={styles.searchSpinner} />}
       </div>
 
       {suggestions.length > 0 && (
@@ -130,7 +127,7 @@ export default function MapControlsPanel({
                 className={styles.suggestion}
                 onClick={() => handleSuggestionSelect(s)}
               >
-                <i className="fa-solid fa-map-location-dot" aria-hidden="true" />
+                <Icon icon="map-location-dot" size="small" />
                 <span>{s.display_name}</span>
               </button>
             </li>
@@ -146,11 +143,15 @@ export default function MapControlsPanel({
           onClick={() => setFiltersOpen((o) => !o)}
           aria-expanded={filtersOpen}
         >
-          <i className="fa-solid fa-filter" aria-hidden="true" />
+          <Icon icon="filter" size="small" />
           <span>Filter{activeCount > 0 && <b> ({activeCount})</b>}</span>
-          <i
-            className={`fa-solid ${filtersOpen ? "fa-chevron-up" : "fa-chevron-down"}`}
-            aria-hidden="true"
+          <Icon
+            icon="chevron-down"
+            size="small"
+            style={{
+              transform: filtersOpen ? "rotate(180deg)" : "none",
+              transition: "transform 0.2s ease",
+            }}
           />
         </button>
         {filtersOpen && activeCount > 0 && (
@@ -162,20 +163,19 @@ export default function MapControlsPanel({
 
       {filtersOpen && (
         <ul className={styles.filterList}>
-          {FILTER_OPTIONS.map(({ key, label, faIcon }) => {
+          {FILTER_OPTIONS.map(({ key, label, icon }) => {
             const active = activeFilters[key];
             return (
               <li key={key}>
-                <button
-                  type="button"
-                  className={`${styles.filterBtn} ${active ? styles.filterBtnActive : ""}`}
+                <Tag
+                  active={active}
+                  class={styles.filterTag}
                   onClick={() => onFilterChange(key, !active)}
-                  aria-pressed={active}
                 >
-                  <i className={`fa-solid ${faIcon}`} aria-hidden="true" />
+                  <Icon icon={icon} size="small" />
                   <span className={styles.filterLabel}>{label}</span>
-                  {active && <i className="fa-solid fa-check" aria-hidden="true" />}
-                </button>
+                  {active && <Icon icon="check" size="small" />}
+                </Tag>
               </li>
             );
           })}
@@ -184,49 +184,24 @@ export default function MapControlsPanel({
 
       {/* Quick links */}
       <button type="button" className={styles.quickLink} onClick={handleFindNearMe}>
-        <i className="fa-solid fa-map-location-dot" aria-hidden="true" />
+        <Icon icon="map-location-dot" size="small" />
         <span>Find a toilet near me</span>
-        <i className="fa-solid fa-angle-right" aria-hidden="true" />
+        <Icon icon="angle-right" size="small" />
       </button>
       {geoError && <p className={styles.geoError}>{geoError}</p>}
 
       <button type="button" className={styles.quickLink} disabled title="Coming soon">
-        <i className="fa-solid fa-circle-plus" aria-hidden="true" />
+        <Icon icon="circle-plus" size="small" />
         <span>Add a Toilet</span>
-        <i className="fa-solid fa-angle-right" aria-hidden="true" />
+        <Icon icon="angle-right" size="small" />
       </button>
-
-      {/* Footer links */}
-      <nav className={styles.footerNav} aria-label="Footer navigation">
-        <a href="/privacy">Privacy Policy</a>
-        <a href="/dataset">Dataset</a>
-        <a href="/app">App</a>
-        <a href="/support">Support Us</a>
-      </nav>
     </div>
-  );
-
-  const primaryNavLinks = (
-    <>
-      <a href="/about">About</a>
-      <a href="/blog">Blog</a>
-      <a href="/contact">Contact</a>
-      <a href="/feedback">Feedback</a>
-    </>
   );
 
   return (
     <>
       {/* Desktop: fixed left panel */}
       <aside className={styles.panel} aria-label="Map controls">
-        <div className={styles.panelHeader}>
-          <a href="/" aria-label="Toilet Map home">
-            <img src={logo} alt="Toilet Map" height={32} />
-          </a>
-          <nav className={styles.primaryNav} aria-label="Primary navigation">
-            {primaryNavLinks}
-          </nav>
-        </div>
         {panelContent}
       </aside>
 
@@ -238,7 +213,7 @@ export default function MapControlsPanel({
         aria-label={`Open menu${activeCount > 0 ? ` (${activeCount} filters active)` : ""}`}
         aria-expanded={isDrawerOpen}
       >
-        <i className="fa-solid fa-bars" aria-hidden="true" />
+        <Icon icon="bars" size="small" />
         <span>Menu</span>
         {activeCount > 0 && (
           <span className={styles.badge} aria-hidden="true">
@@ -247,37 +222,19 @@ export default function MapControlsPanel({
         )}
       </button>
 
-      {/* Mobile: slide-in drawer */}
-      {isDrawerOpen && (
-        // biome-ignore lint/a11y/useKeyWithClickEvents: Overlay backdrop closes drawer on click
-        // biome-ignore lint/a11y/noStaticElementInteractions: Overlay backdrop
-        <div className={styles.overlay} onClick={() => setIsDrawerOpen(false)}>
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Stop propagation to overlay */}
-          <div
-            className={styles.drawer}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Map controls"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.drawerHeader}>
-              <img src={logo} alt="Toilet Map" height={28} />
-              <button
-                type="button"
-                className={styles.drawerClose}
-                onClick={() => setIsDrawerOpen(false)}
-                aria-label="Close menu"
-              >
-                <i className="fa-solid fa-xmark" aria-hidden="true" />
-              </button>
-            </div>
-            <nav className={styles.drawerNav} aria-label="Primary navigation">
-              {primaryNavLinks}
-            </nav>
-            {panelContent}
-          </div>
+      {/* Mobile: slide-in Sheet drawer */}
+      <Sheet
+        visible={isDrawerOpen}
+        side="left"
+        onClose={() => setIsDrawerOpen(false)}
+        zIndex={1200}
+      >
+        <div className={styles.drawerHeader}>
+          <span className={styles.drawerTitle}>Search & Filter</span>
+          <IconButton icon="xmark" aria-label="Close menu" onClick={() => setIsDrawerOpen(false)} />
         </div>
-      )}
+        {panelContent}
+      </Sheet>
     </>
   );
 }

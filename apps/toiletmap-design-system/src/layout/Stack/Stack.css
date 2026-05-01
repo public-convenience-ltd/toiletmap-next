@@ -1,0 +1,53 @@
+.stack {
+  display: flex;
+  justify-content: flex-start;
+  --stack-space: 0;
+}
+
+.stack > * + * {
+  margin: 0;
+}
+
+.stack--column {
+  flex-direction: column;
+}
+
+.stack--row {
+  flex-direction: row;
+}
+
+.stack--column > * + * {
+  margin-block-start: var(--stack-space);
+}
+
+.stack--row > * + * {
+  margin-inline-start: var(--stack-space);
+}
+
+.stack--3xs {
+  --stack-space: var(--space-3xs);
+}
+.stack--2xs {
+  --stack-space: var(--space-2xs);
+}
+.stack--xs {
+  --stack-space: var(--space-xs);
+}
+.stack--s {
+  --stack-space: var(--space-s);
+}
+.stack--m {
+  --stack-space: var(--space-m);
+}
+.stack--l {
+  --stack-space: var(--space-l);
+}
+.stack--xl {
+  --stack-space: var(--space-xl);
+}
+.stack--2xl {
+  --stack-space: var(--space-2xl);
+}
+.stack--3xl {
+  --stack-space: var(--space-3xl);
+}

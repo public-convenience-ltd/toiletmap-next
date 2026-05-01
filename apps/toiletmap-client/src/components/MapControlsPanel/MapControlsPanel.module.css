@@ -4,7 +4,7 @@
   position: fixed;
   top: var(--space-m);
   left: var(--space-m);
-  width: 320px;
+  width: 300px;
   max-height: calc(100vh - var(--space-m) * 2);
   z-index: 1000;
   background: var(--color-base-white);
@@ -36,73 +36,6 @@
   scrollbar-width: thin;
 }
 
-/* ── Desktop panel header (logo + primary nav) ───────────── */
-
-.panelHeader {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-s);
-  border-bottom: 1px solid var(--color-light-grey);
-}
-
-.panelHeader a {
-  display: flex;
-  align-items: center;
-}
-
-.primaryNav {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2xs) var(--space-xs);
-}
-
-.primaryNav a {
-  font-size: var(--text--1);
-  color: var(--color-primary-navy);
-  text-decoration: none;
-  font-family: var(--font-family);
-}
-
-.primaryNav a:hover {
-  text-decoration: underline;
-}
-
-/* ── Footer nav ──────────────────────────────────────────── */
-
-.footerNav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3xs) var(--space-xs);
-  border-top: 1px solid var(--color-light-grey);
-  padding-top: var(--space-s);
-  margin-top: auto;
-}
-
-.footerNav a {
-  font-size: var(--text--2);
-  color: var(--color-neutral-grey);
-  text-decoration: none;
-  font-family: var(--font-family);
-}
-
-.footerNav a:hover {
-  color: var(--color-primary-navy);
-  text-decoration: underline;
-}
-
-/* ── Title ───────────────────────────────────────────────── */
-
-.title {
-  font-size: var(--text-1);
-  font-weight: 700;
-  margin: 0;
-  color: var(--color-primary-navy);
-}
-
 /* ── Search ──────────────────────────────────────────────── */
 
 .searchWrapper {
@@ -116,39 +49,28 @@
   left: var(--space-xs);
   color: var(--color-neutral-grey);
   pointer-events: none;
-  font-size: var(--text--1);
 }
 
+/* Override DS InputField styles for the icon-inset search context */
 .searchInput {
-  width: 100%;
-  padding: var(--space-xs) var(--space-xs) var(--space-xs) calc(var(--space-xs) * 2 + 1em);
-  border: 2px solid var(--color-light-grey);
-  border-radius: 8px;
-  font-size: var(--text--1);
-  font-family: var(--font-family);
-  color: var(--color-primary-navy);
-  background: var(--color-base-white);
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.15s ease;
-  /* Remove native search clear button on WebKit */
+  padding-left: calc(var(--space-xs) * 2 + 1em) !important;
+  border-color: var(--color-light-grey) !important;
+  border-radius: 8px !important;
+  margin-top: 0 !important;
   -webkit-appearance: none;
   appearance: none;
+  transition: border-color 0.15s ease;
 }
 
 .searchInput:focus {
-  border-color: var(--color-primary-navy);
-}
-
-.searchInput::placeholder {
-  color: var(--color-neutral-grey);
+  border-color: var(--color-primary-navy) !important;
+  outline: none;
 }
 
 .searchSpinner {
   position: absolute;
   right: var(--space-xs);
   color: var(--color-neutral-grey);
-  font-size: var(--text--1);
 }
 
 /* ── Autocomplete suggestions ────────────────────────────── */
@@ -189,7 +111,7 @@
   transition: background 0.1s;
 }
 
-.suggestion i {
+.suggestion > :global(.icon) {
   flex-shrink: 0;
   margin-top: 2px;
   color: var(--color-neutral-grey);
@@ -249,7 +171,7 @@
   color: var(--color-primary-navy);
 }
 
-/* ── Filter toggle buttons ───────────────────────────────── */
+/* ── Filter Tag list ─────────────────────────────────────── */
 
 .filterList {
   list-style: none;
@@ -260,39 +182,16 @@
   gap: var(--space-2xs);
 }
 
-.filterBtn {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
+/* Make Tags stretch to full width in the filter list */
+.filterTag {
   width: 100%;
-  padding: var(--space-2xs) var(--space-xs);
   border-radius: 8px;
-  font-weight: 600;
-  font-size: var(--text--1);
-  color: var(--color-primary-navy);
-  background: var(--color-light-grey);
-  border: 2px solid transparent;
-  cursor: pointer;
-  font-family: var(--font-family);
-  transition: all 0.15s ease;
   text-align: left;
-}
-
-.filterBtn:hover {
-  filter: brightness(0.96);
-}
-
-.filterBtnActive {
-  background: var(--color-accent-turquoise);
-  border-color: var(--color-accent-turquoise);
+  justify-content: flex-start;
 }
 
 .filterLabel {
   flex: 1;
-}
-
-.filterBtnActive i:last-child {
-  flex-shrink: 0;
 }
 
 /* ── Quick link buttons ──────────────────────────────────── */
@@ -383,75 +282,7 @@
   line-height: 1;
 }
 
-/* ── Mobile drawer nav ───────────────────────────────────── */
-
-.drawerNav {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--color-light-grey);
-  padding: var(--space-2xs) 0;
-}
-
-.drawerNav a {
-  display: flex;
-  align-items: center;
-  padding: var(--space-xs) var(--space-s);
-  font-size: var(--text-0);
-  font-weight: 500;
-  color: var(--color-primary-navy);
-  text-decoration: none;
-  font-family: var(--font-family);
-  transition: background 0.1s;
-}
-
-.drawerNav a:hover,
-.drawerNav a:focus {
-  background: var(--color-light-grey);
-  outline: none;
-}
-
-/* ── Mobile overlay backdrop ─────────────────────────────── */
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 1200;
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-start;
-  animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* ── Mobile drawer ───────────────────────────────────────── */
-
-.drawer {
-  width: min(85vw, 320px);
-  height: 100%;
-  background: var(--color-base-white);
-  display: flex;
-  flex-direction: column;
-  box-shadow: 4px 0 24px rgba(10, 22, 94, 0.2);
-  animation: slideInLeft 0.25s ease-out;
-  overflow: hidden;
-}
-
-@keyframes slideInLeft {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
+/* ── Mobile drawer header (inside Sheet) ─────────────────── */
 
 .drawerHeader {
   display: flex;
@@ -462,17 +293,9 @@
   flex-shrink: 0;
 }
 
-.drawerClose {
-  background: none;
-  border: none;
-  font-size: var(--text-1);
-  cursor: pointer;
-  color: var(--color-neutral-grey);
-  padding: var(--space-3xs);
-  line-height: 1;
-  transition: color 0.15s;
-}
-
-.drawerClose:hover {
+.drawerTitle {
+  font-size: var(--text-0);
+  font-weight: 700;
   color: var(--color-primary-navy);
+  font-family: var(--font-family);
 }

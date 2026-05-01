@@ -1,0 +1,84 @@
+/* ── Backdrop ─────────────────────────────────────────────── */
+
+.sheet__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.sheet__overlay--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Panel base ───────────────────────────────────────────── */
+
+.sheet {
+  position: fixed;
+  background: var(--color-base-white);
+  visibility: hidden;
+  transition:
+    transform 0.25s ease,
+    visibility 0s 0.25s; /* delay visibility so exit animation plays */
+}
+
+.sheet--visible {
+  visibility: visible;
+  transition:
+    transform 0.25s ease,
+    visibility 0s 0s;
+}
+
+/* ── Bottom sheet ─────────────────────────────────────────── */
+
+.sheet--bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: var(--space-s) var(--space-s) 0 0;
+  box-shadow: 0 -4px 24px rgba(10, 22, 94, 0.14);
+  transform: translateY(100%);
+}
+
+.sheet--bottom.sheet--visible {
+  transform: translateY(0);
+}
+
+/* ── Left sheet ───────────────────────────────────────────── */
+
+.sheet--left {
+  top: 0;
+  left: 0;
+  height: 100dvh;
+  width: min(85vw, 320px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 4px 0 24px rgba(10, 22, 94, 0.2);
+  transform: translateX(-100%);
+}
+
+.sheet--left.sheet--visible {
+  transform: translateX(0);
+}
+
+/* ── Right sheet ──────────────────────────────────────────── */
+
+.sheet--right {
+  top: 0;
+  right: 0;
+  height: 100dvh;
+  width: min(100%, 320px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: -2px 0 24px rgba(10, 22, 94, 0.12);
+  transform: translateX(100%);
+}
+
+.sheet--right.sheet--visible {
+  transform: translateX(0);
+}

@@ -1,0 +1,29 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: var(--color-light-grey);
+  color: var(--color-primary-navy);
+  font-size: var(--text--1);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: all 0.15s ease;
+}
+
+.tag:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.tag:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tag--active {
+  background: var(--color-accent-turquoise);
+  border-color: var(--color-accent-turquoise);
+}

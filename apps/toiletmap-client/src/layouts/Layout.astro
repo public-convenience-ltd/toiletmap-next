@@ -26,5 +26,17 @@
 </html>
 
 <style is:global>
-	@import "toiletmap-design-system/tokens.css";
+	@import "toiletmap-design-system/stylesheet.css";
+
+	body {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		overflow: hidden;
+	}
+
+	/* Astro islands should not create layout boxes — let children be direct flex items */
+	astro-island {
+		display: contents;
+	}
 </style>

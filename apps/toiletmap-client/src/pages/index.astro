@@ -1,22 +1,33 @@
 ---
 import { env } from "cloudflare:workers";
+import { Footer, Header } from "toiletmap-design-system";
+import logo from "../assets/logo.svg?url";
 import LooMap from "../components/LooMap";
 import Layout from "../layouts/Layout.astro";
 
 const apiUrl = env.PUBLIC_API_URL;
+
+const navLinks = [
+  { href: "/about", label: "About" },
+  { href: "/blog", label: "Blog" },
+  { href: "/contact", label: "Contact" },
+  { href: "/feedback", label: "Feedback" },
+];
 ---
 
 <Layout>
+  <Header client:load logoSrc={logo} navLinks={navLinks} />
   <main>
     <LooMap client:only="preact" apiUrl={apiUrl} />
   </main>
+  <Footer />
 </Layout>
 
 <style>
   main {
-    position: relative;
-    height: 100vh;
-    width: 100vw;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
+    position: relative;
   }
 </style>
