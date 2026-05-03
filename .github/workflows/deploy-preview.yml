@@ -1,0 +1,78 @@
+name: Deploy Preview
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - postgres-staging
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-server:
+    name: Deploy Server Preview
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/toiletmap-server
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
+
+      - name: Build admin UI
+        run: pnpm build:client
+
+      - name: Deploy server preview
+        run: |
+          BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+          wrangler deploy --env preview --name "${BRANCH}-toiletmap-server"
+
+  deploy-client:
+    name: Deploy Client Preview
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/toiletmap-client
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Build client
+        run: pnpm build
+
+      - name: Deploy client preview
+        run: |
+          BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+          wrangler deploy --env preview --name "${BRANCH}-toiletmap-client"
