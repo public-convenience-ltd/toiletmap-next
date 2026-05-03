@@ -81,6 +81,18 @@
   margin: 0 0 var(--space-s);
 }
 
+.required {
+  color: var(--color-accent-pink);
+  margin-left: 2px;
+}
+
+.fieldError {
+  display: block;
+  font-size: var(--text--2);
+  color: var(--color-accent-pink);
+  margin-top: var(--space-2xs);
+}
+
 /* ── Search autocomplete ─────────────────────────────────── */
 
 .searchRow {

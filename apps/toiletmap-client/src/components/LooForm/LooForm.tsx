@@ -52,10 +52,14 @@ const boolToTri = (v: boolean | null | undefined): TriStateValue =>
 const triToBool = (v: TriStateValue): boolean | null =>
   v === "true" ? true : v === "false" ? false : null;
 
-const buildInitialState = (data?: LooDetail | null): FormState => ({
+// Default lat/lng for new toilets — used to detect "location not set"
+const DEFAULT_LAT = 51.505;
+const DEFAULT_LNG = -0.09;
+
+const buildInitialState = (data?: LooDetail | null, mode?: "edit" | "add"): FormState => ({
   name: data?.name ?? "",
-  lat: data?.location?.lat ?? 51.505,
-  lng: data?.location?.lng ?? -0.09,
+  lat: data?.location?.lat ?? DEFAULT_LAT,
+  lng: data?.location?.lng ?? DEFAULT_LNG,
   notes: (data?.notes as string | undefined) ?? "",
   paymentDetails: data?.paymentDetails ?? "",
   removalReason: (data?.removalReason as string | undefined) ?? "",
@@ -68,7 +72,8 @@ const buildInitialState = (data?: LooDetail | null): FormState => ({
   radar: boolToTri(data?.radar),
   automatic: boolToTri(data?.automatic),
   noPayment: boolToTri(data?.noPayment),
-  active: boolToTri((data as Record<string, unknown> | undefined)?.active as boolean | undefined),
+  // New toilets default to active; edits preserve current value
+  active: mode === "add" ? "true" : boolToTri((data as Record<string, unknown> | undefined)?.active as boolean | undefined),
   openingTimes: (data?.openingTimes as OpeningTimes | null) ?? null,
 });
 
@@ -79,7 +84,8 @@ export default function LooForm({
   apiUrl,
   isAuthenticated,
 }: LooFormProps) {
-  const [form, setForm] = useState<FormState>(() => buildInitialState(initialData));
+  const [form, setForm] = useState<FormState>(() => buildInitialState(initialData, mode));
+  const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queued, setQueued] = useState(false);
@@ -91,8 +97,19 @@ export default function LooForm({
   const setTri = (key: keyof FormState) => (value: TriStateValue) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const validate = (): boolean => {
+    const errors: Partial<Record<keyof FormState, string>> = {};
+    if (!form.name.trim()) errors.name = "Name is required.";
+    if (mode === "add" && form.lat === DEFAULT_LAT && form.lng === DEFAULT_LNG) {
+      errors.lat = "Please set the toilet's location on the map.";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
+    if (!validate()) return;
     setSubmitting(true);
     setError(null);
     setQueued(false);
@@ -201,8 +218,12 @@ export default function LooForm({
             <LocationPicker
               lat={form.lat}
               lng={form.lng}
-              onChange={(lat, lng) => setForm((f) => ({ ...f, lat, lng }))}
+              onChange={(lat, lng) => {
+                setForm((f) => ({ ...f, lat, lng }));
+                if (formErrors.lat) setFormErrors((fe) => ({ ...fe, lat: undefined }));
+              }}
             />
+            {formErrors.lat && <span class={styles.fieldError}>{formErrors.lat}</span>}
             <Stack direction="row" space="s">
               <div class={styles.coordLabel}>
                 Latitude
@@ -242,15 +263,20 @@ export default function LooForm({
             <h2 class={styles.sectionTitle}>Details</h2>
             <Stack space="s">
               <div class={styles.fieldLabel}>
-                <span>Name</span>
+                <span>
+                  Name <span class={styles.required} aria-hidden="true">*</span>
+                </span>
                 <InputField
                   placeholder="e.g. High Street toilets"
                   value={form.name}
                   aria-label="Toilet name"
-                  onInput={(e) =>
-                    setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))
-                  }
+                  aria-required="true"
+                  onInput={(e) => {
+                    setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }));
+                    if (formErrors.name) setFormErrors((fe) => ({ ...fe, name: undefined }));
+                  }}
                 />
+                {formErrors.name && <span class={styles.fieldError}>{formErrors.name}</span>}
               </div>
               <div class={styles.fieldLabel}>
                 <span>Notes</span>

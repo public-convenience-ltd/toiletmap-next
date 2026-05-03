@@ -1,7 +1,29 @@
 .text-area {
   display: block;
   width: 100%;
-  padding: var(--space-2xs);
-  color: var(--color-blue);
-  border: 1px solid var(--color-blue);
+  box-sizing: border-box;
+  padding: var(--space-2xs) var(--space-xs);
+  font-family: var(--font-family);
+  font-size: var(--text-0);
+  color: var(--color-primary-navy);
+  background: var(--color-base-white);
+  border: 1.5px solid rgba(10, 22, 94, 0.3);
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.15s ease;
+}
+
+.text-area:hover {
+  border-color: var(--color-primary-navy);
+}
+
+.text-area:focus {
+  outline: 2px solid var(--color-accent-turquoise);
+  outline-offset: 1px;
+  border-color: var(--color-primary-navy);
+}
+
+.text-area::placeholder {
+  color: var(--color-neutral-grey);
 }

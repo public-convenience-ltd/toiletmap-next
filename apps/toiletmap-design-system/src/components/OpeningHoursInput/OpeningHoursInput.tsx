@@ -142,20 +142,20 @@ export default function OpeningHoursInput({ value, onChange, error }: OpeningHou
                     type="button"
                     class="oh-action-btn"
                     onClick={() => copyToNext(index)}
-                    title="Copy to next day"
                     aria-label={`Copy ${day} hours to next day`}
                   >
                     <Icon icon="chevron-down" size="small" aria-hidden="true" />
+                    <span class="oh-action-label">Copy to next</span>
                   </button>
                 )}
                 <button
                   type="button"
                   class="oh-action-btn"
                   onClick={() => applyToAll(index)}
-                  title="Apply to all days"
                   aria-label={`Apply ${day} hours to all days`}
                 >
                   <Icon icon="asterisk" size="small" aria-hidden="true" />
+                  <span class="oh-action-label">Apply to all</span>
                 </button>
               </div>
             </div>
