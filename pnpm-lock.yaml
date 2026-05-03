@@ -39,12 +39,21 @@ importers:
       '@astrojs/preact':
         specifier: ^5.1.2
         version: 5.1.2(@babel/core@7.29.0)(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(preact@10.29.1)(rollup@4.60.2)(tsx@4.21.0)(yaml@2.8.3)
+      '@toiletmap/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@types/leaflet':
         specifier: ^1.9.21
         version: 1.9.21
       astro:
         specifier: ^6.1.10
         version: 6.1.10(@types/node@25.5.0)(idb-keyval@6.2.2)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.60.2)(tsx@4.21.0)(typescript@6.0.2)(yaml@2.8.3)
+      concurrently:
+        specifier: ^9.2.1
+        version: 9.2.1
+      hono:
+        specifier: ^4.10.6
+        version: 4.12.15
       idb-keyval:
         specifier: ^6.2.2
         version: 6.2.2
@@ -100,6 +109,9 @@ importers:
       '@prisma/client':
         specifier: ^7.8.0
         version: 7.8.0(prisma@7.8.0(@types/react@19.2.6)(magicast@0.5.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@6.0.2))(typescript@6.0.2)
+      '@toiletmap/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@types/leaflet':
         specifier: ^1.9.21
         version: 1.9.21
@@ -155,6 +167,12 @@ importers:
       vitest:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@25.5.0)(happy-dom@20.9.0)(msw@2.12.2(@types/node@25.5.0)(typescript@6.0.2))(vite@8.0.10(@types/node@25.5.0)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/auth:
+    dependencies:
+      hono:
+        specifier: ^4.10.6
+        version: 4.12.15
 
 packages:
 

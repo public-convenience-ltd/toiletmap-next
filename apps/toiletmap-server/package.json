@@ -38,6 +38,7 @@
     "openapi3-ts": "^4.5.0",
     "pg": "^8.20.0",
     "prisma": "^7.8.0",
+    "@toiletmap/auth": "workspace:*",
     "toiletmap-design-system": "workspace:*",
     "zod": "^4.3.6"
   },

@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "concurrently --names \"ASTRO,AUTH\" -c \"cyan,green\" \"astro dev\" \"pnpm --filter toiletmap-server auth:server\"",
     "build": "astro build",
     "preview": "astro preview",
     "deploy": "wrangler deploy --env production",
@@ -22,6 +22,9 @@
     "leaflet.markercluster": "^1.5.3",
     "ngeohash": "^0.6.3",
     "preact": "^10.29.1",
+    "@toiletmap/auth": "workspace:*",
+    "concurrently": "^9.2.1",
+    "hono": "^4.12.15",
     "toiletmap-design-system": "workspace:*"
   },
   "devDependencies": {
