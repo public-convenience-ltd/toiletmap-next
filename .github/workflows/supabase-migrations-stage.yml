@@ -26,4 +26,4 @@ jobs:
           version: latest
       - run: |
           supabase link --project-ref $STAGE_PROJECT_ID
-          supabase db push
+          supabase db push --db-url "postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${STAGE_PROJECT_ID}.supabase.co:5432/postgres"
