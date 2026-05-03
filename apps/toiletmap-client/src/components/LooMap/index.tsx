@@ -56,13 +56,18 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
     };
   }, []);
 
-  // Pre-select toilet when navigating directly to /loo/{id}
+  // Pre-select toilet when navigating directly to /loo/{id} and pan the map to it
   useEffect(() => {
     if (!initialToiletId) return;
     import("../../api/loos").then(({ getLooById }) => {
       getLooById(apiUrl, initialToiletId).then((detail) => {
         isInitialLoading.current = false;
-        if (detail) setSelectedToilet(detail);
+        if (detail) {
+          setSelectedToilet(detail);
+          if (detail.location && map.current) {
+            map.current.setView([detail.location.lat, detail.location.lng], Math.max(map.current.getZoom(), 15));
+          }
+        }
       });
     });
   }, [apiUrl, initialToiletId]);
