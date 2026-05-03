@@ -29,7 +29,7 @@ export default function MapControlsPanel({
   onResetFilters,
 }: MapControlsPanelProps) {
   const { query, isSearching, suggestions, handleSearchInput, handleSuggestionSelect } =
-    useNominatimSearch(mapRef);
+    useNominatimSearch({ mapRef });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 

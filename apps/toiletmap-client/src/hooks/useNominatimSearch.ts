@@ -9,7 +9,13 @@ export interface NominatimResult {
   lon: string;
 }
 
-export function useNominatimSearch(mapRef: RefObject<L.Map | null>) {
+interface UseNominatimSearchOptions {
+  mapRef?: RefObject<L.Map | null>;
+  onSelect?: (lat: number, lng: number) => void;
+}
+
+export function useNominatimSearch(options: UseNominatimSearchOptions = {}) {
+  const { mapRef, onSelect } = options;
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -45,12 +51,12 @@ export function useNominatimSearch(mapRef: RefObject<L.Map | null>) {
   };
 
   const handleSuggestionSelect = (result: NominatimResult) => {
+    const lat = Number.parseFloat(result.lat);
+    const lng = Number.parseFloat(result.lon);
     setSuggestions([]);
     setQuery(result.display_name);
-    mapRef.current?.flyTo([Number.parseFloat(result.lat), Number.parseFloat(result.lon)], 15, {
-      animate: true,
-      duration: 1,
-    });
+    mapRef?.current?.flyTo([lat, lng], 15, { animate: true, duration: 1 });
+    onSelect?.(lat, lng);
   };
 
   return { query, isSearching, suggestions, handleSearchInput, handleSuggestionSelect };

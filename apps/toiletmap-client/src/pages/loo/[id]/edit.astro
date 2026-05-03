@@ -1,0 +1,49 @@
+---
+import { env } from "cloudflare:workers";
+import { Footer, Header } from "toiletmap-design-system";
+import { getLooById } from "../../../api/loos";
+import logo from "../../../assets/logo.svg?url";
+import LooForm from "../../../components/LooForm/LooForm";
+import Layout from "../../../layouts/Layout.astro";
+
+const { id } = Astro.params;
+const apiUrl = env.PUBLIC_API_URL;
+const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
+
+const toilet = id ? await getLooById(apiUrl, id) : null;
+if (!toilet) return Astro.redirect("/404");
+
+const navLinks = [
+  { href: "/about", label: "About" },
+  { href: "/blog", label: "Blog" },
+  { href: "/contact", label: "Contact" },
+  { href: "/feedback", label: "Feedback" },
+  { href: "/loo/add", label: "Add a Toilet", button: true },
+  isAuthenticated
+    ? { href: "/auth/logout", label: "Sign out" }
+    : { href: "/auth/login", label: "Sign in" },
+];
+---
+
+<Layout>
+  <Header client:load logoSrc={logo} navLinks={navLinks} />
+  <main>
+    <LooForm
+      client:only="preact"
+      mode="edit"
+      initialData={toilet}
+      looId={id}
+      apiUrl={apiUrl}
+      isAuthenticated={isAuthenticated}
+    />
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+</style>
