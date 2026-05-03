@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
 
 const generateToken = () => {
@@ -5,8 +6,7 @@ const generateToken = () => {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 
-export const GET: APIRoute = ({ cookies, redirect, locals }) => {
-  const env = locals.runtime.env;
+export const GET: APIRoute = ({ cookies, redirect }) => {
   const state = generateToken();
   const nonce = generateToken();
 

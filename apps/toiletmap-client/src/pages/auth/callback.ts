@@ -1,5 +1,6 @@
-import type { APIRoute } from "astro";
+import { env } from "cloudflare:workers";
 import { authenticateToken } from "@toiletmap/auth";
+import type { APIRoute } from "astro";
 
 const constantTimeEquals = (a: string, b: string): boolean => {
   if (a.length !== b.length) return false;
@@ -18,9 +19,7 @@ const SESSION_COOKIE_OPTS = {
   maxAge: 86400,
 };
 
-export const GET: APIRoute = async ({ cookies, redirect, url, locals }) => {
-  const env = locals.runtime.env;
-
+export const GET: APIRoute = async ({ cookies, redirect, url }) => {
   const code = url.searchParams.get("code");
   const returnedState = url.searchParams.get("state");
   const storedState = cookies.get("auth_state")?.value;
@@ -80,7 +79,6 @@ export const GET: APIRoute = async ({ cookies, redirect, url, locals }) => {
     cookies.set("id_token", tokenData.id_token, SESSION_COOKIE_OPTS);
     cookies.set("access_token", tokenData.access_token, SESSION_COOKIE_OPTS);
 
-    // user_info is NOT httpOnly so Preact client-side code can read it
     const userInfo = btoa(
       JSON.stringify({
         sub: idTokenUser.sub,
