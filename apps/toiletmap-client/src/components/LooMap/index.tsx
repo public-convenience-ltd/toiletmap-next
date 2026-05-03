@@ -72,7 +72,7 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   useEffect(() => {
     if (isInitialLoading.current) return;
     if (selectedToilet) {
-      history.replaceState(null, "", `/loo/${selectedToilet.id}`);
+      history.pushState(null, "", `/loo/${selectedToilet.id}`);
     } else {
       history.replaceState(null, "", "/");
     }

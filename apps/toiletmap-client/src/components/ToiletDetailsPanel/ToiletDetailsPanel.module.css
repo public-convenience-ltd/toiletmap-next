@@ -45,6 +45,7 @@
 /* Directions button — prevent flex column from stretching it full-width */
 .directionsWrapper {
   display: flex;
+  width: fit-content;
 }
 
 /* 3-col grid → 1 col on small screens */
