@@ -1,4 +1,5 @@
 import "leaflet/dist/leaflet.css";
+import { del } from "idb-keyval";
 import { useState } from "preact/hooks";
 import {
   Banner,
@@ -11,6 +12,7 @@ import {
   TriStateToggle,
   type TriStateValue,
 } from "toiletmap-design-system";
+import { CACHE_KEYS } from "../../api/constants";
 import type { LooDetail } from "../../api/loos";
 import { useNominatimSearch } from "../../hooks/useNominatimSearch";
 import LocationPicker from "./LocationPicker";
@@ -137,6 +139,8 @@ export default function LooForm({
       }
 
       const saved = (await res.json()) as LooDetail;
+      // Clear stale compressed list so the map re-fetches fresh data on next load
+      await Promise.all([del(CACHE_KEYS.LOOS_LIST), del(CACHE_KEYS.LAST_UPDATED)]);
       window.location.href = `/loo/${saved.id}`;
     } catch {
       setError("Something went wrong. Please try again.");

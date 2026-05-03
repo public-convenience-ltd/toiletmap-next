@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { optionalAuth } from "../../auth/middleware";
 import { LOO_ID_LENGTH } from "../../common/constants";
 import { validate } from "../../common/validator";
-import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
 import { hasAdminRole } from "../../middleware/require-admin-role";
 import { generateLooId } from "../../services/loo";
 import type { AppVariables, Env } from "../../types";
@@ -28,18 +27,27 @@ const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
 import { cacheResponse } from "../../middleware/cache";
 
-/** GET /loos/updates */
-loosRouter.get(
-  "/updates",
-  validate("query", updatesQuerySchema, "Invalid updates query"),
-  cacheResponse(300),
-  (c) =>
-    handleRoute(c, "loos.updates", async () => {
-      const { since } = c.req.valid("query");
-      const looService = c.get("looService");
-      const updates = await looService.getUpdates(new Date(since));
-      return c.json(updates);
-    }),
+const invalidateDumpCache = async (requestUrl: string) => {
+  const cache =
+    typeof caches !== "undefined"
+      ? (caches as unknown as { default: Cache | undefined }).default
+      : undefined;
+  if (!cache) return;
+  const { origin } = new URL(requestUrl);
+  await Promise.all([
+    cache.delete(`${origin}/api/loos/dump`),
+    cache.delete(`${origin}/api/loos/dump?rich=true`),
+  ]);
+};
+
+/** GET /loos/updates — intentionally not cached so mutations are visible immediately */
+loosRouter.get("/updates", validate("query", updatesQuerySchema, "Invalid updates query"), (c) =>
+  handleRoute(c, "loos.updates", async () => {
+    const { since } = c.req.valid("query");
+    const looService = c.get("looService");
+    const updates = await looService.getUpdates(new Date(since));
+    return c.json(updates);
+  }),
 );
 
 /** GET /loos/geohash/:geohash */
@@ -207,7 +215,13 @@ loosRouter.post(
           key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
         }) ?? Promise.resolve({ success: true }));
         if (!success) {
-          return c.json({ message: "Too many submissions, please try again in a minute", error: "rate_limit_exceeded" }, 429);
+          return c.json(
+            {
+              message: "Too many submissions, please try again in a minute",
+              error: "rate_limit_exceeded",
+            },
+            429,
+          );
         }
 
         const validation = c.req.valid("json");
@@ -223,7 +237,6 @@ loosRouter.post(
       }
 
       // Authenticated: direct write
-      rateLimiters.write;
       const validation = c.req.valid("json");
       const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
       const { id: requestedId, ...rest } = validation;
@@ -238,6 +251,7 @@ loosRouter.post(
 
       const created = await looService.create(id, rest, contributor);
       if (!created) throw new Error(`Failed to reload loo ${id} after creation`);
+      await invalidateDumpCache(c.req.url);
       return c.json(created, 201);
     }),
 );
@@ -259,7 +273,13 @@ loosRouter.put(
           key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
         }) ?? Promise.resolve({ success: true }));
         if (!success) {
-          return c.json({ message: "Too many submissions, please try again in a minute", error: "rate_limit_exceeded" }, 429);
+          return c.json(
+            {
+              message: "Too many submissions, please try again in a minute",
+              error: "rate_limit_exceeded",
+            },
+            429,
+          );
         }
 
         const validation = c.req.valid("json");
@@ -281,6 +301,7 @@ loosRouter.put(
       const saved = await looService.upsert(id, validation, contributor);
       if (!saved) throw new Error(`Failed to reload loo ${id} after upsert`);
 
+      await invalidateDumpCache(c.req.url);
       return c.json(saved, existing ? 200 : 201);
     }),
 );
