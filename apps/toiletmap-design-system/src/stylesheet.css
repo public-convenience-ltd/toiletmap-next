@@ -19,6 +19,7 @@
 @import "./components/Switch/Switch.css";
 @import "./components/TextArea/TextArea.css";
 @import "./components/TriStateToggle/TriStateToggle.css";
+@import "./components/OpeningHoursInput/OpeningHoursInput.css";
 
 /* Layout */
 @import "./layout/Center/Center.css";
