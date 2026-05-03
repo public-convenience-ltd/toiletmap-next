@@ -24,6 +24,8 @@ export { default as Switch } from "./components/Switch/Switch";
 export type { TagProps } from "./components/Tag/Tag";
 export { default as Tag } from "./components/Tag/Tag";
 export { default as TextArea } from "./components/TextArea/TextArea";
+export type { TriStateToggleProps, TriStateValue } from "./components/TriStateToggle/TriStateToggle";
+export { default as TriStateToggle } from "./components/TriStateToggle/TriStateToggle";
 
 // Layout
 export { default as Center } from "./layout/Center/Center";

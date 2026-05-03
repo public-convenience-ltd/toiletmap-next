@@ -18,6 +18,7 @@
 @import "./components/SiteLayout/SiteLayout.css";
 @import "./components/Switch/Switch.css";
 @import "./components/TextArea/TextArea.css";
+@import "./components/TriStateToggle/TriStateToggle.css";
 
 /* Layout */
 @import "./layout/Center/Center.css";
