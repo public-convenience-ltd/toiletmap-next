@@ -1,8 +1,9 @@
 import type L from "leaflet";
 import type { RefObject } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import type { IconName } from "toiletmap-design-system";
-import { Icon, IconButton, InputField, Sheet, Tag } from "toiletmap-design-system";
+import { Icon, IconButton, InputField, Tag } from "toiletmap-design-system";
+import { useNominatimSearch } from "../../hooks/useNominatimSearch";
 import type { ActiveFilters, FilterKey } from "../../types/filters";
 import styles from "./MapControlsPanel.module.css";
 
@@ -11,13 +12,6 @@ interface MapControlsPanelProps {
   activeFilters: ActiveFilters;
   onFilterChange: (key: FilterKey, value: boolean) => void;
   onResetFilters: () => void;
-}
-
-interface NominatimResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
 }
 
 const FILTER_OPTIONS: Array<{ key: FilterKey; label: string; icon: IconName }> = [
@@ -34,53 +28,12 @@ export default function MapControlsPanel({
   onFilterChange,
   onResetFilters,
 }: MapControlsPanelProps) {
-  const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const { query, isSearching, suggestions, handleSearchInput, handleSuggestionSelect } =
+    useNominatimSearch(mapRef);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
 
   const activeCount = Object.values(activeFilters).filter(Boolean).length;
-
-  const handleSearchInput = (value: string) => {
-    setQuery(value);
-    setSuggestions([]);
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (value.trim().length < 2) return;
-
-    debounceRef.current = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(value)}`,
-          { headers: { "Accept-Language": "en" } },
-        );
-        setSuggestions((await res.json()) as NominatimResult[]);
-      } catch {
-        // search is best-effort
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-  };
-
-  const handleSuggestionSelect = (result: NominatimResult) => {
-    setSuggestions([]);
-    setQuery(result.display_name);
-    mapRef.current?.flyTo([Number.parseFloat(result.lat), Number.parseFloat(result.lon)], 15, {
-      animate: true,
-      duration: 1,
-    });
-  };
 
   const handleFindNearMe = () => {
     setGeoError(null);
@@ -101,23 +54,60 @@ export default function MapControlsPanel({
     );
   };
 
-  const panelContent = (
-    <div className={styles.content}>
-      {/* Location search */}
-      <div className={styles.searchWrapper}>
-        <Icon icon="magnifying-glass" size="small" class={styles.searchIcon} />
-        <InputField
-          type="search"
-          class={styles.searchInput}
-          value={query}
-          onInput={(e) => handleSearchInput((e.target as HTMLInputElement).value)}
-          placeholder="Search for a location…"
-          autoComplete="off"
-          aria-label="Search for a location"
+  return (
+    <search className={styles.floatingBar} aria-label="Map search and filters">
+      {/* Search row */}
+      <div className={styles.searchRow}>
+        <div className={styles.searchWrapper}>
+          <Icon icon="magnifying-glass" size="small" class={styles.searchIcon} aria-hidden="true" />
+          <InputField
+            type="search"
+            class={styles.searchInput}
+            value={query}
+            onInput={(e) => handleSearchInput((e.target as HTMLInputElement).value)}
+            placeholder="Search for a location…"
+            autoComplete="off"
+            aria-label="Search for a location"
+          />
+          {isSearching && (
+            <Icon
+              icon="spinner"
+              size="small"
+              spin
+              class={styles.searchSpinner}
+              aria-hidden="true"
+            />
+          )}
+        </div>
+
+        <IconButton
+          icon="map-location-dot"
+          aria-label="Find a toilet near me"
+          variant="filled"
+          size="medium"
+          onClick={handleFindNearMe}
+          class={styles.geoBtn}
         />
-        {isSearching && <Icon icon="spinner" size="small" spin class={styles.searchSpinner} />}
+
+        <div className={styles.filterBtnWrapper}>
+          <IconButton
+            icon="filter"
+            aria-label={`Filters${activeCount > 0 ? ` (${activeCount} active)` : ""}`}
+            variant={activeCount > 0 ? "filled" : "ghost"}
+            size="medium"
+            onClick={() => setFiltersOpen((o) => !o)}
+            aria-expanded={filtersOpen}
+            class={styles.filterBtn}
+          />
+          {activeCount > 0 && (
+            <span className={styles.filterBadge} aria-hidden="true">
+              {activeCount}
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Autocomplete suggestions */}
       {suggestions.length > 0 && (
         <ul className={styles.suggestions} aria-label="Location suggestions">
           {suggestions.map((s) => (
@@ -127,7 +117,7 @@ export default function MapControlsPanel({
                 className={styles.suggestion}
                 onClick={() => handleSuggestionSelect(s)}
               >
-                <Icon icon="map-location-dot" size="small" />
+                <Icon icon="map-location-dot" size="small" aria-hidden="true" />
                 <span>{s.display_name}</span>
               </button>
             </li>
@@ -135,106 +125,36 @@ export default function MapControlsPanel({
         </ul>
       )}
 
-      {/* Filter section */}
-      <div className={styles.filterHeader}>
-        <button
-          type="button"
-          className={styles.filterToggleBtn}
-          onClick={() => setFiltersOpen((o) => !o)}
-          aria-expanded={filtersOpen}
-        >
-          <Icon icon="filter" size="small" />
-          <span>Filter{activeCount > 0 && <b> ({activeCount})</b>}</span>
-          <Icon
-            icon="chevron-down"
-            size="small"
-            style={{
-              transform: filtersOpen ? "rotate(180deg)" : "none",
-              transition: "transform 0.2s ease",
-            }}
-          />
-        </button>
-        {filtersOpen && activeCount > 0 && (
-          <button type="button" className={styles.resetBtn} onClick={onResetFilters}>
-            Reset Filter
-          </button>
-        )}
-      </div>
-
+      {/* Filter chips */}
       {filtersOpen && (
-        <ul className={styles.filterList}>
-          {FILTER_OPTIONS.map(({ key, label, icon }) => {
-            const active = activeFilters[key];
-            return (
-              <li key={key}>
-                <Tag
-                  active={active}
-                  class={styles.filterTag}
-                  onClick={() => onFilterChange(key, !active)}
-                >
-                  <Icon icon={icon} size="small" />
-                  <span className={styles.filterLabel}>{label}</span>
-                  {active && <Icon icon="check" size="small" />}
-                </Tag>
-              </li>
-            );
-          })}
-        </ul>
+        <div className={styles.filterPanel}>
+          <ul className={styles.filterList}>
+            {FILTER_OPTIONS.map(({ key, label, icon }) => {
+              const active = activeFilters[key];
+              return (
+                <li key={key}>
+                  <Tag
+                    active={active}
+                    class={styles.filterTag}
+                    onClick={() => onFilterChange(key, !active)}
+                  >
+                    <Icon icon={icon} size="small" aria-hidden="true" />
+                    <span>{label}</span>
+                    {active && <Icon icon="check" size="small" aria-hidden="true" />}
+                  </Tag>
+                </li>
+              );
+            })}
+          </ul>
+          {activeCount > 0 && (
+            <button type="button" className={styles.resetBtn} onClick={onResetFilters}>
+              Reset filters
+            </button>
+          )}
+        </div>
       )}
 
-      {/* Quick links */}
-      <button type="button" className={styles.quickLink} onClick={handleFindNearMe}>
-        <Icon icon="map-location-dot" size="small" />
-        <span>Find a toilet near me</span>
-        <Icon icon="angle-right" size="small" />
-      </button>
       {geoError && <p className={styles.geoError}>{geoError}</p>}
-
-      <button type="button" className={styles.quickLink} disabled title="Coming soon">
-        <Icon icon="circle-plus" size="small" />
-        <span>Add a Toilet</span>
-        <Icon icon="angle-right" size="small" />
-      </button>
-    </div>
-  );
-
-  return (
-    <>
-      {/* Desktop: fixed left panel */}
-      <aside className={styles.panel} aria-label="Map controls">
-        {panelContent}
-      </aside>
-
-      {/* Mobile: floating toggle button */}
-      <button
-        type="button"
-        className={styles.mobileToggle}
-        onClick={() => setIsDrawerOpen(true)}
-        aria-label={`Open menu${activeCount > 0 ? ` (${activeCount} filters active)` : ""}`}
-        aria-expanded={isDrawerOpen}
-      >
-        <Icon icon="bars" size="small" />
-        <span>Menu</span>
-        {activeCount > 0 && (
-          <span className={styles.badge} aria-hidden="true">
-            {activeCount}
-          </span>
-        )}
-      </button>
-
-      {/* Mobile: slide-in Sheet drawer */}
-      <Sheet
-        visible={isDrawerOpen}
-        side="left"
-        onClose={() => setIsDrawerOpen(false)}
-        zIndex={1200}
-      >
-        <div className={styles.drawerHeader}>
-          <span className={styles.drawerTitle}>Search & Filter</span>
-          <IconButton icon="xmark" aria-label="Close menu" onClick={() => setIsDrawerOpen(false)} />
-        </div>
-        {panelContent}
-      </Sheet>
-    </>
+    </search>
   );
 }
