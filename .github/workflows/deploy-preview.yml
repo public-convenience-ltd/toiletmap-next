@@ -43,7 +43,7 @@ jobs:
       - name: Deploy server preview
         run: |
           BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
-          wrangler deploy --env preview --name "${BRANCH}-toiletmap-server"
+          pnpm exec wrangler deploy --env preview --name "${BRANCH}-toiletmap-server"
 
   deploy-client:
     name: Deploy Client Preview
@@ -75,4 +75,4 @@ jobs:
       - name: Deploy client preview
         run: |
           BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
-          wrangler deploy --env preview --name "${BRANCH}-toiletmap-client"
+          pnpm exec wrangler deploy --env preview --name "${BRANCH}-toiletmap-client"
