@@ -13,3 +13,32 @@ CREATE TABLE IF NOT EXISTS public.pending_change (
 
 CREATE INDEX IF NOT EXISTS idx_pending_change_status       ON public.pending_change(status);
 CREATE INDEX IF NOT EXISTS idx_pending_change_submitted_at ON public.pending_change(submitted_at);
+
+-- Ownership and role grants
+ALTER TABLE IF EXISTS public.pending_change OWNER TO postgres;
+GRANT ALL ON TABLE public.pending_change TO anon;
+GRANT ALL ON TABLE public.pending_change TO authenticated;
+GRANT ALL ON TABLE public.pending_change TO service_role;
+GRANT ALL ON TABLE public.pending_change TO postgres;
+
+-- Application user: insert (anonymous submissions) + select + update (approve/reject)
+GRANT SELECT, INSERT, UPDATE ON TABLE public.pending_change TO toiletmap_web;
+
+-- Row-level security
+ALTER TABLE public.pending_change ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY select_policy ON public.pending_change
+    FOR SELECT
+    TO toiletmap_web
+    USING (true);
+
+CREATE POLICY insert_policy ON public.pending_change
+    FOR INSERT
+    TO toiletmap_web
+    WITH CHECK (true);
+
+CREATE POLICY update_policy ON public.pending_change
+    FOR UPDATE
+    TO toiletmap_web
+    USING (true)
+    WITH CHECK (true);
