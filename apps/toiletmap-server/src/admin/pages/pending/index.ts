@@ -106,6 +106,9 @@ export const pendingList = async (c: Context<{ Bindings: Env; Variables: AppVari
 
 export const pendingApprove = async (c: Context<{ Bindings: Env; Variables: AppVariables }>) => {
   const id = c.req.param("id");
+  if (!id) {
+    return c.text("Invalid id", 500);
+  }
   const user = c.get("user");
   const pendingChangeService = c.get("pendingChangeService");
   const looService = c.get("looService");
@@ -120,9 +123,9 @@ export const pendingApprove = async (c: Context<{ Bindings: Env; Variables: AppV
 
   if (change.type === "create") {
     const newId = generateLooId();
-    await looService.create(newId, payload, contributor);
+    await looService.create(newId, payload, contributor.name);
   } else if (change.type === "update" && change.loo_id) {
-    await looService.upsert(change.loo_id, payload, contributor);
+    await looService.upsert(change.loo_id, payload, contributor.name);
   }
 
   await pendingChangeService.setStatus(id, "approved", user?.sub ?? "admin");
@@ -131,6 +134,9 @@ export const pendingApprove = async (c: Context<{ Bindings: Env; Variables: AppV
 
 export const pendingReject = async (c: Context<{ Bindings: Env; Variables: AppVariables }>) => {
   const id = c.req.param("id");
+  if (!id) {
+    return c.text("Invalid id", 500);
+  }
   const user = c.get("user");
   const pendingChangeService = c.get("pendingChangeService");
   await pendingChangeService.setStatus(id, "rejected", user?.sub ?? "admin");

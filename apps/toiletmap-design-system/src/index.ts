@@ -14,14 +14,14 @@ export { default as Icon } from "./components/Icon/Icon";
 export type { IconButtonProps } from "./components/IconButton/IconButton";
 export { default as IconButton } from "./components/IconButton/IconButton";
 export { default as InputField } from "./components/InputField/InputField";
-export type {
-  OpeningHoursInputProps,
-  OpeningTimes,
-  DayHours,
-} from "./components/OpeningHoursInput/OpeningHoursInput";
-export { default as OpeningHoursInput } from "./components/OpeningHoursInput/OpeningHoursInput";
 export { default as Logo } from "./components/Logo/Logo";
 export { default as MapOverlay } from "./components/MapOverlay/MapOverlay";
+export type {
+  DayHours,
+  OpeningHoursInputProps,
+  OpeningTimes,
+} from "./components/OpeningHoursInput/OpeningHoursInput";
+export { default as OpeningHoursInput } from "./components/OpeningHoursInput/OpeningHoursInput";
 export { default as RadioInput } from "./components/RadioInput/RadioInput";
 export type { SheetProps } from "./components/Sheet/Sheet";
 export { default as Sheet } from "./components/Sheet/Sheet";

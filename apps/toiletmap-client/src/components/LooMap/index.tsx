@@ -65,7 +65,10 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
         if (detail) {
           setSelectedToilet(detail);
           if (detail.location && map.current) {
-            map.current.setView([detail.location.lat, detail.location.lng], Math.max(map.current.getZoom(), 15));
+            map.current.setView(
+              [detail.location.lat, detail.location.lng],
+              Math.max(map.current.getZoom(), 15),
+            );
           }
         }
       });

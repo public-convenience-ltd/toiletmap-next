@@ -28,11 +28,7 @@ export const GET: APIRoute = async ({ cookies, redirect, url }) => {
   cookies.delete("auth_state", { path: "/" });
   cookies.delete("auth_nonce", { path: "/" });
 
-  if (
-    !returnedState ||
-    !storedState ||
-    !constantTimeEquals(returnedState, storedState)
-  ) {
+  if (!returnedState || !storedState || !constantTimeEquals(returnedState, storedState)) {
     return new Response("Invalid authentication state", { status: 400 });
   }
 

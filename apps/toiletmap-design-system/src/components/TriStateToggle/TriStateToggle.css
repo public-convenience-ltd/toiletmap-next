@@ -49,7 +49,9 @@
   color: var(--color-primary-navy);
   background: var(--color-base-white);
   user-select: none;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
   white-space: nowrap;
 }
 

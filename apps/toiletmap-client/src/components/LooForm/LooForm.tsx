@@ -73,7 +73,10 @@ const buildInitialState = (data?: LooDetail | null, mode?: "edit" | "add"): Form
   automatic: boolToTri(data?.automatic),
   noPayment: boolToTri(data?.noPayment),
   // New toilets default to active; edits preserve current value
-  active: mode === "add" ? "true" : boolToTri((data as Record<string, unknown> | undefined)?.active as boolean | undefined),
+  active:
+    mode === "add"
+      ? "true"
+      : boolToTri((data as Record<string, unknown> | undefined)?.active as boolean | undefined),
   openingTimes: (data?.openingTimes as OpeningTimes | null) ?? null,
 });
 
@@ -264,7 +267,10 @@ export default function LooForm({
             <Stack space="s">
               <div class={styles.fieldLabel}>
                 <span>
-                  Name <span class={styles.required} aria-hidden="true">*</span>
+                  Name{" "}
+                  <span class={styles.required} aria-hidden="true">
+                    *
+                  </span>
                 </span>
                 <InputField
                   placeholder="e.g. High Street toilets"

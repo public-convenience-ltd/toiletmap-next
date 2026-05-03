@@ -39,7 +39,9 @@ export default function TriStateToggle({
               onChange={() => onChange(option.value)}
               class="tri-state-radio"
             />
-            <span class={`tri-state-label${value === option.value ? " tri-state-label--active" : ""}`}>
+            <span
+              class={`tri-state-label${value === option.value ? " tri-state-label--active" : ""}`}
+            >
               {option.label}
             </span>
           </label>

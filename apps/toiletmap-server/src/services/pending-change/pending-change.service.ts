@@ -1,4 +1,4 @@
-import { type PrismaClientInstance } from "../../prisma";
+import type { PrismaClientInstance } from "../../prisma";
 import type { LooMutationAttributes } from "../loo/types";
 
 export type PendingChangeType = "create" | "update";
@@ -34,7 +34,7 @@ export class PendingChangeService {
   }
 
   async listPending(): Promise<PendingChangeRow[]> {
-    return this.prisma.$queryRaw<PendingChangeRow[]>`
+    return await this.prisma.$queryRaw<PendingChangeRow[]>`
       SELECT id::text, type, loo_id, payload, ip, submitted_at, status, reviewed_by, reviewed_at
       FROM public.pending_change
       WHERE status = 'pending'
@@ -42,12 +42,8 @@ export class PendingChangeService {
     `;
   }
 
-  async setStatus(
-    id: string,
-    status: "approved" | "rejected",
-    reviewedBy: string,
-  ): Promise<void> {
-    await this.prisma.$queryRaw`
+  async setStatus(id: string, status: "approved" | "rejected", reviewedBy: string): Promise<void> {
+    await await this.prisma.$queryRaw`
       UPDATE public.pending_change
       SET status = ${status}, reviewed_by = ${reviewedBy}, reviewed_at = now()
       WHERE id = ${id}::uuid
