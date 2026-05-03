@@ -24,11 +24,11 @@ export const GET: APIRoute = ({ cookies, redirect }) => {
   });
 
   const url = new URL(`${env.AUTH0_ISSUER_BASE_URL}authorize`);
-  url.searchParams.set("client_id", env.AUTH0_CLIENT_ID);
-  url.searchParams.set("redirect_uri", env.AUTH0_REDIRECT_URI);
+  url.searchParams.set("client_id", env.AUTH0_CLIENT_ID || "");
+  url.searchParams.set("redirect_uri", env.AUTH0_REDIRECT_URI || "");
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", env.AUTH0_SCOPE);
-  url.searchParams.set("audience", env.AUTH0_AUDIENCE);
+  url.searchParams.set("scope", env.AUTH0_SCOPE || "");
+  url.searchParams.set("audience", env.AUTH0_AUDIENCE || "");
   url.searchParams.set("state", state);
   url.searchParams.set("nonce", nonce);
 

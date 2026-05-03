@@ -6,7 +6,10 @@ import LooMap from "../../components/LooMap";
 import Layout from "../../layouts/Layout.astro";
 
 const { id } = Astro.params;
-const apiUrl = env.PUBLIC_API_URL;
+
+import { getApiUrl } from "../../utils/api";
+
+const apiUrl = getApiUrl(env, Astro.url);
 const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
 
 const navLinks = [
