@@ -6,6 +6,9 @@ import { CACHE_KEYS } from "../../api/constants";
 export type CompressedLoo = [string, string, number]; // id, geohash, filterMask
 
 const POLL_INTERVAL_MS = 60_000; // re-fetch delta every 60 seconds
+// After a full dump, set LAST_UPDATED this far in the past so the next delta
+// re-covers recent mutations — guards against serving a stale cached dump.
+const DUMP_OVERLAP_MS = 5 * 60 * 1000; // 5 minutes
 
 export function useMapData(apiUrl: string) {
   const [data, setData] = useState<CompressedLoo[]>([]);
@@ -16,7 +19,10 @@ export function useMapData(apiUrl: string) {
   useEffect(() => {
     let cancelled = false;
 
-    const applyDelta = async (since: string, current: CompressedLoo[]): Promise<{ next: CompressedLoo[]; updated: boolean }> => {
+    const applyDelta = async (
+      since: string,
+      current: CompressedLoo[],
+    ): Promise<{ next: CompressedLoo[]; updated: boolean }> => {
       const response = await fetch(getApiUrl(apiUrl, `/api/loos/updates?since=${since}`));
       const updates = (await response.json()) as {
         upserted: CompressedLoo[];
@@ -31,7 +37,9 @@ export function useMapData(apiUrl: string) {
       for (const id of updates.deleted) dataMap.delete(id);
       for (const loo of updates.upserted) dataMap.set(loo[0], loo);
 
-      console.log(`Applied delta: +${updates.upserted.length} upserted, -${updates.deleted.length} deleted`);
+      console.log(
+        `Applied delta: +${updates.upserted.length} upserted, -${updates.deleted.length} deleted`,
+      );
       return { next: Array.from(dataMap.values()), updated: true };
     };
 
@@ -54,7 +62,10 @@ export function useMapData(apiUrl: string) {
           const json = (await response.json()) as { data: CompressedLoo[] };
           cachedData = json.data;
           await set(CACHE_KEYS.LOOS_LIST, cachedData);
-          await set(CACHE_KEYS.LAST_UPDATED, now);
+          // Use a timestamp slightly in the past so the next delta re-covers any
+          // mutations that happened while the dump was cached on the server.
+          const dumpSince = new Date(Date.now() - DUMP_OVERLAP_MS).toISOString();
+          await set(CACHE_KEYS.LAST_UPDATED, dumpSince);
         }
 
         if (!cancelled && cachedData) {
