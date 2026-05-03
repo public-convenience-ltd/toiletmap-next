@@ -6,6 +6,7 @@ import LooMap from "../components/LooMap";
 import Layout from "../layouts/Layout.astro";
 
 const apiUrl = env.PUBLIC_API_URL;
+const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
 
 const navLinks = [
   { href: "/about", label: "About" },
@@ -13,6 +14,9 @@ const navLinks = [
   { href: "/contact", label: "Contact" },
   { href: "/feedback", label: "Feedback" },
   { href: "/loo/add", label: "Add a Toilet", button: true },
+  isAuthenticated
+    ? { href: "/auth/logout", label: "Sign out" }
+    : { href: "/auth/login", label: "Sign in" },
 ];
 ---
 

@@ -11,7 +11,13 @@
 	},
   "vars": {
     "ENVIRONMENT": "preview",
-    "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
+    "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev",
+    "AUTH0_ISSUER_BASE_URL": "http://127.0.0.1:44555/",
+    "AUTH0_CLIENT_ID": "toiletmap-client-dev",
+    "AUTH0_CLIENT_SECRET": "dev-secret",
+    "AUTH0_SCOPE": "openid profile email",
+    "AUTH0_AUDIENCE": "https://toiletmap.org.uk",
+    "AUTH0_REDIRECT_URI": "http://localhost:4321/auth/callback"
   },
   "env": {
     "preview": {
