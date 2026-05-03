@@ -107,6 +107,22 @@ model feedback {
   @@schema("public")
 }
 
+model pending_change {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type         String
+  loo_id       String?   @db.Char(24)
+  payload      Json
+  ip           String?
+  submitted_at DateTime  @default(now()) @db.Timestamptz(6)
+  status       String    @default("pending")
+  reviewed_by  String?
+  reviewed_at  DateTime? @db.Timestamptz(6)
+
+  @@index([status])
+  @@index([submitted_at])
+  @@schema("public")
+}
+
 enum operation {
   INSERT
   UPDATE

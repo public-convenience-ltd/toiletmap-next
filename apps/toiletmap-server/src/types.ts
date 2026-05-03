@@ -53,6 +53,7 @@ export interface Env {
   RATE_LIMIT_WRITE: RateLimiter;
   RATE_LIMIT_ADMIN: RateLimiter;
   RATE_LIMIT_AUTH: RateLimiter;
+  RATE_LIMIT_ANON_WRITE: RateLimiter;
 }
 
 // Cloudflare Rate Limiting API type
@@ -63,9 +64,11 @@ interface RateLimiter {
 }
 
 import type { LooService } from "./services/loo";
+import type { PendingChangeService } from "./services/pending-change/pending-change.service";
 
 export type AppVariables = {
   user?: RequestUser;
   looService: LooService;
+  pendingChangeService: PendingChangeService;
   resultCount?: number;
 };

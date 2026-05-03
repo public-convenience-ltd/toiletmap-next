@@ -6,6 +6,7 @@ import type { AppVariables, Env } from "../types";
 import { callback, login, logout } from "./auth";
 import { renderAccessDenied } from "./pages/errors/access-denied";
 import { looDetail, looEdit, loosCreate, loosList } from "./pages/loos";
+import { pendingApprove, pendingList, pendingReject } from "./pages/pending";
 import { userStatistics } from "./pages/users";
 import { updateUserPermissions, userAdministration } from "./pages/users/admin";
 
@@ -31,6 +32,10 @@ admin.get("/loos", loosList);
 admin.get("/loos/create", loosCreate);
 admin.get("/loos/:id/edit", looEdit);
 admin.get("/loos/:id", looDetail);
+admin.get("/pending", pendingList);
+admin.post("/pending/:id/approve", pendingApprove);
+admin.post("/pending/:id/reject", pendingReject);
+
 admin.get("/users", userStatistics);
 admin.get("/users/statistics", userStatistics);
 admin.get("/users/admin", userAdministration);

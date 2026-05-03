@@ -1122,6 +1122,7 @@ export const Layout = (props: { title: string; children: unknown }) => {
               <nav>
                 <ul class="header__nav">
                   <li><a href="/admin">Loos</a></li>
+                  <li><a href="/admin/pending">Pending</a></li>
                   <li><a href="/admin/users/admin">User admin</a></li>
                   <li><a href="/admin/users/statistics">User stats</a></li>
                   <li><a href="/admin/logout">Logout</a></li>

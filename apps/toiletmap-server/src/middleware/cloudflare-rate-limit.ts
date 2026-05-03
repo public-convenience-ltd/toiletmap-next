@@ -6,7 +6,12 @@ import { logger } from "../utils/logger";
  * Rate limiting configuration for Cloudflare Rate Limiting API
  */
 interface CloudflareRateLimitConfig {
-  binding: "RATE_LIMIT_READ" | "RATE_LIMIT_WRITE" | "RATE_LIMIT_ADMIN" | "RATE_LIMIT_AUTH";
+  binding:
+    | "RATE_LIMIT_READ"
+    | "RATE_LIMIT_WRITE"
+    | "RATE_LIMIT_ADMIN"
+    | "RATE_LIMIT_AUTH"
+    | "RATE_LIMIT_ANON_WRITE";
   keyGenerator: (c: Context<{ Bindings: Env; Variables: AppVariables }>) => string;
   message?: string;
   name?: string;
@@ -157,5 +162,13 @@ export const rateLimiters = {
     keyGenerator: (c) => `auth:${getClientIp(c)}`,
     message: "Too many authentication attempts, please try again later",
     name: "auth",
+  }),
+
+  /** Anonymous write operations (1 req/min, IP-based) */
+  anonWrite: cloudflareRateLimit({
+    binding: "RATE_LIMIT_ANON_WRITE",
+    keyGenerator: (c) => `anon-write:${getClientIp(c)}`,
+    message: "Too many submissions, please try again in a minute",
+    name: "anon-write",
   }),
 };

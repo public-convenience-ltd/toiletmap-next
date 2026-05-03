@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { optionalAuth, requireAuth } from "../../auth/middleware";
+import { optionalAuth } from "../../auth/middleware";
 import { LOO_ID_LENGTH } from "../../common/constants";
 import { validate } from "../../common/validator";
 import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
@@ -195,13 +195,37 @@ loosRouter.get("/", validate("query", idsQuerySchema, "Invalid ids query paramet
 /** POST /loos */
 loosRouter.post(
   "/",
-  rateLimiters.write,
-  requireAuth,
+  optionalAuth,
   validate("json", createMutationSchema, "Invalid create request body"),
   (c) =>
     handleRoute(c, "loos.create", async () => {
+      const user = c.get("user");
+
+      if (!user) {
+        // Anonymous submission: rate-limit then queue for approval
+        const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({
+          key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
+        }) ?? Promise.resolve({ success: true }));
+        if (!success) {
+          return c.json({ message: "Too many submissions, please try again in a minute", error: "rate_limit_exceeded" }, 429);
+        }
+
+        const validation = c.req.valid("json");
+        const pendingChangeService = c.get("pendingChangeService");
+        const { id: _id, ...payload } = validation;
+        const { id } = await pendingChangeService.queue(
+          "create",
+          payload,
+          null,
+          c.req.header("cf-connecting-ip") ?? null,
+        );
+        return c.json({ queued: true, id }, 202);
+      }
+
+      // Authenticated: direct write
+      rateLimiters.write;
       const validation = c.req.valid("json");
-      const contributor = extractContributor(c.get("user"), c.env.AUTH0_PROFILE_KEY);
+      const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
       const { id: requestedId, ...rest } = validation;
       const id = requestedId ?? generateLooId();
 
@@ -221,15 +245,37 @@ loosRouter.post(
 /** PUT /loos/:id */
 loosRouter.put(
   "/:id",
-  rateLimiters.write,
-  requireAuth,
+  optionalAuth,
   validate("param", looIdParamSchema, "Invalid id path parameter"),
   validate("json", baseMutationSchema, "Invalid upsert request body"),
   (c) =>
     handleRoute(c, "loos.upsert", async () => {
+      const user = c.get("user");
       const { id } = c.req.valid("param");
+
+      if (!user) {
+        // Anonymous submission: rate-limit then queue for approval
+        const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({
+          key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
+        }) ?? Promise.resolve({ success: true }));
+        if (!success) {
+          return c.json({ message: "Too many submissions, please try again in a minute", error: "rate_limit_exceeded" }, 429);
+        }
+
+        const validation = c.req.valid("json");
+        const pendingChangeService = c.get("pendingChangeService");
+        const { id: queued } = await pendingChangeService.queue(
+          "update",
+          validation,
+          id,
+          c.req.header("cf-connecting-ip") ?? null,
+        );
+        return c.json({ queued: true, id: queued }, 202);
+      }
+
+      // Authenticated: direct write
       const validation = c.req.valid("json");
-      const contributor = extractContributor(c.get("user"), c.env.AUTH0_PROFILE_KEY);
+      const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
       const looService = c.get("looService");
       const existing = await looService.getById(id);
       const saved = await looService.upsert(id, validation, contributor);
