@@ -1,5 +1,5 @@
 {
-	"name": "toiletmap-client",
+	"name": "toiletmap-client-dev",
   "compatibility_date": "2025-12-01",
   "compatibility_flags": [
     "nodejs_compat",
@@ -21,6 +21,7 @@
   },
   "env": {
     "preview": {
+      "name": "toiletmap-client",
       "workers_dev": true,
       "vars": {
         "ENVIRONMENT": "preview",
