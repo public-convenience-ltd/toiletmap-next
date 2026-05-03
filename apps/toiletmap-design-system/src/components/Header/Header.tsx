@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import Center from "../../layout/Center/Center";
 import VisuallyHidden from "../../utilities/VisuallyHidden/VisuallyHidden";
 import Drawer from "../Drawer/Drawer";
-import Icon from "../Icon/Icon";
+import IconButton from "../IconButton/IconButton";
 import Logo from "../Logo/Logo";
 import type { NavLink } from "./MainMenu";
 import MainMenu from "./MainMenu";
@@ -75,16 +75,16 @@ const Header = ({ logoSrc, logoHref = "/", navLinks, onLogoClick }: HeaderProps)
             </VisuallyHidden>
 
             <div class="header__smaller-devices" ref={navRef}>
-              <button
-                type="button"
+              <IconButton
+                icon={isMenuVisible ? "xmark" : "bars"}
+                aria-label="Toggle main menu"
                 aria-expanded={isMenuVisible}
                 aria-haspopup="true"
+                variant="filled"
+                size="large"
                 onClick={() => setIsMenuVisible(!isMenuVisible)}
                 ref={buttonRef}
-              >
-                <VisuallyHidden as="span">Toggle main menu</VisuallyHidden>
-                <Icon icon="bars" size="large" />
-              </button>
+              />
 
               <Drawer visible={isMenuVisible} animateFrom="right">
                 <MainMenu links={navLinks} onLinkClick={() => setIsMenuVisible(false)} />

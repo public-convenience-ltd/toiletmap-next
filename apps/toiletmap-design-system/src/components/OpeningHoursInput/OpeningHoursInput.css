@@ -11,17 +11,19 @@
 }
 
 .oh-row {
-  display: grid;
-  grid-template-columns: 100px auto 1fr auto;
-  gap: var(--space-s);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
   padding: var(--space-xs) var(--space-m);
   background: var(--color-base-white);
   align-items: center;
   min-height: 52px;
 }
 
-/* Day label */
+/* Day label — fixed width so all rows align */
 .oh-day {
+  width: 90px;
+  flex-shrink: 0;
   font-size: var(--text--1);
   font-weight: 600;
   color: var(--color-primary-navy);
@@ -30,13 +32,14 @@
 /* Open / Closed toggle */
 .oh-status {
   display: flex;
+  flex-shrink: 0;
   border: 1.5px solid var(--color-primary-navy);
   border-radius: 8px;
   overflow: hidden;
-  flex-shrink: 0;
 }
 
 .oh-toggle-option {
+  position: relative;
   display: flex;
   cursor: pointer;
 }
@@ -48,20 +51,24 @@
 .oh-radio {
   position: absolute;
   opacity: 0;
-  width: 0;
-  height: 0;
+  width: 1px;
+  height: 1px;
   pointer-events: none;
 }
 
 .oh-toggle-label {
-  display: block;
-  padding: var(--space-3xs) var(--space-xs);
-  font-size: var(--text--2);
+  display: flex;
+  align-items: center;
+  padding: var(--space-2xs) var(--space-s);
+  font-size: var(--text--1);
   font-family: var(--font-family);
+  font-weight: 500;
   color: var(--color-primary-navy);
   background: var(--color-base-white);
   user-select: none;
   white-space: nowrap;
+  min-width: 52px;
+  justify-content: center;
 }
 
 .oh-toggle-label:hover {
@@ -70,19 +77,25 @@
 
 .oh-toggle-label--active {
   background: var(--color-accent-turquoise);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .oh-toggle-label--active:hover {
   background: var(--color-accent-turquoise);
 }
 
+.oh-radio:focus-visible + .oh-toggle-label {
+  outline: 2px solid var(--color-accent-turquoise);
+  outline-offset: -2px;
+}
+
 /* Time inputs area */
 .oh-times {
   display: flex;
   align-items: center;
-  gap: var(--space-s);
+  gap: var(--space-xs);
   flex-wrap: wrap;
+  flex: 1;
   min-height: 36px;
 }
 
@@ -91,50 +104,54 @@
   align-items: center;
   gap: var(--space-2xs);
   cursor: pointer;
-  font-size: var(--text--2);
+  font-size: var(--text--1);
   font-family: var(--font-family);
   color: var(--color-primary-navy);
 }
 
 .oh-checkbox {
   accent-color: var(--color-primary-navy);
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .oh-time-inputs {
   display: flex;
   align-items: center;
-  gap: var(--space-2xs);
+  gap: var(--space-xs);
 }
 
 .oh-time-field {
   padding: var(--space-2xs) var(--space-xs);
-  border: 1.5px solid var(--color-primary-navy);
+  border: 1.5px solid rgba(10, 22, 94, 0.3);
   border-radius: 6px;
-  font-size: var(--text--2);
+  font-size: var(--text--1);
   font-family: var(--font-family);
   color: var(--color-primary-navy);
   background: var(--color-base-white);
-  min-width: 108px;
+  width: 120px;
 }
 
 .oh-time-field:focus {
   outline: 2px solid var(--color-accent-turquoise);
   outline-offset: 1px;
+  border-color: var(--color-primary-navy);
 }
 
 .oh-time-sep {
   color: var(--color-neutral-grey);
   font-size: var(--text--1);
+  flex-shrink: 0;
 }
 
 /* Bulk action buttons */
 .oh-actions {
   display: flex;
   gap: var(--space-2xs);
-  justify-content: flex-end;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .oh-action-btn {
@@ -149,6 +166,7 @@
   justify-content: center;
   width: 30px;
   height: 30px;
+  flex-shrink: 0;
 }
 
 .oh-action-btn:hover {
@@ -163,32 +181,25 @@
   margin: var(--space-xs) 0 0;
 }
 
-/* Mobile */
-@media (max-width: 640px) {
+/* Mobile — stack day + status on first line, times below */
+@media (max-width: 600px) {
   .oh-row {
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      "day status"
-      "times times"
-      "actions actions";
-    gap: var(--space-xs);
     padding: var(--space-s) var(--space-m);
+    row-gap: var(--space-xs);
   }
 
   .oh-day {
-    grid-area: day;
-  }
-
-  .oh-status {
-    grid-area: status;
+    width: auto;
+    flex: 1;
   }
 
   .oh-times {
-    grid-area: times;
+    flex: 0 0 100%;
   }
 
   .oh-actions {
-    grid-area: actions;
+    flex-basis: 100%;
+    margin-left: 0;
     justify-content: flex-start;
   }
 }

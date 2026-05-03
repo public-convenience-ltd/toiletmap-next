@@ -1,8 +1,11 @@
 import L from "leaflet";
 import { useEffect, useRef } from "preact/hooks";
 
-// Fix Leaflet default icon in bundler contexts
-(L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl = undefined;
+// Leaflet bundler fix: deleting _getIconUrl is required because setting it to undefined
+// causes a TypeError when Leaflet calls it as a function.
+// biome-ignore lint/performance/noDelete: intentional — undefined breaks Leaflet
+// biome-ignore lint/suspicious/noExplicitAny: prototype access requires any
+delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
