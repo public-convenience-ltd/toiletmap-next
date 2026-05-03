@@ -37,6 +37,7 @@
   "env": {
     "production": {
       "name": "toiletmap-server",
+      // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET set as Cloudflare secrets
       "vars": {
         "ENVIRONMENT": "production",
         "AUTH0_REDIRECT_URI": "https://toiletmap-server.gbtoiletmap.workers.dev/admin/callback",
@@ -86,6 +87,7 @@
     "preview": {
       "name": "toiletmap-server",
       "workers_dev": true,
+      // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET set as Cloudflare secrets by deploy-preview.yml
       "vars": {
         "ENVIRONMENT": "preview",
         "AUTH0_REDIRECT_URI": "https://*-toiletmap-server.gbtoiletmap.workers.dev/admin/callback",

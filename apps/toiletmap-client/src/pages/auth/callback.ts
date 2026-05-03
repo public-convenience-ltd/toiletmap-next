@@ -50,7 +50,7 @@ export const GET: APIRoute = async ({ cookies, redirect, url }) => {
         client_id: env.AUTH0_CLIENT_ID,
         client_secret: env.AUTH0_CLIENT_SECRET,
         code,
-        redirect_uri: env.AUTH0_REDIRECT_URI,
+        redirect_uri: `${url.origin}/auth/callback`,
       }),
     });
 

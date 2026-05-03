@@ -8,7 +8,6 @@ interface Env {
   AUTH0_CLIENT_SECRET: string;
   AUTH0_SCOPE: string;
   AUTH0_AUDIENCE: string;
-  AUTH0_REDIRECT_URI: string;
 }
 
 type Runtime = import("@astrojs/cloudflare").Runtime<Env>;
