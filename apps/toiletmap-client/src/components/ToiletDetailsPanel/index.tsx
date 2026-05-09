@@ -56,14 +56,14 @@ function formatUpdatedAt(iso: string | null): string {
 function FeatureStatus({ value }: { value: boolean | null | undefined }) {
   if (value === true) {
     return (
-      <Icon icon="check" size="small" style={{ color: "var(--color-success)" }} aria-label="Yes" />
+      <Icon icon="check" size="medium" style={{ color: "var(--color-success)" }} aria-label="Yes" />
     );
   }
   if (value === false) {
     return (
       <Icon
         icon="xmark"
-        size="small"
+        size="medium"
         style={{ color: "var(--color-accent-pink)" }}
         aria-label="No"
       />
@@ -72,7 +72,7 @@ function FeatureStatus({ value }: { value: boolean | null | undefined }) {
   return (
     <Icon
       icon="question"
-      size="small"
+      size="medium"
       style={{ color: "var(--color-neutral-grey)" }}
       aria-label="Unknown"
     />
@@ -136,7 +136,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
       <div className={styles.expandedContent}>
         <div className={styles.grid}>
           {/* Column 1: Details */}
-          <Stack space="s">
+          <Stack space="m">
             <h2 className={styles.name}>{toilet.name ?? "Toilet"}</h2>
             {directionsUrl && (
               <div className={styles.directionsWrapper}>
@@ -177,7 +177,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
               {FEATURES.map(({ key, label, icon }) => (
                 <li key={key} className={styles.featureItem}>
                   <span className={styles.featureLabel}>
-                    <Icon icon={icon} size="small" />
+                    <Icon icon={icon} size="medium" />
                     {label}
                   </span>
                   <FeatureStatus value={toilet[key] as boolean | null | undefined} />

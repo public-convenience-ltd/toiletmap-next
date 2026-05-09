@@ -83,14 +83,14 @@
 /* ── Details column ──────────────────────────────────────── */
 
 .verifyPrompt {
-  margin: 0;
-  font-size: var(--text--1);
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-0);
 }
 
 .verifyActions {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--space-s);
   flex-wrap: wrap;
 }
 
@@ -102,7 +102,7 @@
 }
 
 .updatedAt {
-  font-size: var(--text--2);
+  font-size: var(--text--1);
   color: var(--color-neutral-grey);
   margin: 0;
 }
@@ -119,9 +119,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3xs) 0;
+  padding: var(--space-2xs) 0;
   border-bottom: 1px solid var(--color-light-grey);
-  font-size: var(--text--1);
+  font-size: var(--text-0);
 }
 
 .featureLabel {

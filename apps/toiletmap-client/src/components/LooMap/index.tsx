@@ -22,6 +22,7 @@ interface LooMapProps {
 export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const { data } = useMapData(apiUrl);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
@@ -86,6 +87,29 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
     }
   }, [selectedToilet]);
 
+  // After a toilet is selected and the details panel renders, pan the map so
+  // the marker sits centred in the visible area above the panel rather than
+  // behind it.
+  useEffect(() => {
+    if (!selectedToilet || !map.current || !panelRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      if (!map.current || !panelRef.current) return;
+      const h = panelRef.current.clientHeight;
+      if (h > 0) map.current.panBy([0, h / 2], { animate: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedToilet]);
+
+  // Close the details panel when the user presses Escape
+  useEffect(() => {
+    if (!selectedToilet) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedToilet(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedToilet]);
+
   return (
     <div className="loo-map-container">
       <MapControlsPanel
@@ -131,7 +155,7 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
       />
 
       {selectedToilet && (
-        <div className="toilet-panel">
+        <div className="toilet-panel" ref={panelRef}>
           <ToiletDetailsPanel
             key={selectedToilet.id}
             toilet={selectedToilet}
