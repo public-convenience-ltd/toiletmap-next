@@ -23,6 +23,8 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // True only for the initial /loo/{id} page load — cleared after first center
+  const shouldCenterRef = useRef(!!initialToiletId);
   const { data } = useMapData(apiUrl);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
@@ -88,11 +90,13 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
     }
   }, [selectedToilet]);
 
-  // After a toilet is selected and the details panel renders, pan the map so
-  // the marker sits centred in the visible area above the panel rather than
-  // behind it.
+  // On the initial /loo/{id} load only, offset the map so the marker sits
+  // centred in the visible area above the details panel. Marker clicks skip
+  // this — the user already sees the marker, just open the panel.
   useEffect(() => {
     if (!selectedToilet || !map.current || !panelRef.current) return;
+    if (!shouldCenterRef.current) return;
+    shouldCenterRef.current = false;
     const frame = requestAnimationFrame(() => {
       if (!map.current || !panelRef.current) return;
       const h = panelRef.current.clientHeight;
