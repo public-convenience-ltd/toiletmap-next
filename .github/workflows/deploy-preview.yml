@@ -46,8 +46,8 @@ jobs:
         run: |
           BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
           pnpm exec wrangler deploy --env preview --name "${BRANCH}-toiletmap-server"
-          echo "$AUTH0_CLIENT_ID" | pnpm exec wrangler secret put AUTH0_CLIENT_ID --env "" --name "${BRANCH}-toiletmap-server"
-          echo "$AUTH0_CLIENT_SECRET" | pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --env "" --name "${BRANCH}-toiletmap-server"
+          echo "$AUTH0_CLIENT_ID" | pnpm exec wrangler secret put AUTH0_CLIENT_ID --env preview --name "${BRANCH}-toiletmap-server" || exit 1
+          echo "$AUTH0_CLIENT_SECRET" | pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --env preview --name "${BRANCH}-toiletmap-server" || exit 1
 
   deploy-client:
     name: Deploy Client Preview

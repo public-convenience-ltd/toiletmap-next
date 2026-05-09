@@ -12,12 +12,14 @@ export const GET: APIRoute = ({ cookies, redirect, url }) => {
 
   cookies.set("auth_state", state, {
     httpOnly: true,
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: 300,
   });
   cookies.set("auth_nonce", nonce, {
     httpOnly: true,
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: 300,
