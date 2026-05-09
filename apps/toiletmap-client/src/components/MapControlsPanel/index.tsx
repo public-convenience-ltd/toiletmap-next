@@ -43,9 +43,8 @@ export default function MapControlsPanel({
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        mapRef.current?.flyTo([pos.coords.latitude, pos.coords.longitude], 16, {
-          animate: true,
-          duration: 1,
+        mapRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 16, {
+          animate: false,
         });
       },
       () => {
@@ -117,7 +116,7 @@ export default function MapControlsPanel({
                 className={styles.suggestion}
                 onClick={() => handleSuggestionSelect(s)}
               >
-                <Icon icon="map-location-dot" size="small" aria-hidden="true" />
+                <Icon icon="map-location-dot" size="medium" aria-hidden="true" />
                 <span>{s.display_name}</span>
               </button>
             </li>

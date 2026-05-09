@@ -80,8 +80,8 @@ export default function MapMarkers({
     markerClusterGroup.current = L.markerClusterGroup({
       showCoverageOnHover: false,
       maxClusterRadius: 80, // More aggressive clustering
-      animate: true,
-      animateAddingMarkers: true,
+      animate: false,
+      animateAddingMarkers: false,
       iconCreateFunction: (cluster) => {
         const count = cluster.getChildCount();
         let size = "small";

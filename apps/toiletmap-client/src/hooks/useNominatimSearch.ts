@@ -55,7 +55,7 @@ export function useNominatimSearch(options: UseNominatimSearchOptions = {}) {
     const lng = Number.parseFloat(result.lon);
     setSuggestions([]);
     setQuery(result.display_name);
-    mapRef?.current?.flyTo([lat, lng], 15, { animate: true, duration: 1 });
+    mapRef?.current?.setView([lat, lng], 15, { animate: false });
     onSelect?.(lat, lng);
   };
 
