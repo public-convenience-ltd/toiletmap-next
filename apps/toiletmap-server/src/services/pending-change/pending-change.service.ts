@@ -25,38 +25,38 @@ export class PendingChangeService {
     looId: string | null,
     ip: string | null,
   ): Promise<{ id: string }> {
-    const result = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      INSERT INTO public.pending_change (type, loo_id, payload, ip)
-      VALUES (${type}, ${looId}, ${JSON.stringify(payload)}::jsonb, ${ip})
-      RETURNING id::text
-    `;
-    return { id: result[0].id };
+    const result = await this.prisma.pending_change.create({
+      data: {
+        type,
+        loo_id: looId,
+        // Prisma expects InputJsonValue for Json fields
+        payload: payload as Parameters<
+          typeof this.prisma.pending_change.create
+        >[0]["data"]["payload"],
+        ip,
+      },
+      select: { id: true },
+    });
+    return { id: result.id };
   }
 
   async listPending(): Promise<PendingChangeRow[]> {
-    return await this.prisma.$queryRaw<PendingChangeRow[]>`
-      SELECT id::text, type, loo_id, payload, ip, submitted_at, status, reviewed_by, reviewed_at
-      FROM public.pending_change
-      WHERE status = 'pending'
-      ORDER BY submitted_at ASC
-    `;
+    const rows = await this.prisma.pending_change.findMany({
+      where: { status: "pending" },
+      orderBy: { submitted_at: "asc" },
+    });
+    return rows as PendingChangeRow[];
   }
 
   async setStatus(id: string, status: "approved" | "rejected", reviewedBy: string): Promise<void> {
-    await await this.prisma.$queryRaw`
-      UPDATE public.pending_change
-      SET status = ${status}, reviewed_by = ${reviewedBy}, reviewed_at = now()
-      WHERE id = ${id}::uuid
-    `;
+    await this.prisma.pending_change.update({
+      where: { id },
+      data: { status, reviewed_by: reviewedBy, reviewed_at: new Date() },
+    });
   }
 
   async getById(id: string): Promise<PendingChangeRow | null> {
-    const rows = await this.prisma.$queryRaw<PendingChangeRow[]>`
-      SELECT id::text, type, loo_id, payload, ip, submitted_at, status, reviewed_by, reviewed_at
-      FROM public.pending_change
-      WHERE id = ${id}::uuid
-      LIMIT 1
-    `;
-    return rows[0] ?? null;
+    const row = await this.prisma.pending_change.findUnique({ where: { id } });
+    return row as PendingChangeRow | null;
   }
 }

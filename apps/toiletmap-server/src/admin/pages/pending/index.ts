@@ -3,6 +3,7 @@ import { html } from "hono/html";
 import { generateLooId } from "../../../services/loo";
 import type { PendingChangeRow } from "../../../services/pending-change/pending-change.service";
 import type { AppVariables, Env } from "../../../types";
+import { invalidateDumpCache } from "../../../utils/cache";
 import { Layout } from "../../components/Layout";
 
 const formatDate = (d: Date) =>
@@ -14,17 +15,42 @@ const formatDate = (d: Date) =>
     minute: "2-digit",
   }).format(new Date(d));
 
+const DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const formatPayloadValue = (key: string, v: unknown): string => {
+  if (v === null || v === undefined) return "—";
+  if (key === "location" && typeof v === "object" && v !== null && !Array.isArray(v)) {
+    const loc = v as { lat?: number; lng?: number };
+    const lat = typeof loc.lat === "number" ? loc.lat.toFixed(5) : "?";
+    const lng = typeof loc.lng === "number" ? loc.lng.toFixed(5) : "?";
+    return `${lat}, ${lng}`;
+  }
+  if (key === "openingTimes" && Array.isArray(v)) {
+    const slots = v
+      .slice(0, 7)
+      .map((day: unknown, i: number) =>
+        Array.isArray(day) && day.length === 2 ? `${DAYS_SHORT[i]}: ${day[0]}–${day[1]}` : "",
+      )
+      .filter(Boolean);
+    return slots.length > 0 ? slots.join(", ") : "No hours set";
+  }
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (Array.isArray(v)) return `[${v.length} items]`;
+  if (typeof v === "object") return JSON.stringify(v).slice(0, 80);
+  return String(v);
+};
+
 const PayloadPreview = ({ payload }: { payload: unknown }) => {
   const obj = typeof payload === "object" && payload !== null ? payload : {};
   const entries = Object.entries(obj as Record<string, unknown>)
     .filter(([, v]) => v !== null && v !== undefined && v !== "")
-    .slice(0, 6);
+    .slice(0, 8);
   return html`<dl class="payload-preview">
     ${entries.map(
       ([k, v]) =>
         html`<div class="payload-row">
           <dt class="payload-key">${k}</dt>
-          <dd class="payload-val">${String(v)}</dd>
+          <dd class="payload-val">${formatPayloadValue(k, v)}</dd>
         </div>`,
     )}
   </dl>`;
@@ -128,6 +154,7 @@ export const pendingApprove = async (c: Context<{ Bindings: Env; Variables: AppV
     await looService.upsert(change.loo_id, payload, contributor.name);
   }
 
+  await invalidateDumpCache(c.req.url);
   await pendingChangeService.setStatus(id, "approved", user?.sub ?? "admin");
   return c.redirect("/admin/pending");
 };

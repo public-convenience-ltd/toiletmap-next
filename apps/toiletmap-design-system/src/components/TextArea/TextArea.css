@@ -27,3 +27,11 @@
 .text-area::placeholder {
   color: var(--color-neutral-grey);
 }
+
+.text-area[aria-invalid="true"] {
+  border-color: var(--color-accent-pink);
+}
+
+.text-area[aria-invalid="true"]:focus {
+  outline-color: var(--color-accent-pink);
+}

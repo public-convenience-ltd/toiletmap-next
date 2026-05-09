@@ -26,3 +26,11 @@
 .input::placeholder {
   color: var(--color-neutral-grey);
 }
+
+.input[aria-invalid="true"] {
+  border-color: var(--color-accent-pink);
+}
+
+.input[aria-invalid="true"]:focus {
+  outline-color: var(--color-accent-pink);
+}

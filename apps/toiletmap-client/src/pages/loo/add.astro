@@ -9,6 +9,7 @@ import { getApiUrl } from "../../utils/api";
 
 const apiUrl = getApiUrl(env, Astro.url);
 const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
+const accessToken = Astro.cookies.get("access_token")?.value ?? null;
 
 const navLinks = [
   { href: "/about", label: "About" },
@@ -30,6 +31,7 @@ const navLinks = [
       mode="add"
       apiUrl={apiUrl}
       isAuthenticated={isAuthenticated}
+      accessToken={accessToken}
     />
   </main>
   <Footer />

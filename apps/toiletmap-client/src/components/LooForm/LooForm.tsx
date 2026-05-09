@@ -1,6 +1,6 @@
 import "leaflet/dist/leaflet.css";
 import { del } from "idb-keyval";
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import {
   Banner,
   Button,
@@ -24,6 +24,7 @@ interface LooFormProps {
   looId?: string;
   apiUrl: string;
   isAuthenticated: boolean;
+  accessToken?: string | null;
 }
 
 type FormState = {
@@ -45,6 +46,8 @@ type FormState = {
   active: TriStateValue;
   openingTimes: OpeningTimes | null;
 };
+
+type FormErrors = Partial<Record<keyof FormState, string>>;
 
 const boolToTri = (v: boolean | null | undefined): TriStateValue =>
   v === true ? "true" : v === false ? "false" : "";
@@ -86,12 +89,17 @@ export default function LooForm({
   looId,
   apiUrl,
   isAuthenticated,
+  accessToken,
 }: LooFormProps) {
   const [form, setForm] = useState<FormState>(() => buildInitialState(initialData, mode));
-  const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queued, setQueued] = useState(false);
+
+  const nameRef = useRef<HTMLInputElement>(null);
+  const locationSectionRef = useRef<HTMLElement>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   const search = useNominatimSearch({
     onSelect: (lat, lng) => setForm((f) => ({ ...f, lat, lng })),
@@ -101,13 +109,26 @@ export default function LooForm({
     setForm((f) => ({ ...f, [key]: value }));
 
   const validate = (): boolean => {
-    const errors: Partial<Record<keyof FormState, string>> = {};
+    const errors: FormErrors = {};
     if (!form.name.trim()) errors.name = "Name is required.";
     if (mode === "add" && form.lat === DEFAULT_LAT && form.lng === DEFAULT_LNG) {
       errors.lat = "Please set the toilet's location on the map.";
     }
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+
+    if (Object.keys(errors).length > 0) {
+      // Focus/scroll to first error after state settles
+      setTimeout(() => {
+        if (errors.name) {
+          nameRef.current?.focus();
+        } else if (errors.lat) {
+          locationSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        errorSummaryRef.current?.focus();
+      }, 0);
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: Event) => {
@@ -139,10 +160,15 @@ export default function LooForm({
     const url = mode === "edit" && looId ? `${apiUrl}/api/loos/${looId}` : `${apiUrl}/api/loos`;
     const method = mode === "edit" ? "PUT" : "POST";
 
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
     try {
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -184,16 +210,30 @@ export default function LooForm({
     );
   }
 
+  const errorEntries = Object.entries(formErrors).filter(([, v]) => v);
+
   return (
     <form class={styles.page} onSubmit={handleSubmit} noValidate>
       <h1 class={styles.heading}>{mode === "edit" ? "Edit toilet" : "Add a toilet"}</h1>
+
+      {errorEntries.length > 0 && (
+        <div ref={errorSummaryRef} tabIndex={-1}>
+          <Banner variant="error" title="Please fix the following errors before saving:">
+            <ul class={styles.errorList}>
+              {errorEntries.map(([, msg]) => (
+                <li key={msg}>{msg}</li>
+              ))}
+            </ul>
+          </Banner>
+        </div>
+      )}
 
       {error && <Banner variant="error">{error}</Banner>}
 
       <div class={styles.layout}>
         <div class={styles.main}>
           {/* Location */}
-          <section class={styles.section}>
+          <section class={styles.section} ref={locationSectionRef}>
             <h2 class={styles.sectionTitle}>Location</h2>
             <div class={styles.searchRow}>
               <InputField
@@ -226,7 +266,11 @@ export default function LooForm({
                 if (formErrors.lat) setFormErrors((fe) => ({ ...fe, lat: undefined }));
               }}
             />
-            {formErrors.lat && <span class={styles.fieldError}>{formErrors.lat}</span>}
+            {formErrors.lat && (
+              <span class={styles.fieldError} role="alert">
+                {formErrors.lat}
+              </span>
+            )}
             <Stack direction="row" space="s">
               <div class={styles.coordLabel}>
                 Latitude
@@ -266,23 +310,30 @@ export default function LooForm({
             <h2 class={styles.sectionTitle}>Details</h2>
             <Stack space="s">
               <div class={styles.fieldLabel}>
-                <span>
+                <label for="field-name">
                   Name{" "}
                   <span class={styles.required} aria-hidden="true">
                     *
                   </span>
-                </span>
+                </label>
                 <InputField
+                  id="field-name"
+                  ref={nameRef}
                   placeholder="e.g. High Street toilets"
                   value={form.name}
-                  aria-label="Toilet name"
                   aria-required="true"
+                  aria-invalid={formErrors.name ? "true" : undefined}
+                  aria-describedby={formErrors.name ? "error-name" : undefined}
                   onInput={(e) => {
                     setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }));
                     if (formErrors.name) setFormErrors((fe) => ({ ...fe, name: undefined }));
                   }}
                 />
-                {formErrors.name && <span class={styles.fieldError}>{formErrors.name}</span>}
+                {formErrors.name && (
+                  <span id="error-name" class={styles.fieldError} role="alert">
+                    {formErrors.name}
+                  </span>
+                )}
               </div>
               <div class={styles.fieldLabel}>
                 <span>Notes</span>
