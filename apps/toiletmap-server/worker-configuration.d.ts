@@ -34,8 +34,6 @@ declare namespace Cloudflare {
 		AUTH0_REDIRECT_URI: "https://*-toiletmap-server.gbtoiletmap.workers.dev/admin/callback";
 		AUTH0_ISSUER_BASE_URL: "https://gbptm.eu.auth0.com/";
 		AUTH0_AUDIENCE: "https://www.toiletmap.org.uk/api";
-		AUTH0_CLIENT_ID: "";
-		AUTH0_CLIENT_SECRET: "";
 		AUTH0_PROFILE_KEY: "https://toiletmap.org.uk/profile";
 		AUTH0_PERMISSIONS_KEY: "https://toiletmap.org.uk/permissions";
 		AUTH0_SCOPE: "openid profile email offline_access roles";
@@ -57,8 +55,8 @@ declare namespace Cloudflare {
 		AUTH0_PERMISSIONS_KEY: "https://toiletmap.org.uk/permissions";
 		AUTH0_SCOPE: "openid profile email offline_access roles";
 		ALLOWED_ORIGINS: "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev" | "https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev" | "http://localhost:8787,http://localhost:4321";
-		AUTH0_CLIENT_ID?: "" | "test_client_id";
-		AUTH0_CLIENT_SECRET?: "" | "test_client_secret";
+		AUTH0_CLIENT_ID?: string;
+		AUTH0_CLIENT_SECRET?: string;
 		TEST_HYPERDRIVE?: Hyperdrive;
 	}
 }
