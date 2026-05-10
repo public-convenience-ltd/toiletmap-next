@@ -26,7 +26,14 @@ const normalizeUser = (user: Auth0User): RequestUser => {
     ? user.permissions.filter((p): p is string => typeof p === "string")
     : undefined;
 
-  return { ...user, sub, name: norm(user.name), nickname: norm(user.nickname), email: norm(user.email), permissions };
+  return {
+    ...user,
+    sub,
+    name: norm(user.name),
+    nickname: norm(user.nickname),
+    email: norm(user.email),
+    permissions,
+  };
 };
 
 export const authenticateToken = async (
