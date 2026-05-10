@@ -72,6 +72,7 @@ describe("Loo mutation endpoints", () => {
       const body = await response.json();
       expect(body.queued).toBe(true);
       expect(typeof body.id).toBe("string");
+      cleanupManager.trackPendingChange(body.id);
     });
 
     it("rejects invalid bearer tokens", async () => {
@@ -136,6 +137,7 @@ describe("Loo mutation endpoints", () => {
       expect(response.status).toBe(202);
       const body = await response.json();
       expect(body.queued).toBe(true);
+      cleanupManager.trackPendingChange(body.id);
     });
 
     it("validates request bodies", async () => {
