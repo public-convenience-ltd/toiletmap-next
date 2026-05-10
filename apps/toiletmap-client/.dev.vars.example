@@ -2,3 +2,12 @@
 # This overrides wrangler.jsonc vars when running `wrangler dev`
 PUBLIC_API_URL=http://localhost:8787
 ENVIRONMENT=development
+
+# Auth0 — local dev uses the mock auth server (started automatically by `pnpm dev`)
+# For production, set real Auth0 values via Cloudflare dashboard secrets
+AUTH0_ISSUER_BASE_URL=http://127.0.0.1:44555/
+AUTH0_CLIENT_ID=toiletmap-client-dev
+AUTH0_CLIENT_SECRET=dev-secret
+AUTH0_SCOPE=openid profile email
+AUTH0_AUDIENCE=https://toiletmap.org.uk
+AUTH0_REDIRECT_URI=http://localhost:4321/auth/callback

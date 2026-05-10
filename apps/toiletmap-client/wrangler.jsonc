@@ -1,5 +1,5 @@
 {
-	"name": "toiletmap-client",
+	"name": "toiletmap-client-dev",
   "compatibility_date": "2025-12-01",
   "compatibility_flags": [
     "nodejs_compat",
@@ -9,22 +9,39 @@
 		"binding": "ASSETS",
 		"directory": "./dist"
 	},
+  // AUTH0_REDIRECT_URI is derived from request origin at runtime (no var needed)
   "vars": {
-    "ENVIRONMENT": "preview",
-    "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
+    "ENVIRONMENT": "development",
+    "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev",
+    "AUTH0_ISSUER_BASE_URL": "http://127.0.0.1:44555/",
+    "AUTH0_CLIENT_ID": "toiletmap-client-dev",
+    "AUTH0_CLIENT_SECRET": "dev-secret",
+    "AUTH0_SCOPE": "openid profile email",
+    "AUTH0_AUDIENCE": "https://toiletmap.org.uk"
   },
   "env": {
     "preview": {
+      "name": "toiletmap-client",
+      "workers_dev": true,
+      // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET set as Cloudflare secrets by deploy-preview.yml
+      // PUBLIC_API_URL overridden per-branch via --var in deploy-preview.yml
       "vars": {
         "ENVIRONMENT": "preview",
-        "PUBLIC_API_URL":"https://toiletmap-server.gbtoiletmap.workers.dev"
+        "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev",
+        "AUTH0_ISSUER_BASE_URL": "https://gbptm.eu.auth0.com/",
+        "AUTH0_SCOPE": "openid profile email",
+        "AUTH0_AUDIENCE": "https://www.toiletmap.org.uk/api"
       }
     },
     "production": {
       "name": "toiletmap-client",
+      // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET set as Cloudflare secrets
       "vars": {
         "ENVIRONMENT": "production",
-        "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev"
+        "PUBLIC_API_URL": "https://toiletmap-server.gbtoiletmap.workers.dev",
+        "AUTH0_ISSUER_BASE_URL": "https://gbptm.eu.auth0.com/",
+        "AUTH0_SCOPE": "openid profile email",
+        "AUTH0_AUDIENCE": "https://www.toiletmap.org.uk/api"
       }
     }
   },

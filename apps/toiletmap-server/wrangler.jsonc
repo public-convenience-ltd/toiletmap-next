@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "toiletmap-server",
+  "name": "toiletmap-server-dev",
   "main": "./src/index.ts",
   "compatibility_date": "2025-11-18",
   "compatibility_flags": ["nodejs_compat"],
@@ -37,6 +37,7 @@
   "env": {
     "production": {
       "name": "toiletmap-server",
+      // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET set as Cloudflare secrets
       "vars": {
         "ENVIRONMENT": "production",
         "AUTH0_REDIRECT_URI": "https://toiletmap-server.gbtoiletmap.workers.dev/admin/callback",
@@ -45,7 +46,7 @@
         "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
         "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
         "AUTH0_SCOPE": "openid profile email offline_access roles",
-        "ALLOWED_ORIGINS": "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev,http://localhost:4321"
+        "ALLOWED_ORIGINS": "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev"
       },
       // Production runtime database connection via Hyperdrive
       // Provides connection pooling, caching, and optimized database access
@@ -75,12 +76,21 @@
           "name": "RATE_LIMIT_AUTH",
           "namespace_id": "1003",
           "simple": { "limit": 5, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_ANON_WRITE",
+          "namespace_id": "1004",
+          "simple": { "limit": 1, "period": 60 }
         }
       ]
     },
     "preview": {
       "name": "toiletmap-server",
       "workers_dev": true,
+      // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET are NOT listed here — they are
+      // set as Cloudflare secrets by deploy-preview.yml after each deploy.
+      // Listing them as vars (even empty) causes error 10053 when secret put
+      // tries to create a binding with the same name.
       "vars": {
         "ENVIRONMENT": "preview",
         "AUTH0_REDIRECT_URI": "https://*-toiletmap-server.gbtoiletmap.workers.dev/admin/callback",
@@ -118,6 +128,11 @@
           "name": "RATE_LIMIT_AUTH",
           "namespace_id": "1003",
           "simple": { "limit": 5, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_ANON_WRITE",
+          "namespace_id": "1004",
+          "simple": { "limit": 1, "period": 60 }
         }
       ]
     }

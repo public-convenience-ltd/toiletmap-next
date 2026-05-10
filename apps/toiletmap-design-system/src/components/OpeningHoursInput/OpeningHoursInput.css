@@ -1,0 +1,214 @@
+/* ── OpeningHoursInput ───────────────────────────────────── */
+
+.oh-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--color-light-grey);
+  border: 1px solid var(--color-light-grey);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oh-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-m);
+  background: var(--color-base-white);
+  align-items: center;
+  min-height: 52px;
+}
+
+/* Day label — fixed width so all rows align */
+.oh-day {
+  width: 90px;
+  flex-shrink: 0;
+  font-size: var(--text--1);
+  font-weight: 600;
+  color: var(--color-primary-navy);
+}
+
+/* Open / Closed toggle */
+.oh-status {
+  display: flex;
+  flex-shrink: 0;
+  border: 1.5px solid var(--color-primary-navy);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.oh-toggle-option {
+  position: relative;
+  display: flex;
+  cursor: pointer;
+}
+
+.oh-toggle-option:not(:first-child) {
+  border-left: 1px solid var(--color-primary-navy);
+}
+
+.oh-radio {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.oh-toggle-label {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2xs) var(--space-s);
+  font-size: var(--text--1);
+  font-family: var(--font-family);
+  font-weight: 500;
+  color: var(--color-primary-navy);
+  background: var(--color-base-white);
+  user-select: none;
+  white-space: nowrap;
+  min-width: 52px;
+  justify-content: center;
+}
+
+.oh-toggle-label:hover {
+  background: var(--color-light-grey);
+}
+
+.oh-toggle-label--active {
+  background: var(--color-accent-turquoise);
+  font-weight: 700;
+}
+
+.oh-toggle-label--active:hover {
+  background: var(--color-accent-turquoise);
+}
+
+.oh-radio:focus-visible + .oh-toggle-label {
+  outline: 2px solid var(--color-accent-turquoise);
+  outline-offset: -2px;
+}
+
+/* Time inputs area */
+.oh-times {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  flex: 1;
+  min-height: 36px;
+}
+
+.oh-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  cursor: pointer;
+  font-size: var(--text--1);
+  font-family: var(--font-family);
+  color: var(--color-primary-navy);
+}
+
+.oh-checkbox {
+  accent-color: var(--color-primary-navy);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.oh-time-inputs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.oh-time-field {
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1.5px solid rgba(10, 22, 94, 0.3);
+  border-radius: 6px;
+  font-size: var(--text--1);
+  font-family: var(--font-family);
+  color: var(--color-primary-navy);
+  background: var(--color-base-white);
+  width: 120px;
+}
+
+.oh-time-field:focus {
+  outline: 2px solid var(--color-accent-turquoise);
+  outline-offset: 1px;
+  border-color: var(--color-primary-navy);
+}
+
+.oh-time-sep {
+  color: var(--color-neutral-grey);
+  font-size: var(--text--1);
+  flex-shrink: 0;
+}
+
+/* Bulk action buttons */
+.oh-actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-left: auto;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.oh-action-btn {
+  background: var(--color-base-white);
+  border: 1px solid rgba(10, 22, 94, 0.2);
+  border-radius: 6px;
+  color: var(--color-neutral-grey);
+  cursor: pointer;
+  padding: var(--space-2xs) var(--space-s);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-family: var(--font-family);
+  font-size: var(--text--2);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.oh-action-btn:hover {
+  background: var(--color-light-grey);
+  color: var(--color-primary-navy);
+  border-color: rgba(10, 22, 94, 0.4);
+}
+
+.oh-action-label {
+  /* always visible */
+}
+
+/* Error */
+.oh-error {
+  font-size: var(--text--2);
+  color: var(--color-accent-pink);
+  margin: var(--space-xs) 0 0;
+}
+
+/* Mobile — stack day + status on first line, times below */
+@media (max-width: 600px) {
+  .oh-row {
+    padding: var(--space-s) var(--space-m);
+    row-gap: var(--space-xs);
+  }
+
+  .oh-day {
+    width: auto;
+    flex: 1;
+  }
+
+  .oh-times {
+    flex: 0 0 100%;
+  }
+
+  .oh-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}

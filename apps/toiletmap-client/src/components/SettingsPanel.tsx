@@ -17,7 +17,7 @@ const SettingsPanel = ({ isOpen, onClose, onOpenDevTools }: SettingsPanelProps) 
       <div className={styles.section}>
         <h3>Developer</h3>
         <Button htmlElement="button" variant="secondary" onClick={onOpenDevTools}>
-          <Icon icon="gear" size="medium" />
+          <Icon icon="gear" size="small" />
           Open Developer Tools
         </Button>
       </div>

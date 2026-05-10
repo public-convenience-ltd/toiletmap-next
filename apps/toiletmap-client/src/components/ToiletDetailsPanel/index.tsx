@@ -56,14 +56,14 @@ function formatUpdatedAt(iso: string | null): string {
 function FeatureStatus({ value }: { value: boolean | null | undefined }) {
   if (value === true) {
     return (
-      <Icon icon="check" size="small" style={{ color: "var(--color-success)" }} aria-label="Yes" />
+      <Icon icon="check" size="medium" style={{ color: "var(--color-success)" }} aria-label="Yes" />
     );
   }
   if (value === false) {
     return (
       <Icon
         icon="xmark"
-        size="small"
+        size="medium"
         style={{ color: "var(--color-accent-pink)" }}
         aria-label="No"
       />
@@ -72,7 +72,7 @@ function FeatureStatus({ value }: { value: boolean | null | undefined }) {
   return (
     <Icon
       icon="question"
-      size="small"
+      size="medium"
       style={{ color: "var(--color-neutral-grey)" }}
       aria-label="Unknown"
     />
@@ -98,7 +98,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
         <div className={styles.collapsedHeader}>
           <h2 className={styles.name}>{toilet.name ?? "Toilet"}</h2>
           <Button htmlElement="button" variant="secondary" onClick={onClose}>
-            <Icon icon="xmark" size="medium" />
+            <Icon icon="xmark" size="small" />
             Close
           </Button>
         </div>
@@ -111,12 +111,12 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Icon icon="diamond-turn-right" size="medium" />
+              <Icon icon="diamond-turn-right" size="small" />
               Directions
             </Button>
           )}
           <Button htmlElement="button" variant="secondary" onClick={() => setIsExpanded(true)}>
-            <Icon icon="list" size="medium" />
+            <Icon icon="list" size="small" />
             Details
           </Button>
         </div>
@@ -128,7 +128,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
     <div className={styles.expanded}>
       <div className={styles.expandedHeader}>
         <Button htmlElement="button" variant="secondary" onClick={onClose}>
-          <Icon icon="xmark" size="medium" />
+          <Icon icon="xmark" size="small" />
           Close
         </Button>
       </div>
@@ -136,7 +136,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
       <div className={styles.expandedContent}>
         <div className={styles.grid}>
           {/* Column 1: Details */}
-          <Stack space="s">
+          <Stack space="m">
             <h2 className={styles.name}>{toilet.name ?? "Toilet"}</h2>
             {directionsUrl && (
               <div className={styles.directionsWrapper}>
@@ -147,7 +147,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Icon icon="diamond-turn-right" size="medium" />
+                  <Icon icon="diamond-turn-right" size="small" />
                   Directions
                 </Button>
               </div>
@@ -160,8 +160,8 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
                 </Button>
                 <span className={styles.verifyNoSpan}>
                   No?{" "}
-                  <Button htmlElement="a" variant="secondary" href={`/loos/${toilet.id}/edit`}>
-                    <Icon icon="pen-to-square" size="medium" />
+                  <Button htmlElement="a" variant="secondary" href={`/loo/${toilet.id}/edit`}>
+                    <Icon icon="pen-to-square" size="small" />
                     Edit
                   </Button>
                 </span>
@@ -177,7 +177,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
               {FEATURES.map(({ key, label, icon }) => (
                 <li key={key} className={styles.featureItem}>
                   <span className={styles.featureLabel}>
-                    <Icon icon={icon} size="small" />
+                    <Icon icon={icon} size="medium" />
                     {label}
                   </span>
                   <FeatureStatus value={toilet[key] as boolean | null | undefined} />
@@ -214,7 +214,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
             </ul>
             <p className={styles.hoursNote}>
               Hours may vary with national holidays or seasonal changes.{" "}
-              <a href={`/loos/${toilet.id}/edit`}>Edit this toilet</a> if out of date.
+              <a href={`/loo/${toilet.id}/edit`}>Edit this toilet</a> if out of date.
             </p>
           </div>
         </div>

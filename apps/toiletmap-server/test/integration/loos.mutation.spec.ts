@@ -60,15 +60,19 @@ describe("Loo mutation endpoints", () => {
       expect(String(issueMessage)).toMatch(/24/);
     });
 
-    it("requires authentication", async () => {
+    it("queues anonymous submissions for review (202)", async () => {
       const response = await callApi(
         "/api/loos",
         jsonRequest("POST", {
-          name: "No Auth",
+          name: "Anonymous Loo",
           location: { lat: 51.4, lng: -0.1 },
         }),
       );
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(202);
+      const body = await response.json();
+      expect(body.queued).toBe(true);
+      expect(typeof body.id).toBe("string");
+      cleanupManager.trackPendingChange(body.id);
     });
 
     it("rejects invalid bearer tokens", async () => {
@@ -124,13 +128,16 @@ describe("Loo mutation endpoints", () => {
       expect(body.radar).toBe(true);
     });
 
-    it("requires authentication for updates", async () => {
+    it("queues anonymous updates for review (202)", async () => {
       const existing = await fixtures.loos.create();
       const response = await callApi(
         `/api/loos/${existing.id}`,
-        jsonRequest("PUT", { notes: "No auth update" }),
+        jsonRequest("PUT", { notes: "Anonymous update" }),
       );
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(202);
+      const body = await response.json();
+      expect(body.queued).toBe(true);
+      cleanupManager.trackPendingChange(body.id);
     });
 
     it("validates request bodies", async () => {

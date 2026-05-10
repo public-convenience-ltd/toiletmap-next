@@ -1,0 +1,186 @@
+/* ── Page shell ─────────────────────────────────────────── */
+
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-l) var(--space-m);
+  font-family: var(--font-family);
+  color: var(--color-primary-navy);
+}
+
+.heading {
+  font-size: var(--text-2);
+  font-weight: 700;
+  margin: 0 0 var(--space-l);
+}
+
+/* ── Two-column layout ──────────────────────────────────── */
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-l);
+}
+
+@media (min-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr 280px;
+    align-items: start;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+}
+
+/* ── Sections ───────────────────────────────────────────── */
+
+.section {
+  background: var(--color-base-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: 12px;
+  padding: var(--space-m);
+}
+
+.sectionTitle {
+  font-size: var(--text-0);
+  font-weight: 700;
+  margin: 0 0 var(--space-s);
+}
+
+/* Opening hours section: no inner padding so the OH grid sits flush */
+.sectionFlush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sectionFlush > .sectionTitle {
+  padding: var(--space-m) var(--space-m) var(--space-s);
+}
+
+/* ── Fields ─────────────────────────────────────────────── */
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  font-size: var(--text--1);
+  font-weight: 600;
+}
+
+.coordLabel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  font-size: var(--text--2);
+  font-weight: 600;
+}
+
+.hint {
+  font-size: var(--text--2);
+  color: var(--color-neutral-grey);
+  margin: 0 0 var(--space-s);
+}
+
+.required {
+  color: var(--color-accent-pink);
+  margin-left: 2px;
+}
+
+.fieldError {
+  display: block;
+  font-size: var(--text--2);
+  color: var(--color-accent-pink);
+  margin-top: var(--space-2xs);
+}
+
+/* ── Search autocomplete ─────────────────────────────────── */
+
+.searchRow {
+  position: relative;
+  margin-bottom: var(--space-s);
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-base-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(10, 22, 94, 0.1);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.suggestion {
+  display: block;
+  width: 100%;
+  padding: var(--space-xs);
+  font-size: var(--text--2);
+  font-family: var(--font-family);
+  color: var(--color-primary-navy);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-light-grey);
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.suggestion:last-child {
+  border-bottom: none;
+}
+
+.suggestion:hover {
+  background: var(--color-light-grey);
+}
+
+/* ── Feature toggles ─────────────────────────────────────── */
+
+.triGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-xs) var(--space-s);
+}
+
+/* ── Actions ─────────────────────────────────────────────── */
+
+.actions {
+  margin-top: var(--space-l);
+  padding-top: var(--space-m);
+  border-top: 1px solid var(--color-light-grey);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s);
+}
+
+.anonNote {
+  font-size: var(--text--2);
+  color: var(--color-neutral-grey);
+  margin: 0;
+}
+
+.queuedActions {
+  margin-top: var(--space-m);
+}
+
+.errorList {
+  margin: var(--space-2xs) 0 0;
+  padding-left: var(--space-m);
+}

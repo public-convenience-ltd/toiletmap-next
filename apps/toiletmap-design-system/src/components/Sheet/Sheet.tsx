@@ -15,8 +15,6 @@ export interface SheetProps {
 const Sheet = ({ children, visible, side, onClose, overlay = true, zIndex = 1500 }: SheetProps) => (
   <>
     {overlay && (
-      // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click closes sheet
-      // biome-ignore lint/a11y/noStaticElementInteractions: decorative backdrop
       <div
         class={`sheet__overlay${visible ? " sheet__overlay--visible" : ""}`}
         style={{ zIndex: zIndex - 1 }}

@@ -26,4 +26,5 @@ jobs:
           version: latest
       - run: |
           supabase link --project-ref $PRODUCTION_PROJECT_ID
-          supabase db push
+          ENCODED_PW=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'],safe=''))")
+          supabase db push --db-url "postgresql://postgres.${PRODUCTION_PROJECT_ID}:${ENCODED_PW}@aws-0-eu-west-2.pooler.supabase.com:5432/postgres?sslmode=require"

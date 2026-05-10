@@ -47,19 +47,19 @@
   inset: 0;
 }
 
-/* Floating map overlay buttons */
+/* Floating map overlay buttons — sit in top-right, clear of the centred search bar */
 .settings-btn {
   position: absolute;
-  top: var(--space-m);
-  right: var(--space-m);
-  z-index: 1000;
+  top: var(--space-s);
+  right: var(--space-s);
+  z-index: 1001;
 }
 
 .dev-tools-btn {
   position: absolute;
-  top: var(--space-m);
-  right: calc(var(--space-m) + 40px + var(--space-xs));
-  z-index: 1000;
+  top: var(--space-s);
+  right: calc(var(--space-s) + 40px + var(--space-2xs));
+  z-index: 1001;
 }
 
 /* Toilet details panel — no transition */

@@ -52,10 +52,10 @@ const DevTools = ({ isOpen, onClose, mapInstance }: DevToolsProps) => {
   }, [isOpen, mapInstance]);
 
   const clearAllCache = async () => {
-    if (!confirm("Clear all cached data?")) return;
+    if (!confirm("Clear all cached data and reload the map?")) return;
     const allKeys = await keys();
     await Promise.all(allKeys.map((key) => del(key)));
-    await loadCacheStats();
+    window.location.reload();
   };
 
   if (!isOpen) return null;

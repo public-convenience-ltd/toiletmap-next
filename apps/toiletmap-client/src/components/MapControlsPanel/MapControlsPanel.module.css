@@ -1,45 +1,32 @@
-/* ── Desktop panel ───────────────────────────────────────── */
+/* ── Floating bar container ──────────────────────────────── */
 
-.panel {
-  position: fixed;
-  top: var(--space-m);
-  left: var(--space-m);
-  width: 300px;
-  max-height: calc(100vh - var(--space-m) * 2);
+.floatingBar {
+  position: absolute;
+  top: var(--space-s);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1000;
+  width: min(520px, calc(100% - var(--space-m) * 2));
   background: var(--color-base-white);
-  border-radius: 17px;
-  box-shadow: 0 4px 24px rgba(10, 22, 94, 0.12);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(10, 22, 94, 0.14);
   font-family: var(--font-family);
   color: var(--color-primary-navy);
+  overflow: hidden;
 }
 
-@media (max-width: 767px) {
-  .panel {
-    display: none;
-  }
-}
+/* ── Search row ──────────────────────────────────────────── */
 
-/* ── Scrollable content ──────────────────────────────────── */
-
-.content {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-s) var(--space-s) var(--space-m);
+.searchRow {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-s);
-  scrollbar-color: var(--color-primary-navy) var(--color-light-grey);
-  scrollbar-width: thin;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs);
 }
-
-/* ── Search ──────────────────────────────────────────────── */
 
 .searchWrapper {
   position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
 }
@@ -51,19 +38,17 @@
   pointer-events: none;
 }
 
-/* Override DS InputField styles for the icon-inset search context */
 .searchInput {
-  padding-left: calc(var(--space-xs) * 2 + 1em) !important;
-  border-color: var(--color-light-grey) !important;
-  border-radius: 8px !important;
-  margin-top: 0 !important;
+  padding-left: calc(var(--space-xs) * 2 + 1em);
+  border-color: var(--color-light-grey);
+  border-radius: 8px;
+  margin-top: 0;
   -webkit-appearance: none;
   appearance: none;
-  transition: border-color 0.15s ease;
 }
 
 .searchInput:focus {
-  border-color: var(--color-primary-navy) !important;
+  border-color: var(--color-primary-navy);
   outline: none;
 }
 
@@ -73,17 +58,48 @@
   color: var(--color-neutral-grey);
 }
 
+.geoBtn {
+  flex-shrink: 0;
+}
+
+.filterBtnWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.filterBtn {
+  display: block;
+}
+
+.filterBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2em;
+  height: 1.2em;
+  padding: 0 0.2em;
+  background: var(--color-accent-pink);
+  color: var(--color-base-white);
+  border-radius: 999px;
+  font-size: var(--text--2);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
 /* ── Autocomplete suggestions ────────────────────────────── */
 
 .suggestions {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--color-light-grey);
-  border-radius: 8px;
+  border-top: 1px solid var(--color-light-grey);
   background: var(--color-base-white);
-  box-shadow: 0 4px 16px rgba(10, 22, 94, 0.1);
-  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
 }
 
 .suggestionItem {
@@ -96,11 +112,11 @@
 
 .suggestion {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-xs);
-  padding: var(--space-xs);
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-s) var(--space-m);
   width: 100%;
-  font-size: var(--text--2);
+  font-size: var(--text-0);
   color: var(--color-primary-navy);
   background: none;
   border: none;
@@ -108,194 +124,67 @@
   font-family: var(--font-family);
   text-align: left;
   line-height: 1.4;
-  transition: background 0.1s;
 }
 
 .suggestion > :global(.icon) {
   flex-shrink: 0;
-  margin-top: 2px;
   color: var(--color-neutral-grey);
 }
 
 .suggestion span {
   flex: 1;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .suggestion:hover,
 .suggestion:focus {
-  background: var(--color-light-grey);
+  background: var(--color-frost-ice);
   outline: none;
 }
 
-/* ── Filter section header ───────────────────────────────── */
+/* ── Filter panel ────────────────────────────────────────── */
 
-.filterHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-xs);
-  flex-wrap: wrap;
+.filterPanel {
+  border-top: 1px solid var(--color-light-grey);
+  padding: var(--space-xs) var(--space-s) var(--space-s);
 }
-
-.filterToggleBtn {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-weight: 600;
-  font-size: var(--text-0);
-  color: var(--color-primary-navy);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-family);
-  padding: 0;
-}
-
-.filterToggleBtn:hover {
-  opacity: 0.75;
-}
-
-.resetBtn {
-  font-size: var(--text--1);
-  color: var(--color-neutral-grey);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-family);
-  padding: 0;
-  transition: color 0.15s;
-}
-
-.resetBtn:hover {
-  color: var(--color-primary-navy);
-}
-
-/* ── Filter Tag list ─────────────────────────────────────── */
 
 .filterList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: var(--space-2xs);
 }
 
-/* Make Tags stretch to full width in the filter list */
 .filterTag {
-  width: 100%;
-  border-radius: 8px;
-  text-align: left;
-  justify-content: flex-start;
+  border-radius: 999px;
 }
 
-.filterLabel {
-  flex: 1;
-}
-
-/* ── Quick link buttons ──────────────────────────────────── */
-
-.quickLink {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-weight: 600;
-  font-size: var(--text-0);
-  color: var(--color-primary-navy);
+.resetBtn {
+  display: block;
+  margin-top: var(--space-xs);
+  font-size: var(--text--2);
+  color: var(--color-neutral-grey);
   background: none;
   border: none;
   cursor: pointer;
   font-family: var(--font-family);
   padding: 0;
-  text-align: left;
-  transition: color 0.2s ease;
 }
 
-.quickLink span {
-  flex: 1;
+.resetBtn:hover {
+  color: var(--color-primary-navy);
 }
 
-.quickLink:hover:not(:disabled) {
-  color: var(--color-accent-pink);
-}
-
-.quickLink:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* ── Geo error ───────────────────────────────────────────── */
 
 .geoError {
   font-size: var(--text--2);
   color: var(--color-accent-pink);
   margin: 0;
-}
-
-/* ── Mobile toggle button ────────────────────────────────── */
-
-.mobileToggle {
-  display: none;
-  position: fixed;
-  top: var(--space-m);
-  left: var(--space-m);
-  z-index: 1000;
-  padding: var(--space-xs) var(--space-s);
-  background: var(--color-base-white);
-  border: 1.5px solid rgba(10, 22, 94, 0.18);
-  border-radius: 24px;
-  cursor: pointer;
-  font-size: var(--text-0);
-  font-weight: 600;
-  color: var(--color-primary-navy);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-  align-items: center;
-  gap: var(--space-xs);
-  font-family: var(--font-family);
-  transition:
-    box-shadow 0.15s ease,
-    background 0.15s ease;
-}
-
-.mobileToggle:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-  background: var(--color-light-grey);
-}
-
-@media (max-width: 767px) {
-  .mobileToggle {
-    display: flex;
-  }
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.3em;
-  height: 1.3em;
-  padding: 0 0.25em;
-  background: var(--color-accent-pink);
-  color: var(--color-base-white);
-  border-radius: 999px;
-  font-size: var(--text--2);
-  font-weight: 700;
-  line-height: 1;
-}
-
-/* ── Mobile drawer header (inside Sheet) ─────────────────── */
-
-.drawerHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-s);
-  border-bottom: 1px solid var(--color-light-grey);
-  flex-shrink: 0;
-}
-
-.drawerTitle {
-  font-size: var(--text-0);
-  font-weight: 700;
-  color: var(--color-primary-navy);
-  font-family: var(--font-family);
+  padding: 0 var(--space-s) var(--space-xs);
 }

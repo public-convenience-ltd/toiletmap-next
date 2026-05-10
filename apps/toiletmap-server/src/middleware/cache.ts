@@ -14,7 +14,15 @@ export const cacheResponse = (ttl: TtlResolver): MiddlewareHandler => {
     const match = cache ? await cache.match(c.req.raw) : undefined;
 
     if (match) {
-      return match;
+      // Security/CORS headers were set on the Hono context by middleware that ran
+      // before this handler (e.g. securityHeaders), but returning the raw cached
+      // Response bypasses Hono's context header merging. Copy them across so every
+      // cached response still carries the correct CORS headers for the caller's origin.
+      const response = new Response(match.body, match);
+      for (const [key, value] of c.res.headers.entries()) {
+        response.headers.set(key, value);
+      }
+      return response;
     }
 
     await next();

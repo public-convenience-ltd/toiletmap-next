@@ -105,16 +105,16 @@ describe("Authentication via Cookies", () => {
     const idToken = issueToken({ aud: "wrong-audience" });
 
     const response = await callApi(
-      "/api/loos",
-      jsonRequest(
-        "POST",
-        { openingTimes: [["invalid"]] },
-        {
-          Cookie: `id_token=${idToken}; access_token=dummy; user_info=e30=`,
-        },
-      ),
+      "/admin",
+      jsonRequest("GET", undefined, {
+        Cookie: `id_token=${idToken}; access_token=dummy; user_info=e30=`,
+      }),
     );
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(302);
+    // When authentication fails via cookies, the session cookies are cleared
+    const setCookie = response.headers.get("set-cookie");
+    expect(setCookie).toBeTruthy();
+    expect(setCookie).toContain("id_token=;");
   });
 });

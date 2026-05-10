@@ -1,0 +1,12 @@
+{
+  "name": "@toiletmap/auth",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.12.18"
+  }
+}

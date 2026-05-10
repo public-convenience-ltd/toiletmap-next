@@ -22,6 +22,9 @@ interface LooMapProps {
 export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // True only for the initial /loo/{id} page load — cleared after first center
+  const shouldCenterRef = useRef(!!initialToiletId);
   const { data } = useMapData(apiUrl);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
@@ -56,13 +59,22 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
     };
   }, []);
 
-  // Pre-select toilet when navigating directly to /loo/{id}
+  // Pre-select toilet when navigating directly to /loo/{id} and pan the map to it
   useEffect(() => {
     if (!initialToiletId) return;
     import("../../api/loos").then(({ getLooById }) => {
       getLooById(apiUrl, initialToiletId).then((detail) => {
         isInitialLoading.current = false;
-        if (detail) setSelectedToilet(detail);
+        if (detail) {
+          setSelectedToilet(detail);
+          if (detail.location && map.current) {
+            map.current.setView(
+              [detail.location.lat, detail.location.lng],
+              Math.max(map.current.getZoom(), 15),
+              { animate: false },
+            );
+          }
+        }
       });
     });
   }, [apiUrl, initialToiletId]);
@@ -72,10 +84,35 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   useEffect(() => {
     if (isInitialLoading.current) return;
     if (selectedToilet) {
-      history.replaceState(null, "", `/loo/${selectedToilet.id}`);
+      history.pushState(null, "", `/loo/${selectedToilet.id}`);
     } else {
       history.replaceState(null, "", "/");
     }
+  }, [selectedToilet]);
+
+  // On the initial /loo/{id} load only, offset the map so the marker sits
+  // centred in the visible area above the details panel. Marker clicks skip
+  // this — the user already sees the marker, just open the panel.
+  useEffect(() => {
+    if (!selectedToilet || !map.current || !panelRef.current) return;
+    if (!shouldCenterRef.current) return;
+    shouldCenterRef.current = false;
+    const frame = requestAnimationFrame(() => {
+      if (!map.current || !panelRef.current) return;
+      const h = panelRef.current.clientHeight;
+      if (h > 0) map.current.panBy([0, h / 2], { animate: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedToilet]);
+
+  // Close the details panel when the user presses Escape
+  useEffect(() => {
+    if (!selectedToilet) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedToilet(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [selectedToilet]);
 
   return (
@@ -123,7 +160,7 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
       />
 
       {selectedToilet && (
-        <div className="toilet-panel">
+        <div className="toilet-panel" ref={panelRef}>
           <ToiletDetailsPanel
             key={selectedToilet.id}
             toilet={selectedToilet}

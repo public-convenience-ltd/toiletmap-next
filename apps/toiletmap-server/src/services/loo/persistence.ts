@@ -101,7 +101,10 @@ export const insertLoo = async ({ tx, id, data, mutation, contributor, now }: In
     VALUES (${Prisma.join(values)})
   `;
 
-  await tx.$executeRaw(insertSql);
+  // Prisma.TransactionClient omits $executeRaw in TS 6.0.3 due to over-eager
+  // ITXClientDenyList resolution; the method is present at runtime.
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma 7.8.0 / TS 6.0.3 type gap
+  await (tx as any).$executeRaw(insertSql);
 };
 
 type UpdateArgs = {
@@ -139,6 +142,7 @@ export const updateLoo = async ({ tx, id, data, mutation, contributor, now }: Up
     WHERE id = ${id}
   `;
 
-  const result = await tx.$executeRaw(updateSql);
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma 7.8.0 / TS 6.0.3 type gap
+  const result = await (tx as any).$executeRaw(updateSql);
   return Number(result);
 };
