@@ -133,7 +133,7 @@ export const pendingList = async (c: Context<{ Bindings: Env; Variables: AppVari
 export const pendingApprove = async (c: Context<{ Bindings: Env; Variables: AppVariables }>) => {
   const id = c.req.param("id");
   if (!id) {
-    return c.text("Invalid id", 500);
+    return c.text("Invalid id", 400);
   }
   const user = c.get("user");
   const pendingChangeService = c.get("pendingChangeService");
@@ -144,14 +144,14 @@ export const pendingApprove = async (c: Context<{ Bindings: Env; Variables: AppV
     return c.text("Not found or already processed", 404);
   }
 
-  const contributor = { user_id: user?.sub ?? "admin", name: user?.name ?? "Admin" };
+  const contributorName = user?.name ?? "Admin";
   const payload = change.payload as Parameters<typeof looService.create>[1];
 
   if (change.type === "create") {
     const newId = generateLooId();
-    await looService.create(newId, payload, contributor.name);
+    await looService.create(newId, payload, contributorName);
   } else if (change.type === "update" && change.loo_id) {
-    await looService.upsert(change.loo_id, payload, contributor.name);
+    await looService.upsert(change.loo_id, payload, contributorName);
   }
 
   await invalidateDumpCache(c.req.url);
@@ -162,7 +162,7 @@ export const pendingApprove = async (c: Context<{ Bindings: Env; Variables: AppV
 export const pendingReject = async (c: Context<{ Bindings: Env; Variables: AppVariables }>) => {
   const id = c.req.param("id");
   if (!id) {
-    return c.text("Invalid id", 500);
+    return c.text("Invalid id", 400);
   }
   const user = c.get("user");
   const pendingChangeService = c.get("pendingChangeService");
