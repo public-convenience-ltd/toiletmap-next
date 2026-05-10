@@ -162,7 +162,7 @@ export default function LooForm({
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (accessToken) {
-      headers["Authorization"] = `Bearer ${accessToken}`;
+      headers.Authorization = `Bearer ${accessToken}`;
     }
 
     try {

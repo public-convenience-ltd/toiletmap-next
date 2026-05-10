@@ -142,19 +142,21 @@ export class UserInsightsService {
       LIMIT 20
     `);
 
-    const recentReports: ContributorReport[] = reportRows.map((row) => {
-      const base = mapAuditRecordToReport({
-        id: row.id,
-        record: row.record,
-        old_record: row.old_record,
-      });
-      return {
-        ...base,
-        looId: row.loo_id,
-        looName: row.loo_name,
-        occurredAt: toIsoString(row.ts) ?? base.createdAt,
-      };
-    });
+    const recentReports: ContributorReport[] = reportRows.map(
+      (row: (typeof reportRows)[number]) => {
+        const base = mapAuditRecordToReport({
+          id: row.id,
+          record: row.record,
+          old_record: row.old_record,
+        });
+        return {
+          ...base,
+          looId: row.loo_id,
+          looName: row.loo_name,
+          occurredAt: toIsoString(row.ts) ?? base.createdAt,
+        };
+      },
+    );
 
     return {
       summary: {
@@ -167,12 +169,12 @@ export class UserInsightsService {
         firstSeenAt: toIsoString(eventRow?.first_seen),
         lastSeenAt: toIsoString(eventRow?.last_seen),
       },
-      areas: areaRows.map((row) => ({
+      areas: areaRows.map((row: (typeof areaRows)[number]) => ({
         areaId: row.area_id,
         name: row.area_name,
         count: toNumber(row.count),
       })),
-      loos: looRows.map((row) => ({
+      loos: looRows.map((row: (typeof looRows)[number]) => ({
         id: row.id,
         name: row.name,
         updatedAt: toIsoString(row.updated_at),
@@ -213,7 +215,7 @@ export class UserInsightsService {
       LIMIT ${limit}
     `);
 
-    return rows.map((row) => ({
+    return rows.map((row: (typeof rows)[number]) => ({
       handle: row.handle,
       contributions: toNumber(row.contributions),
     }));
@@ -237,7 +239,7 @@ export class UserInsightsService {
       LIMIT ${limit}
     `);
 
-    return rows.map((row) => ({
+    return rows.map((row: (typeof rows)[number]) => ({
       handle: row.handle,
       contributions: toNumber(row.contributions),
     }));

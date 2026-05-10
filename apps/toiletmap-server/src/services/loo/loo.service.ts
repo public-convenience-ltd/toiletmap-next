@@ -105,7 +105,7 @@ export class LooService {
     const query = buildSelectByIdsQuery(ids);
     const rows = (await this.prisma.$queryRaw<RawLooRow[]>(query)) ?? [];
 
-    return rows.map((loo) => {
+    return rows.map((loo: RawLooRow) => {
       const validated = RawLooRowSchema.parse(loo);
       return mapLoo({
         ...rawLooToToilets(validated),
@@ -137,7 +137,7 @@ export class LooService {
     const total =
       countRows.length > 0 && countRows[0]?.count !== undefined ? Number(countRows[0].count) : 0;
 
-    const data = rows.map((loo) => {
+    const data = rows.map((loo: RawLooRow) => {
       const validated = RawLooRowSchema.parse(loo);
       return mapLoo({
         ...rawLooToToilets(validated),
@@ -302,7 +302,7 @@ export class LooService {
       },
     });
 
-    return rows.map((row) => {
+    return rows.map((row: (typeof rows)[number]) => {
       return [
         row.id,
         row.geohash ?? "",
@@ -361,7 +361,7 @@ export class LooService {
       },
     });
 
-    return rows.map((row) => {
+    return rows.map((row: (typeof rows)[number]) => {
       return [
         row.id,
         row.geohash ?? "",
@@ -447,7 +447,7 @@ export class LooService {
     const query = buildProximityQuery(lat, lng, radius);
     const loos = (await this.prisma.$queryRaw<RawNearbyLooRow[]>(query)) ?? [];
 
-    return loos.map((loo) => {
+    return loos.map((loo: RawNearbyLooRow) => {
       const validated = RawNearbyLooRowSchema.parse(loo);
       return mapNearbyLoo({
         ...rawLooToToilets(validated),
@@ -479,8 +479,8 @@ export class LooService {
     // and are left over from our old system where we recorded a separate
     // location report for each loo.
     const mapped = reportRecords
-      .map((entry) => mapAuditRecordToReport(entry))
-      .filter((report) => !report.contributor?.endsWith("-location"));
+      .map((entry: Parameters<typeof mapAuditRecordToReport>[0]) => mapAuditRecordToReport(entry))
+      .filter((report: ReportResponse) => !report.contributor?.endsWith("-location"));
 
     const sortedReports = [...mapped].sort((a, b) => {
       const timeA = Date.parse(a.createdAt);

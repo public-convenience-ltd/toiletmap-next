@@ -13,24 +13,24 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^13.2.2",
+    "@astrojs/cloudflare": "^13.5.0",
     "@astrojs/preact": "^5.1.2",
+    "@toiletmap/auth": "workspace:*",
     "@types/leaflet": "^1.9.21",
-    "astro": "^6.1.10",
+    "astro": "^6.3.1",
+    "concurrently": "^9.2.1",
+    "hono": "^4.12.18",
     "idb-keyval": "^6.2.2",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "ngeohash": "^0.6.3",
     "preact": "^10.29.1",
-    "@toiletmap/auth": "workspace:*",
-    "concurrently": "^9.2.1",
-    "hono": "^4.12.15",
     "toiletmap-design-system": "workspace:*"
   },
   "devDependencies": {
     "@types/leaflet.markercluster": "^1.5.6",
     "@types/ngeohash": "^0.6.8",
-    "@types/node": "25.5.0",
+    "@types/node": "25.6.2",
     "happy-dom": "^20.9.0",
     "vitest": "^4.1.5"
   }
