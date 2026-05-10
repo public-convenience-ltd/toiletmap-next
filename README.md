@@ -6,7 +6,7 @@ This repository contains the code that powers both the public API and the admin 
 
 ## Project Overview
 
-- **What we ship**: REST API, geospatial queries, authentication, admin dashboard, soon a dedicated client worker
+- **What we ship**: REST API, geospatial queries, authentication, admin dashboard, public-facing client worker with add/edit toilet forms
 - **Runtime**: Cloudflare Workers with Hono, Prisma, and Supabase/PostGIS
 - **Edge Caching**: High-performance caching for toilet data and map tiles at the edge
 - **Why a monorepo**: keeps the API/admin worker and the frontend worker aligned, sharing tooling, CI, and documentation
@@ -15,10 +15,11 @@ This repository contains the code that powers both the public API and the admin 
 
 | Workspace          | Path                    | Purpose                                                                                                                        |
 | ------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `toiletmap-server` | `apps/toiletmap-server` | The original API + admin Cloudflare Worker. Houses all routing, services, Prisma schema, Supabase migrations, docs, and tests. |
-| `toiletmap-client` | `apps/toiletmap-client` | Public-facing frontend (Astro, Preact, SSR). See [Architecture](apps/toiletmap-client/docs/architecture.md). |
-| `toiletmap-app` | `apps/toiletmap-app` | Mobile application (Flutter). |
-| `toiletmap-design-system` | `apps/toiletmap-design-system` | Shared design tokens and assets. |
+| `toiletmap-server` | `apps/toiletmap-server` | API + admin Cloudflare Worker. Routing, services, Prisma schema, Supabase migrations, docs, and tests. |
+| `toiletmap-client` | `apps/toiletmap-client` | Public-facing frontend (Astro, Preact, SSR) including add/edit forms and Auth0 login. See [Architecture](apps/toiletmap-client/docs/architecture.md). |
+| `toiletmap-app`    | `apps/toiletmap-app`    | Mobile application (Flutter). |
+| `toiletmap-design-system` | `apps/toiletmap-design-system` | Shared Preact component library (Badge, Button, Icon, OpeningHoursInput, TriStateToggle, etc.). |
+| `@toiletmap/auth`  | `packages/auth`         | Shared Auth0 JWT verification utilities used by both the server and client workers. |
 
 Each workspace keeps its own `package.json` and configuration files, but all dependencies are managed through pnpm at the repository root.
 
@@ -65,7 +66,7 @@ make dev-server
 
 This command first generates the Prisma client and builds the admin interface assets, then concurrently runs the Vite build (watch mode), Wrangler dev server, and mock Auth0 server so you can visit your local Toilet Map immediately (default: `http://localhost:8787`).
 
-Want to see the client worker placeholder?
+To run the client worker (map, add/edit forms, Auth0 login):
 
 ```bash
 make dev-client
@@ -191,11 +192,14 @@ Both workflows can also be manually triggered through GitHub Actions. See [ONBOA
 
 ```
 apps/
-  toiletmap-server/   # API + admin worker (legacy project)
-  toiletmap-client/   # frontend worker placeholder
-docs/                 # project-wide docs (architecture, onboarding, ops)
-package.json          # workspace scripts + overrides
-pnpm-workspace.yaml   # workspace definition and onlyBuiltDependencies rules
+  toiletmap-server/        # API + admin worker
+  toiletmap-client/        # public-facing frontend worker
+  toiletmap-design-system/ # shared Preact component library
+packages/
+  auth/                    # shared @toiletmap/auth JWT utilities
+docs/                      # project-wide docs (architecture, onboarding, ops)
+package.json               # workspace scripts + overrides
+pnpm-workspace.yaml        # workspace definition and onlyBuiltDependencies rules
 ```
 
 ## Contributing

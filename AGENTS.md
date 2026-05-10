@@ -617,6 +617,8 @@ const contributor = contributorPath.split('.').reduce(
 9. **JWKS Caching**: Auth0 signing keys are cached (5 entries, 10 min TTL) - rate-limited to 10 requests/min
 10. **Dual Prisma Clients**: Never mix imports - always use the correct client for your runtime
 11. **Session Cookies**: Admin interface uses HTTP-only cookies; test with browser or cookie-aware HTTP client
+12. **Anonymous Mutations**: `POST /api/loos` and `PUT /api/loos/:id` without auth return 202 (queued) not 401. Integration tests that call these endpoints unauthenticated must track the returned `id` via `cleanupManager.trackPendingChange(body.id)` to avoid polluting the test DB.
+13. **Pending-Change Tests**: Use `getPrismaClient()` from `test/integration/setup.ts` to seed or inspect `pending_change` rows directly in integration tests.
 
 ## Documentation
 
@@ -634,7 +636,7 @@ const contributor = contributorPath.split('.').reduce(
 
 ---
 
-**Last Updated**: 2025-11-23
+**Last Updated**: 2026-05-10
 **Maintainer**: Public Convenience Ltd.
 **Repository**: `public-convenience-ltd/toiletmap-server`
 **Deployment**: Cloudflare Workers
