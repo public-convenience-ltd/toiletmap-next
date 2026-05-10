@@ -1,4 +1,4 @@
-import type { PrismaClientInstance } from "../../prisma";
+import type { Prisma, PrismaClientInstance } from "../../prisma";
 import type { LooMutationAttributes } from "../loo/types";
 
 export type PendingChangeType = "create" | "update";
@@ -29,10 +29,7 @@ export class PendingChangeService {
       data: {
         type,
         loo_id: looId,
-        // Prisma expects InputJsonValue for Json fields
-        payload: payload as Parameters<
-          typeof this.prisma.pending_change.create
-        >[0]["data"]["payload"],
+        payload: payload as Prisma.InputJsonValue,
         ip,
       },
       select: { id: true },
