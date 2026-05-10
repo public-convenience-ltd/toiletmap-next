@@ -57,7 +57,7 @@ export default function LocationPicker({ lat, lng, onChange }: LocationPickerPro
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || !lat || !lng) return;
+    if (!mapRef.current) return;
     updateMarker(lat, lng);
     const cur = mapRef.current.getCenter();
     if (cur.distanceTo([lat, lng]) > 500) {
