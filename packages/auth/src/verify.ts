@@ -1,7 +1,8 @@
 import { verifyWithJwks } from "hono/jwt";
 import type { Auth0User, AuthEnv, RequestUser } from "./types";
 
-const matchesAudience = (claim: unknown, expected: string): boolean => {
+/** @internal exposed for unit testing only */
+export const matchesAudience = (claim: unknown, expected: string): boolean => {
   if (!expected) return true;
   if (Array.isArray(claim)) return claim.includes(expected);
   if (typeof claim === "string") {
@@ -15,7 +16,8 @@ const matchesAudience = (claim: unknown, expected: string): boolean => {
   return false;
 };
 
-const normalizeUser = (user: Auth0User): RequestUser => {
+/** @internal exposed for unit testing only */
+export const normalizeUser = (user: Auth0User): RequestUser => {
   const sub = typeof user?.sub === "string" ? user.sub.trim() : null;
   if (!sub) throw new Error("Auth0 token missing `sub` claim");
 
