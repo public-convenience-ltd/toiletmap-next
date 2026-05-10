@@ -1,11 +1,14 @@
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { optionalAuth } from "../../auth/middleware";
 import { LOO_ID_LENGTH } from "../../common/constants";
 import { validate } from "../../common/validator";
+import { cacheResponse } from "../../middleware/cache";
 import { hasAdminRole } from "../../middleware/require-admin-role";
 import { generateLooId } from "../../services/loo";
 import type { AppVariables, Env } from "../../types";
 import { extractContributor } from "../../utils/auth-utils";
+import { invalidateDumpCache } from "../../utils/cache";
 import { badRequest, handleRoute, notFound } from "../shared/route-helpers";
 import type { MetricsQuery, SearchQuery } from "./schemas";
 import {
@@ -25,8 +28,23 @@ import {
 
 const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
-import { cacheResponse } from "../../middleware/cache";
-import { invalidateDumpCache } from "../../utils/cache";
+const anonRateLimitExceeded = async (
+  c: Context<{ Variables: AppVariables; Bindings: Env }>,
+): Promise<Response | null> => {
+  const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({
+    key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
+  }) ?? Promise.resolve({ success: true }));
+  if (!success) {
+    return c.json(
+      {
+        message: "Too many submissions, please try again in a minute",
+        error: "rate_limit_exceeded",
+      },
+      429,
+    );
+  }
+  return null;
+};
 
 /** GET /loos/updates — intentionally not cached so mutations are visible immediately */
 loosRouter.get("/updates", validate("query", updatesQuerySchema, "Invalid updates query"), (c) =>
@@ -199,18 +217,8 @@ loosRouter.post(
 
       if (!user) {
         // Anonymous submission: rate-limit then queue for approval
-        const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({
-          key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
-        }) ?? Promise.resolve({ success: true }));
-        if (!success) {
-          return c.json(
-            {
-              message: "Too many submissions, please try again in a minute",
-              error: "rate_limit_exceeded",
-            },
-            429,
-          );
-        }
+        const limited = await anonRateLimitExceeded(c);
+        if (limited) return limited;
 
         const validation = c.req.valid("json");
         const pendingChangeService = c.get("pendingChangeService");
@@ -257,18 +265,8 @@ loosRouter.put(
 
       if (!user) {
         // Anonymous submission: rate-limit then queue for approval
-        const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({
-          key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
-        }) ?? Promise.resolve({ success: true }));
-        if (!success) {
-          return c.json(
-            {
-              message: "Too many submissions, please try again in a minute",
-              error: "rate_limit_exceeded",
-            },
-            429,
-          );
-        }
+        const limited = await anonRateLimitExceeded(c);
+        if (limited) return limited;
 
         const validation = c.req.valid("json");
         const pendingChangeService = c.get("pendingChangeService");
