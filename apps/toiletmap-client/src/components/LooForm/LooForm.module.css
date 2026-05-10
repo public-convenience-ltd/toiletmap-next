@@ -56,6 +56,16 @@
   margin: 0 0 var(--space-s);
 }
 
+/* Opening hours section: no inner padding so the OH grid sits flush */
+.sectionFlush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sectionFlush > .sectionTitle {
+  padding: var(--space-m) var(--space-m) var(--space-s);
+}
+
 /* ── Fields ─────────────────────────────────────────────── */
 
 .fieldLabel {
@@ -143,8 +153,8 @@
 
 .triGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--space-s);
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-xs) var(--space-s);
 }
 
 /* ── Actions ─────────────────────────────────────────────── */

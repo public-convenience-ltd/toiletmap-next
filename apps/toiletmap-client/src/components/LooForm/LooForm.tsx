@@ -351,7 +351,7 @@ export default function LooForm({
           </section>
 
           {/* Opening hours */}
-          <section class={styles.section}>
+          <section class={`${styles.section} ${styles.sectionFlush}`}>
             <h2 class={styles.sectionTitle}>Opening hours</h2>
             <OpeningHoursInput
               value={form.openingTimes}

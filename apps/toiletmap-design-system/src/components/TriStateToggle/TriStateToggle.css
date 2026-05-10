@@ -21,11 +21,11 @@
   border: 1.5px solid var(--color-primary-navy);
   border-radius: 8px;
   overflow: hidden;
-  width: fit-content;
 }
 
 .tri-state-option {
   display: flex;
+  flex: 1;
   cursor: pointer;
 }
 
@@ -42,8 +42,11 @@
 }
 
 .tri-state-label {
-  display: block;
-  padding: var(--space-3xs) var(--space-s);
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xs) var(--space-2xs);
   font-size: var(--text--1);
   font-family: var(--font-family);
   color: var(--color-primary-navy);
@@ -53,6 +56,7 @@
     background 0.12s ease,
     color 0.12s ease;
   white-space: nowrap;
+  text-align: center;
 }
 
 .tri-state-label:hover {
