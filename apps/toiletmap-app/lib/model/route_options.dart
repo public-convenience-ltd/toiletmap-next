@@ -21,6 +21,8 @@ class RouteOptions {
     }
   }
 
+  TransportMode get transportMode => mode;
+
   @override
   String toString() => 'RouteOptions(mode: $mode, restrictions: $restrictions)';
 }

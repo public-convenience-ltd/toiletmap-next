@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:toilet_map_2/model/route_options.dart';
 
 class RouteOptionsDialog extends StatefulWidget {
-  const RouteOptionsDialog({super.key});
+  const RouteOptionsDialog({super.key, required this.initialOptions});
+
+  final RouteOptions initialOptions;
 
   @override
   State<RouteOptionsDialog> createState() => _RouteOptionsDialogState();
@@ -16,6 +18,7 @@ class _RouteOptionsDialogState extends State<RouteOptionsDialog>
   @override
   void initState() {
     super.initState();
+    _selectedMode = widget.initialOptions.transportMode;
   }
 
   void _cancel() => Navigator.of(context).pop();

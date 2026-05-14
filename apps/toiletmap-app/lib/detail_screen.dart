@@ -152,7 +152,7 @@ class _DetailScreenState extends State<DetailScreen> {
             child: Column(children: [Icon(Icons.route), Text("Route Options")]),
             //icon: Icon(Icons.replay),
             onPressed: () async {
-              final result = await showRouteOptionsDialog(context);
+              final result = await showRouteOptionsDialog(context, _routeOptions);
               print("Route options dialog result: $result");
               if (result != null) {
                 setState(() {
@@ -446,11 +446,11 @@ class _DetailScreenState extends State<DetailScreen> {
 // Public helper – call this from anywhere to show the dialog
 // ─────────────────────────────────────────────────────────────────────────────
 
-Future<RouteOptions?> showRouteOptionsDialog(BuildContext context) {
+Future<RouteOptions?> showRouteOptionsDialog(BuildContext context, RouteOptions routeOptions) {
   return showDialog<RouteOptions>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const RouteOptionsDialog(),
+    builder: (_) => RouteOptionsDialog(initialOptions: routeOptions),
   );
 }
 
