@@ -152,7 +152,7 @@ class _DetailScreenState extends State<DetailScreen> {
         actions: <Widget>[
           TextButton(
             //backgroundColor: Theme.of(context).colorScheme.onPrimary,
-            child: Column(children: [Icon(Icons.route), Text("Route Options")]),
+            child: Column(children: [Icon(Icons.route), Text("Mode of Transport")]),
             //icon: Icon(Icons.replay),
             onPressed: () async {
               final result = await showRouteOptionsDialog(
