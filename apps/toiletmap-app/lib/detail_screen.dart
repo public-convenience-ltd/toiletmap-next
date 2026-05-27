@@ -157,6 +157,7 @@ class _DetailScreenState extends State<DetailScreen> {
               if (result != null) {
                 setState(() {
                   _routeOptions = result;
+                  distance = 0;
                   routePoints = null;
                 });
               }
@@ -243,7 +244,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                   style: Theme.of(context).textTheme.bodySmall,
                                 )
                               : Text(
-                                  "${placemark?.street}, ${placemark?.postalCode}, ${placemark?.country}\nWalking Distance: ${distance.toStringAsFixed(0)} m",
+                                  "${placemark?.street}, ${placemark?.postalCode}, ${placemark?.country}\nRoute Distance: ${distance.toStringAsFixed(0)} m",
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                         ),
