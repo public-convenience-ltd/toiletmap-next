@@ -193,11 +193,7 @@ class _RouteOptionsDialogState extends State<RouteOptionsDialog>
   
   Widget? _buildConditionalFields() {
     switch (_selectedMode) {
-      case TransportMode.car:
-        return Text(
-          'Additional car-specific options would go here.',
-          style: TextStyle(color: Theme.of(context).colorScheme.primary),
-        );
+      
       case TransportMode.hgv:
         return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -211,7 +207,12 @@ class _RouteOptionsDialogState extends State<RouteOptionsDialog>
           ],
         ),
       );
-
+      /*
+      case TransportMode.car:
+        return Text(
+          'Additional car-specific options would go here.',
+          style: TextStyle(color: Theme.of(context).colorScheme.primary),
+        );
       case TransportMode.walking:
         return Text(
           'Additional walking-specific options would go here.',
@@ -227,6 +228,9 @@ class _RouteOptionsDialogState extends State<RouteOptionsDialog>
           'Additional cycling-specific options would go here.',
           style: TextStyle(color: Theme.of(context).colorScheme.primary),
         );
+        */
+      default:
+        return null;
     }
   }
 }
