@@ -25,7 +25,9 @@ class NavigationLauncher {
       case 'driving-hgv':
         mode = 'd';
         break;
-      case 'transit':
+      case 'transit':  // we dont have a transit option in our app but just in case
+        mode = 'r';
+        break;
       default:
         mode = 'r';
     }
