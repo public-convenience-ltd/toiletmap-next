@@ -16,6 +16,7 @@ import 'route_options_dialog.dart';
 import 'services/ors_service.dart';
 import 'util/logging.dart' as logging;
 import 'util/map_util.dart';
+import 'util/navigation_launcher.dart';
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({
@@ -89,7 +90,9 @@ class _DetailScreenState extends State<DetailScreen> {
       // distance = Geolocator.distanceBetween(userLocation!.latitude,
       //     userLocation!.longitude, loo.location.lat, loo.location.lng);
       route().then((value) {
-        if (routePoints == null || const DeepCollectionEquality().equals(routePoints, value) == false) {
+        if (routePoints == null ||
+            const DeepCollectionEquality().equals(routePoints, value) ==
+                false) {
           setState(() {
             routePoints = value;
             logging.log.info("Route points: $routePoints");
@@ -152,8 +155,10 @@ class _DetailScreenState extends State<DetailScreen> {
             child: Column(children: [Icon(Icons.route), Text("Route Options")]),
             //icon: Icon(Icons.replay),
             onPressed: () async {
-              final result = await showRouteOptionsDialog(context, _routeOptions);
-              print("Route options dialog result: $result");
+              final result = await showRouteOptionsDialog(
+                context,
+                _routeOptions,
+              );
               if (result != null) {
                 setState(() {
                   _routeOptions = result;
@@ -161,6 +166,14 @@ class _DetailScreenState extends State<DetailScreen> {
                   routePoints = null;
                 });
               }
+            },
+          ),
+          TextButton(
+            //backgroundColor: Theme.of(context).colorScheme.onPrimary,
+            child: Column(children: [Icon(Icons.navigation), Text("Navigate")]),
+            //icon: Icon(Icons.replay),
+            onPressed: () async {
+              NavigationLauncher.navigateTo(lat: loo.location.lat, lng: loo.location.lng, transportType: _routeOptions.orsProfile);
             },
           ),
         ],
@@ -447,11 +460,13 @@ class _DetailScreenState extends State<DetailScreen> {
 // Public helper – call this from anywhere to show the dialog
 // ─────────────────────────────────────────────────────────────────────────────
 
-Future<RouteOptions?> showRouteOptionsDialog(BuildContext context, RouteOptions routeOptions) {
+Future<RouteOptions?> showRouteOptionsDialog(
+  BuildContext context,
+  RouteOptions routeOptions,
+) {
   return showDialog<RouteOptions>(
     context: context,
     barrierDismissible: false,
     builder: (_) => RouteOptionsDialog(initialOptions: routeOptions),
   );
 }
-
