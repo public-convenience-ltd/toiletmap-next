@@ -32,8 +32,8 @@ class _RouteOptionsDialogState extends State<RouteOptionsDialog>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    //final theme = Theme.of(context);
+    //final colorScheme = theme.colorScheme;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,

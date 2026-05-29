@@ -35,8 +35,6 @@ class RouteOptions {
         return 'b';
       case TransportMode.transit:
         return 'r';
-      default:
-        return 'w';
     }
   }
 
@@ -52,8 +50,6 @@ class RouteOptions {
         return 'c';
       case TransportMode.transit:
         return 'r';
-      default:
-        return 'w';
     }
   }
   
