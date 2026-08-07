@@ -147,3 +147,37 @@ jobs:
       - name: Build Android APK
         run: make build-app
 
+  cloudflare-build-check:
+    name: Cloudflare Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build & Dry-Run Deploy (Server)
+        working-directory: apps/toiletmap-server
+        run: |
+          pnpm prisma:generate
+          pnpm build:client
+          pnpm exec wrangler deploy --dry-run
+
+      - name: Build & Dry-Run Deploy (Client)
+        working-directory: apps/toiletmap-client
+        run: |
+          pnpm build
+          pnpm exec wrangler deploy --dry-run
+
