@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  hono: ^4.12.18
+  hono: ^4.13.1
   valibot@>=0.31.0 <1.2.0: '>=1.2.0'
 
 importers:
@@ -732,12 +732,12 @@ packages:
   '@hono/swagger-ui@0.6.1':
     resolution: {integrity: sha512-sJTvldu1GPeEPfyeLG7gRj+W4vEuD+JDi+JjJ3TJs/DvMUtBLs0KJO5yokGegWWdy5qrbdnQGekbhgNRmPmYKQ==}
     peerDependencies:
-      hono: ^4.12.18
+      hono: ^4.13.1
 
   '@hono/zod-validator@0.9.0':
     resolution: {integrity: sha512-n0ZSXmCiHVIp4Y5wlOOyZCeTd/rsawA/qW1cipB8QOYKZ9N8Tk0nZUZCXho9cu374AN4JpDNKioNKBJ/W+LBug==}
     peerDependencies:
-      hono: ^4.12.18
+      hono: ^4.13.1
       zod: ^3.25.0 || ^4.0.0
 
   '@img/colour@1.1.0':
