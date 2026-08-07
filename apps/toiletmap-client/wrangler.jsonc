@@ -5,10 +5,10 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
- "assets": {
-		"binding": "ASSETS",
-		"directory": "./dist"
-	},
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist/client"
+  },
   // AUTH0_REDIRECT_URI is derived from request origin at runtime (no var needed)
   // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET are Cloudflare secrets — set via `wrangler secret put`
   // For local dev, override all vars via .dev.vars (see .dev.vars.example)

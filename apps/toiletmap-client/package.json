@@ -13,11 +13,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.2.0",
-    "@astrojs/preact": "^6.0.2",
+    "@astrojs/cloudflare": "^13.5.0",
+    "@astrojs/preact": "^5.1.2",
     "@toiletmap/auth": "workspace:*",
     "@types/leaflet": "^1.9.22",
-    "astro": "^7.2.0",
+    "astro": "^6.3.1",
     "concurrently": "^10.0.4",
     "hono": "^4.13.1",
     "idb-keyval": "^6.3.0",
