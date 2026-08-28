@@ -11,8 +11,12 @@ import 'package:open_route_service/open_route_service.dart';
 import 'env/env.dart';
 import 'model/loo.dart';
 import 'model/osm_data.dart';
+import 'model/route_options.dart';
+import 'route_options_dialog.dart';
+import 'services/ors_service.dart';
 import 'util/logging.dart' as logging;
 import 'util/map_util.dart';
+import 'util/navigation_launcher.dart';
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({
@@ -51,6 +55,8 @@ class _DetailScreenState extends State<DetailScreen> {
     "Saturday",
     "Sunday",
   ];
+
+  RouteOptions _routeOptions = const RouteOptions(TransportMode.walking);
 
   _DetailScreenState() {
     mapController = MapController();
@@ -141,6 +147,42 @@ class _DetailScreenState extends State<DetailScreen> {
             .colorScheme
             .primary, //backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(loo.getName()),
+        actions: <Widget>[
+          TextButton(
+            //backgroundColor: Theme.of(context).colorScheme.onPrimary,
+            child: Column(children: [Icon(Icons.navigation), Text("Navigate")]),
+            //icon: Icon(Icons.replay),
+            onPressed: () async {
+              final result = await showDialog<RouteOptions>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => RouteOptionsDialog(initialOptions: _routeOptions),
+              );
+              if (result != null) {
+                setState(() {
+                  _routeOptions = result;
+                  distance = 0;
+                  routePoints = null;
+                });
+                NavigationLauncher.navigateTo(
+                  lat: loo.location.lat, 
+                  lng: loo.location.lng, 
+                  options: _routeOptions
+                );
+              }
+            },
+          ),
+          /*
+          TextButton(
+            //backgroundColor: Theme.of(context).colorScheme.onPrimary,
+            child: Column(children: [Icon(Icons.navigation), Text("Navigate")]),
+            //icon: Icon(Icons.replay),
+            onPressed: () async {
+              NavigationLauncher.navigateTo(lat: loo.location.lat, lng: loo.location.lng, transportType: _routeOptions.orsProfile);
+            },
+          ),
+          */
+        ],
       ),
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
@@ -355,9 +397,8 @@ class _DetailScreenState extends State<DetailScreen> {
       return routePoints!;
     }
     // Initialize the openrouteservice with your API key.
-    final OpenRouteService client = OpenRouteService(
+    final OrsService service = OrsService(
       apiKey: Env.orsKey,
-      defaultProfile: ORSProfile.footWalking,
     );
     OsmData loc = widget.foundLocation ?? userLocation!;
     // OsmData loc = userLocation!;
@@ -372,10 +413,16 @@ class _DetailScreenState extends State<DetailScreen> {
     List<ORSCoordinate> routeCoordinates = [];
     try {
       // Form Route between coordinates
-      routeCoordinates = await client.directionsRouteCoordsGet(
-        startCoordinate: ORSCoordinate(latitude: startLat, longitude: startLng),
-        endCoordinate: ORSCoordinate(latitude: endLat, longitude: endLng),
+      final result = await service.getOrsRoute(
+        start: [startLng, startLat],
+        end: [endLng, endLat],
+        routeOptions: _routeOptions,
       );
+      routeCoordinates = result.geometry
+          .map(
+            (coord) => ORSCoordinate(latitude: coord[1], longitude: coord[0]),
+          )
+          .toList();
     } catch (e) {
       logging.log.severe("Error getting route: $e");
       routeCoordinates = [];
