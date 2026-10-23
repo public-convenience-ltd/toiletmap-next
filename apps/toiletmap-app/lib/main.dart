@@ -75,4 +75,5 @@ class _ToiletAppState extends State<ToiletApp> {
     LocationService.instance.dispose();
     super.dispose();
   }
+
 }
