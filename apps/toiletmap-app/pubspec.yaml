@@ -55,7 +55,7 @@ dependencies:
   google_fonts: ^8.1.0
   shared_preferences: ^2.5.3
   email_validator: ^3.0.0
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
