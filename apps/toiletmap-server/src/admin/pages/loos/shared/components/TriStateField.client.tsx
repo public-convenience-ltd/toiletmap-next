@@ -30,6 +30,8 @@ type TriStateFieldProps = {
   error?: string;
   hint?: string;
   compact?: boolean;
+  /** When false, only Yes / No are offered (e.g. for the `active` flag). */
+  allowUnknown?: boolean;
 };
 
 export const TriStateField = ({
@@ -40,6 +42,7 @@ export const TriStateField = ({
   error,
   hint,
   compact,
+  allowUnknown = true,
 }: TriStateFieldProps) => (
   <fieldset
     class={`tri-field ${compact ? "tri-field--compact" : ""}`}
@@ -47,7 +50,7 @@ export const TriStateField = ({
   >
     <legend class="form-label">{label}</legend>
     <div class="tri-state-container">
-      {OPTIONS.map((option) => (
+      {(allowUnknown ? OPTIONS : OPTIONS.filter((option) => option.value !== "")).map((option) => (
         <label class="tri-state-option">
           <input
             type="radio"

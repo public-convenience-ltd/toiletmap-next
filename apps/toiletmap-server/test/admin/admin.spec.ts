@@ -375,7 +375,11 @@ describe("Admin Routes", () => {
     };
 
     vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
-    const getById = vi.spyOn(LooService.prototype, "getById").mockResolvedValue(mockLoo);
+    // The edit page must read the record fresh (uncached), not via getById.
+    const getMutationBase = vi
+      .spyOn(LooService.prototype, "getMutationBase")
+      .mockResolvedValue({ ...mockLoo, areaId: null });
+    const getById = vi.spyOn(LooService.prototype, "getById");
 
     const res = await app.request(
       `/admin/loos/${mockLoo.id}/edit`,
@@ -383,16 +387,20 @@ describe("Admin Routes", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(getById).toHaveBeenCalledWith(mockLoo.id);
+    expect(getMutationBase).toHaveBeenCalledWith(mockLoo.id);
+    expect(getById).not.toHaveBeenCalled();
 
     const text = await res.text();
     const config = extractJsonConfig<{
       defaults: Record<string, unknown>;
       api: { update: string };
       looId: string;
+      baseUpdatedAt: string | null;
     }>(text, "loo-edit-config");
 
     expect(config.looId).toBe(mockLoo.id);
+    // The concurrency token the save is checked against.
+    expect(config.baseUpdatedAt).toBe(mockLoo.updatedAt);
     expect(config.api.update).toBe(`/api/loos/${mockLoo.id}`);
     expect(config.defaults.openingTimes).toEqual(openingTimes);
     expect(config.defaults.lat).toBe(mockLoo.location?.lat.toString());
@@ -404,7 +412,9 @@ describe("Admin Routes", () => {
 
   it("should render a helpful state when trying to edit a missing loo", async () => {
     vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
-    const getById = vi.spyOn(LooService.prototype, "getById").mockResolvedValue(null);
+    const getMutationBase = vi
+      .spyOn(LooService.prototype, "getMutationBase")
+      .mockResolvedValue(null);
 
     const res = await app.request(
       "/admin/loos/missing/edit",
@@ -412,7 +422,7 @@ describe("Admin Routes", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(getById).toHaveBeenCalledWith("missing");
+    expect(getMutationBase).toHaveBeenCalledWith("missing");
     const text = await res.text();
     expect(text).toContain("Loo not found");
     expect(text).toContain("Back to dataset");

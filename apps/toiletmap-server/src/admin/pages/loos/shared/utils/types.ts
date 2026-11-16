@@ -1,7 +1,7 @@
 import type { OpeningTimes } from "../../../../../services/loo/types";
-import type { FieldErrors, TriStateValue } from "./form-helpers";
+import type { BooleanValue, FieldErrors, TriStateValue } from "./form-helpers";
 
-export type { FieldErrors, TriStateValue };
+export type { BooleanValue, FieldErrors, TriStateValue };
 
 export type LooFormState = {
   name: string;
@@ -20,7 +20,8 @@ export type LooFormState = {
   allGender: TriStateValue;
   children: TriStateValue;
   urinalOnly: TriStateValue;
-  active: TriStateValue;
+  /** Two-state only: the public API never accepts `active: null`. */
+  active: BooleanValue;
   removalReason: string;
   openingTimes: OpeningTimes;
 };

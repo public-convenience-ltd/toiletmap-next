@@ -1,5 +1,9 @@
 import type { OpeningTimes } from "../../services/loo/types";
 
+/** Any non-empty pair whose opening and closing times are equal means "open 24 hours". */
+const isTwentyFourHours = (day: readonly string[]): boolean =>
+  day.length === 2 && day[0] !== "" && day[0] === day[1];
+
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export const OpeningHours = (props: { openingTimes: OpeningTimes }) => {
@@ -13,28 +17,16 @@ export const OpeningHours = (props: { openingTimes: OpeningTimes }) => {
     return <span style="color: var(--color-accent-pink);">Closed</span>;
   }
 
-  // Check if open 24/7 (all days have 00:00-00:00 or similar logic if we had it,
-  // but for now we'll just check if every day has some hours)
-  // Actually, let's just render the list.
-
   return (
     <ul style="list-style: none; padding: 0; margin: 0; font-size: var(--text-0);">
       {props.openingTimes.map((times, index) => {
         const dayName = DAYS[index];
         let timeString = "Closed";
 
-        if (times.length > 0) {
-          // Assuming [open, close] format
+        if (times.length === 2) {
           const [open, close] = times;
-          if (open === "00:00" && close === "00:00") {
-            // This is often used for 24 hours in some datasets,
-            // or we might see specific 24h flags.
-            // For this system, let's just print the times or "24 Hours" if we detect it.
-            // But strictly following the type:
-            timeString = "24 Hours";
-          } else {
-            timeString = `${open} - ${close}`;
-          }
+          // Any pair where open === close (e.g. 00:00–00:00) means open 24 hours.
+          timeString = isTwentyFourHours(times) ? "24 Hours" : `${open} - ${close}`;
         }
 
         const isToday = new Date().getDay() === (index + 1) % 7;
