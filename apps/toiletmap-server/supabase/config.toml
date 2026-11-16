@@ -25,7 +25,7 @@ major_version = 15
 # Port to use for Supabase Studio.
 port = 54323
 
-[inbucket]
+[local_smtp]
 enabled = false
 
 [realtime]
