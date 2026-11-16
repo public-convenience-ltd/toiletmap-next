@@ -22,6 +22,11 @@ export type {
   OpeningTimes,
 } from "./components/OpeningHoursInput/OpeningHoursInput";
 export { default as OpeningHoursInput } from "./components/OpeningHoursInput/OpeningHoursInput";
+export {
+  createDefaultOpeningTimes,
+  isTwentyFourHours,
+  validateOpeningTimes,
+} from "./components/OpeningHoursInput/openingTimes";
 export { default as RadioInput } from "./components/RadioInput/RadioInput";
 export type { SheetProps } from "./components/Sheet/Sheet";
 export { default as Sheet } from "./components/Sheet/Sheet";
