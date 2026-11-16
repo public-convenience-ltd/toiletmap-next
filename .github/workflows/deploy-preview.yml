@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   deploy-server:
@@ -89,3 +90,69 @@ jobs:
             --var "AUTH0_AUDIENCE:https://www.toiletmap.org.uk/api" \
             --var "AUTH0_CLIENT_ID:${AUTH0_CLIENT_ID}" \
             --var "AUTH0_CLIENT_SECRET:${AUTH0_CLIENT_SECRET}"
+
+  comment-preview-urls:
+    name: Comment Preview URLs on PR
+    runs-on: ubuntu-latest
+    needs: [deploy-server, deploy-client]
+    steps:
+      - name: Post Deploy Preview Links
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const refName = process.env.GITHUB_REF_NAME || '';
+            const branch = refName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
+
+            const serverUrl = `https://${branch}-toiletmap-server.gbtoiletmap.workers.dev`;
+            const clientUrl = `https://${branch}-toiletmap-client.gbtoiletmap.workers.dev`;
+
+            const body = `### 🚀 Cloudflare Preview Deployed!
+
+            | App | Preview URL |
+            | --- | --- |
+            | **Server / Admin** | [${serverUrl}](${serverUrl}) |
+            | **Client** | [${clientUrl}](${clientUrl}) |
+
+            *Built from commit \`${context.sha.substring(0, 7)}\`*`;
+
+            let issueNumber = context.payload.pull_request ? context.payload.pull_request.number : null;
+
+            if (!issueNumber) {
+              const pulls = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: `${context.repo.owner}:${refName}`,
+                state: 'open'
+              });
+              if (pulls.data.length > 0) {
+                issueNumber = pulls.data[0].number;
+              }
+            }
+
+            if (issueNumber) {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+              });
+
+              const botComment = comments.find(c => c.body && c.body.includes('Cloudflare Preview Deployed!'));
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: body,
+                });
+              }
+            }
+
