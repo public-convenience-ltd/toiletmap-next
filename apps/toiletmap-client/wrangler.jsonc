@@ -35,6 +35,9 @@
     },
     "production": {
       "name": "toiletmap-client",
+      // Service binding used by the same-origin /api/* proxy and SSR fetches.
+      // Preview has no binding (server names are per-branch) and falls back to PUBLIC_API_URL.
+      "services": [{ "binding": "API", "service": "toiletmap-server" }],
       // AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET set as Cloudflare secrets
       "vars": {
         "ENVIRONMENT": "production",

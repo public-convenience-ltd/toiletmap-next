@@ -14,6 +14,7 @@ declare namespace Cloudflare {
 	}
 	interface ProductionEnv {
 		ASSETS: Fetcher;
+		API: Fetcher;
 		AUTH0_ISSUER_BASE_URL: "https://gbptm.eu.auth0.com/";
 		AUTH0_SCOPE: "openid profile email";
 		AUTH0_AUDIENCE: "https://www.toiletmap.org.uk/api";
@@ -24,6 +25,7 @@ declare namespace Cloudflare {
 	}
 	interface Env {
 		ASSETS: Fetcher;
+		API?: Fetcher;
 		AUTH0_ISSUER_BASE_URL: "https://gbptm.eu.auth0.com/" | "http://127.0.0.1:44555/";
 		AUTH0_SCOPE: "openid profile email";
 		AUTH0_AUDIENCE: "https://www.toiletmap.org.uk/api" | "https://toiletmap.org.uk";
