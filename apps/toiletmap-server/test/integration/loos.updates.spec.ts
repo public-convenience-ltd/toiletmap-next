@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
+import { getTestContext } from "./setup";
 import { createFixtureFactory } from "./utils/fixtures";
-import { callApi } from "./utils/test-client";
+import { callApi, jsonRequest } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
 
@@ -46,4 +47,40 @@ test("GET /loos/geohash returns summary data", async () => {
   // Our implementation currently returns full LooResponse, so let's check for a field
   // that is NOT in compressed but IS in LooResponse, e.g. 'name'.
   expect(found.name).toBeDefined();
+});
+
+test("GET /loos/updates lists a deactivated loo under deleted", async () => {
+  const loo = await fixtures.loos.create({ active: true });
+
+  // Make sure the deactivation lands strictly after `since`.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const since = new Date().toISOString();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  const { issueToken } = getTestContext();
+  const deactivate = await callApi(
+    `/api/loos/${loo.id}`,
+    jsonRequest(
+      "PUT",
+      { active: false, removalReason: "Closed permanently" },
+      { Authorization: `Bearer ${issueToken()}` },
+    ),
+  );
+  expect(deactivate.status).toBe(200);
+  const body = (await deactivate.json()) as {
+    active: boolean | null;
+    removalReason: string | null;
+  };
+  expect(body.active).toBe(false);
+  expect(body.removalReason).toBe("Closed permanently");
+
+  const response = await callApi(`/api/loos/updates?since=${since}`);
+  expect(response.status).toBe(200);
+  const updates = (await response.json()) as {
+    upserted: [string, string, number][];
+    deleted: string[];
+  };
+
+  expect(updates.deleted).toContain(loo.id);
+  expect(updates.upserted.find((row) => row[0] === loo.id)).toBeUndefined();
 });

@@ -106,7 +106,12 @@ describe("Loo mutation endpoints", () => {
     });
 
     it("updates an existing loo and returns 200", async () => {
-      const existing = await fixtures.loos.create({ notes: "Before update" });
+      const existing = await fixtures.loos.create({
+        notes: "Before update",
+        name: "Keep this name",
+        babyChange: true,
+        paymentDetails: "50p",
+      });
       const payload = {
         notes: "After update",
         radar: true,
@@ -126,6 +131,13 @@ describe("Loo mutation endpoints", () => {
       const body = await response.json();
       expect(body.notes).toBe("After update");
       expect(body.radar).toBe(true);
+
+      // Fields omitted from the payload are left untouched.
+      expect(body.name).toBe("Keep this name");
+      expect(body.babyChange).toBe(true);
+      expect(body.paymentDetails).toBe("50p");
+      expect(body.accessible).toBe(existing.accessible);
+      expect(body.location).toEqual(existing.location);
     });
 
     it("queues anonymous updates for review (202)", async () => {

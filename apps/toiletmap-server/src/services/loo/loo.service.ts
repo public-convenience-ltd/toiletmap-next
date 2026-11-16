@@ -1,5 +1,6 @@
 import { MAX_SEARCH_LIMIT, MIN_SEARCH_LIMIT, RECENT_WINDOW_DAYS } from "../../common/constants";
 import { Prisma, type PrismaClientInstance } from "../../prisma";
+import type { LooDiffBase } from "./diff";
 import {
   areaSelection,
   buildAreaFromJoin,
@@ -33,6 +34,16 @@ import {
   type RawNearbyLooRow,
   RawNearbyLooRowSchema,
 } from "./types";
+
+type DbClient = PrismaClientInstance | Prisma.TransactionClient;
+
+/** A loo as read for mutation purposes: the public response plus its raw `areaId`. */
+export type LooMutationBase = LooDiffBase & { areaId: string | null };
+
+export type UpdateExistingResult =
+  | { status: "updated"; loo: LooResponse | null }
+  | { status: "not_found" }
+  | { status: "conflict" };
 
 /**
  * Service for managing Loo (toilet) data.
@@ -93,6 +104,20 @@ export class LooService {
 
     this.looCache.set(id, loo);
     return loo;
+  }
+
+  /**
+   * Reads a loo fresh from the database (bypassing the per-request cache) for
+   * use as the comparison base of a mutation. Includes the raw `areaId`, which
+   * the public response omits. Pass a transaction client to read within it.
+   */
+  async getMutationBase(id: string, db: DbClient = this.prisma): Promise<LooMutationBase | null> {
+    const row = await db.toilets.findUnique({
+      where: { id },
+      include: { areas: areaSelection },
+    });
+    if (!row) return null;
+    return { ...mapLoo(row), areaId: row.area_id ?? null };
   }
 
   /**
@@ -540,6 +565,83 @@ export class LooService {
     });
 
     return this.getById(id);
+  }
+
+  /**
+   * Inserts a new loo inside a caller-owned transaction. The caller is
+   * responsible for reloading the record after the transaction commits.
+   */
+  async createInTransaction(
+    tx: Prisma.TransactionClient,
+    id: string,
+    mutation: LooMutationAttributes,
+    contributor: string | null,
+  ): Promise<void> {
+    await insertLoo({
+      tx,
+      id,
+      data: mapMutationToPrismaData(mutation, { forCreate: true }),
+      mutation,
+      contributor,
+      now: new Date(),
+    });
+    this.looCache.delete(id);
+  }
+
+  /**
+   * Strictly updates an existing loo. Unlike {@link upsert}, this never inserts:
+   * if the loo does not exist the result is `not_found`.
+   *
+   * @param options.expectedUpdatedAt - Optimistic-concurrency token (the
+   *   `updatedAt` the change was computed against). When supplied and the row
+   *   has been modified since, nothing is written and the result is `conflict`.
+   * @param options.tx - Run inside a caller-owned transaction. The returned
+   *   `loo` is then read through that transaction.
+   */
+  async updateExisting(
+    id: string,
+    mutation: LooMutationAttributes,
+    contributor: string | null,
+    options: { expectedUpdatedAt?: string | null; tx?: Prisma.TransactionClient } = {},
+  ): Promise<UpdateExistingResult> {
+    const { expectedUpdatedAt, tx: outerTx } = options;
+    const expected =
+      expectedUpdatedAt === undefined
+        ? undefined
+        : expectedUpdatedAt === null
+          ? null
+          : new Date(expectedUpdatedAt);
+
+    const run = async (tx: Prisma.TransactionClient): Promise<UpdateExistingResult> => {
+      const updatedCount = await updateLoo({
+        tx,
+        id,
+        data: mapMutationToPrismaData(mutation, { forCreate: false }),
+        mutation,
+        contributor,
+        now: new Date(),
+        expectedUpdatedAt: expected,
+      });
+      this.looCache.delete(id);
+
+      if (updatedCount > 0) return { status: "updated", loo: null };
+
+      const stillExists = await tx.toilets.findUnique({ where: { id }, select: { id: true } });
+      return stillExists ? { status: "conflict" } : { status: "not_found" };
+    };
+
+    if (outerTx) {
+      const result = await run(outerTx);
+      if (result.status !== "updated") return result;
+      const base = await this.getMutationBase(id, outerTx);
+      if (!base) return { status: "updated", loo: null };
+      const { areaId: _areaId, ...loo } = base;
+      return { status: "updated", loo };
+    }
+
+    const result = await this.prisma.$transaction(run);
+    if (result.status !== "updated") return result;
+    return { status: "updated", loo: await this.getById(id) };
   }
 
   /**
