@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { LooDetail } from "../../api/loos";
@@ -11,7 +11,12 @@ import {
   saveSnapshot,
 } from "../../api/mapCache";
 import { draftKey } from "./draft";
-import LooForm, { LIVE_STRAIGHT_AWAY, MESSAGES, MODERATOR_WILL_CHECK } from "./LooForm";
+import LooForm, {
+  LIVE_STRAIGHT_AWAY,
+  MESSAGES,
+  MODERATOR_WILL_CHECK,
+  NO_CHANGES_HINT,
+} from "./LooForm";
 import { formStateFromLoo } from "./payload";
 
 const pendingKey = (looId: string) => `toiletmap-pending:${looId}`;
@@ -939,7 +944,6 @@ describe("LooForm review sheet", () => {
     renderEdit(makeLoo(), true, { canWriteDirectly: false });
     expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
     await changeName(user, "Renamed");
-    expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
     await user.click(saveButton());
     expect(
       within(reviewSheet()).getByText(
@@ -990,17 +994,87 @@ describe("LooForm review sheet", () => {
   });
 });
 
+/** The sticky bar with Cancel and Save. */
+const actionBar = () => saveButton().closest("[data-action-bar]") as HTMLElement;
+/** The "goes live / a moderator will check" notice above the questions. */
+const saveNotice = () => {
+  const text = screen.getByText(/^(Your change will go live|A moderator will check)/);
+  return text.closest(".banner") as HTMLElement;
+};
+
+describe("LooForm save notice", () => {
+  it("tells a trusted user once, above the questions, that their change goes live", () => {
+    renderEdit(makeLoo(), true, { canWriteDirectly: true });
+    expect(screen.getAllByText(LIVE_STRAIGHT_AWAY)).toHaveLength(1);
+    expect(screen.queryByText(MODERATOR_WILL_CHECK)).toBeNull();
+    const notice = saveNotice();
+    // Under the heading, before the first question, and not in the action bar.
+    expect(
+      screen.getByRole("heading", { level: 1 }).compareDocumentPosition(notice) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      notice.compareDocumentPosition(nameInput()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(actionBar()).not.toContainElement(notice);
+    expect(within(notice).queryByRole("link")).toBeNull();
+  });
+
+  it("tells a signed-in user without report:loo a moderator will check, without a sign-in link", () => {
+    renderEdit(makeLoo(), true, { canWriteDirectly: false });
+    expect(screen.getAllByText(MODERATOR_WILL_CHECK)).toHaveLength(1);
+    expect(screen.queryByText(LIVE_STRAIGHT_AWAY)).toBeNull();
+    expect(within(saveNotice()).queryByRole("link")).toBeNull();
+  });
+
+  it("tells anonymous users their change will be reviewed, with a sign-in link back here", () => {
+    locationStub.pathname = "/loos/add";
+    locationStub.search = "?lat=51.5&lng=-0.1&zoom=17";
+    renderAdd(false);
+    expect(screen.getAllByText(MODERATOR_WILL_CHECK)).toHaveLength(1);
+    const notice = saveNotice();
+    expect(within(notice).getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      `/auth/login?returnTo=${encodeURIComponent("/loos/add?lat=51.5&lng=-0.1&zoom=17")}`,
+    );
+    // Only the one link (the bar has no status line of its own any more).
+    expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
+  });
+
+  it("stays put as the form changes", async () => {
+    const user = userEvent.setup();
+    renderEdit(makeLoo(), true, { canWriteDirectly: true });
+    await changeName(user, "Renamed");
+    expect(screen.getAllByText(LIVE_STRAIGHT_AWAY)).toHaveLength(1);
+  });
+});
+
 describe("LooForm sticky action bar", () => {
+  it("is one row: a Cancel link and the Save button, with no status line", () => {
+    renderEdit(makeLoo(), false);
+    const bar = actionBar();
+    const inner = bar.firstElementChild as HTMLElement;
+    const visible = Array.from(inner.children).filter((el) => el.id !== "save-hint");
+    expect(visible).toEqual([screen.getByRole("link", { name: "Cancel" }), saveButton()]);
+    expect(within(bar).queryByText(MODERATOR_WILL_CHECK)).toBeNull();
+    expect(within(bar).queryByRole("link", { name: "Sign in" })).toBeNull();
+    expect(within(bar).queryByRole("paragraph")).toBeNull();
+  });
+
   it("counts changes and disables saving when there are none", async () => {
     const user = userEvent.setup();
     renderEdit(makeLoo(), true, { canWriteDirectly: true });
     expect(saveButton()).toBeDisabled();
-    expect(screen.getByText("Change any answer to save.")).toBeInTheDocument();
+    expect(saveButton()).toHaveAccessibleName("No changes to save");
+    // The hint is the disabled button's description, not a line of its own.
+    expect(saveButton()).toHaveAccessibleDescription(NO_CHANGES_HINT);
 
     await changeName(user, "Renamed");
     await user.click(facility("Men").getByLabelText("No"));
     expect(saveButton()).toHaveTextContent("Save 2 changes");
     expect(saveButton()).toBeEnabled();
+    expect(saveButton()).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText(NO_CHANGES_HINT)).toBeNull();
 
     await changeName(user, "High Street toilets");
     expect(saveButton()).toHaveTextContent("Save 1 change");
@@ -1011,19 +1085,93 @@ describe("LooForm sticky action bar", () => {
     renderAdd();
     expect(saveButton()).toHaveTextContent("Add toilet");
     expect(saveButton()).toBeDisabled();
+    expect(saveButton()).not.toHaveAttribute("aria-describedby");
     await user.type(nameInput(), "X");
     expect(saveButton()).toBeEnabled();
   });
+});
 
-  it("tells anonymous users their change will be reviewed, with a sign-in link back here", () => {
-    locationStub.pathname = "/loos/add";
-    locationStub.search = "?lat=51.5&lng=-0.1&zoom=17";
-    renderAdd(false);
-    expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
-      "href",
-      `/auth/login?returnTo=${encodeURIComponent("/loos/add?lat=51.5&lng=-0.1&zoom=17")}`,
-    );
+describe("LooForm action bar and the on-screen keyboard", () => {
+  /** A touch screen (or not) whose visual viewport the test can shrink, like a keyboard does. */
+  const stubDevice = (coarse: boolean) => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(pointer: coarse)" ? coarse : false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    const viewport = new EventTarget() as EventTarget & { height: number; scale: number };
+    viewport.height = window.innerHeight;
+    viewport.scale = 1;
+    vi.stubGlobal("visualViewport", viewport);
+    return (height: number) => {
+      viewport.height = height;
+      viewport.dispatchEvent(new Event("resize"));
+    };
+  };
+  const keyboardUp = () => Math.round(window.innerHeight * 0.55);
+
+  it("slides away while typing on a touch screen, and comes back when the keyboard goes", () => {
+    const resize = stubDevice(true);
+    renderEdit();
+    expect(actionBar()).not.toHaveAttribute("data-hidden");
+
+    act(() => nameInput().focus());
+    act(() => resize(keyboardUp()));
+    expect(actionBar()).toHaveAttribute("data-hidden", "true");
+    // Still in the page (CSS hides it, not aria-hidden or inert), so Enter still submits.
+    expect(saveButton()).toBeInTheDocument();
+    expect(actionBar()).not.toHaveAttribute("aria-hidden");
+    expect(actionBar()).not.toHaveAttribute("inert");
+
+    act(() => resize(window.innerHeight));
+    expect(actionBar()).not.toHaveAttribute("data-hidden");
+
+    act(() => notesInput().focus());
+    act(() => resize(keyboardUp()));
+    expect(actionBar()).toHaveAttribute("data-hidden", "true");
+    act(() => notesInput().blur());
+    expect(actionBar()).not.toHaveAttribute("data-hidden");
+  });
+
+  it("comes back as soon as focus moves into the bar", () => {
+    const resize = stubDevice(true);
+    renderEdit();
+    act(() => nameInput().focus());
+    act(() => resize(keyboardUp()));
+    expect(actionBar()).toHaveAttribute("data-hidden", "true");
+    act(() => screen.getByRole("link", { name: "Cancel" }).focus());
+    expect(actionBar()).not.toHaveAttribute("data-hidden");
+  });
+
+  it("is never hidden with a mouse or trackpad", async () => {
+    const resize = stubDevice(false);
+    const user = userEvent.setup();
+    renderEdit();
+    await user.click(nameInput());
+    act(() => resize(keyboardUp()));
+    await user.type(nameInput(), " more");
+    expect(actionBar()).not.toHaveAttribute("data-hidden");
+  });
+
+  it("is not hidden for checkboxes and radios, only text fields", () => {
+    const resize = stubDevice(true);
+    renderEdit();
+    act(() => facility("Men").getByLabelText("No").focus());
+    act(() => resize(keyboardUp()));
+    expect(actionBar()).not.toHaveAttribute("data-hidden");
+  });
+
+  it("Enter in a text field still submits while the bar is hidden", async () => {
+    const resize = stubDevice(true);
+    const user = userEvent.setup();
+    renderEdit();
+    await changeName(user, "Renamed");
+    act(() => resize(keyboardUp()));
+    expect(actionBar()).toHaveAttribute("data-hidden", "true");
+    expect(document.activeElement).toBe(nameInput());
+    await user.keyboard("{Enter}");
+    expect(reviewSheet()).toBeVisible();
   });
 });
 

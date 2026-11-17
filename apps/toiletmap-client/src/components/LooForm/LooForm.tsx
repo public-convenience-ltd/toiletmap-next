@@ -14,6 +14,7 @@ import {
 import type { LooDetail } from "../../api/loos";
 import { applyLocalMutation } from "../../api/mapCache";
 import { readPendingChange, rememberPendingChange } from "../../api/reports";
+import { useSoftKeyboardOpen } from "../../hooks/useSoftKeyboardOpen";
 import { currentPath, loginHref } from "../../utils/returnTo";
 import { type MapView, mapViewFromSearch } from "../LooMap/mapView";
 import Dialog from "../ReviewChanges/Dialog";
@@ -93,6 +94,8 @@ export const MESSAGES = {
 
 export const LIVE_STRAIGHT_AWAY = "Your change will go live straight away.";
 export const MODERATOR_WILL_CHECK = "A moderator will check your change before it appears.";
+/** Read out with the disabled "No changes to save" button on the edit form. */
+export const NO_CHANGES_HINT = "Change any answer to save.";
 
 /**
  * Two `?lat&lng` spots (or a pin and a spot) closer than this are the same place: a restored
@@ -337,6 +340,7 @@ export default function LooForm({
     mode === "edit" && looId ? readPendingChange(looId) : null,
   );
 
+  const formRef = useRef<HTMLFormElement>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const alertsRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
@@ -356,6 +360,10 @@ export default function LooForm({
   const canSave = mode === "add" ? dirty : changeCount > 0;
   const reviewRequired = !isAuthenticated || !skipReview;
   const requiresLocation = mode === "add" || !base.initialForm.location;
+  // On a phone with the keyboard up, the action bar would sit on top of the field being typed
+  // in: slide it away until the keyboard goes (never with a mouse, and never mid-save).
+  const keyboardOpen = useSoftKeyboardOpen(formRef);
+  const actionBarHidden = keyboardOpen && !submitting && !leaving;
 
   /**
    * Store the draft. While restored-draft conflicts are unresolved, the user's own values for
@@ -682,18 +690,39 @@ export default function LooForm({
           : `Save ${changeCount} change${changeCount === 1 ? "" : "s"}`;
 
   // Says for certain what a save will do: only trusted users' changes go live straight away.
-  const actionStatus = !trusted
-    ? MODERATOR_WILL_CHECK
-    : mode === "edit" && changeCount === 0
-      ? "Change any answer to save."
-      : LIVE_STRAIGHT_AWAY;
+  const saveNotice = trusted ? LIVE_STRAIGHT_AWAY : MODERATOR_WILL_CHECK;
+  // Why Save is disabled, for screen readers (the label already says "No changes to save").
+  const saveHint =
+    mode === "edit" && changeCount === 0 && !submitting && !leaving ? NO_CHANGES_HINT : null;
 
   return (
-    <form class={styles.page} onSubmit={handleSubmit} noValidate>
+    <form ref={formRef} class={styles.page} onSubmit={handleSubmit} noValidate>
       <h1 class={styles.heading}>{mode === "edit" ? "Edit toilet" : "Add a toilet"}</h1>
       <p class={styles.intro}>
         Answer what you know. Anything you're not sure about can stay as “Don't know”.
       </p>
+
+      <div class={styles.saveNotice}>
+        <Banner variant="info">
+          <p>
+            {saveNotice}
+            {!isAuthenticated && (
+              <>
+                {" "}
+                <a
+                  href={loginHref(currentPath(fallbackPath))}
+                  onClick={() => {
+                    // Changes so far are kept as a draft and restored after signing in.
+                    allowUnloadRef.current = true;
+                  }}
+                >
+                  Sign in
+                </a>
+              </>
+            )}
+          </p>
+        </Banner>
+      </div>
 
       {pendingSuggestion && (
         <Banner variant="info">
@@ -982,49 +1011,41 @@ export default function LooForm({
         </Question>
       </div>
 
-      <div class={styles.actionBar}>
+      <div
+        class={[styles.actionBar, actionBarHidden && styles.actionBarHidden]
+          .filter(Boolean)
+          .join(" ")}
+        data-action-bar=""
+        data-hidden={actionBarHidden ? "true" : undefined}
+      >
         <div class={styles.actionBarInner}>
-          {actionStatus && (
-            <p class={styles.actionStatus}>
-              {actionStatus}
-              {!isAuthenticated && (
-                <>
-                  {" "}
-                  <a
-                    href={loginHref(currentPath(fallbackPath))}
-                    onClick={() => {
-                      // Changes so far are kept as a draft and restored after signing in.
-                      allowUnloadRef.current = true;
-                    }}
-                  >
-                    Sign in
-                  </a>
-                </>
-              )}
-            </p>
+          <a
+            class={styles.cancelButton}
+            href={cancelHref}
+            onClick={(e: MouseEvent) => {
+              if (!dirty) return;
+              e.preventDefault();
+              setDiscardTarget(cancelHref);
+            }}
+          >
+            Cancel
+          </a>
+          <Button
+            htmlElement="button"
+            type="submit"
+            variant="primary"
+            class={styles.saveButton}
+            disabled={submitting || leaving || !canSave}
+            aria-describedby={saveHint ? "save-hint" : undefined}
+          >
+            {saveLabel}
+          </Button>
+          {/* Hidden: only read as the button's description, not again as a line of its own. */}
+          {saveHint && (
+            <span id="save-hint" hidden>
+              {saveHint}
+            </span>
           )}
-          <div class={styles.actionButtons}>
-            <Button
-              htmlElement="a"
-              variant="secondary"
-              href={cancelHref}
-              onClick={(e: MouseEvent) => {
-                if (!dirty) return;
-                e.preventDefault();
-                setDiscardTarget(cancelHref);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              htmlElement="button"
-              type="submit"
-              variant="primary"
-              disabled={submitting || leaving || !canSave}
-            >
-              {saveLabel}
-            </Button>
-          </div>
         </div>
       </div>
 
