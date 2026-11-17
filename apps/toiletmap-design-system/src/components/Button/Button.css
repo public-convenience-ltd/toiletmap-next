@@ -21,15 +21,11 @@
 .button:disabled {
   border-color: var(--color-light-grey);
   background-color: var(--color-light-grey);
-}
-
-.button:disabled:hover {
-  color: var(--color-blue);
   cursor: not-allowed;
 }
 
-.button:not(:disabled):hover,
-.button:not(:disabled):focus {
+/* Keyboard focus only (:focus-visible), so a tapped or clicked button doesn't stay filled. */
+.button:not(:disabled):focus-visible {
   color: var(--color-turquoise);
   background-color: var(--color-blue);
   border-color: var(--color-blue);
@@ -40,7 +36,28 @@
   border-color: var(--color-blue);
 }
 
-.button--secondary:not(:disabled):hover,
-.button--secondary:not(:disabled):focus {
+.button--secondary:not(:disabled):focus-visible {
   color: var(--color-white);
+}
+
+/* Hover only where there is a real hover: on touch screens it sticks after a tap. */
+@media (hover: hover) {
+  .button:not(:disabled):hover {
+    color: var(--color-turquoise);
+    background-color: var(--color-blue);
+    border-color: var(--color-blue);
+  }
+
+  .button--secondary:not(:disabled):hover {
+    color: var(--color-white);
+  }
+}
+
+/* Big enough to hit with a finger (--tap-min is 44px on touch screens). */
+@media (pointer: coarse) {
+  .button {
+    min-height: var(--tap-min);
+    min-width: var(--tap-min);
+    border-radius: calc(var(--tap-min) / 2);
+  }
 }

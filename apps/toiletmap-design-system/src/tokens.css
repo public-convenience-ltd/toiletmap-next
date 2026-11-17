@@ -40,6 +40,34 @@
   --toilet-max-width: 1680px;
   --toilet-article-max-width: 75ch;
   --toilet-gutter: var(--space-l);
+
+  /*
+   * Viewport and touch (shared contract P2). The page sets
+   * viewport-fit=cover, so content can sit under notches and home
+   * indicators: anything pinned to a screen edge pads by these.
+   */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /* The visible viewport height; 100vh on mobile includes the hidden URL bar. */
+  --app-height: 100vh;
+
+  /* Minimum size of anything tappable: 44px for fingers, 36px for a mouse. */
+  --tap-min: 36px;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
+@media (pointer: coarse) {
+  :root {
+    --tap-min: 44px;
+  }
 }
 
 body {

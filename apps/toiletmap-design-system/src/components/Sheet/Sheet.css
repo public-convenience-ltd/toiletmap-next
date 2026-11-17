@@ -52,7 +52,7 @@
 .sheet--left {
   top: 0;
   left: 0;
-  height: 100dvh;
+  height: var(--app-height, 100vh);
   width: min(85vw, 320px);
   display: flex;
   flex-direction: column;
@@ -70,7 +70,7 @@
 .sheet--right {
   top: 0;
   right: 0;
-  height: 100dvh;
+  height: var(--app-height, 100vh);
   width: min(100%, 320px);
   display: flex;
   flex-direction: column;
@@ -81,4 +81,27 @@
 
 .sheet--right.sheet--visible {
   transform: translateX(0);
+}
+
+/* Keep sheet content clear of the home indicator and notches. */
+.sheet--bottom {
+  padding-bottom: var(--safe-bottom, 0px);
+}
+
+.sheet--left {
+  padding-top: var(--safe-top, 0px);
+  padding-left: var(--safe-left, 0px);
+}
+
+.sheet--right {
+  padding-top: var(--safe-top, 0px);
+  padding-right: var(--safe-right, 0px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet--visible,
+  .sheet__overlay {
+    transition: none;
+  }
 }

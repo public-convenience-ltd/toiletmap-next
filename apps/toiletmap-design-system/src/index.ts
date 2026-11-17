@@ -2,11 +2,16 @@
 export { default as Badge } from "./components/Badge/Badge";
 export type { BannerVariant } from "./components/Banner/Banner";
 export { default as Banner } from "./components/Banner/Banner";
+export type {
+  BottomSheetProps,
+  BottomSheetState,
+} from "./components/BottomSheet/BottomSheet";
+export { default as BottomSheet } from "./components/BottomSheet/BottomSheet";
 export type { ButtonProps } from "./components/Button/Button";
 export { default as Button } from "./components/Button/Button";
 export { default as Drawer } from "./components/Drawer/Drawer";
 export type { FooterLink } from "./components/Footer/Footer";
-export { default as Footer } from "./components/Footer/Footer";
+export { default as Footer, defaultFooterLinks } from "./components/Footer/Footer";
 export type { NavLink } from "./components/Header/Header";
 export { default as Header } from "./components/Header/Header";
 export type { IconName, IconProps } from "./components/Icon/Icon";
