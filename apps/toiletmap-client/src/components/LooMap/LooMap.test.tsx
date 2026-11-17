@@ -8,12 +8,23 @@ import type { CompressedLoo, MapDataState } from "./useMapData";
 
 // Leaflet doesn't run in happy-dom: a minimal fake map is enough for LooMap's own logic.
 const fakeMap = vi.hoisted(() => {
+  const handlers = new Map<string, (() => void)[]>();
   const m = {
     setView: vi.fn(),
     getZoom: vi.fn(() => 13),
+    getCenter: vi.fn(() => ({ lat: 51.505, lng: -0.09 })),
     panBy: vi.fn(),
     remove: vi.fn(),
     getBounds: vi.fn(() => ({ contains: () => true })),
+    on: vi.fn((name: string, fn: () => void) => {
+      handlers.set(name, [...(handlers.get(name) ?? []), fn]);
+      return m;
+    }),
+    /** Runs the handlers LooMap registered for `name` (e.g. "moveend" after a pan). */
+    fire: (name: string) => {
+      for (const fn of handlers.get(name) ?? []) fn();
+    },
+    handlers,
   };
   m.setView.mockReturnValue(m);
   return m;
@@ -106,7 +117,10 @@ beforeEach(() => {
     loo: looFor(id),
     fresh: true,
   }));
-  for (const fn of Object.values(fakeMap)) fn.mockClear();
+  for (const fn of Object.values(fakeMap)) if (vi.isMockFunction(fn)) fn.mockClear();
+  fakeMap.handlers.clear();
+  fakeMap.getCenter.mockReturnValue({ lat: 51.505, lng: -0.09 });
+  fakeMap.getZoom.mockReturnValue(13);
   window.history.replaceState(null, "", "/");
 });
 
@@ -554,5 +568,86 @@ describe("LooMap freshness", () => {
     setMapData({ status: "ok" });
     rerender(<LooMap apiUrl="" />);
     expect(screen.queryByText(/showing saved data|Couldn't refresh/)).not.toBeInTheDocument();
+  });
+});
+
+describe("LooMap view memory and 'Add a toilet here'", () => {
+  const VIEW_KEY = "toiletmap-map-view";
+  /** Node's own (non-functional) localStorage shadows happy-dom's here, so use a memory one. */
+  const memoryStorage = (): Storage => {
+    const items = new Map<string, string>();
+    return {
+      get length() {
+        return items.size;
+      },
+      clear: () => items.clear(),
+      getItem: (key) => items.get(key) ?? null,
+      key: (index) => [...items.keys()][index] ?? null,
+      removeItem: (key) => {
+        items.delete(key);
+      },
+      setItem: (key, value) => {
+        items.set(key, String(value));
+      },
+    };
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal("localStorage", memoryStorage());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const addLink = () => screen.getByRole("link", { name: "Add a toilet here" });
+
+  it("opens at the remembered view when there is no deep link", () => {
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ lat: 53.48, lng: -2.24, zoom: 15 }));
+    render(<LooMap apiUrl="" />);
+    expect(fakeMap.setView).toHaveBeenCalledWith([53.48, -2.24], 15);
+    expect(addLink()).toHaveAttribute("href", "/loos/add?lat=53.48&lng=-2.24&zoom=15");
+  });
+
+  it("ignores the remembered view for a /loos/:id deep link", () => {
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ lat: 53.48, lng: -2.24, zoom: 15 }));
+    window.history.replaceState(null, "", "/loos/aaa");
+    render(<LooMap apiUrl="" initialToiletId="aaa" />);
+    expect(fakeMap.setView).toHaveBeenNthCalledWith(1, [51.505, -0.09], 13);
+  });
+
+  it("falls back to London with nothing (or junk) remembered", () => {
+    localStorage.setItem(VIEW_KEY, "{junk");
+    render(<LooMap apiUrl="" />);
+    expect(fakeMap.setView).toHaveBeenCalledWith([51.505, -0.09], 13);
+  });
+
+  it("remembers the view and moves the add link with the map", () => {
+    render(<LooMap apiUrl="" />);
+    fakeMap.getCenter.mockReturnValue({ lat: 52.2053, lng: 0.1218 });
+    fakeMap.getZoom.mockReturnValue(16);
+    act(() => fakeMap.fire("moveend"));
+
+    expect(JSON.parse(localStorage.getItem(VIEW_KEY) ?? "null")).toEqual({
+      lat: 52.2053,
+      lng: 0.1218,
+      zoom: 16,
+    });
+    expect(addLink()).toHaveAttribute("href", "/loos/add?lat=52.2053&lng=0.1218&zoom=16");
+  });
+
+  it("keeps working when storage is unavailable", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("SecurityError");
+      },
+    });
+    render(<LooMap apiUrl="" />);
+    fakeMap.getCenter.mockReturnValue({ lat: 52.2, lng: 0.12 });
+    expect(() => act(() => fakeMap.fire("moveend"))).not.toThrow();
+    expect(addLink()).toHaveAttribute("href", "/loos/add?lat=52.2&lng=0.12&zoom=13");
   });
 });

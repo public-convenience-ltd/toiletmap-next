@@ -1,0 +1,325 @@
+/* ── Location picker ─────────────────────────────────────── */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-family: var(--font-family);
+  color: var(--color-primary-navy);
+}
+
+.label {
+  display: block;
+  font-size: var(--text--1);
+  font-weight: 600;
+}
+
+/* 16px minimum stops iOS zooming into the field. */
+.input {
+  font-size: max(16px, var(--text-0));
+}
+
+.hint {
+  font-size: var(--text--1);
+  color: var(--color-neutral-grey);
+  margin: 0;
+}
+
+.error {
+  font-size: var(--text--1);
+  color: var(--color-accent-pink);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ── Toolbar (search + locate) ─────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+.search {
+  position: relative;
+  flex: 1 1 16rem;
+}
+
+/* "Searching…" / "No places found": empty (and zero height) the rest of the time. */
+.searchStatus {
+  font-size: var(--text--1);
+  color: var(--color-neutral-grey);
+  margin: 0;
+}
+
+.searchStatus:not(:empty) {
+  margin-top: var(--space-3xs);
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-base-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(10, 22, 94, 0.1);
+  z-index: 1100;
+  overflow: hidden;
+}
+
+.suggestion {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-xs);
+  font: inherit;
+  font-size: var(--text--1);
+  color: var(--color-primary-navy);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-light-grey);
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.suggestion:last-child {
+  border-bottom: none;
+}
+
+.suggestion:hover,
+.suggestion:focus-visible {
+  background: var(--color-light-grey);
+  outline: none;
+}
+
+/* ── Map ──────────────────────────────────────────────────── */
+
+.mapWrap {
+  position: relative;
+}
+
+.map {
+  height: clamp(260px, 45vh, 380px);
+  width: 100%;
+  border-radius: 8px;
+  z-index: 1;
+}
+
+/* Moving state lives on the wrapper: the map element's own class list belongs to Leaflet. */
+.mapWrap:not(.mapWrapMoving) .map {
+  cursor: default;
+}
+
+.map:focus-visible {
+  outline: 3px solid var(--color-accent-turquoise);
+  outline-offset: 2px;
+}
+
+/* The pin while moving: fixed at the map centre, tip on the exact centre point. */
+.centrePin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 21px;
+  height: 33px;
+  margin: -33px 0 0 -10.5px;
+  pointer-events: none;
+  z-index: 1000;
+  filter: drop-shadow(0 2px 2px rgba(10, 22, 94, 0.35));
+}
+
+.centrePinIcon,
+.centrePinIcon > svg {
+  display: block;
+}
+
+.centreDot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--color-primary-navy);
+  box-shadow: 0 0 0 2px var(--color-base-white);
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.chip {
+  position: absolute;
+  top: var(--space-xs);
+  left: var(--space-xs);
+  z-index: 1000;
+  max-width: calc(100% - 2 * var(--space-xs) - 40px);
+  padding: var(--space-3xs, 4px) var(--space-xs);
+  border-radius: 999px;
+  background: var(--color-base-white);
+  color: var(--color-primary-navy);
+  font-size: var(--text--1);
+  font-weight: 600;
+  box-shadow: 0 1px 6px rgba(10, 22, 94, 0.2);
+  pointer-events: none;
+}
+
+.chipWarning {
+  background: #fff4d6;
+}
+
+/* ── Panel under the map ──────────────────────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.zoomNotice {
+  margin: 0;
+  font-size: var(--text--1);
+  font-weight: 600;
+}
+
+.warning {
+  padding: var(--space-xs) var(--space-s);
+  border-left: 4px solid #e5a000;
+  border-radius: 4px;
+  background: #fff4d6;
+  font-size: var(--text--1);
+}
+
+.warning p {
+  margin: 0 0 var(--space-3xs, 4px);
+  font-weight: 600;
+}
+
+.warning a {
+  color: var(--color-primary-navy);
+  font-weight: 600;
+}
+
+/* A fieldset (the question is its legend). The floated legend sits inside the border. */
+.prompt {
+  margin: 0;
+  min-width: 0;
+  padding: var(--space-s);
+  border: 2px solid var(--color-primary-navy);
+  border-radius: 8px;
+  background: var(--color-base-white);
+}
+
+.prompt:focus-visible {
+  outline: 3px solid var(--color-accent-turquoise);
+  outline-offset: 2px;
+}
+
+.promptText {
+  float: left;
+  width: 100%;
+  margin: 0 0 var(--space-xs);
+  padding: 0;
+  font-size: var(--text-0);
+}
+
+.prompt > .actions {
+  clear: both;
+}
+
+.linkButton {
+  padding: 0;
+  font: inherit;
+  font-size: var(--text--1);
+  font-weight: 600;
+  color: var(--color-primary-navy);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linkButton:hover {
+  text-decoration: none;
+}
+
+.linkButton:focus-visible,
+.coordsSummary:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Enter coordinates ────────────────────────────────────── */
+
+.coords {
+  font-size: var(--text--1);
+}
+
+.coordsSummary {
+  cursor: pointer;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.coordsBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs, 4px);
+  margin-top: var(--space-xs);
+}
+
+.coordsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.coordsRow > :first-child {
+  flex: 1 1 12rem;
+  margin-top: 0;
+}
+
+/* ── Touch: 44px targets ──────────────────────────────────── */
+
+@media (pointer: coarse) {
+  .actions :global(.button),
+  .toolbar :global(.button),
+  .coordsRow :global(.button),
+  .linkButton,
+  .coordsSummary {
+    min-height: 44px;
+  }
+
+  .linkButton,
+  .coordsSummary {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

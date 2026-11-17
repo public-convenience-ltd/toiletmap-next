@@ -73,3 +73,21 @@
   border-radius: var(--space-s) var(--space-s) 0 0;
   box-shadow: 0 -4px 24px rgba(10, 22, 94, 0.14);
 }
+
+/* "Add a toilet here": opens the add form at the map centre. Sits under the details panel. */
+.add-toilet-here {
+  position: absolute;
+  right: var(--space-s);
+  bottom: var(--space-l);
+  z-index: 1000;
+}
+
+.add-toilet-here .button {
+  box-shadow: 0 1px 6px rgba(10, 22, 94, 0.25);
+}
+
+@media (pointer: coarse) {
+  .add-toilet-here .button {
+    min-height: 44px;
+  }
+}

@@ -4,6 +4,7 @@ import ngeohash from "ngeohash";
 import { useEffect, useRef } from "preact/hooks";
 import { getLooById, type LooDetail, peekLooDetail } from "../../api/loos";
 import { type ActiveFilters, FILTER_BIT, type FilterKey } from "../../types/filters";
+import { makeIcon } from "./looIcon";
 import type { CompressedLoo } from "./useMapData";
 
 interface MapMarkersProps {
@@ -59,30 +60,10 @@ export function filterLoos(data: CompressedLoo[], activeFilters: ActiveFilters):
   return requiredMask === 0 ? data : data.filter((loo) => (loo[2] & requiredMask) === requiredMask);
 }
 
-const getIconString = (isHighlighted: boolean) => `
-    <svg viewBox="-1 -1 21 33" height="${isHighlighted ? 44 : 33}" width="${isHighlighted ? 28 : 21}" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 0C4.47632 0 0 4.47529 0 10C0 19.5501 10 32 10 32C10 32 20 19.5501 20 10C20 4.47529 15.5237 0 10 0Z" fill="#ED3D63" stroke="white"/>
-      ${
-        isHighlighted
-          ? '<path d="M10 4L11.7634 7.57295L15.7063 8.1459L12.8532 10.9271L13.5267 14.8541L10 13L6.47329 14.8541L7.14683 10.9271L4.29366 8.1459L8.23664 7.57295L10 4Z" fill="white"/>'
-          : '<circle cx="10" cy="10" r="5" fill="white"/>'
-      }
-    </svg>
-  `;
-
-const makeIcon = (isHighlighted: boolean) =>
-  L.divIcon({
-    html: getIconString(isHighlighted),
-    className: "loo-marker",
-    iconSize: isHighlighted ? [28, 44] : [21, 33],
-    iconAnchor: isHighlighted ? [14, 44] : [10.5, 33],
-    popupAnchor: [0, isHighlighted ? -44 : -33],
-  });
-
 // Shared icon instances: ~14k markers don't need ~14k identical icon objects.
 let icons: { normal: L.DivIcon; highlighted: L.DivIcon } | null = null;
 const getIcon = (isHighlighted: boolean) => {
-  icons ??= { normal: makeIcon(false), highlighted: makeIcon(true) };
+  icons ??= { normal: makeIcon("default"), highlighted: makeIcon("highlighted") };
   return isHighlighted ? icons.highlighted : icons.normal;
 };
 
