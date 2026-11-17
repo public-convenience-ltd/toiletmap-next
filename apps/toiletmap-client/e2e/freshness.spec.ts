@@ -1,7 +1,7 @@
 import type { Page, Request } from "@playwright/test";
 import { e2eName, getLoo, updateLooViaApi } from "./support/api";
 import { authedTest, expect, test } from "./support/fixtures";
-import { openEditForm, SAVED_BANNER_TEXT, waitForSaved } from "./support/form";
+import { openEditForm, QUESTIONS, SAVED_BANNER_TEXT, waitForSaved } from "./support/form";
 import {
   clickMarkerAt,
   detailsPanelHeading,
@@ -9,6 +9,7 @@ import {
   otherMarkerIndices,
   readMapCache,
   selectedMarker,
+  syncUntil,
   triggerMapSync,
   waitForMap,
   waitForWarmMapCache,
@@ -53,14 +54,6 @@ function recordMapRequests(page: Page) {
   return { dumps, updates };
 }
 
-/** Triggers syncs until `check` passes (a sync already in flight swallows a trigger). */
-async function syncUntil(page: Page, check: () => Promise<void>): Promise<void> {
-  await expect(async () => {
-    await triggerMapSync(page);
-    await check();
-  }).toPass({ timeout: 20_000, intervals: [250, 500, 1_000] });
-}
-
 authedTest.describe("freshness after a signed-in edit", () => {
   authedTest(
     "the save lands on /loos/:id?saved=1 with the banner and the new name, then drops the param",
@@ -75,7 +68,7 @@ authedTest.describe("freshness after a signed-in edit", () => {
           request.resourceType() === "document" &&
           request.url().endsWith(`/loos/${loo.id}?saved=1`),
       );
-      await form.save.click();
+      await form.submit();
       await landing;
       await waitForSaved(page, loo.id);
       // The panel shows the saved version, not a cached copy of the old one.
@@ -105,9 +98,9 @@ authedTest.describe("freshness after a signed-in edit", () => {
       const form = await openEditForm(page, loo.id);
       const newName = e2eName("fresh same session renamed");
       await form.name.fill(newName);
-      await form.facility("Accessible", "Yes").click();
+      await form.facility(QUESTIONS.accessible, "Yes").click();
       const requests = recordMapRequests(page);
-      await form.save.click();
+      await form.submit();
       await waitForSaved(page, loo.id);
       await expect(detailsPanelHeading(page)).toHaveText(newName);
 
@@ -162,7 +155,7 @@ authedTest.describe("freshness after a signed-in edit", () => {
       const form = await openEditForm(page, loo.id);
       const newName = e2eName("fresh other tab renamed");
       await form.name.fill(newName);
-      await form.save.click();
+      await form.submit();
       await waitForSaved(page, loo.id);
 
       // A name edit doesn't change the compressed row; the delta naming the open

@@ -1,6 +1,6 @@
 import { e2eName, getLoo, type OpeningTimes, stable } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
-import { jsonBody, looForm, nextSave, openEditForm, waitForSaved } from "./support/form";
+import { jsonBody, looForm, nextSave, openEditForm, QUESTIONS, waitForSaved } from "./support/form";
 import { detailsPanelHeading } from "./support/map";
 
 /**
@@ -40,7 +40,7 @@ test.describe("edit (signed in)", () => {
     await expect(form.save).toHaveText("Save 1 change");
 
     const put = nextSave(page, "PUT");
-    await form.save.click();
+    await form.submit();
     const body = jsonBody(await put);
     expect(Object.keys(body).sort()).toEqual(["baseUpdatedAt", "name"]);
     expect(body.name).toBe(newName);
@@ -64,7 +64,7 @@ test.describe("edit (signed in)", () => {
     const form = await openEditForm(page, loo.id);
     await form.notes.fill("New notes");
     const put = nextSave(page, "PUT");
-    await form.save.click();
+    await form.submit();
     const body = jsonBody(await put);
     expect(body).not.toHaveProperty("openingTimes");
     await waitForSaved(page, loo.id);
@@ -81,7 +81,7 @@ test.describe("edit (signed in)", () => {
 
     await form.notes.fill("");
     const put = nextSave(page, "PUT");
-    await form.save.click();
+    await form.submit();
     expect(jsonBody(await put)).toMatchObject({ notes: null });
     await waitForSaved(page, loo.id);
 
@@ -97,12 +97,12 @@ test.describe("edit (signed in)", () => {
     await expect(form.save).toBeDisabled();
     await expect(form.save).toHaveText("No changes to save");
 
-    await form.facility("Accessible", "No").click();
+    await form.facility(QUESTIONS.accessible, "No").click();
     await form.notes.fill("Something new");
     await expect(form.save).toBeEnabled();
     await expect(form.save).toHaveText("Save 2 changes");
 
-    await form.facility("Accessible", "Yes").click();
+    await form.facility(QUESTIONS.accessible, "Yes").click();
     await form.notes.fill("");
     await expect(form.save).toBeDisabled();
     await expect(form.save).toHaveText("No changes to save");
@@ -136,12 +136,12 @@ test.describe("edit (signed in)", () => {
     await page.goto(`/loos/${loo.id}`);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
 
-    await page.locator(".toilet-panel").getByRole("link", { name: "Edit", exact: true }).click();
+    await page.locator(".toilet-panel").getByRole("link", { name: "Suggest an edit" }).click();
     const form = looForm(page);
     await expect(form.heading).toHaveText("Edit toilet");
     const newName = e2eName("edit from panel renamed");
     await form.name.fill(newName);
-    await form.save.click();
+    await form.submit();
 
     await waitForSaved(page, loo.id);
     await expect(detailsPanelHeading(page)).toHaveText(newName);

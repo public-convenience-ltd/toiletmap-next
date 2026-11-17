@@ -210,7 +210,7 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 - **GET /api/loos/:id** - Fetch single loo by ID
 - **GET /api/loos?ids=** - Batch fetch loos (comma-separated or repeated `?ids=` params)
 - **GET /api/loos/geohash/:geohash** - Search by geohash prefix (optional `?active=true/false/any`)
-- **GET /api/loos/proximity** - Find nearby loos (`lat`, `lng` required, optional `radius`)
+- **GET /api/loos/proximity** - Find nearby loos, nearest first (`lat`, `lng` required; optional `radius`, `includeInactive=true|false` (default false: active only) and `exclude=<id>`). Each item carries `active` and `distance` (metres).
 - **GET /api/loos/search** - Advanced search with filters, sorting, pagination
 - **GET /api/loos/metrics** - Aggregate metrics for filtered results
 - **GET /api/loos/:id/reports** - Audit history (contributors redacted unless caller has `access:admin`)
@@ -221,6 +221,16 @@ Public routes still accept optional authentication so admin tokens can unlock ex
 
 - **POST /api/loos** - Create new loo (requires contributor info in JWT)
 - **PUT /api/loos/:id** - Upsert (create or update) loo (requires contributor info in JWT)
+
+Writes go live only for callers with `report:loo` or `access:admin` (`canWriteDirectly` in `src/middleware/require-admin-role.ts`). Anonymous callers and signed-in users without either permission are queued as a `pending_change` and get `202 {queued: true, id}` (an untrusted PUT cannot create a new id). Anonymous writes use the anon write limiter.
+
+### Report, restore and verify (anyone; trusted callers apply directly)
+
+- **POST /api/loos/:id/report** - `{reason: permanently_closed|does_not_exist|not_public|duplicate|other, details?, duplicateOf?, baseUpdatedAt?}`. Trusted: `active=false`, `removal_category`, `removal_reason`, `duplicate_of`; 200 with the loo and `compressed: null`. Others: 202, pending type `remove`. 409 `already_removed` / stale `conflict`; `details` required for `other`, `duplicateOf` required for (and only allowed with) `duplicate`.
+- **POST /api/loos/:id/restore** - `{details?, baseUpdatedAt?}`. Trusted: `active=true`, clears category and duplicate link; 200 with `compressed`. Others: 202, pending type `restore`. 409 `not_removed`.
+- **POST /api/loos/:id/verify** - no body; anyone (anonymous rate-limited). Sets only `verified_at`; 200 `{id, verifiedAt}`. 409 `removed` for an inactive loo.
+
+`LooResponse` includes `removalCategory` and `duplicateOf`. Optional secret `MODERATION_SLACK_WEBHOOK` (off when unset) posts a counts-only "N changes awaiting review" message when something is queued.
 
 ### Admin Interface Routes (Session Auth Required)
 

@@ -5,7 +5,9 @@ import {
   e2eName,
   issueAccessToken,
   type LooInput,
+  type MockUser,
   randomFixtureLocation,
+  UNTRUSTED_USER,
 } from "./api";
 import { deleteLoos, deletePendingChanges } from "./db";
 import { CLIENT_URL } from "./env";
@@ -66,11 +68,12 @@ export async function signInThroughMockAuth(page: Page): Promise<void> {
 
 /**
  * The cookies /auth/callback would set (src/pages/auth/callback.ts), built from
- * a token issued by the mock Auth0 server, minus the `Secure` flag.
+ * a token issued by the mock Auth0 server (for `user`, or the default trusted
+ * "Test User"), minus the `Secure` flag.
  * `id_token` is omitted: nothing in the client reads it after sign-in.
  */
-async function injectedSessionState(): Promise<StorageState> {
-  const accessToken = await issueAccessToken();
+export async function injectedSessionState(user?: MockUser): Promise<StorageState> {
+  const accessToken = await issueAccessToken(user);
   const claims = JSON.parse(
     Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString("utf8"),
   ) as Record<string, unknown>;
@@ -172,6 +175,28 @@ export const authedTest = test.extend<AuthedTestFixtures>({
     } finally {
       await context.close();
     }
+  },
+});
+
+type UntrustedWorkerFixtures = {
+  /** Cookies of a signed-in contributor without `report:loo` / `access:admin`. */
+  untrustedState: StorageState;
+};
+
+/**
+ * Like `test`, but every page starts signed in as UNTRUSTED_USER: a signed-in
+ * contributor whose edits, reports and restores are queued for a moderator (202).
+ */
+export const untrustedTest = test.extend<object, UntrustedWorkerFixtures>({
+  untrustedState: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright fixtures must destructure
+    async ({}, use) => {
+      await use(await injectedSessionState(UNTRUSTED_USER));
+    },
+    { scope: "worker" },
+  ],
+  storageState: async ({ untrustedState }, use) => {
+    await use(untrustedState);
   },
 });
 

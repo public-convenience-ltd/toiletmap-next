@@ -130,8 +130,8 @@ investigated.
 | Project | Device | Specs |
 | --- | --- | --- |
 | `desktop-chromium` | Desktop Chrome 1280×720 | all |
-| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness` |
-| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness` |
+| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness`, `picker`, `report` |
+| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness`, `picker`, `report` |
 
 ## How the tests work
 
@@ -145,6 +145,18 @@ and reuses the cookies.
   Instead, the WebKit projects inject the same `access_token` (httpOnly) and
   `user_info` cookies, built from a token issued by the mock server, without
   `Secure`.
+
+**Who writes directly.** The server applies a write (edit, add, report, restore)
+straight away only for tokens with `report:loo` or `access:admin`; everyone else
+is queued as a `pending_change` (202). The mock "Test User" has both, so
+`authedTest` and the `loos` fixture write directly. `untrustedTest` signs in as
+`UNTRUSTED_USER` (`support/api.ts`, no permissions) by injecting its cookies, so
+its writes are queued like an anonymous user's; plain `test` is signed out.
+
+**Forms.** Every save goes through the review sheet ("Confirm and save"):
+`looForm(page).submit()` clicks both. The location picker has no lat/lng boxes:
+`enterCoordinates` (in `support/form.ts`) types into its "Enter coordinates"
+box and confirms with "Use this location".
 
 **Test data.** Tests never modify seed rows; the map tests only read the London
 seed rows shown in the default view.

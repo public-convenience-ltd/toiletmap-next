@@ -123,6 +123,19 @@ export async function triggerMapSync(page: Page): Promise<void> {
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
 }
 
+/** Triggers syncs until `check` passes (a sync already in flight swallows a trigger). */
+export async function syncUntil(page: Page, check: () => Promise<void>): Promise<void> {
+  await expect(async () => {
+    await triggerMapSync(page);
+    await check();
+  }).toPass({ timeout: 20_000, intervals: [250, 500, 1_000] });
+}
+
+/** True once the map cache stored in this browser holds a row for `id`. */
+export async function mapCacheHas(page: Page, id: string): Promise<boolean> {
+  return (await readMapCache(page))?.data.some(([rowId]) => rowId === id) ?? false;
+}
+
 /** The highlighted (selected) marker: the taller icon. */
 export const selectedMarker = (page: Page) => page.locator("#map .loo-marker svg[height='44']");
 

@@ -1,6 +1,6 @@
 import { e2eName, getLoo } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
-import { looForm, openEditForm, waitForSaved } from "./support/form";
+import { looForm, openEditForm, QUESTIONS, waitForSaved } from "./support/form";
 
 /**
  * Optimistic concurrency (baseUpdatedAt → 409): two people edit the same
@@ -21,11 +21,11 @@ test.describe("edit conflicts", () => {
 
     const aliceName = e2eName("conflict renamed by alice");
     await aliceForm.name.fill(aliceName);
-    await aliceForm.save.click();
+    await aliceForm.submit();
     await waitForSaved(alice, loo.id);
 
     await bobForm.notes.fill("Notes from Bob");
-    await bobForm.save.click();
+    await bobForm.submit();
     await expect(bobForm.conflictBanner).toBeVisible();
     await expect(bob.getByText("None of the fields you changed were affected")).toBeVisible();
     // Nothing was written by the refused save.
@@ -36,7 +36,7 @@ test.describe("edit conflicts", () => {
     await expect(bobForm.name).toHaveValue(aliceName);
     await expect(bobForm.notes).toHaveValue("Notes from Bob");
     await expect(bobForm.save).toHaveText("Save 1 change");
-    await bobForm.save.click();
+    await bobForm.submit();
     await waitForSaved(bob, loo.id);
 
     const after = await getLoo(loo.id);
@@ -55,11 +55,11 @@ test.describe("edit conflicts", () => {
     const bobForm = await openEditForm(bob, loo.id);
 
     await aliceForm.notes.fill("Open Sundays since June");
-    await aliceForm.save.click();
+    await aliceForm.submit();
     await waitForSaved(alice, loo.id);
 
     await bobForm.notes.fill("Closed Sundays, key at café");
-    await bobForm.save.click();
+    await bobForm.submit();
     await expect(bobForm.conflictBanner).toBeVisible();
     await expect(
       bob.getByText("These fields you changed have also been changed by someone else:"),
@@ -69,7 +69,7 @@ test.describe("edit conflicts", () => {
 
     await bobForm.loadLatest.click();
     await expect(bobForm.notes).toHaveValue("Closed Sundays, key at café");
-    await bobForm.save.click();
+    await bobForm.submit();
     await waitForSaved(bob, loo.id);
 
     expect((await getLoo(loo.id)).notes).toBe("Closed Sundays, key at café");
@@ -85,16 +85,16 @@ test.describe("edit conflicts", () => {
     const otherForm = await openEditForm(other, loo.id);
 
     await otherForm.notes.fill("Someone else's note");
-    await otherForm.save.click();
+    await otherForm.submit();
     await waitForSaved(other, loo.id);
 
-    await form.facility("Accessible", "No").click();
-    await form.save.click();
+    await form.facility(QUESTIONS.accessible, "No").click();
+    await form.submit();
     await expect(form.conflictBanner).toBeVisible();
     await expect(looForm(page).save).toBeEnabled();
     await form.loadLatest.click();
     await expect(form.notes).toHaveValue("Someone else's note");
-    await form.save.click();
+    await form.submit();
     await waitForSaved(page, loo.id);
 
     const after = await getLoo(loo.id);

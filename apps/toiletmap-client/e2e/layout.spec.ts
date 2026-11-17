@@ -140,4 +140,42 @@ test.describe("layout", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Add a toilet");
     await expectNoHorizontalOverflow(page);
   });
+
+  test("the edit form with the picker moving and the review sheet open has no horizontal overflow", async ({
+    page,
+    loos,
+  }) => {
+    const loo = await loos.create({ noPayment: false, paymentDetails: "20p" }, "layout review");
+    const form = await openEditForm(page, loo.id);
+    await form.picker.movePin.click();
+    await expect(form.picker.useLocation).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await form.picker.cancel.click();
+
+    await page
+      .getByRole("region", { name: "When is it open?" })
+      .getByText("Set the hours", { exact: true })
+      .click();
+    await page
+      .getByRole("region", { name: "When is it open?" })
+      .getByText("Different each day", { exact: true })
+      .click();
+    await expectNoHorizontalOverflow(page);
+
+    await form.notes.fill(
+      "A long note that should wrap inside the review sheet on a narrow phone.",
+    );
+    await form.save.click();
+    await expect(form.review).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("the report page has no horizontal overflow", async ({ page, loos }) => {
+    const loo = await loos.create({}, "layout report");
+    await page.goto(`/loos/${loo.id}/remove`);
+    await expect(page.getByRole("group", { name: "What's wrong with this toilet?" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await page.getByText("It's a duplicate of another toilet", { exact: true }).click();
+    await expectNoHorizontalOverflow(page);
+  });
 });

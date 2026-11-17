@@ -128,6 +128,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Opening hours package (type check + tests)
+        run: |
+          pnpm --filter @toiletmap/opening-hours typecheck
+          pnpm --filter @toiletmap/opening-hours test
+
       - name: Design system type check
         run: pnpm --filter toiletmap-design-system typecheck
 
