@@ -25,6 +25,19 @@ export type AdminGeo = z.infer<typeof AdminGeoSchema>;
 const nullableBoolean = z.boolean().nullable();
 const nullableString = z.string().nullable();
 
+/**
+ * Why a toilet was removed from the map (`toilets.removal_category`).
+ * Free-text details live in `removal_reason`.
+ */
+export const REMOVAL_CATEGORIES = [
+  "permanently_closed",
+  "does_not_exist",
+  "not_public",
+  "duplicate",
+  "other",
+] as const;
+export type RemovalCategory = (typeof REMOVAL_CATEGORIES)[number];
+
 // Shared base for every outward-facing loo representation.
 const LooCommonSchema = z
   .object({
@@ -43,6 +56,8 @@ const LooCommonSchema = z
     noPayment: nullableBoolean,
     paymentDetails: nullableString,
     removalReason: nullableString,
+    removalCategory: nullableString,
+    duplicateOf: nullableString,
     radar: nullableBoolean,
     openingTimes: openingTimesSchema,
     location: CoordinatesSchema.nullable(),
@@ -177,6 +192,8 @@ export const ToiletsRecordSchema = z
     area_id: nullableString,
     opening_times: openingTimesFromDbSchema,
     location: jsonValueSchema.nullable(),
+    removal_category: nullableString,
+    duplicate_of: nullableString,
   })
   .partial();
 
@@ -209,6 +226,8 @@ export const RawLooRowSchema = z.object({
   area_id: nullableString,
   opening_times: openingTimesFromDbSchema,
   location: jsonValueSchema.nullable(),
+  removal_category: nullableString.optional(),
+  duplicate_of: nullableString.optional(),
   area_name: nullableString.optional(),
   area_type: nullableString.optional(),
 });
@@ -240,6 +259,13 @@ export type LooMutationAttributes = {
   noPayment?: boolean | null;
   paymentDetails?: string | null;
   removalReason?: string | null;
+  /**
+   * Set only by the report/restore flows (never accepted from request bodies;
+   * the mutation schemas are strict and do not list it).
+   */
+  removalCategory?: RemovalCategory | null;
+  /** Set only by the report/restore flows, like `removalCategory`. */
+  duplicateOf?: string | null;
   openingTimes?: OpeningTimes;
   location?: Coordinates | null;
 };

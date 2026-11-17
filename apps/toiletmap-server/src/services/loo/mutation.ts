@@ -24,6 +24,8 @@ const MUTATION_PRISMA_FIELD_MAP = [
   { attr: "noPayment", prismaKey: "no_payment" },
   { attr: "paymentDetails", prismaKey: "payment_details" },
   { attr: "removalReason", prismaKey: "removal_reason" },
+  { attr: "removalCategory", prismaKey: "removal_category" },
+  { attr: "duplicateOf", prismaKey: "duplicate_of" },
 ] as const satisfies readonly MutationFieldMapEntry[];
 
 type MutationPrismaKey = (typeof MUTATION_PRISMA_FIELD_MAP)[number]["prismaKey"];

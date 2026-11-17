@@ -24,7 +24,13 @@ export type {
 export { default as OpeningHoursInput } from "./components/OpeningHoursInput/OpeningHoursInput";
 export {
   createDefaultOpeningTimes,
+  formatRange,
+  formatTime,
+  is24h,
+  isOpenNow,
   isTwentyFourHours,
+  summariseOpeningTimes,
+  validateDay,
   validateOpeningTimes,
 } from "./components/OpeningHoursInput/openingTimes";
 export { default as RadioInput } from "./components/RadioInput/RadioInput";

@@ -233,3 +233,116 @@
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
+
+/* ── Verify / report actions ─────────────────────────────── */
+
+.verifyStatus:empty {
+  display: none;
+}
+
+.verifyStatus {
+  margin-top: var(--space-2xs);
+  font-size: var(--text--1);
+}
+
+.verifyThanks {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.verifyError {
+  color: var(--color-accent-pink);
+  font-weight: 700;
+}
+
+/* ── Removed / restore ───────────────────────────────────── */
+
+.removedText {
+  margin: 0;
+}
+
+.removedText + .removedText {
+  margin-top: var(--space-3xs);
+}
+
+.removedText a {
+  color: inherit;
+}
+
+.removedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.restorePrompt {
+  padding: var(--space-s);
+  border: 1.5px solid var(--color-primary-navy);
+  border-radius: 8px;
+  background: var(--color-base-white);
+}
+
+.restorePrompt h3:focus {
+  outline: none;
+}
+
+.restorePrompt h3:focus-visible {
+  outline: 2px solid var(--color-accent-turquoise);
+  outline-offset: 2px;
+}
+
+.restoreText {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text--1);
+}
+
+.restoreLabel {
+  display: block;
+  font-weight: 700;
+  font-size: var(--text--1);
+  margin-bottom: var(--space-3xs);
+}
+
+/* Never below 16px, so iOS doesn't zoom on focus. */
+.restoreTextarea {
+  font-size: max(16px, var(--text-0));
+}
+
+.focusTarget:focus {
+  outline: none;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Touch screens: 44px targets for the panel's actions. */
+@media (pointer: coarse) {
+  .verifyActions :global(.button),
+  .removedActions :global(.button),
+  .directionsWrapper :global(.button),
+  .expandedHeader :global(.button) {
+    min-height: 44px;
+    border-radius: 22px;
+  }
+}
+
+.openNow {
+  margin: 0 0 var(--space-3xs, 0.25rem);
+  font-weight: 700;
+}
+
+.hoursSummary {
+  margin: 0 0 var(--space-2xs, 0.5rem);
+  color: var(--color-neutral-grey, inherit);
+}

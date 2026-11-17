@@ -41,6 +41,8 @@ export const rawLooToToilets = (raw: RawLooRow): toilets => ({
   area_id: raw.area_id ?? null,
   opening_times: raw.opening_times ?? null,
   location: raw.location ?? null,
+  removal_category: raw.removal_category ?? null,
+  duplicate_of: raw.duplicate_of ?? null,
 });
 
 export const areaSelection = {
@@ -97,6 +99,8 @@ const mapSharedLooFields = (source: Partial<toilets> | null | undefined): LooCom
   noPayment: source?.no_payment ?? null,
   paymentDetails: source?.payment_details ?? null,
   removalReason: source?.removal_reason ?? null,
+  removalCategory: source?.removal_category ?? null,
+  duplicateOf: source?.duplicate_of?.trim() ?? null,
   openingTimes: openingTimesSchema.catch(null).parse(source?.opening_times ?? null),
   radar: source?.radar ?? null,
   location: extractCoordinates(source?.location),

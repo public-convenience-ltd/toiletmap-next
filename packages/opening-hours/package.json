@@ -1,0 +1,19 @@
+{
+  "name": "@toiletmap/opening-hours",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Framework-free helpers for Toilet Map opening hours: validation, formatting, summaries and open-now.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

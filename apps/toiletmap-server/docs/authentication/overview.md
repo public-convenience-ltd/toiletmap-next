@@ -8,7 +8,7 @@ The Toilet Map API and Admin Interface use [Auth0](https://auth0.com/) for authe
 
 - **Client Worker (public site)**: Uses the Authorization Code Flow with PKCE (`/auth/login` → `/auth/callback`). On callback the client worker exchanges the code for tokens, verifies the id token, and sets the same three HTTP-only cookies. Logout clears all three cookies.
 
-- **API mutations**: `POST /api/loos` and `PUT /api/loos/:id` accept either a Bearer token or a session cookie. If no valid credential is present the request is accepted as an **anonymous submission** — it is rate-limited and queued in `pending_change` for admin review rather than written directly to the database. Approved changes are applied by an admin via `POST /admin/pending/:id/approve`.
+- **API mutations**: `POST /api/loos` and `PUT /api/loos/:id` accept either a Bearer token or a session cookie. If no valid credential is present the request is accepted as an **anonymous submission** — it is rate-limited and queued in `pending_change` for admin review rather than written directly to the database. Approved changes are applied by an admin via `POST /admin/pending/:id/approve`. A signed-in caller writes directly (no permission needed) unless they are blocked in Auth0; blocked users, users whose block status the Auth0 Management API cannot confirm, and sessions whose access token no longer verifies (authenticated by `id_token` alone) are queued like anonymous submissions, limited to one queued change a minute. The same rule applies to `POST /api/loos/:id/report` and `/restore`.
 
 - **Read endpoints**: Fully public, no authentication required.
 

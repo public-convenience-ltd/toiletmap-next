@@ -18,7 +18,7 @@ afterEach(() => {
 const renderToggle = (
   value: TriStateValue,
   onChange = vi.fn(),
-  extra: { hint?: string; error?: string } = {},
+  extra: { hint?: string; error?: string; unknownLabel?: string } = {},
 ) => {
   act(() => {
     render(
@@ -48,7 +48,7 @@ const activeLabels = () =>
   Array.from(container.querySelectorAll(".tri-state-label--active")).map((el) => el.textContent);
 
 describe("TriStateToggle", () => {
-  it("renders a labelled group of Yes / No / Unknown radios sharing one name", () => {
+  it("renders a labelled group of Yes / No / Don't know radios sharing one name", () => {
     renderToggle("");
     const fieldset = container.querySelector("fieldset");
     expect(fieldset?.querySelector("legend")?.textContent).toBe("Accessible");
@@ -61,11 +61,11 @@ describe("TriStateToggle", () => {
   it.each([
     ["true", "Yes"],
     ["false", "No"],
-    ["", "Unknown"],
+    ["", "Don't know"],
   ] as const)("checks only the matching option for value %j", (value, label) => {
     renderToggle(value);
     expect(radio(label).checked).toBe(true);
-    const others = ["Yes", "No", "Unknown"].filter((l) => l !== label);
+    const others = ["Yes", "No", "Don't know"].filter((l) => l !== label);
     for (const other of others) expect(radio(other).checked).toBe(false);
     expect(activeLabels()).toEqual([label]);
   });
@@ -78,9 +78,23 @@ describe("TriStateToggle", () => {
     expect(onChange).toHaveBeenLastCalledWith("false");
   });
 
-  it("emits an empty string for Unknown", () => {
+  it("emits an empty string for Don't know", () => {
     const onChange = renderToggle("true");
-    act(() => radio("Unknown").click());
+    act(() => radio("Don't know").click());
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it('labels the no-answer option "Don\'t know" by default, and accepts another label', () => {
+    renderToggle("");
+    expect(Array.from(container.querySelectorAll("label")).map((l) => l.textContent)).toEqual([
+      "Yes",
+      "No",
+      "Don't know",
+    ]);
+    const onChange = renderToggle("true", vi.fn(), { unknownLabel: "Not sure" });
+    expect(radio("Not sure").value).toBe("");
+    expect(container.textContent).not.toContain("Don't know");
+    act(() => radio("Not sure").click());
     expect(onChange).toHaveBeenCalledWith("");
   });
 

@@ -1,6 +1,6 @@
 import { MAX_SEARCH_LIMIT, MIN_SEARCH_LIMIT, RECENT_WINDOW_DAYS } from "../../common/constants";
 import { Prisma, type PrismaClientInstance } from "../../prisma";
-import type { LooDiffBase } from "./diff";
+import { isStaleBase, type LooDiffBase } from "./diff";
 import {
   areaSelection,
   buildAreaFromJoin,
@@ -19,6 +19,7 @@ import {
   buildSearchQueries,
   buildSelectByIdsQuery,
   createSearchWhereBuilder,
+  type ProximityOptions,
 } from "./sql";
 import type {
   CompressedLoo,
@@ -27,6 +28,7 @@ import type {
   LooResponse,
   LooSearchParams,
   NearbyLooResponse,
+  RemovalCategory,
   ReportResponse,
   ReportSummaryResponse,
 } from "./types";
@@ -58,6 +60,59 @@ export type DatasetVersion = {
 
 /** A loo as read for mutation purposes: the public response plus its raw `areaId`. */
 export type LooMutationBase = LooDiffBase & { areaId: string | null };
+
+/** What a caller asks for when reporting a loo as gone (`POST /loos/:id/report`). */
+export type RemovalInput = {
+  reason: RemovalCategory;
+  details?: string;
+  duplicateOf?: string;
+};
+
+/** Options shared by report/restore. */
+export type StateChangeOptions = {
+  /** The `updatedAt` the caller loaded; a mismatch is a `conflict`. */
+  baseUpdatedAt?: string | Date | null;
+  /** Run inside a caller-owned transaction (moderator approval). */
+  tx?: Prisma.TransactionClient;
+};
+
+/**
+ * Outcome of checking whether a report/restore may proceed. Everything except
+ * `ok` is a refusal the route maps to an HTTP status.
+ */
+export type StateChangeCheck =
+  | { status: "ok"; base: LooMutationBase }
+  | { status: "not_found" }
+  | { status: "already_removed"; current: LooResponse }
+  | { status: "not_removed"; current: LooResponse }
+  | { status: "conflict"; current: LooResponse }
+  | { status: "invalid_duplicate"; message: string };
+
+export type StateChangeResult =
+  | { status: "updated"; loo: LooResponse }
+  | Exclude<StateChangeCheck, { status: "ok" }>;
+
+export type VerifyResult =
+  | { status: "verified"; verifiedAt: string }
+  | { status: "not_found" }
+  | { status: "removed" };
+
+/** Written to `removal_reason` when a report has no free-text details. */
+export const DEFAULT_REMOVAL_REASONS: Record<RemovalCategory, string> = {
+  permanently_closed: "Reported as permanently closed.",
+  does_not_exist: "Reported as not existing at this location.",
+  not_public: "Reported as not open to the public.",
+  duplicate: "Reported as a duplicate of another toilet.",
+  other: "Reported as no longer available.",
+};
+
+/** A loo counts as removed unless it is explicitly active (null is off the map too). */
+const isRemoved = (loo: { active: boolean | null }) => loo.active !== true;
+
+const stripAreaId = ({ areaId: _areaId, ...loo }: LooMutationBase): LooResponse => loo;
+
+/** Bounded retries when a concurrent write lands between our read and our update. */
+const MAX_STATE_CHANGE_ATTEMPTS = 3;
 
 export type UpdateExistingResult =
   | { status: "updated"; loo: LooResponse | null }
@@ -483,11 +538,17 @@ export class LooService {
   }
 
   /**
-   * Finds loos within a specified radius (in meters) of a coordinate.
-   * Uses PostGIS spherical distance calculation.
+   * Finds loos within a specified radius (in meters) of a coordinate, nearest
+   * first. Active loos only unless `options.includeInactive`; `options.excludeId`
+   * leaves one loo out. Uses PostGIS spherical distance calculation.
    */
-  async getByProximity(lat: number, lng: number, radius: number): Promise<NearbyLooResponse[]> {
-    const query = buildProximityQuery(lat, lng, radius);
+  async getByProximity(
+    lat: number,
+    lng: number,
+    radius: number,
+    options: ProximityOptions = {},
+  ): Promise<NearbyLooResponse[]> {
+    const query = buildProximityQuery(lat, lng, radius, options);
     const loos = (await this.prisma.$queryRaw<RawNearbyLooRow[]>(query)) ?? [];
 
     return loos.map((loo: RawNearbyLooRow) => {
@@ -709,5 +770,220 @@ export class LooService {
     });
 
     return this.getById(id);
+  }
+  // ===========================================================================
+  // REPORT / RESTORE / VERIFY
+  // ===========================================================================
+
+  /**
+   * Checks that `id` can be reported as gone: it exists, is still on the map,
+   * matches `baseUpdatedAt`, and any `duplicateOf` names a different, active
+   * loo. Writes nothing; untrusted callers run this before queueing.
+   */
+  async checkReport(
+    id: string,
+    input: RemovalInput,
+    { baseUpdatedAt, tx }: StateChangeOptions = {},
+  ): Promise<StateChangeCheck> {
+    const db: DbClient = tx ?? this.prisma;
+    const base = await this.getMutationBase(id, db);
+    if (!base) return { status: "not_found" };
+    if (isRemoved(base)) return { status: "already_removed", current: stripAreaId(base) };
+    if (isStaleBase(baseUpdatedAt, base.updatedAt)) {
+      return { status: "conflict", current: stripAreaId(base) };
+    }
+
+    if (input.duplicateOf !== undefined) {
+      if (input.duplicateOf === id) {
+        return { status: "invalid_duplicate", message: "A toilet cannot duplicate itself" };
+      }
+      const target = await db.toilets.findUnique({
+        where: { id: input.duplicateOf },
+        select: { active: true },
+      });
+      if (!target) {
+        return { status: "invalid_duplicate", message: "The duplicate toilet does not exist" };
+      }
+      if (isRemoved(target)) {
+        return {
+          status: "invalid_duplicate",
+          message: "The duplicate toilet has been removed; choose one that is still on the map",
+        };
+      }
+    }
+
+    return { status: "ok", base };
+  }
+
+  /**
+   * Removes a loo from the map with a category and reason (trusted callers
+   * and moderator approval). A strict, version-guarded update: it never
+   * inserts, and a concurrent edit is either retried (no `baseUpdatedAt`) or
+   * reported as a conflict.
+   */
+  report(
+    id: string,
+    input: RemovalInput,
+    contributor: string | null,
+    options: StateChangeOptions = {},
+  ): Promise<StateChangeResult> {
+    const mutation: LooMutationAttributes = {
+      active: false,
+      removalCategory: input.reason,
+      removalReason: input.details ?? DEFAULT_REMOVAL_REASONS[input.reason],
+      duplicateOf: input.reason === "duplicate" ? (input.duplicateOf ?? null) : null,
+    };
+    return this.applyStateChange(
+      id,
+      // Lock the duplicate target too, so it cannot be removed (for example
+      // as a duplicate of this loo) between the check and the write.
+      input.duplicateOf !== undefined && input.duplicateOf !== id ? input.duplicateOf : null,
+      (tx) => this.checkReport(id, input, { ...options, tx }),
+      mutation,
+      contributor,
+      options,
+    );
+  }
+
+  /** Checks that `id` can be restored: it exists, is removed, and matches `baseUpdatedAt`. */
+  async checkRestore(
+    id: string,
+    { baseUpdatedAt, tx }: StateChangeOptions = {},
+  ): Promise<StateChangeCheck> {
+    const base = await this.getMutationBase(id, tx ?? this.prisma);
+    if (!base) return { status: "not_found" };
+    if (!isRemoved(base)) return { status: "not_removed", current: stripAreaId(base) };
+    if (isStaleBase(baseUpdatedAt, base.updatedAt)) {
+      return { status: "conflict", current: stripAreaId(base) };
+    }
+    return { status: "ok", base };
+  }
+
+  /**
+   * Puts a removed loo back on the map and clears its removal category,
+   * reason and duplicate link. The previous values stay in the audit trail.
+   */
+  restore(
+    id: string,
+    contributor: string | null,
+    options: StateChangeOptions = {},
+  ): Promise<StateChangeResult> {
+    const mutation: LooMutationAttributes = {
+      active: true,
+      removalCategory: null,
+      removalReason: null,
+      duplicateOf: null,
+    };
+    return this.applyStateChange(
+      id,
+      null,
+      (tx) => this.checkRestore(id, { ...options, tx }),
+      mutation,
+      contributor,
+      options,
+    );
+  }
+
+  /**
+   * Locks the reported row (`FOR UPDATE`) and, when given, the row it
+   * depends on (`FOR SHARE`, e.g. a duplicate target), in ascending id order
+   * so two state changes naming each other wait rather than deadlock.
+   */
+  private async lockForStateChange(
+    tx: Prisma.TransactionClient,
+    id: string,
+    dependsOn: string | null,
+  ): Promise<void> {
+    const locks = [
+      { lockId: id, sql: Prisma.sql`SELECT id FROM toilets WHERE id = ${id} FOR UPDATE` },
+      ...(dependsOn
+        ? [
+            {
+              lockId: dependsOn,
+              sql: Prisma.sql`SELECT id FROM toilets WHERE id = ${dependsOn} FOR SHARE`,
+            },
+          ]
+        : []),
+    ].sort((a, b) => (a.lockId < b.lockId ? -1 : a.lockId > b.lockId ? 1 : 0));
+    for (const lock of locks) {
+      await tx.$queryRaw(lock.sql);
+    }
+  }
+
+  /**
+   * Runs `check` and the write in one transaction (the caller's, or a new
+   * one) after locking the row and `dependsOn`, so what the check saw still
+   * holds when the update commits.
+   */
+  private async applyStateChange(
+    id: string,
+    dependsOn: string | null,
+    check: (tx: Prisma.TransactionClient) => Promise<StateChangeCheck>,
+    mutation: LooMutationAttributes,
+    contributor: string | null,
+    options: StateChangeOptions,
+  ): Promise<StateChangeResult> {
+    const attempt = async (tx: Prisma.TransactionClient) => {
+      await this.lockForStateChange(tx, id, dependsOn);
+      const checked = await check(tx);
+      if (checked.status !== "ok") return checked;
+      const result = await this.updateExisting(id, mutation, contributor, {
+        tx,
+        expectedUpdatedAt: checked.base.updatedAt,
+      });
+      if (result.status === "conflict") return { status: "version_missed" as const };
+      return result.status === "updated" ? { status: "updated" as const } : result;
+    };
+
+    for (let i = 1; i <= MAX_STATE_CHANGE_ATTEMPTS; i++) {
+      const result = options.tx
+        ? await attempt(options.tx)
+        : await this.prisma.$transaction(attempt);
+      if (result.status === "updated") {
+        const loo = options.tx
+          ? await this.getMutationBase(id, options.tx).then((base) => base && stripAreaId(base))
+          : await this.getById(id);
+        if (!loo) throw new Error(`Failed to reload loo ${id} after update`);
+        return { status: "updated", loo };
+      }
+      if (result.status !== "version_missed") return result;
+
+      // The version guard missed even though the row was locked (should not
+      // happen). Inside a caller's transaction, or when the caller pinned a
+      // version, report a conflict; otherwise re-check against the new version.
+      if (options.tx || (options.baseUpdatedAt !== undefined && options.baseUpdatedAt !== null)) {
+        const current = await this.getMutationBase(id, options.tx ?? this.prisma);
+        if (!current) return { status: "not_found" };
+        return { status: "conflict", current: stripAreaId(current) };
+      }
+    }
+
+    const current = await this.getMutationBase(id);
+    if (!current) return { status: "not_found" };
+    return { status: "conflict", current: stripAreaId(current) };
+  }
+
+  /**
+   * Records that someone confirmed the loo is still there: sets
+   * `verified_at = now()` and nothing else (no contributor, and `updated_at`
+   * is left alone so edit forms holding a base version do not conflict). The
+   * detail ETag still changes because it hashes the body.
+   */
+  async verify(id: string): Promise<VerifyResult> {
+    const rows = await this.prisma.$queryRaw<Array<{ verified_at: Date }>>(Prisma.sql`
+      UPDATE toilets
+      SET verified_at = now()
+      WHERE id = ${id} AND active IS TRUE
+      RETURNING verified_at
+    `);
+    this.looCache.delete(id);
+    const [row] = rows;
+    if (row) return { status: "verified", verifiedAt: new Date(row.verified_at).toISOString() };
+
+    const existing = await this.prisma.toilets.findUnique({
+      where: { id },
+      select: { active: true },
+    });
+    return existing ? { status: "removed" } : { status: "not_found" };
   }
 }

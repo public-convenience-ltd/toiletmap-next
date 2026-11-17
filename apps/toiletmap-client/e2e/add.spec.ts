@@ -1,52 +1,44 @@
-import type { Page } from "@playwright/test";
 import { e2eName, getLoo, randomFixtureLocation } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
-import { jsonBody, looForm, nextSave, waitForSaved } from "./support/form";
+import {
+  enterCoordinates,
+  jsonBody,
+  looForm,
+  nextSave,
+  QUESTIONS,
+  waitForSaved,
+} from "./support/form";
 import { detailsPanelHeading } from "./support/map";
-
-const nextFrames = (page: Page) =>
-  page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
 
 /** Signed-in "Add a toilet" (legacy cypress/e2e/{desktop,mobile}/add.cy.ts). */
 test.describe("add (signed in)", () => {
-  test("adds a toilet with a name, a placed pin and one facility", async ({ page, loos }) => {
+  test("adds a toilet with a name, a confirmed pin and one facility", async ({ page, loos }) => {
     await page.goto("/loos/add");
     const form = looForm(page);
     await expect(form.heading).toHaveText("Add a toilet");
-    await expect(form.pin).toHaveCount(0);
+    // Add mode opens moving: a fixed centre pin, nothing confirmed yet.
+    await expect(form.picker.useLocation).toBeVisible();
+    await expect(form.save).toBeDisabled();
 
-    // Saving without a pin is refused.
+    // Saving without a confirmed pin is refused.
     const name = e2eName("added");
     await form.name.fill(name);
+    await expect(form.save).toBeEnabled();
     await form.save.click();
-    await expect(
-      page.getByText("Please set the toilet's location on the map.").first(),
-    ).toBeVisible();
+    await expect(page.getByText("There's a problem")).toBeVisible();
+    await expect(form.review).toBeHidden();
 
-    await form.placePin.click();
-    await expect(form.pin).toBeVisible();
-    await expect(form.movePinToCentre).toBeVisible();
-    // Fine-tune by typing coordinates, moving it off the default (London) view
-    // so it never shows up in the map tests.
+    // Somewhere off the default (London) view so it never shows up in the map tests.
     const target = randomFixtureLocation();
-    // Commit each field (Enter) and let Preact flush its effects in between: the
-    // form re-syncs both text boxes from the pin after every commit, which
-    // would overwrite a second box filled within the same frame.
-    await form.latitude.fill(String(target.lat));
-    await form.latitude.press("Enter");
-    await nextFrames(page);
-    await form.longitude.fill(String(target.lng));
-    await form.longitude.press("Enter");
-    await nextFrames(page);
-    await expect(form.latitude).toHaveValue(String(target.lat));
-    await expect(form.longitude).toHaveValue(String(target.lng));
+    await enterCoordinates(page, target);
 
-    await form.facility("Baby change", "Yes").click();
+    await form.facility(QUESTIONS.babyChange, "Yes").click();
 
     const post = nextSave(page, "POST");
     await form.save.click();
+    await expect(form.review).toBeVisible();
+    await expect(form.review.getByRole("heading")).toHaveText("Check the new toilet");
+    await form.confirm.click();
     const body = jsonBody(await post);
     expect(body).toMatchObject({ name, babyChange: true, location: target });
 
@@ -65,5 +57,18 @@ test.describe("add (signed in)", () => {
     });
     expect(saved.location?.lat).toBeCloseTo(target.lat, 5);
     expect(saved.location?.lng).toBeCloseTo(target.lng, 5);
+  });
+
+  test("the map's 'Add a toilet here' opens the add form at that view", async ({ page }) => {
+    const target = randomFixtureLocation();
+    await page.goto(`/loos/add?lat=${target.lat}&lng=${target.lng}&zoom=18`);
+    const form = looForm(page);
+    await expect(form.picker.useLocation).toBeEnabled();
+    await form.picker.useLocation.click();
+    await expect(form.picker.movePin).toBeVisible();
+    await form.picker.coordsToggle.click();
+    const [lat, lng] = (await form.picker.coords.inputValue()).split(",").map(Number);
+    expect(lat).toBeCloseTo(target.lat, 4);
+    expect(lng).toBeCloseTo(target.lng, 4);
   });
 });

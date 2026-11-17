@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { contextStorage } from "hono/context-storage";
 import { requireAdminAuth } from "../auth/middleware";
 import { rateLimiters } from "../middleware/cloudflare-rate-limit";
 import { requireAdminRole } from "../middleware/require-admin-role";
@@ -11,6 +12,10 @@ import { userStatistics } from "./pages/users";
 import { updateUserPermissions, userAdministration } from "./pages/users/admin";
 
 const admin = new Hono<{ Bindings: Env; Variables: AppVariables }>();
+
+// Lets the shared Layout read per-request values (the pending badge) without
+// threading them through every page.
+admin.use("*", contextStorage());
 
 // Public routes (no auth required, with rate limiting to prevent brute force)
 admin.get("/login", rateLimiters.auth, login);
@@ -25,6 +30,18 @@ admin.use(
     unauthorizedResponse: (c) => renderAccessDenied(c, c.get("user")),
   }),
 );
+
+// Nav badge: a cheap indexed count, only for page views.
+admin.use("*", async (c, next) => {
+  if (c.req.method === "GET") {
+    try {
+      c.set("pendingCount", await c.get("pendingChangeService").countPending());
+    } catch {
+      // The badge is cosmetic; never fail a page over it.
+    }
+  }
+  await next();
+});
 
 // Protected routes
 admin.get("/", loosList);

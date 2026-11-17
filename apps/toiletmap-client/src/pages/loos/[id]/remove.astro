@@ -1,0 +1,84 @@
+---
+/**
+ * "Report a problem" with a toilet (the legacy `/loos/:id/remove` URL).
+ * The ReportProblem island posts to the same-origin /api proxy.
+ */
+import { env } from "cloudflare:workers";
+import { Footer, Header } from "toiletmap-design-system";
+import type { LooDetail } from "../../../api/loos";
+import logo from "../../../assets/logo.svg?url";
+import ReportProblem from "../../../components/ReportProblem/ReportProblem";
+import Layout from "../../../layouts/Layout.astro";
+import { BROWSER_API_URL, fetchApi } from "../../../utils/api";
+import { sessionCanWriteDirectly } from "../../../utils/permissions";
+
+const { id } = Astro.params;
+
+const apiUrl = BROWSER_API_URL;
+const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
+// Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
+const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
+
+if (!id) return new Response("Toilet not found", { status: 404 });
+
+// SSR fetch goes straight upstream (service binding or PUBLIC_API_URL), not via the proxy.
+let toilet: LooDetail;
+try {
+  const clientIp = Astro.request.headers.get("cf-connecting-ip");
+  const res = await fetchApi(env, Astro.url, `/api/loos/${encodeURIComponent(id)}`, {
+    headers: {
+      accept: "application/json",
+      ...(clientIp ? { "cf-connecting-ip": clientIp, "x-forwarded-for": clientIp } : {}),
+    },
+  });
+  if (res.status === 404 || res.status === 400) {
+    return new Response("Toilet not found", { status: 404 });
+  }
+  if (!res.ok) {
+    console.error(`Failed to load loo ${id} for reporting: HTTP ${res.status}`);
+    return new Response("Could not load this toilet right now. Please try again later.", {
+      status: 502,
+    });
+  }
+  toilet = (await res.json()) as LooDetail;
+} catch (error) {
+  console.error(`Failed to load loo ${id} for reporting:`, error);
+  return new Response("Could not load this toilet right now. Please try again later.", {
+    status: 502,
+  });
+}
+
+const returnTo = `/loos/${encodeURIComponent(id)}/remove`;
+const navLinks = [
+  { href: "/about", label: "About" },
+  { href: "/blog", label: "Blog" },
+  { href: "/contact", label: "Contact" },
+  { href: "/feedback", label: "Feedback" },
+  { href: "/loos/add", label: "Add a Toilet", button: true },
+  isAuthenticated
+    ? { href: "/auth/logout", label: "Sign out" }
+    : { href: `/auth/login?returnTo=${encodeURIComponent(returnTo)}`, label: "Sign in" },
+];
+---
+
+<Layout>
+  <Header client:load logoSrc={logo} navLinks={navLinks} />
+  <main>
+    <ReportProblem
+      client:only="preact"
+      loo={toilet}
+      apiUrl={apiUrl}
+      isAuthenticated={isAuthenticated}
+      canWriteDirectly={canWriteDirectly}
+    />
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+</style>

@@ -210,7 +210,7 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 - **GET /api/loos/:id** - Fetch single loo by ID
 - **GET /api/loos?ids=** - Batch fetch loos (comma-separated or repeated `?ids=` params)
 - **GET /api/loos/geohash/:geohash** - Search by geohash prefix (optional `?active=true/false/any`)
-- **GET /api/loos/proximity** - Find nearby loos (`lat`, `lng` required, optional `radius`)
+- **GET /api/loos/proximity** - Find nearby loos, nearest first (`lat`, `lng` required; optional `radius`, `includeInactive=true|false` (default false: active only) and `exclude=<id>`). Each item carries `active` and `distance` (metres).
 - **GET /api/loos/search** - Advanced search with filters, sorting, pagination
 - **GET /api/loos/metrics** - Aggregate metrics for filtered results
 - **GET /api/loos/:id/reports** - Audit history (contributors redacted unless caller has `access:admin`)
@@ -222,6 +222,16 @@ Public routes still accept optional authentication so admin tokens can unlock ex
 - **POST /api/loos** - Create new loo (requires contributor info in JWT)
 - **PUT /api/loos/:id** - Upsert (create or update) loo (requires contributor info in JWT)
 
+Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). Sessions authenticated only by their `id_token` (the access token failed verification) are queued too, and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked in local dev and tests, but in production (`ENVIRONMENT=production`) missing credentials queue every signed-in change. To stop someone editing, block the user in the Auth0 dashboard (for an admin, also remove `access:admin`: blocking does not end an existing session or admin access). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
+
+### Report, restore and verify (anyone; signed-in, unblocked callers apply directly)
+
+- **POST /api/loos/:id/report** - `{reason: permanently_closed|does_not_exist|not_public|duplicate|other, details?, duplicateOf?, baseUpdatedAt?}`. Trusted: `active=false`, `removal_category`, `removal_reason`, `duplicate_of`; 200 with the loo and `compressed: null`. Others: 202, pending type `remove`. 409 `already_removed` / stale `conflict`; `details` required for `other`, `duplicateOf` required for (and only allowed with) `duplicate`.
+- **POST /api/loos/:id/restore** - `{details?, baseUpdatedAt?}`. Trusted: `active=true`, clears category and duplicate link; 200 with `compressed`. Others: 202, pending type `restore`. 409 `not_removed`.
+- **POST /api/loos/:id/verify** - no body; anyone (anonymous rate-limited). Sets only `verified_at`; 200 `{id, verifiedAt}`. 409 `removed` for an inactive loo.
+
+`LooResponse` includes `removalCategory` and `duplicateOf`. Optional secret `MODERATION_SLACK_WEBHOOK` (off when unset) posts a counts-only "N changes awaiting review" message when something is queued.
+
 ### Admin Interface Routes (Session Auth Required)
 
 - **GET /admin** - Admin dashboard
@@ -230,7 +240,7 @@ Public routes still accept optional authentication so admin tokens can unlock ex
 - **POST /admin/loos** - Create loo via admin form (form submission)
 - **GET /admin/users/statistics** (alias `/admin/users`) - Contributor analytics / user statistics dashboard
 - **GET /admin/users/admin** - Auth0-backed user administration (view + edit permissions)
-- **POST /admin/users/admin/permissions** - Toggle `access:admin` / `report:loo` via Auth0 Management API
+- **POST /admin/users/admin/permissions** - Toggle `access:admin` via Auth0 Management API
 - **GET /admin/logout** - Clear session and redirect to login
 
 ## Development Workflows
@@ -434,7 +444,7 @@ The dataset explorer (`src/admin/pages/loos/list.tsx`) provides:
 - **User Administration (`/admin/users/admin`)**
   - Searches the Auth0 directory by email/name/subject
   - Shows profile metadata (created, last login, login count) and all API permissions
-  - Toggle buttons for the key permissions: `access:admin` (dashboard access) and `report:loo` (loo contributions)
+  - Toggle button for `access:admin` (dashboard access). Editing needs no permission; the page tells admins to block a user in the Auth0 dashboard to stop them editing, and says when the selected user is blocked
   - Powered by `Auth0ManagementClient` (`src/services/auth0/management.ts`) which wraps the Auth0 Management API with token caching
   - Requires dedicated `AUTH0_MANAGEMENT_CLIENT_ID` / `AUTH0_MANAGEMENT_CLIENT_SECRET` credentials (plus optional `AUTH0_MANAGEMENT_AUDIENCE`). Missing credentials trigger a warning banner and disable write actions.
 

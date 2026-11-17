@@ -217,6 +217,42 @@ describe("buildLooPatch (edit)", () => {
   });
 });
 
+describe("urinalOnly", () => {
+  it("is loaded into the form as a tri-state", () => {
+    expect(formStateFromLoo(makeLoo({ urinalOnly: true }), "edit").urinalOnly).toBe("true");
+    expect(formStateFromLoo(makeLoo({ urinalOnly: false }), "edit").urinalOnly).toBe("false");
+    expect(formStateFromLoo(makeLoo(), "edit").urinalOnly).toBe("");
+  });
+
+  it("is sent on its own when it is the only change", () => {
+    const { payload, changedKeys } = editPatch(makeLoo({ urinalOnly: null }), (f) => ({
+      ...f,
+      urinalOnly: "true",
+    }));
+    expect(payload).toEqual({ urinalOnly: true, baseUpdatedAt: UPDATED_AT });
+    expect(changedKeys).toEqual(["urinalOnly"]);
+  });
+
+  it("is not sent when untouched, and is sent as null when set back to unknown", () => {
+    expect(editPatch(makeLoo({ urinalOnly: false }), (f) => f).payload).toEqual({});
+    expect(
+      editPatch(makeLoo({ urinalOnly: false }), (f) => ({ ...f, urinalOnly: "" })).payload,
+    ).toEqual({ urinalOnly: null, baseUpdatedAt: UPDATED_AT });
+  });
+
+  it("counts as a changed field for conflicts and rebasing", () => {
+    const loo = makeLoo({ urinalOnly: null });
+    const initialForm = formStateFromLoo(loo, "edit");
+    const form = { ...initialForm, urinalOnly: "true" as const };
+    expect(changedFormFields(initialForm, form)).toEqual(["urinalOnly"]);
+    const current = makeLoo({ urinalOnly: false, updatedAt: "2025-12-01T00:00:00.000Z" });
+    expect(conflictingFields({ initialForm, form, current })).toEqual(["urinalOnly"]);
+    expect(rebaseOnCurrent({ current, initialForm, form, mode: "edit" }).form.urinalOnly).toBe(
+      "true",
+    );
+  });
+});
+
 describe("buildLooPatch (add)", () => {
   it("sends a full payload without active or baseUpdatedAt", () => {
     const initialForm = formStateFromLoo(null, "add");
@@ -242,6 +278,7 @@ describe("buildLooPatch (add)", () => {
       men: null,
       women: null,
       children: null,
+      urinalOnly: null,
       babyChange: null,
       radar: null,
       automatic: null,

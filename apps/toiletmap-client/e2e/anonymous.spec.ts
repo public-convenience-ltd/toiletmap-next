@@ -22,11 +22,14 @@ test.describe("anonymous edits", () => {
 
     const form = await openEditForm(page, loo.id);
     expect((await context.cookies()).map((c) => c.name)).not.toContain("access_token");
-    await expect(page.getByText("You're not signed in")).toBeVisible();
+    // Says the change will be checked, with a way to sign in.
+    const status = page.getByText("A moderator will check your change before it appears.");
+    await expect(status).toBeVisible();
+    await expect(status.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
 
     await form.notes.fill("Suggested by a passer-by");
     const put = nextSave(page, "PUT");
-    await form.save.click();
+    await form.submit();
     const request = await put;
     // Sent to the client's own /api proxy, never straight to toiletmap-server.
     expect(new URL(request.url()).origin).toBe(new URL(CLIENT_URL).origin);

@@ -1,16 +1,27 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
+import { every } from "hono/combine";
 import { optionalAuth } from "../../auth/middleware";
 import { LOO_ID_LENGTH } from "../../common/constants";
 import { validate } from "../../common/validator";
 import { cacheResponse, edgeCache } from "../../middleware/cache";
 import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
-import { hasAdminRole } from "../../middleware/require-admin-role";
+import { canWriteDirectly, hasAdminRole } from "../../middleware/require-admin-role";
 import { generateLooId } from "../../services/loo";
-import { diffMutation, isEmptyMutation, isStaleBase } from "../../services/loo/diff";
-import type { LooMutationBase } from "../../services/loo/loo.service";
+import {
+  clearRemovalOnReactivate,
+  diffMutation,
+  isEmptyMutation,
+  isStaleBase,
+} from "../../services/loo/diff";
+import type { LooMutationBase, StateChangeResult } from "../../services/loo/loo.service";
 import { toCompressedLoo } from "../../services/loo/mappers";
 import type { LooResponse } from "../../services/loo/types";
+import { scheduleModerationAlert } from "../../services/moderation-alert";
+import type {
+  PendingChangeType,
+  PendingPayload,
+} from "../../services/pending-change/pending-change.service";
 import type { AppVariables, Env } from "../../types";
 import { extractContributor } from "../../utils/auth-utils";
 import {
@@ -34,7 +45,9 @@ import {
   looIdParamSchema,
   metricsQuerySchema,
   proximitySchema,
+  reportSchema,
   reportsQuerySchema,
+  restoreSchema,
   searchQuerySchema,
   updateMutationSchema,
   updatesQuerySchema,
@@ -42,12 +55,21 @@ import {
 
 const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
-const anonRateLimitExceeded = async (
+/**
+ * The 1/min submission limit for writes that are queued for moderation:
+ * anonymous callers by IP, signed-in callers (blocked, or block status
+ * unknown) by user, so a blocked account cannot fill the queue faster than
+ * an anonymous caller can. Anonymous verifies share it too.
+ */
+const queuedWriteRateLimitExceeded = async (
   c: Context<{ Variables: AppVariables; Bindings: Env }>,
 ): Promise<Response | null> => {
-  const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({
-    key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
-  }) ?? Promise.resolve({ success: true }));
+  const user = c.get("user");
+  const key = user
+    ? `anon-write:user:${user.sub}`
+    : `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`;
+  const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({ key }) ??
+    Promise.resolve({ success: true }));
   if (!success) {
     return c.json(
       {
@@ -62,10 +84,14 @@ const anonRateLimitExceeded = async (
 
 type AppContext = Context<{ Variables: AppVariables; Bindings: Env }>;
 
+const signedInWriteLimiters = every(rateLimiters.write, rateLimiters.writeIp);
+
 /**
- * Applies the per-user write rate limiter to authenticated mutations.
- * Anonymous mutations are limited separately (see anonRateLimitExceeded).
- * Like every Cloudflare limiter here, a missing binding fails open.
+ * Applies the write rate limiters to authenticated mutations: per user, and
+ * per IP so one person cannot multiply the per-user budget by switching
+ * accounts. Anonymous mutations are limited separately (see
+ * queuedWriteRateLimitExceeded). Like every Cloudflare limiter here, a
+ * missing binding fails open.
  */
 const authenticatedWriteRateLimit: MiddlewareHandler<{
   Variables: AppVariables;
@@ -75,7 +101,7 @@ const authenticatedWriteRateLimit: MiddlewareHandler<{
     await next();
     return;
   }
-  return rateLimiters.write(c, next);
+  return signedInWriteLimiters(c, next);
 };
 
 const CONFLICT_MESSAGE = "This toilet was changed by someone else while you were editing.";
@@ -95,6 +121,63 @@ const savedLooResponse = (c: AppContext, loo: LooResponse, status: 200 | 201) =>
 
 /** Bounded retries when a concurrent write lands between our read and our update. */
 const MAX_UPDATE_ATTEMPTS = 3;
+
+/**
+ * Queues a change for moderation and alerts moderators (when configured).
+ * Signed-in submitters are recorded so approval credits them.
+ */
+const queueForModeration = async (
+  c: AppContext,
+  type: PendingChangeType,
+  payload: PendingPayload,
+  looId: string | null,
+  baseUpdatedAt: string | Date | null | undefined,
+) => {
+  const user = c.get("user");
+  const { id } = await c.get("pendingChangeService").queue(type, payload, {
+    looId,
+    ip: c.req.header("cf-connecting-ip") ?? null,
+    baseUpdatedAt: baseUpdatedAt ? new Date(baseUpdatedAt) : null,
+    submittedBy: user ? extractContributor(user, c.env.AUTH0_PROFILE_KEY) : null,
+  });
+  scheduleModerationAlert(c);
+  return c.json({ queued: true, id }, 202);
+};
+
+/** Maps a refused or completed report/restore to its HTTP response. */
+const stateChangeResponse = (c: AppContext, result: StateChangeResult) => {
+  switch (result.status) {
+    case "updated":
+      return savedLooResponse(c, result.loo, 200);
+    case "not_found":
+      return notFound(c, "Loo not found");
+    case "conflict":
+      return conflictResponse(c, result.current);
+    case "already_removed":
+      return c.json(
+        {
+          message: "This toilet has already been removed from the map.",
+          error: "already_removed",
+          current: result.current,
+        },
+        409,
+      );
+    case "not_removed":
+      return c.json(
+        {
+          message: "This toilet is already on the map.",
+          error: "not_removed",
+          current: result.current,
+        },
+        409,
+      );
+    case "invalid_duplicate":
+      return badRequest(c, "Invalid report request body", {
+        _errors: [],
+        duplicateOf: { _errors: [result.message] },
+      });
+  }
+};
 
 /**
  * GET /loos/updates?since=<cursor>
@@ -203,12 +286,16 @@ loosRouter.get("/dump", validate("query", dumpQuerySchema, "Invalid dump query")
 loosRouter.get(
   "/proximity",
   validate("query", proximitySchema, "Invalid proximity query"),
-  cacheResponse(300),
+  // Short TTL: the add/edit duplicate prompt should see reports and restores soon.
+  cacheResponse(60),
   (c) =>
     handleRoute(c, "loos.proximity", async () => {
-      const { lat, lng, radius } = c.req.valid("query");
+      const { lat, lng, radius, includeInactive, exclude } = c.req.valid("query");
       const looService = c.get("looService");
-      const loos = await looService.getByProximity(lat, lng, radius);
+      const loos = await looService.getByProximity(lat, lng, radius, {
+        includeInactive,
+        excludeId: exclude,
+      });
       return c.json({ data: loos, count: loos.length });
     }),
 );
@@ -304,24 +391,16 @@ loosRouter.post(
     handleRoute(c, "loos.create", async () => {
       const user = c.get("user");
 
-      if (!user) {
-        // Anonymous submission: rate-limit then queue for approval
-        const limited = await anonRateLimitExceeded(c);
+      if (!(await canWriteDirectly(c, user))) {
+        // Anonymous, blocked, or block status unknown: queue for approval.
+        const limited = await queuedWriteRateLimitExceeded(c);
         if (limited) return limited;
 
-        const validation = c.req.valid("json");
-        const pendingChangeService = c.get("pendingChangeService");
-        const { id: _id, ...payload } = validation;
-        const { id } = await pendingChangeService.queue(
-          "create",
-          payload,
-          null,
-          c.req.header("cf-connecting-ip") ?? null,
-        );
-        return c.json({ queued: true, id }, 202);
+        const { id: _id, ...payload } = c.req.valid("json");
+        return queueForModeration(c, "create", payload, null, null);
       }
 
-      // Authenticated: direct write
+      // Signed in and not blocked: direct write
       const validation = c.req.valid("json");
       const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
       const { id: requestedId, ...rest } = validation;
@@ -362,13 +441,13 @@ loosRouter.put(
       const { baseUpdatedAt, ...mutation } = c.req.valid("json");
       const looService = c.get("looService");
 
-      if (!user) {
-        // Anonymous submission: rate-limit then queue the diff for approval
-        const limited = await anonRateLimitExceeded(c);
+      if (!(await canWriteDirectly(c, user))) {
+        // Anonymous, blocked, or block status unknown: queue the diff for approval.
+        const limited = await queuedWriteRateLimitExceeded(c);
         if (limited) return limited;
 
         const existing = await looService.getMutationBase(id);
-        // Anonymous users can only suggest edits to toilets that exist.
+        // Untrusted callers can only suggest edits to toilets that exist.
         if (!existing) return notFound(c, "Loo not found");
         if (isStaleBase(baseUpdatedAt, existing.updatedAt)) {
           return conflictResponse(c, stripMutationBase(existing));
@@ -379,19 +458,10 @@ loosRouter.put(
           return c.json({ queued: false, unchanged: true }, 200);
         }
 
-        const pendingChangeService = c.get("pendingChangeService");
-        const baseVersion = baseUpdatedAt ?? existing.updatedAt;
-        const { id: queued } = await pendingChangeService.queue(
-          "update",
-          changes,
-          id,
-          c.req.header("cf-connecting-ip") ?? null,
-          baseVersion ? new Date(baseVersion) : null,
-        );
-        return c.json({ queued: true, id: queued }, 202);
+        return queueForModeration(c, "update", changes, id, baseUpdatedAt ?? existing.updatedAt);
       }
 
-      // Authenticated: direct write
+      // Signed in and not blocked: direct write
       const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
 
       for (let attempt = 1; attempt <= MAX_UPDATE_ATTEMPTS; attempt++) {
@@ -408,7 +478,7 @@ loosRouter.put(
           return conflictResponse(c, stripMutationBase(existing));
         }
 
-        const changes = diffMutation(mutation, existing);
+        const changes = clearRemovalOnReactivate(diffMutation(mutation, existing), existing);
         if (isEmptyMutation(changes)) {
           return savedLooResponse(c, stripMutationBase(existing), 200);
         }
@@ -436,6 +506,135 @@ loosRouter.put(
         { message: CONFLICT_MESSAGE, error: "conflict", current: await looService.getById(id) },
         409,
       );
+    }),
+);
+
+/**
+ * POST /loos/:id/report
+ *
+ * "Report a problem": the toilet is gone, never existed, is not public, or
+ * duplicates another. Trusted callers (signed in, not blocked) remove it
+ * from the map immediately (200, with `compressed: null`); everyone else gets
+ * a 202 and a pending `remove` change. Refusals: 404 unknown, 409
+ * `already_removed`, 409 `conflict` (stale `baseUpdatedAt`), 400 validation.
+ */
+loosRouter.post(
+  "/:id/report",
+  optionalAuth,
+  authenticatedWriteRateLimit,
+  validate("param", looIdParamSchema, "Invalid id path parameter"),
+  validate("json", reportSchema, "Invalid report request body"),
+  (c) =>
+    handleRoute(c, "loos.report", async () => {
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
+      const { baseUpdatedAt, ...input } = c.req.valid("json");
+      const looService = c.get("looService");
+
+      if (await canWriteDirectly(c, user)) {
+        const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
+        return stateChangeResponse(
+          c,
+          await looService.report(id, input, contributor, { baseUpdatedAt }),
+        );
+      }
+
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
+
+      const checked = await looService.checkReport(id, input, { baseUpdatedAt });
+      if (checked.status !== "ok") return stateChangeResponse(c, checked);
+
+      const payload = {
+        reason: input.reason,
+        ...(input.details ? { details: input.details } : {}),
+        ...(input.duplicateOf ? { duplicateOf: input.duplicateOf } : {}),
+      };
+      return queueForModeration(c, "remove", payload, id, baseUpdatedAt ?? checked.base.updatedAt);
+    }),
+);
+
+/**
+ * POST /loos/:id/restore
+ *
+ * "It's still here": puts a removed toilet back on the map. Trusted callers
+ * apply it (200 with the loo and its `compressed` tuple); everyone else
+ * queues a `restore` change (202). 409 `not_removed` when it is on the map.
+ * `details` is a moderator note: kept on queued restores only. A trusted
+ * restore does not store it and answers `detailsIgnored: true` when sent.
+ */
+loosRouter.post(
+  "/:id/restore",
+  optionalAuth,
+  authenticatedWriteRateLimit,
+  validate("param", looIdParamSchema, "Invalid id path parameter"),
+  validate("json", restoreSchema, "Invalid restore request body"),
+  (c) =>
+    handleRoute(c, "loos.restore", async () => {
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
+      const { baseUpdatedAt, details } = c.req.valid("json");
+      const looService = c.get("looService");
+
+      if (await canWriteDirectly(c, user)) {
+        const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
+        const result = await looService.restore(id, contributor, { baseUpdatedAt });
+        // `details` is a note for moderators; a direct restore has no
+        // moderator and no field to store it in, so it is not kept. Say so
+        // rather than drop it silently.
+        if (result.status === "updated" && details) {
+          return c.json(
+            { ...result.loo, compressed: toCompressedLoo(result.loo), detailsIgnored: true },
+            200,
+          );
+        }
+        return stateChangeResponse(c, result);
+      }
+
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
+
+      const checked = await looService.checkRestore(id, { baseUpdatedAt });
+      if (checked.status !== "ok") return stateChangeResponse(c, checked);
+
+      return queueForModeration(
+        c,
+        "restore",
+        details ? { details } : {},
+        id,
+        baseUpdatedAt ?? checked.base.updatedAt,
+      );
+    }),
+);
+
+/**
+ * POST /loos/:id/verify
+ *
+ * "Yes, it's still here": anyone may confirm a toilet, which only sets
+ * `verified_at` to now. Anonymous callers share the anonymous write limiter.
+ */
+loosRouter.post(
+  "/:id/verify",
+  optionalAuth,
+  authenticatedWriteRateLimit,
+  validate("param", looIdParamSchema, "Invalid id path parameter"),
+  (c) =>
+    handleRoute(c, "loos.verify", async () => {
+      const { id } = c.req.valid("param");
+      if (!c.get("user")) {
+        const limited = await queuedWriteRateLimitExceeded(c);
+        if (limited) return limited;
+      }
+
+      const result = await c.get("looService").verify(id);
+      if (result.status === "not_found") return notFound(c, "Loo not found");
+      if (result.status === "removed") {
+        return c.json(
+          { message: "This toilet has been removed from the map.", error: "removed" },
+          409,
+        );
+      }
+      return c.json({ id, verifiedAt: result.verifiedAt }, 200);
     }),
 );
 

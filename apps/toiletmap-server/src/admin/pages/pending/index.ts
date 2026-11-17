@@ -1,10 +1,25 @@
 import type { Context } from "hono";
 import { html } from "hono/html";
+import { z } from "zod";
 import { generateLooId } from "../../../services/loo";
-import { diffMutation, isEmptyMutation, isStaleBase } from "../../../services/loo/diff";
-import type { LooMutationAttributes, LooResponse } from "../../../services/loo/types";
+import {
+  clearRemovalOnReactivate,
+  diffMutation,
+  isEmptyMutation,
+  isStaleBase,
+} from "../../../services/loo/diff";
+import type { StateChangeResult } from "../../../services/loo/loo.service";
+import {
+  type LooMutationAttributes,
+  type LooResponse,
+  REMOVAL_CATEGORIES,
+  type RemovalCategory,
+} from "../../../services/loo/types";
 import type {
   PendingChangeRow,
+  PendingOrder,
+  PendingPage,
+  ReviewApplyOutcome,
   ReviewResult,
 } from "../../../services/pending-change/pending-change.service";
 import type { AppVariables, Env } from "../../../types";
@@ -26,7 +41,9 @@ const DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /** Human labels for mutation fields, in display order. */
 const FIELD_LABELS: Record<keyof LooMutationAttributes, string> = {
   active: "Active (on map)",
+  removalCategory: "Removal category",
   removalReason: "Removal reason",
+  duplicateOf: "Duplicate of",
   name: "Name",
   location: "Location",
   areaId: "Area",
@@ -82,6 +99,41 @@ const asPayload = (payload: unknown): LooMutationAttributes =>
     ? (payload as LooMutationAttributes)
     : {};
 
+/** Moderator-facing names for removal categories. */
+const REMOVAL_CATEGORY_LABELS: Record<RemovalCategory, string> = {
+  permanently_closed: "Permanently closed",
+  does_not_exist: "Does not exist / wrong place",
+  not_public: "Not open to the public",
+  duplicate: "Duplicate",
+  other: "Something else",
+};
+
+const categoryLabel = (category: string | null | undefined) =>
+  category && Object.hasOwn(REMOVAL_CATEGORY_LABELS, category)
+    ? REMOVAL_CATEGORY_LABELS[category as RemovalCategory]
+    : null;
+
+const removePayloadSchema = z.object({
+  reason: z.enum(REMOVAL_CATEGORIES),
+  details: z.string().max(2000).optional(),
+  duplicateOf: z
+    .string()
+    .regex(/^[0-9a-f]{24}$/)
+    .optional(),
+});
+
+const restorePayloadSchema = z.object({ details: z.string().max(2000).optional() });
+
+const parseRemovePayload = (payload: unknown) => {
+  const parsed = removePayloadSchema.safeParse(payload);
+  return parsed.success ? parsed.data : null;
+};
+
+const parseRestorePayload = (payload: unknown) => {
+  const parsed = restorePayloadSchema.safeParse(payload);
+  return parsed.success ? parsed.data : {};
+};
+
 const orderedKeys = (payload: LooMutationAttributes) =>
   FIELD_ORDER.filter((key) => payload[key] !== undefined);
 
@@ -117,6 +169,108 @@ const ChangeTable = ({ rows, unchangedCount }: { rows: DiffRow[]; unchangedCount
   }
 `;
 
+/** Two-row "Current → Proposed" table for removal and restore requests. */
+const StateTable = ({
+  rows,
+}: {
+  rows: Array<{ label: string; before: unknown; after: unknown }>;
+}) =>
+  html`<table class="change-table">
+    <thead>
+      <tr>
+        <th scope="col">Field</th>
+        <th scope="col">Current</th>
+        <th scope="col">Proposed</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(
+        (row) => html`<tr>
+          <th scope="row">${row.label}</th>
+          <td class="change-before">${row.before ?? "—"}</td>
+          <td class="change-after">${row.after ?? "—"}</td>
+        </tr>`,
+      )}
+    </tbody>
+  </table>`;
+
+const looStatus = (loo: LooResponse) =>
+  loo.active === true
+    ? "On the map"
+    : `Removed${categoryLabel(loo.removalCategory) ? ` (${categoryLabel(loo.removalCategory)})` : ""}`;
+
+const RemovalPreview = ({
+  row,
+  current,
+}: {
+  row: PendingChangeRow;
+  current: LooResponse | undefined;
+}) => {
+  const payload = parseRemovePayload(row.payload);
+  if (!payload) {
+    return html`<p class="change-warning">This removal request is malformed. Reject it.</p>`;
+  }
+  const label = REMOVAL_CATEGORY_LABELS[payload.reason];
+  const summary = html`<p class="change-summary">
+    <strong>Removal request: ${label}</strong>${payload.details ? html` — ${payload.details}` : ""}
+  </p>`;
+  const duplicateLink = payload.duplicateOf
+    ? html`<p class="change-note">
+        Duplicate of <a href="/admin/loos/${payload.duplicateOf}">${payload.duplicateOf}</a>
+      </p>`
+    : "";
+
+  if (!current) {
+    return html`${summary}<p class="change-warning">
+        This toilet no longer exists. Approving will reject the request.
+      </p>`;
+  }
+  if (current.active !== true) {
+    return html`${summary}${duplicateLink}<p class="change-note">
+        Already removed (${looStatus(current)}). Approving changes nothing.
+      </p>`;
+  }
+  return html`${summary}${StateTable({
+    rows: [
+      { label: "Status", before: looStatus(current), after: `Removed (${label})` },
+      {
+        label: "Removal reason",
+        before: current.removalReason,
+        after: payload.details ?? "(default for the category)",
+      },
+    ],
+  })}${duplicateLink}`;
+};
+
+const RestorePreview = ({
+  row,
+  current,
+}: {
+  row: PendingChangeRow;
+  current: LooResponse | undefined;
+}) => {
+  const payload = parseRestorePayload(row.payload);
+  const summary = html`<p class="change-summary">
+    <strong>Restore request</strong>${payload.details ? html` — ${payload.details}` : ""}
+  </p>`;
+  if (!current) {
+    return html`${summary}<p class="change-warning">
+        This toilet no longer exists. Approving will reject the request.
+      </p>`;
+  }
+  if (current.active === true) {
+    return html`${summary}<p class="change-note">
+        Already on the map. Approving changes nothing.
+      </p>`;
+  }
+  return html`${summary}${StateTable({
+    rows: [
+      { label: "Status", before: looStatus(current), after: "On the map" },
+      { label: "Removal reason", before: current.removalReason, after: null },
+    ],
+  })}`;
+};
+
 const ChangePreview = ({
   row,
   current,
@@ -124,6 +278,9 @@ const ChangePreview = ({
   row: PendingChangeRow;
   current: LooResponse | undefined;
 }) => {
+  if (row.type === "remove") return RemovalPreview({ row, current });
+  if (row.type === "restore") return RestorePreview({ row, current });
+
   const payload = asPayload(row.payload);
 
   if (row.type === "create") {
@@ -156,7 +313,18 @@ const ChangePreview = ({
   return ChangeTable({ rows, unchangedCount });
 };
 
-const isRemovalRequest = (row: PendingChangeRow) => asPayload(row.payload).active === false;
+/** The type badge for a queued change. */
+const TypeBadge = (row: PendingChangeRow) => {
+  if (row.type === "remove" || isRemovalRequest(row)) {
+    return html`<span class="badge badge--no">Removal request</span>`;
+  }
+  if (row.type === "restore") return html`<span class="badge badge--yes">Restore request</span>`;
+  if (row.type === "create") return html`<span class="badge badge--neutral">New toilet</span>`;
+  return html`<span class="badge badge--neutral">Edit</span>`;
+};
+
+const isRemovalRequest = (row: PendingChangeRow) =>
+  row.type === "update" && asPayload(row.payload).active === false;
 
 const changedSinceSubmission = (row: PendingChangeRow, current: LooResponse | undefined) => {
   if (!row.base_updated_at || !current?.updatedAt) return false;
@@ -200,6 +368,11 @@ const NOTICES = {
     text: "That change has already been reviewed. Nothing was applied.",
   },
   "not-found": { tone: "warning", text: "That pending change could not be found." },
+  "duplicate-invalid": {
+    tone: "warning",
+    text: "The toilet this one duplicates no longer exists or has been removed. Nothing was applied; reject the request or ask for another duplicate.",
+  },
+  malformed: { tone: "warning", text: "The change was malformed, so it was rejected." },
 } as const;
 
 type NoticeCode = keyof typeof NOTICES;
@@ -215,10 +388,46 @@ const NoticeBanner = (code: string | undefined) => {
   </div>`;
 };
 
+const parsePage = (value: string | undefined) => {
+  const page = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+};
+
+const parseOrder = (value: string | undefined): PendingOrder =>
+  value === "oldest" ? "oldest" : "newest";
+
+const pageHref = (page: number, order: PendingOrder) =>
+  `/admin/pending?page=${page}${order === "oldest" ? "&order=oldest" : ""}`;
+
+const Pagination = ({ page, pageCount, total, order }: PendingPage & { order: PendingOrder }) =>
+  html`<nav class="pending-pagination" aria-label="Pending changes pages">
+    <p>
+      ${total} pending ${total === 1 ? "change" : "changes"} · Page ${page} of ${pageCount} ·
+      ${
+        order === "oldest"
+          ? html`<a href="${pageHref(1, "newest")}">Newest first</a> | <strong>Oldest first</strong>`
+          : html`<strong>Newest first</strong> | <a href="${pageHref(1, "oldest")}">Oldest first</a>`
+      }
+    </p>
+    ${
+      pageCount > 1
+        ? html`<p>
+            ${page > 1 ? html`<a class="button button--secondary" rel="prev" href="${pageHref(page - 1, order)}">Previous</a>` : ""}
+            ${page < pageCount ? html`<a class="button button--secondary" rel="next" href="${pageHref(page + 1, order)}">Next</a>` : ""}
+          </p>`
+        : ""
+    }
+  </nav>`;
+
 export const pendingList = async (c: AdminContext) => {
   const pendingChangeService = c.get("pendingChangeService");
   const looService = c.get("looService");
-  const pending = await pendingChangeService.listPending();
+  const order = parseOrder(c.req.query("order"));
+  const result = await pendingChangeService.listPending({
+    page: parsePage(c.req.query("page")),
+    order,
+  });
+  const pending = result.rows;
 
   const looIds = [
     ...new Set(pending.map((row) => row.loo_id).filter((id): id is string => Boolean(id))),
@@ -245,7 +454,7 @@ export const pendingList = async (c: AdminContext) => {
             ? html`<div class="empty-state">
                 <p>No pending changes to review.</p>
               </div>`
-            : html`<div class="table-overflow">
+            : html`${Pagination({ ...result, order })}<div class="table-overflow">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -260,16 +469,9 @@ export const pendingList = async (c: AdminContext) => {
                   <tbody>
                     ${pending.map((row: PendingChangeRow) => {
                       const current = row.loo_id ? currentLoos.get(row.loo_id) : undefined;
-                      const removal = isRemovalRequest(row);
                       return html`
                         <tr>
-                          <td>
-                            ${
-                              removal
-                                ? html`<span class="badge badge--no">Removal request</span>`
-                                : html`<span class="badge badge--neutral">${row.type}</span>`
-                            }
-                          </td>
+                          <td>${TypeBadge(row)}</td>
                           <td>
                             ${
                               row.loo_id
@@ -277,7 +479,10 @@ export const pendingList = async (c: AdminContext) => {
                                 : "—"
                             }
                           </td>
-                          <td>${formatDate(row.submitted_at)}</td>
+                          <td>
+                            ${formatDate(row.submitted_at)}
+                            <br /><span class="change-note">by ${row.submitted_by ?? "anonymous"}</span>
+                          </td>
                           <td>${row.ip ?? "—"}</td>
                           <td>
                             ${
@@ -294,7 +499,7 @@ export const pendingList = async (c: AdminContext) => {
                             <div style="display:flex;gap:var(--space-xs);">
                               <form method="POST" action="/admin/pending/${row.id}/approve">
                                 ${
-                                  row.type === "update"
+                                  row.type !== "create"
                                     ? html`<input
                                         type="hidden"
                                         name="${REVIEWED_VERSION_FIELD}"
@@ -318,7 +523,7 @@ export const pendingList = async (c: AdminContext) => {
                     })}
                   </tbody>
                 </table>
-              </div>`
+              </div>${Pagination({ ...result, order })}`
         }
 
         <style>
@@ -329,6 +534,8 @@ export const pendingList = async (c: AdminContext) => {
           .change-before { color: var(--color-neutral-grey); text-decoration: line-through; word-break: break-word; }
           .change-after { color: var(--color-primary-navy); font-weight: 600; word-break: break-word; }
           .change-note { margin: var(--space-3xs) 0 0; font-size: var(--text--2); color: var(--color-neutral-grey); }
+          .change-summary { margin: 0 0 var(--space-3xs); font-size: var(--text--1); }
+          .pending-pagination p { margin-block: var(--space-xs); display: flex; gap: var(--space-xs); flex-wrap: wrap; align-items: center; }
           .change-warning { margin: 0 0 var(--space-3xs); font-size: var(--text--2); color: var(--color-accent-pink); font-weight: 600; }
           .pending-notice { margin-block: var(--space-s); padding: var(--space-xs) var(--space-s); border-radius: 8px; font-weight: 600; }
           .pending-notice--success { background: #e2fbf2; color: var(--color-primary-navy); }
@@ -342,6 +549,30 @@ export const pendingList = async (c: AdminContext) => {
 /** Thrown inside the review transaction to roll back when a concurrent edit is detected. */
 class ApprovalConflictError extends Error {}
 
+/** Thrown to roll back (keep the change pending) when a removal's duplicate target is invalid. */
+class DuplicateInvalidError extends Error {}
+
+/**
+ * Maps a report/restore applied during approval to the recorded outcome.
+ * Conflicts and invalid duplicates roll the claim back so the change stays
+ * pending for re-review.
+ */
+const stateChangeOutcome = (result: StateChangeResult): ReviewApplyOutcome<NoticeCode> => {
+  switch (result.status) {
+    case "updated":
+      return { status: "approved", detail: "approved" };
+    case "already_removed":
+    case "not_removed":
+      return { status: "approved", detail: "approved-noop" };
+    case "not_found":
+      return { status: "rejected", detail: "loo-missing" };
+    case "conflict":
+      throw new ApprovalConflictError();
+    case "invalid_duplicate":
+      throw new DuplicateInvalidError();
+  }
+};
+
 export const pendingApprove = async (c: AdminContext) => {
   const id = c.req.param("id");
   if (!id) {
@@ -350,7 +581,7 @@ export const pendingApprove = async (c: AdminContext) => {
   const user = c.get("user");
   const pendingChangeService = c.get("pendingChangeService");
   const looService = c.get("looService");
-  const contributorName = user?.name ?? "Admin";
+  const moderatorName = user?.name ?? "Admin";
 
   // The version the moderator reviewed. Absent (e.g. a scripted POST) means
   // no check; otherwise approval only applies to that exact version.
@@ -365,20 +596,22 @@ export const pendingApprove = async (c: AdminContext) => {
       "approved",
       user?.sub ?? "admin",
       async (tx, change) => {
-        const { active, ...rest } = asPayload(change.payload);
-        // Changes queued before `active` became boolean-only may carry null,
-        // which would hide the toilet without a decision. Never apply it.
-        const payload: LooMutationAttributes = active === null ? rest : { ...rest, active };
+        // Credit the signed-in submitter when known; anonymous changes are
+        // credited to the approving moderator.
+        const contributorName = change.submitted_by ?? moderatorName;
 
         if (change.type === "create") {
+          const { active, ...rest } = asPayload(change.payload);
+          // Changes queued before `active` became boolean-only may carry null,
+          // which would hide the toilet without a decision. Never apply it.
+          const payload: LooMutationAttributes = active === null ? rest : { ...rest, active };
           await looService.createInTransaction(tx, generateLooId(), payload, contributorName);
           return { status: "approved", detail: "approved" };
         }
 
         if (!change.loo_id) return { status: "rejected", detail: "loo-missing" };
 
-        // Re-diff the stored payload against the record as it is now, so fields
-        // that already match (e.g. after an intervening edit) are not rewritten.
+        // Re-read the record as it is now, inside the claim's transaction.
         const current = await looService.getMutationBase(change.loo_id, tx);
         if (!current) return { status: "rejected", detail: "loo-missing" };
 
@@ -391,7 +624,28 @@ export const pendingApprove = async (c: AdminContext) => {
           throw new ApprovalConflictError();
         }
 
-        const changes = diffMutation(payload, current);
+        if (change.type === "remove") {
+          const removal = parseRemovePayload(change.payload);
+          if (!removal) return { status: "rejected", detail: "malformed" };
+          if (current.active !== true) return { status: "approved", detail: "approved-noop" };
+          return stateChangeOutcome(
+            await looService.report(change.loo_id, removal, contributorName, { tx }),
+          );
+        }
+
+        if (change.type === "restore") {
+          if (current.active === true) return { status: "approved", detail: "approved-noop" };
+          return stateChangeOutcome(
+            await looService.restore(change.loo_id, contributorName, { tx }),
+          );
+        }
+
+        const { active, ...rest } = asPayload(change.payload);
+        const payload: LooMutationAttributes = active === null ? rest : { ...rest, active };
+
+        // Re-diff the stored payload against the current record, so fields
+        // that already match (e.g. after an intervening edit) are not rewritten.
+        const changes = clearRemovalOnReactivate(diffMutation(payload, current), current);
         if (isEmptyMutation(changes)) return { status: "approved", detail: "approved-noop" };
 
         // Strict update: never inserts, and only applies to the version we diffed.
@@ -406,6 +660,7 @@ export const pendingApprove = async (c: AdminContext) => {
     );
   } catch (error) {
     if (error instanceof ApprovalConflictError) return redirectWithNotice(c, "conflict");
+    if (error instanceof DuplicateInvalidError) return redirectWithNotice(c, "duplicate-invalid");
     throw error;
   }
 

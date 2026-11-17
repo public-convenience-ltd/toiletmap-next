@@ -19,6 +19,10 @@ export interface LooDetail {
   notes?: string | null;
   active?: boolean | null;
   removalReason?: string | null;
+  /** Why it was removed: permanently_closed | does_not_exist | not_public | duplicate | other. */
+  removalCategory?: string | null;
+  /** The toilet this one duplicates, when removed as a duplicate. */
+  duplicateOf?: string | null;
   urinalOnly?: boolean | null;
   attended?: boolean | null;
   createdAt?: string | null;

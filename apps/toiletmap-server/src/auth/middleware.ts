@@ -49,6 +49,7 @@ const createAuthMiddleware = (mode: "optional" | "required", options?: AuthMiddl
     }
 
     c.set("user", result.user);
+    c.set("authSource", result.source);
     return next();
   });
 

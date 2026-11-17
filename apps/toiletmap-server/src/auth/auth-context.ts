@@ -1,13 +1,11 @@
 import type { Context } from "hono";
-import type { AppVariables, Env, RequestUser } from "../types";
+import type { AppVariables, AuthSource, Env, RequestUser } from "../types";
 import { logger } from "../utils/logger";
 import { clearSessionCookies, getSession, type SessionData, type SessionUser } from "./session";
 import { fetchUserInfo as fetchAuth0UserInfo } from "./userinfo";
 import { authenticateToken } from "./verify";
 
 type AuthenticatedContext = Context<{ Bindings: Env; Variables: AppVariables }>;
-
-type AuthSource = "authorization-header" | "session-access-token" | "session-id-token";
 
 export interface AuthResult {
   user: RequestUser;

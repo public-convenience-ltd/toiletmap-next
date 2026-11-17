@@ -2,14 +2,22 @@
 import { Footer, Header } from "toiletmap-design-system";
 import logo from "../../assets/logo.svg?url";
 import LooForm from "../../components/LooForm/LooForm";
+import { mapViewFromSearch } from "../../components/LooMap/mapView";
 import Layout from "../../layouts/Layout.astro";
 
 import { BROWSER_API_URL } from "../../utils/api";
+import { sessionCanWriteDirectly } from "../../utils/permissions";
+import { loginHref } from "../../utils/returnTo";
 
 // LooForm calls the same-origin /api/* proxy, which attaches the access token
 // server-side; the token is never rendered into the page.
 const apiUrl = BROWSER_API_URL;
 const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
+// Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
+const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
+
+// "Add a toilet here" on the map links to /loos/add?lat&lng&zoom; the picker opens there.
+const initialView = mapViewFromSearch(Astro.url.search);
 
 const navLinks = [
   { href: "/about", label: "About" },
@@ -19,7 +27,7 @@ const navLinks = [
   { href: "/loos/add", label: "Add a Toilet", button: true },
   isAuthenticated
     ? { href: "/auth/logout", label: "Sign out" }
-    : { href: "/auth/login", label: "Sign in" },
+    : { href: loginHref(`${Astro.url.pathname}${Astro.url.search}`), label: "Sign in" },
 ];
 ---
 
@@ -30,7 +38,9 @@ const navLinks = [
       client:only="preact"
       mode="add"
       apiUrl={apiUrl}
+      initialView={initialView}
       isAuthenticated={isAuthenticated}
+      canWriteDirectly={canWriteDirectly}
     />
   </main>
   <Footer />

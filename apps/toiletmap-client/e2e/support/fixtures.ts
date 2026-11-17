@@ -1,10 +1,12 @@
 import { type BrowserContext, test as base, expect, type Page } from "@playwright/test";
 import {
   type ApiLoo,
+  CONTRIBUTOR,
   createLooViaApi,
   e2eName,
   issueAccessToken,
   type LooInput,
+  type MockUser,
   randomFixtureLocation,
 } from "./api";
 import { deleteLoos, deletePendingChanges } from "./db";
@@ -66,11 +68,12 @@ export async function signInThroughMockAuth(page: Page): Promise<void> {
 
 /**
  * The cookies /auth/callback would set (src/pages/auth/callback.ts), built from
- * a token issued by the mock Auth0 server, minus the `Secure` flag.
+ * a token issued by the mock Auth0 server (for `user`, or the default trusted
+ * "Test User"), minus the `Secure` flag.
  * `id_token` is omitted: nothing in the client reads it after sign-in.
  */
-async function injectedSessionState(): Promise<StorageState> {
-  const accessToken = await issueAccessToken();
+export async function injectedSessionState(user?: MockUser): Promise<StorageState> {
+  const accessToken = await issueAccessToken(user);
   const claims = JSON.parse(
     Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString("utf8"),
   ) as Record<string, unknown>;
@@ -172,6 +175,28 @@ export const authedTest = test.extend<AuthedTestFixtures>({
     } finally {
       await context.close();
     }
+  },
+});
+
+type ContributorWorkerFixtures = {
+  /** Cookies of a signed-in contributor with no Auth0 permissions. */
+  contributorState: StorageState;
+};
+
+/**
+ * Like `test`, but every page starts signed in as CONTRIBUTOR: a signed-in user with no
+ * permissions, whose edits, reports and restores still go live straight away.
+ */
+export const contributorTest = test.extend<object, ContributorWorkerFixtures>({
+  contributorState: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright fixtures must destructure
+    async ({}, use) => {
+      await use(await injectedSessionState(CONTRIBUTOR));
+    },
+    { scope: "worker" },
+  ],
+  storageState: async ({ contributorState }, use) => {
+    await use(contributorState);
   },
 });
 

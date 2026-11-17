@@ -130,8 +130,8 @@ investigated.
 | Project | Device | Specs |
 | --- | --- | --- |
 | `desktop-chromium` | Desktop Chrome 1280×720 | all |
-| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness` |
-| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness` |
+| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness`, `picker`, `report` |
+| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness`, `picker`, `report` |
 
 ## How the tests work
 
@@ -145,6 +145,20 @@ and reuses the cookies.
   Instead, the WebKit projects inject the same `access_token` (httpOnly) and
   `user_info` cookies, built from a token issued by the mock server, without
   `Secure`.
+
+**Who writes directly.** The server applies a write (edit, add, report, restore)
+straight away for anyone signed in, unless they are blocked in Auth0; anonymous
+writes are queued as a `pending_change` (202). The e2e server has no Auth0
+Management API, so nobody counts as blocked (blocked users are covered by the
+server's integration tests). The mock "Test User" (`access:admin`) backs
+`authedTest` and the `loos` fixture. `contributorTest` signs in as `CONTRIBUTOR`
+(`support/api.ts`, no permissions) by injecting its cookies, and still writes
+directly. Plain `test` is signed out, so it is the way to exercise the queued path.
+
+**Forms.** Every save goes through the review sheet ("Confirm and save"):
+`looForm(page).submit()` clicks both. The location picker has no lat/lng boxes:
+`enterCoordinates` (in `support/form.ts`) types into its "Enter coordinates"
+box and confirms with "Use this location".
 
 **Test data.** Tests never modify seed rows; the map tests only read the London
 seed rows shown in the default view.

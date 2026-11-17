@@ -2,7 +2,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { IconButton } from "toiletmap-design-system";
+import { Button, IconButton } from "toiletmap-design-system";
 import { getLooById, getLooDetail, type LooDetail, peekLooDetail } from "../../api/loos";
 import { type ActiveFilters, DEFAULT_FILTERS, type FilterKey } from "../../types/filters";
 import DevTools from "../DevTools";
@@ -12,6 +12,13 @@ import SettingsPanel from "../SettingsPanel";
 import ToiletDetailsPanel from "../ToiletDetailsPanel";
 import "./LooMap.css";
 import MapMarkers from "./MapMarkers";
+import {
+  addToiletHref,
+  DEFAULT_MAP_VIEW,
+  type MapView,
+  readMapView,
+  writeMapView,
+} from "./mapView";
 import {
   consumeSavedParam,
   freshnessNotice,
@@ -49,9 +56,11 @@ const isPushedEntry = (state: unknown) =>
 interface LooMapProps {
   apiUrl: string;
   initialToiletId?: string;
+  /** Passed to the details panel for its restore copy (see ToiletDetailsPanel). */
+  canWriteDirectly?: boolean;
 }
 
-export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
+export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = false }: LooMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -74,6 +83,14 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
 
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>(DEFAULT_FILTERS);
 
+  // Where the map opens: the last view the user left it at, unless a /loos/{id} deep link
+  // will move it to that toilet anyway.
+  const [startView] = useState<MapView>(() =>
+    initialToiletId ? DEFAULT_MAP_VIEW : (readMapView() ?? DEFAULT_MAP_VIEW),
+  );
+  /** The "Add a toilet here" link, following the map centre. */
+  const [addHref, setAddHref] = useState(() => addToiletHref(startView));
+
   const handleFilterChange = (key: FilterKey, value: boolean) => {
     setActiveFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -86,11 +103,22 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    map.current = L.map(mapContainer.current, { zoomControl: false }).setView([51.505, -0.09], 13);
+    const created = L.map(mapContainer.current, { zoomControl: false }).setView(
+      [startView.lat, startView.lng],
+      startView.zoom,
+    );
+    map.current = created;
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map.current);
+    }).addTo(created);
+    // Remember the view for next time, and keep "Add a toilet here" pointing at the centre.
+    created.on("moveend", () => {
+      const centre = created.getCenter();
+      const view = { lat: centre.lat, lng: centre.lng, zoom: created.getZoom() };
+      writeMapView(view);
+      setAddHref(addToiletHref(view));
+    });
 
     return () => {
       map.current?.remove();
@@ -340,6 +368,12 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
         onToiletSelect={selectToilet}
       />
 
+      <div className="add-toilet-here">
+        <Button htmlElement="a" variant="primary" href={addHref}>
+          Add a toilet here
+        </Button>
+      </div>
+
       <div
         role="status"
         className="map-freshness-notice"
@@ -370,6 +404,7 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
             removed={removedId === selectedToilet.id}
             saved={savedId === selectedToilet.id}
             onDismissSaved={() => setSavedId(null)}
+            canWriteDirectly={canWriteDirectly}
           />
         </div>
       )}

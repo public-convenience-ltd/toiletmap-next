@@ -53,3 +53,4 @@ If you are logged into the Admin Interface in the same browser, the API will aut
        --header 'content-type: application/json' \
        --data '{"client_id":"YOUR_CLIENT_ID","client_secret":"YOUR_CLIENT_SECRET","audience":"YOUR_AUDIENCE","grant_type":"client_credentials"}'
      ```
+   - A client-credentials token belongs to an application, not a user, so it cannot be blocked in Auth0. Its loo writes (create, edit, report, restore) go live directly only when the token carries `access:admin`; otherwise they are queued for moderation like an anonymous submission.

@@ -60,6 +60,16 @@ export type DumpBody = ListBody<CompressedLoo> & { cursor: string };
 /** 200/201 from an authenticated create or update. */
 export type SavedLooBody = LooResponse & { compressed: CompressedLoo | null };
 
+/** 409 from a report on a loo already off the map, or a restore of one on it. */
+export type StateConflictBody = {
+  message: string;
+  error: "already_removed" | "not_removed";
+  current: LooResponse;
+};
+
+/** 200 from POST /api/loos/:id/verify */
+export type VerifyBody = { id: string; verifiedAt: string };
+
 /** 202 from an anonymous create or update that was queued for moderation. */
 export type QueuedBody = { queued: true; id: string };
 

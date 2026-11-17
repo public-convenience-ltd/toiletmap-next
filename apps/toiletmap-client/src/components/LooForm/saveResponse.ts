@@ -4,8 +4,8 @@ import type { LooFormMode } from "./payload";
 
 /** What the form should do with a response from POST /api/loos or PUT /api/loos/:id. */
 export type SaveAction =
-  /** 202: an anonymous submission was queued for moderation. */
-  | { kind: "queued" }
+  /** 202 `{ queued: true, id }`: the change was queued for moderation (`id` is the pending change). */
+  | { kind: "queued"; pendingId?: string }
   /** 200/201 with a record: the change was written; go to the toilet's page. */
   | { kind: "saved"; id: string }
   /** 200 `{ queued: false, unchanged: true }`: the stored record already matched (anonymous PUT). */
@@ -16,7 +16,11 @@ export type SaveAction =
   | { kind: "auth" }
   /** 404 on edit: the toilet no longer exists. */
   | { kind: "notFound" }
-  | { kind: "error"; message: string; details?: string[] };
+  /**
+   * Anything else. For a 400, `issues` is the server's raw validation payload, so the form
+   * can map it onto its fields; `details` is the same, flattened into readable lines.
+   */
+  | { kind: "error"; message: string; details?: string[]; issues?: unknown };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -37,7 +41,11 @@ export function interpretSaveResponse(
   body: unknown,
   mode: LooFormMode,
 ): SaveAction {
-  if (status === 202) return { kind: "queued" };
+  if (status === 202) {
+    const pendingId =
+      isRecord(body) && typeof body.id === "string" && body.id.trim() ? body.id : undefined;
+    return pendingId ? { kind: "queued", pendingId } : { kind: "queued" };
+  }
 
   if (status >= 200 && status < 300) {
     if (isRecord(body) && body.unchanged === true) return { kind: "unchanged" };
@@ -54,11 +62,13 @@ export function interpretSaveResponse(
   if (status === 404 && mode === "edit") return { kind: "notFound" };
 
   if (status === 400) {
-    const details = isRecord(body) ? describeIssues(body.issues) : [];
+    const issues = isRecord(body) ? body.issues : undefined;
+    const details = describeIssues(issues);
     return {
       kind: "error",
       message: messageFrom(body, "Some of the details aren't valid."),
-      details: details.length > 0 ? details : undefined,
+      ...(details.length > 0 ? { details } : {}),
+      ...(issues !== undefined ? { issues } : {}),
     };
   }
 

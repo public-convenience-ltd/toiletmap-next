@@ -35,24 +35,67 @@ export type LooInput = Partial<Omit<ApiLoo, "id" | "updatedAt">> & {
 /** Fields that legitimately change on every write and are ignored when diffing records. */
 export const VOLATILE_FIELDS = ["updatedAt", "contributorsCount", "reports"] as const;
 
+/** A user the mock Auth0 server signs in, for tokens other than the default "Test User" (an admin). */
+export interface MockUser {
+  sub: string;
+  name: string;
+  nickname: string;
+  email: string;
+  /** Auth0 permissions in the token. Not needed to write: anyone signed in writes directly. */
+  permissions: string[];
+}
+
+/**
+ * A signed-in contributor with no permissions at all. Their edits, reports and restores still
+ * go live straight away: the server trusts anyone signed in who is not blocked in Auth0 (the
+ * e2e server has no Auth0 Management API, so nobody is blocked).
+ */
+export const CONTRIBUTOR: MockUser = {
+  sub: "auth0|e2e-contributor",
+  name: "Contributor Tester",
+  nickname: "contributor",
+  email: "contributor@localhost",
+  permissions: [],
+};
+
 /**
  * Obtains an API access token from the mock Auth0 server exactly as
  * apps/toiletmap-server/scripts/issue-test-token.ts does: an auto-approved
- * /authorize (default "Test User" profile) followed by the code exchange.
+ * /authorize (default "Test User" profile, permission access:admin)
+ * followed by the code exchange. With `user`, the login form is submitted for
+ * that profile instead (what "Continue as" does after editing the form).
  */
-export async function issueAccessToken(): Promise<string> {
+export async function issueAccessToken(user?: MockUser): Promise<string> {
   const redirectUri = "http://localhost:9999/callback"; // never visited
-  const authorize = new URL(`${AUTH_URL}/authorize`);
-  authorize.searchParams.set("client_id", "toiletmap-e2e");
-  authorize.searchParams.set("redirect_uri", redirectUri);
-  authorize.searchParams.set("response_type", "code");
-  authorize.searchParams.set("scope", "openid profile email");
-  authorize.searchParams.set("audience", AUTH_AUDIENCE);
-  authorize.searchParams.set("state", "e2e");
-  authorize.searchParams.set("nonce", `e2e-${Date.now()}`);
-  authorize.searchParams.set("auto", "1");
+  const params = new URLSearchParams({
+    client_id: "toiletmap-e2e",
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid profile email",
+    audience: AUTH_AUDIENCE,
+    state: "e2e",
+    nonce: `e2e-${Date.now()}`,
+  });
 
-  const authorizeRes = await fetch(authorize, { redirect: "manual" });
+  let authorizeRes: Response;
+  if (user) {
+    const form = new URLSearchParams(params);
+    form.set("user_name", user.name);
+    form.set("user_email", user.email);
+    form.set("user_sub", user.sub);
+    form.set("user_nickname", user.nickname);
+    form.set("contributor_name", user.name);
+    for (const permission of user.permissions) form.append("permissions", permission);
+    authorizeRes = await fetch(`${AUTH_URL}/authorize`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: form,
+      redirect: "manual",
+    });
+  } else {
+    params.set("auto", "1");
+    authorizeRes = await fetch(`${AUTH_URL}/authorize?${params}`, { redirect: "manual" });
+  }
   const location = authorizeRes.headers.get("location");
   const code = location ? new URL(location).searchParams.get("code") : null;
   if (authorizeRes.status !== 302 || !code) {
@@ -134,6 +177,31 @@ export async function updateLooViaApi(
     body: JSON.stringify(changes),
   });
   if (!res.ok) throw new Error(`PUT /api/loos/${id} failed: HTTP ${res.status}`);
+  return (await res.json()) as ApiLoo;
+}
+
+/** Reasons POST /api/loos/:id/report accepts. */
+export type ReportReason =
+  | "permanently_closed"
+  | "does_not_exist"
+  | "not_public"
+  | "duplicate"
+  | "other";
+
+/** Removes a toilet directly as a trusted user (POST /api/loos/:id/report → 200). */
+export async function reportLooViaApi(
+  token: string,
+  id: string,
+  body: { reason: ReportReason; details?: string; duplicateOf?: string },
+): Promise<ApiLoo> {
+  const res = await serverFetch(`${SERVER_URL}/api/loos/${id}/report`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (res.status !== 200) {
+    throw new Error(`POST /api/loos/${id}/report failed: HTTP ${res.status} ${await res.text()}`);
+  }
   return (await res.json()) as ApiLoo;
 }
 

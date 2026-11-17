@@ -1,9 +1,10 @@
 /* ── Page shell ─────────────────────────────────────────── */
 
 .page {
-  max-width: 900px;
+  box-sizing: border-box;
+  max-width: 720px;
   margin: 0 auto;
-  padding: var(--space-l) var(--space-m);
+  padding: var(--space-l) var(--space-m) 0;
   font-family: var(--font-family);
   color: var(--color-primary-navy);
 }
@@ -11,112 +12,146 @@
 .heading {
   font-size: var(--text-2);
   font-weight: 700;
-  margin: 0 0 var(--space-l);
+  margin: 0 0 var(--space-2xs);
 }
 
-/* ── Layout ─────────────────────────────────────────────── */
+.intro {
+  margin: 0 0 var(--space-m);
+  font-size: var(--text-0);
+  color: var(--color-neutral-grey);
+}
 
-.layout {
+.alerts:focus,
+.errorSummary:focus,
+.outcome:focus {
+  outline: none;
+}
+
+.alerts:focus-visible,
+.errorSummary:focus-visible,
+.outcome:focus-visible {
+  outline: 3px solid var(--color-primary-navy);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.alerts:not(:empty),
+.errorSummary,
+.restored {
+  margin-bottom: var(--space-m);
+}
+
+/* ── Question cards ──────────────────────────────────────── */
+
+.questions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-l);
+  gap: var(--space-m);
 }
 
-/* ── Sections ───────────────────────────────────────────── */
-
-.section {
+.card {
   background: var(--color-base-white);
   border: 1px solid var(--color-light-grey);
   border-radius: 12px;
   padding: var(--space-m);
+  min-width: 0;
 }
 
-.sectionTitle {
-  font-size: var(--text-0);
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-1);
   font-weight: 700;
+  line-height: 1.25;
+  margin: 0 0 var(--space-xs);
+}
+
+.cardTitle label {
+  cursor: pointer;
+}
+
+.cardNumber {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  font-size: var(--text--1);
+  color: var(--color-base-white);
+  background: var(--color-primary-navy);
+}
+
+.hint {
+  font-size: var(--text--1);
+  color: var(--color-neutral-grey);
   margin: 0 0 var(--space-s);
 }
 
 /* ── Fields ─────────────────────────────────────────────── */
 
-.fieldLabel {
+.field {
   display: flex;
   flex-direction: column;
   gap: var(--space-2xs);
+}
+
+.fieldLabel {
   font-size: var(--text--1);
   font-weight: 600;
 }
 
-.coordLabel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-  font-size: var(--text--2);
-  font-weight: 600;
-}
-
-.hint {
-  font-size: var(--text--2);
-  color: var(--color-neutral-grey);
-  margin: var(--space-2xs) 0 var(--space-s);
-}
-
-.required {
-  color: var(--color-accent-pink);
-  margin-left: 2px;
+/* 16px or larger, so iOS doesn't zoom into the field on focus. */
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: max(16px, var(--text-0));
 }
 
 .fieldError {
   display: block;
-  font-size: var(--text--2);
+  font-size: var(--text--1);
+  font-weight: 600;
   color: var(--color-accent-pink);
   margin-top: var(--space-2xs);
 }
 
-/* ── Location picker ─────────────────────────────────────── */
-
-.pickerWrap {
-  position: relative;
+.locationField:focus {
+  outline: none;
 }
 
-.pickerMap {
-  height: 360px;
-  width: 100%;
+.locationField:focus-visible {
+  outline: 3px solid var(--color-primary-navy);
+  outline-offset: 4px;
   border-radius: 8px;
-  z-index: 1;
 }
 
-.crosshair {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
-  border: 2px solid var(--color-primary-navy);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.placePin {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+.triGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
   gap: var(--space-s);
-  margin-top: var(--space-2xs);
 }
 
-.placePin > .hint {
-  flex: 1 1 16rem;
-  margin: 0;
+.triStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  margin-top: var(--space-s);
+}
+
+.triStack:first-child {
+  margin-top: 0;
+}
+
+.triField {
+  min-width: 0;
 }
 
 .linkButton {
   padding: 0;
   font: inherit;
-  font-size: var(--text--1);
   font-weight: 600;
   color: var(--color-primary-navy);
   background: none;
@@ -135,92 +170,119 @@
   border-radius: 2px;
 }
 
-.coordRow {
-  margin-top: var(--space-s);
-}
+/* ── Sticky action bar ───────────────────────────────────── */
 
-/* ── Search autocomplete ─────────────────────────────────── */
-
-.searchRow {
-  position: relative;
-  margin-bottom: var(--space-s);
-}
-
-.suggestions {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.actionBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin: var(--space-l) calc(-1 * var(--space-m)) 0;
+  padding: var(--space-s) var(--space-m) calc(var(--space-s) + env(safe-area-inset-bottom, 0px));
   background: var(--color-base-white);
-  border: 1px solid var(--color-light-grey);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(10, 22, 94, 0.1);
-  z-index: 10;
-  overflow: hidden;
-}
-
-.suggestion {
-  display: block;
-  width: 100%;
-  padding: var(--space-xs);
-  font-size: var(--text--2);
-  font-family: var(--font-family);
-  color: var(--color-primary-navy);
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--color-light-grey);
-  cursor: pointer;
-  text-align: left;
-  line-height: 1.4;
-}
-
-.suggestion:last-child {
-  border-bottom: none;
-}
-
-.suggestion:hover {
-  background: var(--color-light-grey);
-}
-
-/* ── Feature toggles ─────────────────────────────────────── */
-
-.triGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-xs) var(--space-s);
-}
-
-/* ── Actions ─────────────────────────────────────────────── */
-
-.actions {
-  margin-top: var(--space-l);
-  padding-top: var(--space-m);
   border-top: 1px solid var(--color-light-grey);
+  box-shadow: 0 -4px 16px rgba(10, 22, 94, 0.08);
+}
+
+.actionBarInner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-s);
+  gap: var(--space-xs) var(--space-s);
 }
 
-.anonNote {
-  font-size: var(--text--2);
-  color: var(--color-neutral-grey);
+.actionStatus {
+  flex: 1 1 14rem;
   margin: 0;
+  font-size: var(--text--1);
+  color: var(--color-neutral-grey);
 }
 
-.queuedActions {
+.actionButtons {
+  display: flex;
+  gap: var(--space-s);
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .actionButtons {
+    width: 100%;
+  }
+
+  .actionButtons > * {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ── Outcome (queued / unchanged) ────────────────────────── */
+
+.outcomeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
   margin-top: var(--space-m);
 }
+
+.signInPrompt {
+  margin: var(--space-m) 0 0;
+  font-weight: 600;
+}
+
+/* ── Errors and banners ──────────────────────────────────── */
 
 .errorList {
   margin: var(--space-2xs) 0 0;
   padding-left: var(--space-m);
 }
 
+.errorList a {
+  color: inherit;
+  font-weight: 600;
+}
+
 .bannerActions {
   margin-top: var(--space-s);
+}
+
+/* ── Discard dialog ──────────────────────────────────────── */
+
+.dialogTitle {
+  font-size: var(--text-1);
+  font-weight: 700;
+  margin: 0 0 var(--space-xs);
+}
+
+.dialogText {
+  margin: 0 0 var(--space-m);
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-s);
+}
+
+/* ── Touch targets ───────────────────────────────────────── */
+
+@media (pointer: coarse) {
+  .actionButtons :global(.button),
+  .outcomeActions :global(.button),
+  .dialogActions :global(.button),
+  .bannerActions :global(.button) {
+    min-height: 44px;
+  }
+
+  .linkButton,
+  .errorList a,
+  .signInPrompt a {
+    display: inline-block;
+    min-height: 44px;
+    line-height: 44px;
+  }
+
+  .input {
+    min-height: 44px;
+  }
 }

@@ -1,0 +1,260 @@
+.container {
+  box-sizing: border-box;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: var(--space-m) var(--space-s) var(--space-xl);
+  color: var(--color-primary-navy);
+}
+
+.title {
+  font-size: var(--text-2);
+  font-weight: 700;
+  margin: 0 0 var(--space-m);
+}
+
+.title:focus {
+  outline: none;
+}
+
+.title:focus-visible {
+  outline: 2px solid var(--color-accent-turquoise);
+  outline-offset: 4px;
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-m);
+  min-width: 0;
+}
+
+.legend {
+  font-size: var(--text-1);
+  font-weight: 700;
+  padding: 0;
+  margin: 0 0 var(--space-s);
+}
+
+.subLegend {
+  font-size: var(--text-0);
+  font-weight: 700;
+  padding: 0;
+  margin: 0 0 var(--space-xs);
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: var(--space-2xs) var(--space-s);
+  border: 1.5px solid rgba(10, 22, 94, 0.3);
+  border-radius: 8px;
+  background: var(--color-base-white);
+  font-size: var(--text-0);
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--color-primary-navy);
+}
+
+.card:focus-within {
+  outline: 2px solid var(--color-accent-turquoise);
+  outline-offset: 1px;
+}
+
+.cardSelected {
+  border-color: var(--color-primary-navy);
+  background: var(--color-frost-ice);
+}
+
+.radio {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--color-primary-navy);
+}
+
+.cardText {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3xs) var(--space-s);
+  flex: 1;
+}
+
+.cardMeta {
+  color: var(--color-neutral-grey);
+  font-size: var(--text--1);
+}
+
+/* A duplicate candidate: the radio's label fills the card, the "View" link sits beside it. */
+.cardWithLink {
+  padding: 0 var(--space-s) 0 0;
+}
+
+.cardLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+  min-height: inherit;
+  padding: var(--space-2xs) 0 var(--space-2xs) var(--space-s);
+  cursor: pointer;
+}
+
+.cardLink {
+  flex-shrink: 0;
+  padding: var(--space-2xs) 0;
+  font-size: var(--text--1);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.explain {
+  margin: 0 0 var(--space-m);
+  padding: var(--space-s);
+  border-radius: 8px;
+  background: var(--color-light-grey);
+  font-size: var(--text-0);
+}
+
+.explain p {
+  margin: 0 0 var(--space-s);
+}
+
+.explain p:last-child {
+  margin-bottom: 0;
+}
+
+.explain a,
+.hint a,
+.summary a {
+  color: var(--color-primary-navy);
+}
+
+.field {
+  margin: 0 0 var(--space-m);
+}
+
+.label {
+  display: block;
+  font-weight: 700;
+  font-size: var(--text-0);
+  margin-bottom: var(--space-3xs);
+}
+
+.hint {
+  margin: 0 0 var(--space-2xs);
+  font-size: var(--text--1);
+  color: var(--color-neutral-grey);
+}
+
+.hint p {
+  margin: 0 0 var(--space-2xs);
+}
+
+.error {
+  margin: 0 0 var(--space-2xs);
+  font-weight: 700;
+  color: var(--color-accent-pink);
+}
+
+/* Never below 16px, so iOS doesn't zoom on focus. */
+.textarea {
+  font-size: max(16px, var(--text-0));
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+}
+
+.summary {
+  margin: 0 0 var(--space-m);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.summary > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, max-content) 1fr;
+  gap: var(--space-s);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-light-grey);
+}
+
+.summary dt {
+  font-weight: 700;
+}
+
+.summary dd {
+  margin: 0;
+}
+
+.detailsText {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.consequence {
+  display: flex;
+  gap: var(--space-2xs);
+  align-items: flex-start;
+  margin: 0 0 var(--space-m);
+  padding: var(--space-s);
+  border-radius: 8px;
+  background: var(--color-frost-ice);
+  font-weight: 600;
+}
+
+.submitError,
+.undoResult {
+  margin: 0 0 var(--space-m);
+}
+
+.submitError:focus,
+.undoResult:focus {
+  outline: none;
+}
+
+@media (max-width: 480px) {
+  .summary > div {
+    grid-template-columns: 1fr;
+    gap: var(--space-3xs);
+  }
+}
+
+/* Touch screens: 44px targets. */
+@media (pointer: coarse) {
+  .actions :global(.button) {
+    min-height: 44px;
+    border-radius: 22px;
+  }
+
+  .card {
+    min-height: 48px;
+  }
+}

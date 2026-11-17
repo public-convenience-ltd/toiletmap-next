@@ -24,7 +24,6 @@ describe("local auth server customization", () => {
       form.set("user_sub", "auth0|custom-dev");
       form.set("contributor_name", "Custom Contributor");
       form.set("extra_permissions", "beta:feature,ops:read");
-      form.append("permissions", "report:loo");
       form.append("permissions", "access:admin");
       form.set(
         "custom_claims",
@@ -68,7 +67,7 @@ describe("local auth server customization", () => {
       expect(decodedAccess?.name).toBe("Custom Dev");
       expect(decodedAccess?.email).toBe("dev@example.com");
       expect(decodedAccess?.permissions).toEqual(
-        expect.arrayContaining(["access:admin", "report:loo", "beta:feature", "ops:read"]),
+        expect.arrayContaining(["access:admin", "beta:feature", "ops:read"]),
       );
       expect(decodedAccess?.app_metadata).toMatchObject({ contributor_name: "Custom Contributor" });
 
@@ -79,7 +78,7 @@ describe("local auth server customization", () => {
       const userInfo = (await userInfoResponse.json()) as Record<string, unknown>;
       expect(userInfo.email).toBe("dev@example.com");
       expect(userInfo.permissions).toEqual(
-        expect.arrayContaining(["access:admin", "report:loo", "beta:feature", "ops:read"]),
+        expect.arrayContaining(["access:admin", "beta:feature", "ops:read"]),
       );
       expect(userInfo["https://claims.example/roles"]).toEqual(["editor"]);
     } finally {

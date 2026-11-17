@@ -112,7 +112,7 @@ type CustomizationParseResult =
   | { success: true; customization: ApprovalCustomization; formState: CustomizationFormState }
   | { success: false; errors: string[]; formState: CustomizationFormState };
 
-const DEFAULT_PERMISSIONS = ["access:admin", "report:loo"];
+const DEFAULT_PERMISSIONS = ["access:admin"];
 
 const toInitials = (value: string) => {
   const trimmed = value.trim();
@@ -777,10 +777,6 @@ const renderLoginPage = (
                 <input type="checkbox" name="permissions" value="access:admin" ${isPermissionChecked("access:admin")} />
                 <span>access:admin</span>
               </label>
-              <label class="pill-toggle">
-                <input type="checkbox" name="permissions" value="report:loo" ${isPermissionChecked("report:loo")} />
-                <span>report:loo</span>
-              </label>
             </div>
             <div class="field">
               <label for="extra_permissions">Extra permissions</label>
@@ -1150,6 +1146,9 @@ export const startAuthServer = async (options: StartAuthServerOptions): Promise<
   const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs1" }) as string;
 
   const issueToken: IssueTokenFn = (claims = {}) => {
+    // Default tokens carry no permissions: any signed-in user writes loo data
+    // directly (unless blocked in Auth0). Pass `permissions: ["access:admin"]`
+    // for an admin.
     const defaults = {
       sub: "auth0|integration-test-user",
       nickname: "integration-test-user",
@@ -1157,6 +1156,7 @@ export const startAuthServer = async (options: StartAuthServerOptions): Promise<
       app_metadata: {
         nickname: "integration-tester",
       },
+      permissions: [],
     } satisfies Record<string, unknown>;
 
     const { aud, ...restClaims } = claims;

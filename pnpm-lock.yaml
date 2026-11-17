@@ -42,6 +42,9 @@ importers:
       '@toiletmap/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@toiletmap/opening-hours':
+        specifier: workspace:*
+        version: link:../../packages/opening-hours
       '@types/leaflet':
         specifier: ^1.9.22
         version: 1.9.22
@@ -120,6 +123,10 @@ importers:
         version: 4.1.10(@types/node@26.1.2)(happy-dom@20.11.1)(msw@2.12.2(@types/node@26.1.2)(typescript@6.0.3))(vite@8.2.1(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.10)(yaml@2.9.0))
 
   apps/toiletmap-design-system:
+    dependencies:
+      '@toiletmap/opening-hours':
+        specifier: workspace:*
+        version: link:../../packages/opening-hours
     devDependencies:
       happy-dom:
         specifier: ^20.11.1
@@ -151,6 +158,9 @@ importers:
       '@toiletmap/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@toiletmap/opening-hours':
+        specifier: workspace:*
+        version: link:../../packages/opening-hours
       '@types/leaflet':
         specifier: ^1.9.22
         version: 1.9.22
@@ -212,6 +222,15 @@ importers:
       hono:
         specifier: ^4.13.1
         version: 4.13.1
+
+  packages/opening-hours:
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.2)(happy-dom@20.11.1)(msw@2.12.2(@types/node@26.1.2)(typescript@7.0.2))(vite@8.2.1(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.10)(yaml@2.9.0))
 
 packages:
 

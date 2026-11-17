@@ -94,10 +94,10 @@ describe("normalizeUser", () => {
         "access:admin",
         42 as unknown as string,
         null as unknown as string,
-        "report:loo",
+        "beta:feature",
       ],
     });
-    expect(result.permissions).toEqual(["access:admin", "report:loo"]);
+    expect(result.permissions).toEqual(["access:admin", "beta:feature"]);
   });
 
   it("sets permissions to undefined when permissions is not an array", () => {

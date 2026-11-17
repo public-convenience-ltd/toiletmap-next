@@ -9,11 +9,15 @@ import Layout from "../../../layouts/Layout.astro";
 const { id } = Astro.params;
 
 import { BROWSER_API_URL, fetchApi } from "../../../utils/api";
+import { sessionCanWriteDirectly } from "../../../utils/permissions";
+import { loginHref } from "../../../utils/returnTo";
 
 // LooForm calls the same-origin /api/* proxy, which attaches the access token
 // server-side; the token is never rendered into the page.
 const apiUrl = BROWSER_API_URL;
 const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
+// Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
+const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
 
 if (!id) return new Response("Toilet not found", { status: 404 });
 
@@ -53,7 +57,7 @@ const navLinks = [
   { href: "/loos/add", label: "Add a Toilet", button: true },
   isAuthenticated
     ? { href: "/auth/logout", label: "Sign out" }
-    : { href: "/auth/login", label: "Sign in" },
+    : { href: loginHref(`/loos/${encodeURIComponent(id)}/edit`), label: "Sign in" },
 ];
 ---
 
@@ -67,6 +71,7 @@ const navLinks = [
       looId={id}
       apiUrl={apiUrl}
       isAuthenticated={isAuthenticated}
+      canWriteDirectly={canWriteDirectly}
     />
   </main>
   <Footer />

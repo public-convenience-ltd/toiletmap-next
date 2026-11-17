@@ -8,6 +8,9 @@
     "./tokens.css": "./src/tokens.css",
     "./stylesheet.css": "./src/stylesheet.css"
   },
+  "dependencies": {
+    "@toiletmap/opening-hours": "workspace:*"
+  },
   "peerDependencies": {
     "preact": ">=10"
   },
