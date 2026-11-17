@@ -7,10 +7,13 @@ import Layout from "../../layouts/Layout.astro";
 const { id } = Astro.params;
 
 import { BROWSER_API_URL } from "../../utils/api";
+import { sessionCanWriteDirectly } from "../../utils/permissions";
 
 // Browser islands call the same-origin /api/* proxy.
 const apiUrl = BROWSER_API_URL;
 const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
+// Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
+const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
 
 const navLinks = [
   { href: "/about", label: "About" },
@@ -27,7 +30,12 @@ const navLinks = [
 <Layout>
   <Header client:load logoSrc={logo} navLinks={navLinks} />
   <main>
-    <LooMap client:only="preact" apiUrl={apiUrl} initialToiletId={id} />
+    <LooMap
+      client:only="preact"
+      apiUrl={apiUrl}
+      initialToiletId={id}
+      canWriteDirectly={canWriteDirectly}
+    />
   </main>
   <Footer />
 </Layout>
