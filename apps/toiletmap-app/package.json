@@ -9,8 +9,5 @@
     "test": "flutter test",
     "lint": "flutter analyze",
     "setup": "flutter pub get"
-  },
-  "devDependencies": {
-    "rimraf": "^6.1.3"
   }
 }

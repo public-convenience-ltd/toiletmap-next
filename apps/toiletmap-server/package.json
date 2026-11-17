@@ -48,7 +48,7 @@
     "@cloudflare/vite-plugin": "^1.67.0",
     "@types/node": "26.6.6",
     "@types/pg": "^8.23.1",
-    "concurrently": "^10.0.4",
+    "concurrently": "^10.0.6",
     "dotenv": "^17.4.2",
     "knip": "^6.44.1",
     "supabase": "^2.112.0",

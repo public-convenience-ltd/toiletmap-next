@@ -43,7 +43,7 @@
     "@types/ngeohash": "^0.6.8",
     "@types/node": "26.6.6",
     "astro-eslint-parser": "^1.1.0",
-    "concurrently": "^10.0.4",
+    "concurrently": "^10.0.6",
     "eslint": "^9.20.1",
     "fake-indexeddb": "6.2.7",
     "happy-dom": "^21.0.4",
