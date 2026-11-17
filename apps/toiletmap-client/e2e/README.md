@@ -197,9 +197,11 @@ save, use `waitForSaved` (`support/form.ts`): it waits for the redirect to
 `/loos/<id>?saved=1`, the banner, and the param being stripped.
 
 **Details panel and phone layout.** `panel.spec.ts` covers the Phase 4 panel on
-every project: a marker tap or deep link opens it expanded (at most 60% of the
-map on phones, scrolling inside, with the map still draggable around it; a card
-of at most 400px on the left on desktop), Details or the sheet's handle
+every project: a marker tap or deep link opens it expanded (at most 70% of the
+map on phones and never within 10rem of its top, scrolling inside under a
+compact pinned header of name, open-now line, Details and Close, with
+Directions and the key features leading the scrolling content and the map
+still draggable around it; a card of at most 400px on the left on desktop), Details or the sheet's handle
 collapses it to the summary (at most 30% of a phone screen) and expands it
 again, Escape collapses then closes, Close closes at once, focus moves to the
 heading and back to the marker, and the selected marker's box never touches the

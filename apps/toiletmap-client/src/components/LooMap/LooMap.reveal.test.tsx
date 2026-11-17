@@ -272,12 +272,13 @@ describe("LooMap keeps the selected marker in view", () => {
     });
   });
 
-  // The panel opens expanded: its first report is the expanded size. The measured box stays
-  // the default 300px sheet, so a pan from the measurement instead would show as 316 below.
+  // The panel opens expanded: its first report is the expanded size (the sheet's 70% cap of
+  // this 800px map). The measured box stays the default 300px sheet, so a pan from the
+  // measurement instead would show as 316 below.
   const EXPANDED_SHEET: PanelLayout = {
     mode: "sheet",
     state: "expanded",
-    occludes: { top: 0, right: 0, bottom: 480, left: 0 },
+    occludes: { top: 0, right: 0, bottom: 560, left: 0 },
   };
 
   it("keeps a tapped marker above the expanded sheet from the first open, and on collapse", async () => {
@@ -289,12 +290,12 @@ describe("LooMap keeps the selected marker in view", () => {
     await waitFor(() => expect(fakeMap.panInside).toHaveBeenCalled());
     await nextFrame();
 
-    // One pan, already clear of the 60% sheet: never a peek-sized pan first.
+    // One pan, already clear of the 70% sheet: never a peek-sized pan first.
     expect(fakeMap.panBy).not.toHaveBeenCalled();
     expect(fakeMap.panInside).toHaveBeenCalledTimes(1);
     expect(fakeMap.panInside).toHaveBeenLastCalledWith([51.5, -0.1], {
       paddingTopLeft: [SIDE, TOP],
-      paddingBottomRight: [SIDE, 496],
+      paddingBottomRight: [SIDE, 576],
       animate: true,
     });
 
@@ -302,7 +303,7 @@ describe("LooMap keeps the selected marker in view", () => {
     act(() =>
       panel.props?.onLayoutChange?.({
         ...EXPANDED_SHEET,
-        occludes: { ...EXPANDED_SHEET.occludes, bottom: 481 },
+        occludes: { ...EXPANDED_SHEET.occludes, bottom: 561 },
       }),
     );
     expect(fakeMap.panInside).toHaveBeenCalledTimes(1);
@@ -337,7 +338,7 @@ describe("LooMap keeps the selected marker in view", () => {
     expect(fakeMap.panInside).toHaveBeenCalledTimes(2);
     expect(fakeMap.panInside).toHaveBeenLastCalledWith([51.5, -0.1], {
       paddingTopLeft: [SIDE, TOP],
-      paddingBottomRight: [SIDE, 496],
+      paddingBottomRight: [SIDE, 576],
       animate: true,
     });
   });
@@ -349,9 +350,9 @@ describe("LooMap keeps the selected marker in view", () => {
     await screen.findByRole("heading", { name: "Toilet aaa" });
     await waitFor(() => expect(fakeMap.panBy).toHaveBeenCalled());
     await nextFrame();
-    // Free area: y 128…304 (centre 216) in an 800px container (centre 400).
+    // Free area: y 128…224 (centre 176) in an 800px container (centre 400).
     expect(fakeMap.panBy).toHaveBeenCalledTimes(1);
-    expect(fakeMap.panBy).toHaveBeenCalledWith([0, 184], { animate: false });
+    expect(fakeMap.panBy).toHaveBeenCalledWith([0, 224], { animate: false });
   });
 
   it("ignores the freshness notice while it is hidden in the panel (no phantom left inset)", async () => {

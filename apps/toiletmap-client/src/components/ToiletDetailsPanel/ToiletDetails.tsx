@@ -134,7 +134,6 @@ export default function ToiletDetails({
 
       <section className={styles.section} aria-labelledby={`${id}-hours`}>
         <h3 id={`${id}-hours`} className={styles.sectionHeading}>
-          <Icon icon="clock" size="small" />
           Opening hours
         </h3>
         <OpeningHours hours={hours} today={today} />

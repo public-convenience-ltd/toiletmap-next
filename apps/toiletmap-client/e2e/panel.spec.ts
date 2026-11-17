@@ -18,10 +18,11 @@ import {
 /**
  * Phase 4: the details panel. A marker tap (or a /loos/:id deep link) opens it expanded: the
  * summary with the details below; "Details" (or the sheet's handle) collapses it to the
- * summary and expands it again. Below 768px it is a non-modal bottom sheet (expanded ≤ 60% of
- * the map, scrolling inside; collapsed, the summary ≤ 30% of the screen); from 768px a card of
- * at most 400px on the left, below the search bar. Either way the selected marker is kept
- * clear of the panel and the floating map controls.
+ * summary and expands it again. Below 768px it is a non-modal bottom sheet (expanded ≤ 70% of
+ * the map and never within 10rem of its top, scrolling inside under a compact pinned header;
+ * collapsed, the summary ≤ 30% of the screen); from 768px a card of at most 400px on the
+ * left, below the search bar. Either way the selected marker is kept clear of the panel and
+ * the floating map controls.
  */
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -37,6 +38,18 @@ const LONG_NOTES = Array.from(
   { length: 8 },
   (_, i) => `Line ${i + 1}: the entrance is round the back, past the bike racks and the café.`,
 ).join("\n");
+
+/**
+ * The expanded sheet's height cap (--bottom-sheet-max-height in ToiletDetailsPanel.module.css):
+ * 70% of the map, leaving at least 10rem (160px) above it for the search bar and the marker.
+ */
+const expandedSheetCap = (map: Box) => Math.min(map.height * 0.7, map.height - 160) + 1;
+
+/**
+ * The expanded sheet's pinned header: the name beside Details and Close, then the status line.
+ * Every fixture name here fits two lines on a phone (a third line would add about 23px).
+ */
+const PINNED_HEADER_MAX = 96;
 
 /** Below 768px the panel is a bottom sheet (ToiletDetailsPanel usePanelMode). */
 const isSheet = (page: Page) => (page.viewportSize()?.width ?? 1280) < 768;
@@ -240,17 +253,21 @@ test.describe("details panel", () => {
     await expect(page.getByRole("region", { name: loo.name ?? "" })).toBeVisible();
 
     // Expanded: the summary (open-now chip, key features, Directions, an expanded Details
-    // toggle) with the details below it.
+    // toggle) with the details below it. In the sheet the key features and Directions lead the
+    // scrolling content under the pinned header: still on screen as it opens.
     await expect(detailsPanel(page).getByTestId("open-now")).toHaveText("Open 24 hours");
     await expect(detailsPanel(page).getByRole("list", { name: "Key features" })).toBeVisible();
+    if (isSheet(page)) {
+      await expect(detailsPanel(page).getByRole("link", { name: "Directions" })).toBeInViewport();
+    }
     await expectDetailsExpanded(page);
     await expect(page.getByRole("button", { name: "Yes, it's still here" })).toHaveCount(1);
 
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     const panel = await settledBox(detailsPanel(page));
     if (isSheet(page)) {
-      expect(panel.height, "the expanded sheet is capped at 60% of the map").toBeLessThanOrEqual(
-        map.height * 0.6 + 1,
+      expect(panel.height, "the expanded sheet is capped at 70% of the map").toBeLessThanOrEqual(
+        expandedSheetCap(map),
       );
       expect(Math.round(panel.y + panel.height)).toBe(Math.round(map.y + map.height));
     }
@@ -328,8 +345,8 @@ test.describe("details panel", () => {
     const map = (await page.locator("#map").boundingBox()) as Box;
     const panel = await settledBox(detailsPanel(page));
     if (isSheet(page)) {
-      expect(panel.height, "the expanded sheet is capped at 60% of the map").toBeLessThanOrEqual(
-        map.height * 0.6 + 1,
+      expect(panel.height, "the expanded sheet is capped at 70% of the map").toBeLessThanOrEqual(
+        expandedSheetCap(map),
       );
     } else {
       // The card stays inside the map, below the search bar.
@@ -353,14 +370,16 @@ test.describe("details panel", () => {
     await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     expect(await page.evaluate(() => document.scrollingElement?.scrollTop ?? 0)).toBe(0);
 
-    // Scrolled, the header stays put: the name and Close are still on screen, inside the
-    // panel, and nothing covers Close (the sheet's summary is sticky; the card's sits above
-    // its scroller). A short card scrolls as a whole, header included, by design.
+    // Scrolled, the header stays put: the name, Details and Close are still on screen, inside
+    // the panel, and nothing covers Close or Details (the sheet's compact header is sticky; the
+    // card's summary sits above its scroller). A short card scrolls as a whole, header
+    // included, by design.
     if (!isShortCard(page)) {
       const close = detailsPanel(page).getByRole("button", { name: "Close", exact: true });
       const scrolledPanel = (await detailsPanel(page).boundingBox()) as Box;
       for (const [what, locator] of [
         ["name", detailsPanelHeading(page)],
+        ["Details", detailsToggle(page)],
         ["Close", close],
       ] as const) {
         await expect(locator, `${what} stays in view while the details scroll`).toBeInViewport();
@@ -368,6 +387,35 @@ test.describe("details panel", () => {
         expect(box.y, `${what} stays inside the panel`).toBeGreaterThanOrEqual(scrolledPanel.y - 1);
       }
       await close.click({ trial: true });
+      await detailsToggle(page).click({ trial: true });
+    }
+
+    // The sheet pins only that compact header, so the details get most of the sheet: the open-now
+    // line stays with it, while Directions scrolls with the details (it is the first thing
+    // below the header).
+    if (isSheet(page)) {
+      const header = await detailsPanel(page).evaluate((panel) => {
+        const heading = panel.querySelector("h2");
+        const body = panel.querySelector(".bottom-sheet__body");
+        const pinned = [...(body?.children ?? [])].find((el) => el.contains(heading));
+        return pinned
+          ? {
+              position: getComputedStyle(pinned).position,
+              height: pinned.getBoundingClientRect().height,
+              hasDirections: !!pinned.querySelector('a[target="_blank"]'),
+            }
+          : null;
+      });
+      expect(header, "the expanded sheet has a pinned header").not.toBeNull();
+      expect(header?.position).toBe("sticky");
+      expect(header?.height, "the pinned header is compact").toBeLessThanOrEqual(PINNED_HEADER_MAX);
+      expect(header?.hasDirections, "Directions scrolls with the details").toBe(false);
+      await expect(detailsPanel(page).getByTestId("open-now")).toBeInViewport();
+      const scrollerBox = (await scroller.boundingBox()) as Box;
+      expect(
+        scrollerBox.height - (header?.height ?? 0),
+        "most of the sheet is left for the details",
+      ).toBeGreaterThan(scrollerBox.height / 2);
     }
 
     // The summary shows the price as text; the details have the facilities (one row each with

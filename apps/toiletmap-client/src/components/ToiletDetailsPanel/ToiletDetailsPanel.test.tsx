@@ -478,18 +478,79 @@ describe("ToiletDetailsPanel", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps the summary a direct child of the scrolling body, so it can stay pinned", () => {
-      const { container } = renderExpanded();
+    it("pins only a compact header, a direct child of the scrolling body, while expanded", () => {
+      const { container } = renderExpanded({
+        toilet: { ...toilet, openingTimes: weekdays, noPayment: false, paymentDetails: "20p" },
+      });
       const region = screen.getByRole("region", { name: "High Street toilets" });
       expect(region).toHaveAttribute("data-state", "expanded");
       const body = container.querySelector(".bottom-sheet__body") as HTMLElement;
       const heading = screen.getByRole("heading", { level: 2 });
-      const summary = Array.from(body.children).find((child) => child.contains(heading));
-      expect(summary).toBeDefined();
-      // The X and Directions are in it, above the details.
-      expect(summary).toContainElement(screen.getByRole("button", { name: "Close" }));
+      const children = Array.from(body.children);
+      const header = children.find((child) => child.contains(heading)) as HTMLElement;
+      expect(header).toBeDefined();
+      // The name, the open-now line, Details (to collapse) and Close stay pinned...
+      expect(header).toContainElement(screen.getByTestId("open-now"));
+      // The open-now line spans the header below the name and buttons, not squeezed beside them.
+      expect(screen.getByTestId("open-now").parentElement?.parentElement).toBe(header);
+      expect(header).toContainElement(detailsToggle());
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
+      expect(header).toContainElement(screen.getByRole("button", { name: "Close" }));
+      // ...the key features, payment and Directions scroll, first, just below it...
+      const extras = header.nextElementSibling as HTMLElement;
+      const directions = screen.getByRole("link", { name: /directions/i });
+      for (const el of [
+        directions,
+        screen.getByTestId("payment"),
+        screen.getByRole("list", { name: "Key features" }),
+      ]) {
+        expect(header).not.toContainElement(el);
+        expect(extras).toContainElement(el);
+      }
+      // ...followed by the details.
+      expect(extras.nextElementSibling).toContainElement(screen.getByText(VERIFY_PROMPT));
+      expect(children.indexOf(extras)).toBe(children.indexOf(header) + 1);
+    });
+
+    it("keeps the whole summary together at peek", async () => {
+      const user = userEvent.setup();
+      renderExpanded();
+      await user.click(screen.getByRole("button", { name: "Toilet details" }));
+      const heading = screen.getByRole("heading", { level: 2 });
+      const summary = heading.closest(".bottom-sheet__body > *") as HTMLElement;
       expect(summary).toContainElement(screen.getByRole("link", { name: /directions/i }));
-      expect(summary).not.toContainElement(screen.getByText(VERIFY_PROMPT));
+      expect(summary).toContainElement(screen.getByRole("list", { name: "Key features" }));
+      expect(summary).toContainElement(screen.getByTestId("payment"));
+      expect(summary).toContainElement(detailsToggle());
+      expect(visibleText(detailsToggle()).trim()).toBe("Details");
+    });
+
+    it("moves focus with the Details toggle between the pinned header and the summary", async () => {
+      const user = userEvent.setup();
+      renderExpanded();
+      const heading = screen.getByRole("heading", { level: 2 });
+      const sheet = () => screen.getByRole("region", { name: "High Street toilets" });
+      await user.click(detailsToggle());
+      expect(sheet()).toHaveAttribute("data-state", "peek");
+      // Collapsed, the toggle is the summary's text button: focus followed it there.
+      expect(detailsToggle()).toHaveFocus();
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
+
+      await user.click(detailsToggle());
+      expect(sheet()).toHaveAttribute("data-state", "expanded");
+      expect(detailsToggle()).toHaveFocus();
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
+      expect(detailsToggle()).toHaveAttribute("aria-controls");
+      expect(
+        document.getElementById(detailsToggle().getAttribute("aria-controls") ?? ""),
+      ).toContainElement(screen.getByText(VERIFY_PROMPT));
+
+      // Escape on the pinned toggle collapses, keeping focus on the toggle.
+      fireEvent.keyDown(detailsToggle(), { key: "Escape" });
+      expect(sheet()).toHaveAttribute("data-state", "peek");
+      await waitFor(() => expect(detailsToggle()).toHaveFocus());
+      // The heading is the same element throughout (it names the region).
+      expect(screen.getByRole("heading", { level: 2 })).toBe(heading);
     });
 
     it("pads the scroller by the pinned summary's height while expanded, following its size", async () => {

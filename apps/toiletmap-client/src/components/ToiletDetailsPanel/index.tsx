@@ -145,7 +145,10 @@ export interface ToiletDetailsPanelProps {
  * verify / edit / report actions) below it. The Details toggle or the sheet's handle
  * collapses it to the summary alone, and expands it again.
  *
- * - Below 768px: a non-modal bottom sheet (expanded / peek, capped at 60% of the map).
+ * - Below 768px: a non-modal bottom sheet (expanded / peek). Expanded, it is capped at 70% of
+ *   the map (less on a short map, so the selected marker always fits above it) and pins only
+ *   a compact header (name, distance / open now, Details and Close); the key features,
+ *   payment, notices and Directions scroll, first, with the details.
  * - From 768px: a floating card on the left, under the search bar, scrolling inside.
  *
  * Close (the X) always closes. Escape inside the panel collapses the details first, then
@@ -185,6 +188,8 @@ export default function ToiletDetailsPanel({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const detailsToggleRef = useRef<HTMLButtonElement>(null);
+  /** Set when a state change should take focus to the Details toggle once it re-renders. */
+  const focusToggleRef = useRef(false);
   const returnFocusRef = useRef(returnFocusTo);
   returnFocusRef.current = returnFocusTo;
 
@@ -220,9 +225,20 @@ export default function ToiletDetailsPanel({
   const looHref = `/loos/${encodeURIComponent(toilet.id)}`;
   const directionsHref = current.location && !isRemoved ? directionsUrl(current.location) : null;
 
+  /** The expanded sheet pins only a compact header; the rest of the summary scrolls. */
+  const compactHeader = mode === "sheet" && expanded;
+
   useLayoutReporter(rootRef, mode, panelState, onLayoutChange);
-  // The expanded sheet's summary is sticky: its scroller pads its top by the summary's height.
-  useSummaryHeight(rootRef, summaryRef, mode === "sheet" && expanded);
+  // The expanded sheet's header is sticky: its scroller pads its top by the header's height.
+  useSummaryHeight(rootRef, summaryRef, compactHeader);
+
+  // In the sheet the Details toggle moves between the pinned header (expanded) and the
+  // summary's actions (collapsed): when it had focus, focus follows it to its new place.
+  useEffect(() => {
+    if (!focusToggleRef.current) return;
+    focusToggleRef.current = false;
+    detailsToggleRef.current?.focus({ preventScroll: true });
+  }, [expanded]);
 
   // Focus the heading on open, and hand focus back on close if it was still in the panel
   // (closed from outside: Escape on the map, Back, another marker).
@@ -253,10 +269,18 @@ export default function ToiletDetailsPanel({
   }, [restore.status]);
 
   const setPanelState = (next: PanelState) => {
-    if (next === "peek") {
-      // Focus inside the details would be lost when they unmount: keep it on the toggle.
-      const details = document.getElementById(detailsId);
-      if (details?.contains(document.activeElement)) detailsToggleRef.current?.focus();
+    const active = document.activeElement;
+    // Focus inside the details would be lost when they unmount, and the toggle itself moves
+    // in the sheet: keep focus on the toggle.
+    const details = next === "peek" ? document.getElementById(detailsId) : null;
+    if (
+      (active && active === detailsToggleRef.current) ||
+      (active && details?.contains(active)) ||
+      // The scrolling top of the expanded sheet (Directions, notices) goes too.
+      (next === "peek" && active?.closest(`.${styles.summaryExtras}`))
+    ) {
+      detailsToggleRef.current?.focus();
+      focusToggleRef.current = true;
     }
     setExpanded(next === "expanded");
   };
@@ -527,6 +551,7 @@ export default function ToiletDetailsPanel({
       directionsHref={directionsHref}
       restoreAction={restoreAction}
       expanded={expanded}
+      compact={compactHeader}
       detailsId={detailsId}
       detailsToggleRef={detailsToggleRef}
       onToggleDetails={() => setPanelState(expanded ? "peek" : "expanded")}

@@ -175,19 +175,19 @@ describe("onLayoutChange (ResizeObserver)", () => {
     });
   });
 
-  it("reports the expanded sheet on open, capped by the CSS at 60% of the map", () => {
+  it("reports the expanded sheet on open, capped by the CSS at 70% of the map", () => {
     setViewport("sheet");
     boxes.set(mapContainer, { top: 0, left: 0, width: 412, height: 800 });
-    boxes.set(panelDefaults, { top: 320, left: 0, width: 412, height: 480 });
+    boxes.set(panelDefaults, { top: 240, left: 0, width: 412, height: 560 });
     const onLayoutChange = vi.fn<(layout: PanelLayout) => void>();
     render(<ToiletDetailsPanel toilet={toilet} onClose={noop} onLayoutChange={onLayoutChange} />, {
       container: mapContainer,
     });
-    // No peek-sized report first: a phone's marker is panned above the 60% sheet straight away.
+    // No peek-sized report first: a phone's marker is panned above the 70% sheet straight away.
     expect(onLayoutChange.mock.calls[0]?.[0]).toEqual({
       mode: "sheet",
       state: "expanded",
-      occludes: { top: 0, right: 0, bottom: 480, left: 0 },
+      occludes: { top: 0, right: 0, bottom: 560, left: 0 },
     });
     expect(onLayoutChange.mock.calls.every(([layout]) => layout.state === "expanded")).toBe(true);
   });
