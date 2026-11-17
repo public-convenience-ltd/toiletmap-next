@@ -142,6 +142,11 @@ jobs:
       - name: Check build output for the SSR render test
         run: test -f apps/toiletmap-client/dist/server/entry.mjs
 
+      # Every /_astro/ file the build references must exist. The e2e suite runs
+      # `astro dev`, so a missing built asset (e.g. a lazy chunk's CSS) only shows here.
+      - name: Check built assets are all present
+        run: node apps/toiletmap-client/scripts/check-build-assets.mjs apps/toiletmap-client/dist
+
       - name: Client tests (unit, component and SSR render)
         run: pnpm --filter toiletmap-client test
 

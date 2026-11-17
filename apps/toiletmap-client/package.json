@@ -7,6 +7,7 @@
     "build": "astro build",
     "build:production": "CLOUDFLARE_ENV=production astro build",
     "build:preview": "CLOUDFLARE_ENV=preview astro build",
+    "check:assets": "node scripts/check-build-assets.mjs",
     "preview": "astro preview",
     "deploy": "pnpm build:production && wrangler deploy --env production",
     "deploy:preview": "pnpm build:preview && wrangler versions upload --env preview",
