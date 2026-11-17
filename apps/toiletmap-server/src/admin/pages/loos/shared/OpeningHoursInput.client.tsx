@@ -1,15 +1,19 @@
 /** @jsxImportSource hono/jsx/dom */
 
-import { useId } from "hono/jsx";
+import { useId, useState } from "hono/jsx";
 import type { OpeningTimes } from "../../../../services/loo/types";
 import {
   copyDayTo,
+  createAllDayWeek,
   createDefaultWeek,
   DAYS,
   type DayHours,
   DEFAULT_DAY_HOURS,
+  isOpen24Every,
+  isOvernight,
   isTwentyFourHours,
   normaliseWeek,
+  summariseOpeningTimes,
   TWENTY_FOUR_HOURS,
 } from "./utils/opening-hours";
 
@@ -20,21 +24,62 @@ type Props = {
   error?: string;
 };
 
+type Mode = "unknown" | "24h" | "set";
+type DayStatus = "closed" | "open" | "24h";
+
 const WEEKDAY_INDEXES = [1, 2, 3, 4];
 const OTHER_DAY_INDEXES = [1, 2, 3, 4, 5, 6];
+
+const MODES: [Mode, string][] = [
+  ["unknown", "Don't know"],
+  ["24h", "Open 24/7"],
+  ["set", "Set the hours"],
+];
+
+const STATUSES: [DayStatus, string][] = [
+  ["closed", "Closed"],
+  ["open", "Open"],
+  ["24h", "24 hours"],
+];
+
+const statusOf = (day: DayHours): DayStatus =>
+  day.length !== 2 ? "closed" : isTwentyFourHours(day) ? "24h" : "open";
+
+/** "24:00" is valid data but a time input can't show it; it is the same midnight as "00:00". */
+const displayTime = (time: string) => (time === "24:00" ? "00:00" : time);
 
 /**
  * Fully controlled opening hours editor: everything is derived from `value`,
  * so `null` ("not known") is preserved until the moderator chooses to set hours.
+ * Mirrors the public design-system editor: Don't know / Open 24/7 / Set the
+ * hours, a live summary, and Closed / Open / 24 hours per day.
  */
 export const OpeningHoursInput = ({ value, onChange, error }: Props) => {
   const baseId = useId();
   const isKnown = value !== null && value !== undefined;
   const hours = isKnown ? normaliseWeek(value) : null;
+  // Remembers "Set the hours" so making each day 24 hours doesn't hide the rows.
+  const [preferSet, setPreferSet] = useState(false);
+  const mode: Mode = !hours ? "unknown" : isOpen24Every(hours) && !preferSet ? "24h" : "set";
+
+  const chooseMode = (next: Mode) => {
+    if (next === mode) return;
+    setPreferSet(next === "set");
+    if (next === "unknown") onChange(null);
+    else if (next === "24h") onChange(createAllDayWeek());
+    else onChange(createDefaultWeek());
+  };
 
   const setDay = (dayIndex: number, next: DayHours) => {
     if (!hours) return;
     onChange(hours.map((day, index) => (index === dayIndex ? next : day)));
+  };
+
+  const setStatus = (dayIndex: number, status: DayStatus) => {
+    if (!hours || statusOf(hours[dayIndex]) === status) return;
+    if (status === "closed") setDay(dayIndex, []);
+    else if (status === "24h") setDay(dayIndex, [...TWENTY_FOUR_HOURS]);
+    else setDay(dayIndex, [...DEFAULT_DAY_HOURS]);
   };
 
   const setTime = (dayIndex: number, position: 0 | 1, time: string) => {
@@ -48,47 +93,35 @@ export const OpeningHoursInput = ({ value, onChange, error }: Props) => {
 
   return (
     <div class="opening-hours-input">
+      <p class="oh-summary" role="status">
+        {summariseOpeningTimes(hours)}
+      </p>
       <fieldset class="oh-fieldset" aria-invalid={error ? "true" : "false"}>
         <legend class="oh-visually-hidden">Are the opening hours known?</legend>
         <div class="tri-state-container">
-          <label class="tri-state-option">
-            <input
-              type="radio"
-              name={`${baseId}-mode`}
-              value="unknown"
-              checked={!isKnown}
-              onChange={() => {
-                if (isKnown) onChange(null);
-              }}
-            />
-            <span class="tri-state-label">Don't know</span>
-          </label>
-          <label class="tri-state-option">
-            <input
-              type="radio"
-              name={`${baseId}-mode`}
-              value="known"
-              checked={isKnown}
-              onChange={() => {
-                if (!isKnown) onChange(createDefaultWeek());
-              }}
-            />
-            <span class="tri-state-label">Set opening hours</span>
-          </label>
+          {MODES.map(([option, text]) => (
+            <label class="tri-state-option" key={option}>
+              <input
+                type="radio"
+                name={`${baseId}-mode`}
+                value={option}
+                checked={mode === option}
+                onChange={() => chooseMode(option)}
+              />
+              <span class="tri-state-label">{text}</span>
+            </label>
+          ))}
         </div>
       </fieldset>
 
-      {!isKnown && (
+      {mode === "unknown" && (
         <p class="field-hint">
-          Opening hours will be saved as "not known". Choose "Set opening hours" to enter them.
+          Opening hours will be saved as "not known". Choose "Set the hours" to enter them.
         </p>
       )}
 
-      {hours && (
+      {mode === "set" && hours && (
         <>
-          <p class="field-hint">
-            Every day starts at 09:00–17:00. Check each day and change any that are different.
-          </p>
           <div class="oh-bulk">
             <button
               type="button"
@@ -109,94 +142,63 @@ export const OpeningHoursInput = ({ value, onChange, error }: Props) => {
           <div class="opening-hours-grid">
             {DAYS.map((day, index) => {
               const times = hours[index];
-              const isOpen = times.length === 2;
-              const is24h = isOpen && isTwentyFourHours(times);
-              const legendId = `${baseId}-day-${index}`;
+              const status = statusOf(times);
+              const overnight = status === "open" && isOvernight(times);
+              const rowId = `${baseId}-day-${index}`;
 
               return (
                 <fieldset class="oh-fieldset" key={day}>
-                  <legend class="oh-visually-hidden" id={legendId}>
-                    {day}
-                  </legend>
+                  <legend class="oh-visually-hidden">{day}</legend>
                   <div class="opening-hours-row">
                     <span class="day-name" aria-hidden="true">
                       {day}
                     </span>
 
                     <div class="tri-state-container oh-status">
-                      <label class="tri-state-option">
-                        <input
-                          type="radio"
-                          name={`${baseId}-status-${index}`}
-                          value="closed"
-                          checked={!isOpen}
-                          onChange={() => setDay(index, [])}
-                        />
-                        <span class="tri-state-label">Closed</span>
-                      </label>
-                      <label class="tri-state-option">
-                        <input
-                          type="radio"
-                          name={`${baseId}-status-${index}`}
-                          value="open"
-                          checked={isOpen}
-                          onChange={() => {
-                            if (!isOpen) setDay(index, [...DEFAULT_DAY_HOURS]);
-                          }}
-                        />
-                        <span class="tri-state-label">Open</span>
-                      </label>
+                      {STATUSES.map(([option, text]) => (
+                        <label class="tri-state-option" key={option}>
+                          <input
+                            type="radio"
+                            name={`${rowId}-status`}
+                            value={option}
+                            checked={status === option}
+                            onChange={() => setStatus(index, option)}
+                          />
+                          <span class="tri-state-label">{text}</span>
+                        </label>
+                      ))}
                     </div>
 
-                    {isOpen && (
+                    {status === "open" && times.length === 2 && (
                       <div class="time-inputs">
-                        {is24h ? (
-                          <span class="oh-24h-text">Open 24 hours</span>
-                        ) : (
-                          <>
-                            <input
-                              type="time"
-                              value={times[0]}
-                              onInput={(e: Event) =>
-                                setTime(index, 0, (e.target as HTMLInputElement).value)
-                              }
-                              class="input time-input"
-                              aria-label={`${day} opening time`}
-                            />
-                            <span class="time-separator" aria-hidden="true">
-                              to
-                            </span>
-                            <input
-                              type="time"
-                              value={times[1]}
-                              onInput={(e: Event) =>
-                                setTime(index, 1, (e.target as HTMLInputElement).value)
-                              }
-                              class="input time-input"
-                              aria-label={`${day} closing time`}
-                            />
-                          </>
+                        <input
+                          type="time"
+                          value={displayTime(times[0])}
+                          onInput={(e: Event) =>
+                            setTime(index, 0, (e.target as HTMLInputElement).value)
+                          }
+                          class="input time-input"
+                          aria-label={`${day} opening time`}
+                        />
+                        <span class="time-separator" aria-hidden="true">
+                          to
+                        </span>
+                        <input
+                          type="time"
+                          value={displayTime(times[1])}
+                          onInput={(e: Event) =>
+                            setTime(index, 1, (e.target as HTMLInputElement).value)
+                          }
+                          class="input time-input"
+                          aria-label={`${day} closing time`}
+                          aria-describedby={overnight ? `${rowId}-note` : undefined}
+                        />
+                        {overnight && (
+                          <span class="oh-note" id={`${rowId}-note`}>
+                            Closes the next morning
+                          </span>
                         )}
                       </div>
-                    )}
-
-                    {isOpen && (
-                      <label class="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={is24h}
-                          aria-label={`${day}: open 24 hours`}
-                          onChange={(e: Event) =>
-                            setDay(
-                              index,
-                              (e.target as HTMLInputElement).checked
-                                ? [...TWENTY_FOUR_HOURS]
-                                : [...DEFAULT_DAY_HOURS],
-                            )
-                          }
-                        />
-                        <span aria-hidden="true">24 hours</span>
-                      </label>
                     )}
                   </div>
                 </fieldset>
@@ -247,7 +249,7 @@ export const OpeningHoursInput = ({ value, onChange, error }: Props) => {
                 /* day | status | times | 24 hours — fixed columns so rows align */
                 .opening-hours-row {
                     display: grid;
-                    grid-template-columns: 7rem 11rem minmax(0, 1fr) max-content;
+                    grid-template-columns: 7rem max-content minmax(0, 1fr);
                     column-gap: var(--space-m);
                     row-gap: var(--space-2xs);
                     min-height: 3.5rem;
@@ -269,20 +271,14 @@ export const OpeningHoursInput = ({ value, onChange, error }: Props) => {
                     gap: var(--space-xs);
                     min-width: 0;
                 }
-                .checkbox-label {
-                    grid-column: 4;
-                    display: flex;
-                    align-items: center;
-                    gap: var(--space-2xs);
-                    cursor: pointer;
-                    font-size: var(--text--1);
-                    font-weight: 500;
-                    color: var(--color-primary-navy);
-                    white-space: nowrap;
-                }
-                .oh-24h-text {
+                .oh-summary {
+                    margin: 0;
                     font-weight: 600;
                     color: var(--color-primary-navy);
+                }
+                .oh-note {
+                    font-size: var(--text--1);
+                    color: var(--color-neutral-grey);
                 }
                 .time-input {
                     padding: var(--space-2xs) var(--space-xs);
@@ -302,7 +298,7 @@ export const OpeningHoursInput = ({ value, onChange, error }: Props) => {
                         padding: var(--space-xs) var(--space-s);
                     }
                     .day-name, .oh-status { grid-column: auto; }
-                    .time-inputs, .checkbox-label { grid-column: 1 / -1; }
+                    .time-inputs { grid-column: 1 / -1; flex-wrap: wrap; }
                     .time-input { flex: 1; width: auto; }
                 }
             `}</style>

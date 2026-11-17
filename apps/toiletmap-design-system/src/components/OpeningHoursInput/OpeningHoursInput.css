@@ -4,6 +4,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  /* The narrow layout below follows the editor's own width (it always sits in
+     a card or form column), not the viewport's. */
+  container-type: inline-size;
 }
 
 .oh-input *,
@@ -12,26 +15,71 @@
   box-sizing: border-box;
 }
 
-/* Segmented controls (top-level choice and per-day status).
+.oh-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.oh-step:focus {
+  outline: none;
+}
+
+.oh-step:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+/* Visually hidden, still announced */
+.oh-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Live plain-English summary */
+.oh-summary {
+  margin: 0;
+  padding: var(--space-2xs) var(--space-s);
+  border-radius: 8px;
+  background: var(--color-frost-ice);
+  color: var(--color-primary-navy);
+  font-size: var(--text--1);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.oh-question {
+  padding: 0;
+  margin: 0 0 var(--space-3xs);
+  font-size: var(--text--1);
+  font-weight: 600;
+  color: var(--color-primary-navy);
+}
+
+/* Segmented controls (mode, layout preset and per-day status).
    Mirrors the TriStateToggle conventions. */
-.oh-mode,
-.oh-status {
+.oh-segmented {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   border: 1.5px solid var(--color-primary-navy);
   border-radius: 8px;
   overflow: hidden;
-  justify-self: start;
-  align-self: center;
-}
-
-.oh-mode {
-  align-self: flex-start;
 }
 
 .oh-toggle-option {
   position: relative;
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
   cursor: pointer;
 }
 
@@ -56,9 +104,10 @@
   min-height: 2.5rem;
   min-width: 4.5rem;
   padding: var(--space-3xs) var(--space-s);
+  font: inherit;
   font-size: var(--text--1);
-  font-family: var(--font-family, inherit);
   font-weight: 500;
+  line-height: 1.2;
   color: var(--color-primary-navy);
   background: var(--color-base-white);
   user-select: none;
@@ -87,37 +136,6 @@
   color: var(--color-neutral-grey);
 }
 
-/* Bulk copy actions (above the rows) */
-.oh-bulk {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2xs);
-}
-
-.oh-action-btn {
-  font: inherit;
-  font-size: var(--text--1);
-  font-weight: 500;
-  line-height: 1.2;
-  min-height: 2.5rem;
-  padding: var(--space-3xs) var(--space-s);
-  background: var(--color-base-white);
-  border: 1px solid rgba(10, 22, 94, 0.3);
-  border-radius: 6px;
-  color: var(--color-primary-navy);
-  cursor: pointer;
-}
-
-.oh-action-btn:hover {
-  background: var(--color-light-grey);
-  border-color: rgba(10, 22, 94, 0.5);
-}
-
-.oh-action-btn:focus-visible {
-  outline: 2px solid var(--color-primary-navy);
-  outline-offset: 2px;
-}
-
 /* Day rows */
 .oh-grid {
   display: flex;
@@ -129,32 +147,13 @@
   overflow: hidden;
 }
 
-.oh-day-group {
-  border: 0;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-}
-
-.oh-legend {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* Every row shares the same fixed columns so they line up:
-   day | status | times | 24 hours */
+   day | status | times */
 .oh-row {
   display: grid;
-  grid-template-columns: 6.5rem 10rem minmax(0, 1fr) max-content;
+  grid-template-columns: 6.5rem max-content minmax(0, 1fr);
   column-gap: var(--space-s);
-  row-gap: var(--space-2xs);
+  row-gap: var(--space-3xs);
   align-items: center;
   min-height: 3.5rem;
   padding: var(--space-2xs) var(--space-s);
@@ -170,7 +169,11 @@
 
 .oh-status {
   grid-column: 2;
-  width: 100%;
+}
+
+.oh-status .oh-toggle-label {
+  min-width: 4rem;
+  padding-inline: var(--space-2xs);
 }
 
 .oh-times {
@@ -179,33 +182,6 @@
   align-items: center;
   gap: var(--space-2xs);
   min-width: 0;
-}
-
-.oh-checkbox-label {
-  grid-column: 4;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  min-height: 2.5rem;
-  cursor: pointer;
-  font-size: var(--text--1);
-  color: var(--color-primary-navy);
-  white-space: nowrap;
-}
-
-.oh-checkbox {
-  accent-color: var(--color-primary-navy);
-  width: 1.1rem;
-  height: 1.1rem;
-  margin: 0;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.oh-24h-text {
-  font-size: var(--text--1);
-  font-weight: 600;
-  color: var(--color-primary-navy);
 }
 
 .oh-time-field {
@@ -228,40 +204,69 @@
   border-color: var(--color-primary-navy);
 }
 
+.oh-time-field[aria-invalid="true"] {
+  border-color: var(--color-accent-pink);
+  border-width: 2px;
+}
+
 .oh-time-sep {
   color: var(--color-neutral-grey);
   font-size: var(--text--1);
   flex-shrink: 0;
 }
 
+.oh-row-note {
+  grid-column: 3;
+  margin: 0;
+  font-size: var(--text--2);
+  color: var(--color-neutral-grey);
+}
+
 /* Error */
 .oh-error {
-  font-size: var(--text--2);
+  font-size: var(--text--1);
+  font-weight: 600;
   color: var(--color-accent-pink);
   margin: 0;
 }
 
-/* Narrow screens: day + status on the first line; times and the 24 hours
-   option only appear (on their own lines) when the day is open, so closed
-   days have no empty band. */
-@media (max-width: 600px) {
+/* Touch screens: 44px tap targets */
+@media (pointer: coarse) {
+  .oh-toggle-label,
+  .oh-time-field {
+    min-height: 44px;
+  }
+}
+
+/* Narrow editor (phones, and any column too narrow for day | status | two
+   times): the day name on its own line, the status control full width under
+   it, then the times (only for open days, so closed days have no empty band). */
+@container (max-width: 40rem) {
   .oh-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     padding: var(--space-2xs) var(--space-s);
   }
 
   .oh-day,
-  .oh-status {
-    grid-column: auto;
-  }
-
-  .oh-status {
-    width: auto;
-  }
-
+  .oh-status,
   .oh-times,
-  .oh-checkbox-label {
-    grid-column: 1 / -1;
+  .oh-row-note {
+    grid-column: 1;
+  }
+
+  .oh-status {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+
+  .oh-status .oh-toggle-option {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .oh-status .oh-toggle-label {
+    min-width: 0;
   }
 
   .oh-time-field {
@@ -269,7 +274,25 @@
     width: auto;
   }
 
-  .oh-action-btn {
-    flex: 1 1 100%;
+  .oh-mode {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .oh-mode .oh-toggle-label {
+    min-width: 0;
+    padding-inline: var(--space-2xs);
+    white-space: normal;
+  }
+
+  /* Presets stack so their longer labels never wrap mid-row */
+  .oh-presets {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .oh-presets .oh-toggle-option:not(:first-child) {
+    border-left: 0;
+    border-top: 1px solid var(--color-primary-navy);
   }
 }

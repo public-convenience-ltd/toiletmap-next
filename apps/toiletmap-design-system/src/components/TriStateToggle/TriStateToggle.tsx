@@ -2,11 +2,8 @@ import "./TriStateToggle.css";
 
 export type TriStateValue = "true" | "false" | "";
 
-const OPTIONS: Array<{ label: string; value: TriStateValue }> = [
-  { label: "Yes", value: "true" },
-  { label: "No", value: "false" },
-  { label: "Unknown", value: "" },
-];
+/** The default label of the "no answer" option (value `""`). */
+export const TRI_STATE_UNKNOWN_LABEL = "Don't know";
 
 export interface TriStateToggleProps {
   name: string;
@@ -15,6 +12,8 @@ export interface TriStateToggleProps {
   onChange: (value: TriStateValue) => void;
   hint?: string;
   error?: string;
+  /** Label of the "no answer" option (value `""`). Defaults to "Don't know". */
+  unknownLabel?: string;
 }
 
 export default function TriStateToggle({
@@ -24,12 +23,18 @@ export default function TriStateToggle({
   onChange,
   hint,
   error,
+  unknownLabel = TRI_STATE_UNKNOWN_LABEL,
 }: TriStateToggleProps) {
+  const options: Array<{ label: string; value: TriStateValue }> = [
+    { label: "Yes", value: "true" },
+    { label: "No", value: "false" },
+    { label: unknownLabel, value: "" },
+  ];
   return (
     <fieldset class="tri-state-fieldset" aria-invalid={error ? "true" : "false"}>
       <legend class="tri-state-legend">{label}</legend>
       <div class="tri-state-options">
-        {OPTIONS.map((option) => (
+        {options.map((option) => (
           <label key={option.value} class="tri-state-option">
             <input
               type="radio"
