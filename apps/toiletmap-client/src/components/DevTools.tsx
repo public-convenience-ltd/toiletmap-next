@@ -1,5 +1,6 @@
 import { del, entries, keys } from "idb-keyval";
 import { useEffect, useState } from "preact/hooks";
+import { Icon } from "toiletmap-design-system";
 import styles from "./DevTools.module.css";
 
 interface DevToolsProps {
@@ -68,10 +69,10 @@ const DevTools = ({ isOpen, onClose, mapInstance }: DevToolsProps) => {
       <div className={styles.panel} onClick={(e) => e.stopPropagation()} role="dialog">
         <div className={styles.header}>
           <h2>
-            <i className="fa-solid fa-code" /> Developer Tools
+            <Icon icon="list" size="small" /> Developer Tools
           </h2>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
-            <i className="fa-solid fa-xmark" />
+            <Icon icon="xmark" size="small" />
           </button>
         </div>
 
@@ -92,10 +93,10 @@ const DevTools = ({ isOpen, onClose, mapInstance }: DevToolsProps) => {
             )}
             <div className={styles.actions}>
               <button type="button" className={styles.actionBtn} onClick={loadCacheStats}>
-                <i className="fa-solid fa-refresh" /> Refresh
+                <Icon icon="spinner" size="small" /> Refresh
               </button>
               <button type="button" className={styles.dangerBtn} onClick={clearAllCache}>
-                <i className="fa-solid fa-trash" /> Clear All
+                <Icon icon="circle-xmark" size="small" /> Clear All
               </button>
             </div>
           </section>
@@ -120,7 +121,7 @@ const DevTools = ({ isOpen, onClose, mapInstance }: DevToolsProps) => {
             )}
             <div className={styles.actions}>
               <button type="button" className={styles.actionBtn} onClick={loadMapStats}>
-                <i className="fa-solid fa-refresh" /> Refresh
+                <Icon icon="spinner" size="small" /> Refresh
               </button>
             </div>
           </section>

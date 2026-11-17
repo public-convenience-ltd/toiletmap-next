@@ -42,44 +42,119 @@
   height: 50px;
 }
 
+/*
+ * The map always sits below the page header, which already pads the top safe-area inset, so
+ * nothing on the map adds --safe-top again. At the bottom, the footer (visible from 768px)
+ * pads --safe-bottom; only below 768px, where the footer is hidden and the map runs to the
+ * bottom of the screen, does the map chrome keep clear of the home indicator itself.
+ */
 .loo-map-container {
   position: absolute;
   inset: 0;
+  --map-safe-bottom: 0px;
 }
 
-/* Floating map overlay buttons — sit in top-right, clear of the centred search bar */
-.settings-btn {
-  position: absolute;
-  top: var(--space-s);
-  right: var(--space-s);
-  z-index: 1001;
+@media (max-width: 767.98px) {
+  .loo-map-container {
+    --map-safe-bottom: var(--safe-bottom, 0px);
+  }
 }
 
-.dev-tools-btn {
+/*
+ * Floating map chrome. Each group is one flex row/column, so its buttons can never overlap
+ * one another, and every group keeps clear of the notch / home indicator (--safe-left/right
+ * and --map-safe-bottom above; 0 without them). Groups ignore pointer events between their
+ * buttons so the map stays draggable there.
+ */
+.map-chrome-top,
+.map-chrome-bottom-right {
   position: absolute;
-  top: var(--space-s);
-  right: calc(var(--space-s) + 40px + var(--space-2xs));
-  z-index: 1001;
-}
-
-/* Toilet details panel — no transition */
-.toilet-panel {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 1500;
-  background: var(--color-base-white);
-  border-radius: var(--space-s) var(--space-s) 0 0;
-  box-shadow: 0 -4px 24px rgba(10, 22, 94, 0.14);
-}
-
-/* "Add a toilet here": opens the add form at the map centre. Sits under the details panel. */
-.add-toilet-here {
-  position: absolute;
-  right: var(--space-s);
-  bottom: var(--space-l);
   z-index: 1000;
+  display: flex;
+  gap: var(--space-2xs, 8px);
+  pointer-events: none;
+}
+
+.map-chrome-top > *,
+.map-chrome-bottom-right > * {
+  pointer-events: auto;
+}
+
+/* Search bar (centred, up to 520px) with the developer buttons beside it. */
+.map-chrome-top {
+  top: var(--space-s, 12px);
+  left: calc(var(--safe-left, 0px) + var(--space-s, 12px));
+  right: calc(var(--safe-right, 0px) + var(--space-s, 12px));
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.map-chrome-top > search {
+  flex: 0 1 520px;
+  min-width: 0;
+}
+
+.map-chrome-utilities {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: var(--space-2xs, 8px);
+}
+
+/* Wide enough for the bar to stay centred with the buttons pinned to the right edge. */
+@media (min-width: 768px) {
+  .map-chrome-utilities {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+}
+
+.settings-btn,
+.dev-tools-btn {
+  min-width: var(--tap-min, 36px);
+  min-height: var(--tap-min, 36px);
+  box-shadow: 0 1px 6px rgba(10, 22, 94, 0.25);
+}
+
+/* Zoom buttons above "Add a toilet here", bottom right. */
+.map-chrome-bottom-right {
+  right: calc(var(--safe-right, 0px) + var(--space-s, 12px));
+  bottom: calc(var(--map-safe-bottom) + var(--space-l, 32px));
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* Desktop only: phones and tablets pinch to zoom. */
+.map-zoom-controls {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .map-zoom-controls {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-base-white);
+    border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(10, 22, 94, 0.25);
+    overflow: hidden;
+  }
+}
+
+.map-zoom-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 0;
+  color: var(--color-primary-navy);
+}
+
+.map-zoom-btn + .map-zoom-btn {
+  border-top: 1px solid var(--color-light-grey);
+}
+
+.map-zoom-btn:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: -2px;
 }
 
 .add-toilet-here .button {
@@ -88,6 +163,91 @@
 
 @media (pointer: coarse) {
   .add-toilet-here .button {
-    min-height: 44px;
+    min-height: var(--tap-min, 44px);
+  }
+}
+
+/* "Offline — showing saved data": bottom left; collapses to nothing when there's no notice. */
+.map-freshness-notice {
+  position: absolute;
+  left: calc(var(--safe-left, 0px) + var(--space-s, 12px));
+  bottom: calc(var(--map-safe-bottom) + var(--space-l, 32px));
+  z-index: 1000;
+  max-width: calc(100% - 2 * var(--space-s, 12px) - var(--safe-left, 0px) - var(--safe-right, 0px));
+  box-sizing: border-box;
+  color: var(--color-primary-navy);
+  font-size: 0.875rem;
+  pointer-events: none;
+}
+
+.map-freshness-notice--shown {
+  padding: var(--space-3xs, 4px) var(--space-xs, 8px);
+  border-radius: var(--space-2xs, 6px);
+  background: var(--color-base-white);
+  box-shadow: 0 1px 6px rgba(10, 22, 94, 0.2);
+}
+
+/* Shown in the open details panel instead; kept (visually hidden) as the live region. */
+.map-freshness-notice--in-panel {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * The details panel's layer (the panel itself is `.toilet-panel`): covers the map container
+ * (above the chrome) without taking
+ * pointer events, so the panel (ToiletDetailsPanel) positions itself inside it as a bottom
+ * sheet or a floating card and reports what it covers through onLayoutChange.
+ */
+.toilet-panel-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1500;
+  pointer-events: none;
+}
+
+.toilet-panel-layer > * {
+  pointer-events: auto;
+}
+
+/* From 768px the footer below the map has padded the bottom inset; the card doesn't again. */
+@media (min-width: 768px) {
+  .toilet-panel-layer {
+    --safe-bottom: 0px;
+  }
+}
+
+/* "You are here": a blue dot with a white ring, drawn under the toilet markers. */
+.user-location-marker {
+  background: none;
+  border: none;
+}
+
+.user-location-marker__dot {
+  display: block;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 4px solid var(--color-base-white, #fff);
+  box-shadow:
+    0 0 0 1px rgba(10, 22, 94, 0.25),
+    0 1px 4px rgba(10, 22, 94, 0.35);
+}
+
+.user-location-accuracy {
+  pointer-events: none;
+}
+
+/* With reduced motion, the map's own fades and zoom transitions don't animate either. */
+@media (prefers-reduced-motion: reduce) {
+  .loo-map-container .leaflet-fade-anim .leaflet-tile,
+  .loo-map-container .leaflet-zoom-anim .leaflet-zoom-animated,
+  .loo-map-container .leaflet-pan-anim {
+    transition: none;
   }
 }

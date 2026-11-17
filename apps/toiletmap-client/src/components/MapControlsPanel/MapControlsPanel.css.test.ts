@@ -1,0 +1,42 @@
+// @vitest-environment node
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { contrastRatio, declarationsFor, parseCss } from "../ToiletDetailsPanel/css.testutil";
+
+const rules = parseCss(
+  readFileSync(join(import.meta.dirname, "MapControlsPanel.module.css"), "utf8"),
+);
+const rule = (selector: string, at: string[] = []) => declarationsFor(rules, selector, at);
+
+/** A custom property's value from the bar's own rule, for colours set through one. */
+const resolve = (value: string) => {
+  const name = value.match(/^var\((--[\w-]+)\)$/)?.[1];
+  return name ? rule(".floatingBar")[name] : value;
+};
+
+describe("MapControlsPanel.module.css", () => {
+  it("sets the bar's secondary text (Reset filters, the location error) at 14px or more", () => {
+    expect(rule(".floatingBar")["--bar-text-small"]).toBe("max(0.875rem, var(--text--1))");
+    for (const selector of [".resetBtn", ".geoError"]) {
+      expect(rule(selector)["font-size"], selector).toBe("var(--bar-text-small)");
+    }
+  });
+
+  it("gives the bar's secondary text at least 4.5:1 contrast on white", () => {
+    for (const selector of [".resetBtn", ".geoError"]) {
+      const color = resolve(rule(selector).color);
+      expect(color, selector).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(contrastRatio(color, "#ffffff"), selector).toBeGreaterThanOrEqual(4.5);
+    }
+    // The design system's neutral grey (about 4:1) and accent pink colour only icons, which
+    // need 3:1, never text.
+    const ICONS = [".searchIcon", ".searchSpinner", ".suggestion > :global(.icon)"];
+    const weakText = rules.filter(
+      (r) =>
+        ["var(--color-neutral-grey)", "var(--color-accent-pink)"].includes(r.declarations.color) &&
+        !r.selectors.every((s) => ICONS.includes(s)),
+    );
+    expect(weakText).toEqual([]);
+  });
+});
