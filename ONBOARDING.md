@@ -268,7 +268,7 @@ The test auth server provides:
 - Configurable user claims (name, email, permissions)
 - Interactive login portal so `/authorize` flows mimic Auth0 (click the button to continue as Test User)
 
-Before continuing you can customise the demo subject: toggle the `access:admin` / `report:loo` grants, add extra permissions, override name/email/scope, or paste JSON that will be merged into the issued tokens and `/userinfo` payload. This makes it easy to impersonate different contributors without touching code.
+Before continuing you can customise the demo subject: toggle the `access:admin` grant, add extra permissions, override name/email/scope, or paste JSON that will be merged into the issued tokens and `/userinfo` payload. This makes it easy to impersonate different contributors without touching code.
 
 **Production Auth0 (optional):**
 To test against real Auth0, create a `.env` file with your Auth0 credentials. This will override the test auth server defaults in `wrangler.jsonc`. When doing so, start the worker with `pnpm dev:api` so the local auth server is not launched automatically.
@@ -839,9 +839,8 @@ Two dedicated pages keep contributor analytics separate from Auth0 account manag
 
 - Searches Auth0 directory records by email, name, or `user_id`
 - Shows profile metadata (last login, total logins, created date) plus the raw permission list for our API
-- Provides toggle buttons for the two critical permissions:
-  - `access:admin` → unlocks the admin dashboard itself
-  - `report:loo` → grants loo contribution/reporting rights
+- Provides a toggle button for `access:admin`, which unlocks the admin dashboard itself
+- Editing loos needs no permission: anyone signed in writes directly unless they are blocked in Auth0. To stop someone editing, block the user in the Auth0 dashboard (their changes are then queued for moderation)
 - Uses the new `Auth0ManagementClient` (`src/services/auth0/management.ts`) which wraps the Auth0 Management API with token caching
 - Requires a dedicated Auth0 M2M application (`AUTH0_MANAGEMENT_CLIENT_ID` / `AUTH0_MANAGEMENT_CLIENT_SECRET`). Optionally override the default audience via `AUTH0_MANAGEMENT_AUDIENCE`.
 - When credentials are missing, the page renders a warning banner and disables live search/updates so it is safe to deploy without the secrets.

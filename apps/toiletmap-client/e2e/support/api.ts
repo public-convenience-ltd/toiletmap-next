@@ -35,29 +35,33 @@ export type LooInput = Partial<Omit<ApiLoo, "id" | "updatedAt">> & {
 /** Fields that legitimately change on every write and are ignored when diffing records. */
 export const VOLATILE_FIELDS = ["updatedAt", "contributorsCount", "reports"] as const;
 
-/** A user the mock Auth0 server signs in, for tokens other than the default trusted "Test User". */
+/** A user the mock Auth0 server signs in, for tokens other than the default "Test User" (an admin). */
 export interface MockUser {
   sub: string;
   name: string;
   nickname: string;
   email: string;
-  /** Auth0 permissions in the token. Writes go live only with `report:loo` or `access:admin`. */
+  /** Auth0 permissions in the token. Not needed to write: anyone signed in writes directly. */
   permissions: string[];
 }
 
-/** A signed-in contributor with no permissions: their edits and reports are queued (202). */
-export const UNTRUSTED_USER: MockUser = {
-  sub: "auth0|e2e-untrusted",
-  name: "Untrusted Tester",
-  nickname: "untrusted",
-  email: "untrusted@localhost",
+/**
+ * A signed-in contributor with no permissions at all. Their edits, reports and restores still
+ * go live straight away: the server trusts anyone signed in who is not blocked in Auth0 (the
+ * e2e server has no Auth0 Management API, so nobody is blocked).
+ */
+export const CONTRIBUTOR: MockUser = {
+  sub: "auth0|e2e-contributor",
+  name: "Contributor Tester",
+  nickname: "contributor",
+  email: "contributor@localhost",
   permissions: [],
 };
 
 /**
  * Obtains an API access token from the mock Auth0 server exactly as
  * apps/toiletmap-server/scripts/issue-test-token.ts does: an auto-approved
- * /authorize (default "Test User" profile, permissions access:admin + report:loo)
+ * /authorize (default "Test User" profile, permission access:admin)
  * followed by the code exchange. With `user`, the login form is submitted for
  * that profile instead (what "Continue as" does after editing the form).
  */

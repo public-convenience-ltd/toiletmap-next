@@ -876,6 +876,8 @@ export const openApiDocument: OpenAPIObject = {
         type: "http",
         scheme: "bearer",
         bearerFormat: "JWT",
+        description:
+          "An Auth0 access token for this API. A user's token writes loo data directly unless the user is blocked in Auth0. A machine-to-machine (client-credentials) token writes directly only when it carries `access:admin`; otherwise its changes are queued for moderation.",
       },
       cookieAuth: {
         type: "apiKey",
@@ -961,7 +963,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Create a loo",
         description:
-          "Callers with `report:loo` or `access:admin` create the loo directly (201). Everyone else has the new loo queued for moderation (202).",
+          "Signed-in callers create the loo directly (201) unless they are blocked in Auth0. Anonymous and blocked callers have the new loo queued for moderation (202), as does anyone whose block status cannot be confirmed.",
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: {
           required: true,
@@ -1053,7 +1055,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Update (or create) a loo",
         description:
-          "Callers with the `report:loo` or `access:admin` permission write directly; an unknown id creates the loo. Everyone else (anonymous, or signed in without those permissions) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
+          "Signed-in callers write directly unless they are blocked in Auth0; an unknown id creates the loo. Anonymous and blocked callers (and anyone whose block status cannot be confirmed) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: {
@@ -1064,7 +1066,7 @@ export const openApiDocument: OpenAPIObject = {
         responses: {
           200: {
             description:
-              "Existing loo updated, or returned unchanged when nothing differed; both include the `compressed` map tuple. Anonymous no-op submissions return `{ queued: false, unchanged: true }`.",
+              "Existing loo updated, or returned unchanged when nothing differed; both include the `compressed` map tuple. Anonymous or blocked callers' no-op submissions return `{ queued: false, unchanged: true }`.",
             content: {
               "application/json": {
                 schema: {
@@ -1078,7 +1080,8 @@ export const openApiDocument: OpenAPIObject = {
             content: jsonContent("SavedLooResponse"),
           },
           202: {
-            description: "Change queued for moderation (anonymous, or no direct-write permission).",
+            description:
+              "Change queued for moderation (anonymous, blocked in Auth0, or block status could not be confirmed).",
             content: jsonContent("QueuedChangeResponse"),
           },
           400: {
@@ -1087,7 +1090,7 @@ export const openApiDocument: OpenAPIObject = {
           },
           401: authErrorResponse,
           404: {
-            description: "Anonymous change for a loo that does not exist.",
+            description: "Anonymous or blocked caller's change for a loo that does not exist.",
             content: jsonContent("ErrorResponse"),
           },
           409: {
@@ -1106,7 +1109,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Report a problem (remove a loo from the map)",
         description:
-          "Callers with `report:loo` or `access:admin` remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation. Anonymous callers are rate limited.",
+          "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller.",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: { required: true, content: jsonContent("ReportLooRequest") },
@@ -1145,7 +1148,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Restore a removed loo",
         description:
-          "Callers with `report:loo` or `access:admin` put the loo back on the map and clear its removal category, reason and duplicate link (kept in the audit history). Everyone else queues a `restore` change. The body is optional.",
+          "Signed-in callers who are not blocked in Auth0 put the loo back on the map and clear its removal category, reason and duplicate link (kept in the audit history). Everyone else queues a `restore` change. The body is optional.",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: { required: false, content: jsonContent("RestoreLooRequest") },

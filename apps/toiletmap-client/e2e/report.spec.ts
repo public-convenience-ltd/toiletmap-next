@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { getLoo, stable } from "./support/api";
 import { getPendingChangesForLoo } from "./support/db";
-import { authedTest, expect, test, untrustedTest } from "./support/fixtures";
+import { authedTest, contributorTest, expect, test } from "./support/fixtures";
 import {
   detailsPanelHeading,
   expandDetails,
@@ -12,9 +12,9 @@ import {
 } from "./support/map";
 
 /**
- * "Report a problem" (/loos/:id/remove, src/components/ReportProblem): trusted users
- * (report:loo) remove a toilet straight away and can Undo; everyone else's report is
- * queued as a pending_change of type "remove" carrying only the report fields.
+ * "Report a problem" (/loos/:id/remove, src/components/ReportProblem): signed-in users
+ * (any permissions, or none) remove a toilet straight away and can Undo; an anonymous report
+ * is queued as a pending_change of type "remove" carrying only the report fields.
  */
 
 const report = (page: Page) => ({
@@ -196,21 +196,28 @@ test.describe("report a problem (anonymous)", () => {
   });
 });
 
-untrustedTest.describe("report a problem (signed in, untrusted)", () => {
-  untrustedTest("a contributor without report:loo is queued too", async ({ page, loos }) => {
-    const loo = await loos.create({}, "report untrusted");
-    const r = await openReport(page, loo.id);
-    await r.reason(PERMANENTLY_CLOSED).click();
-    await r.continue.click();
-    await r.reportIt.click();
-    await expect(
-      page.getByRole("heading", { name: "Thanks — a moderator will review your report" }),
-    ).toBeVisible();
+contributorTest.describe("report a problem (signed in, no permissions)", () => {
+  contributorTest(
+    "a contributor with no permissions removes it straight away",
+    async ({ page, loos }) => {
+      const loo = await loos.create({}, "report contributor");
+      const r = await openReport(page, loo.id);
+      await r.reason(PERMANENTLY_CLOSED).click();
+      await r.continue.click();
+      await expect(
+        page.getByText(
+          `${loo.name} will be removed from the map straight away. You can undo this on the next screen.`,
+        ),
+      ).toBeVisible();
+      await r.reportIt.click();
+      await expect(page.getByRole("heading", { name: "Removed — thanks." })).toBeVisible();
+      await expect(r.undo).toBeVisible();
 
-    const pending = await getPendingChangesForLoo(loo.id);
-    for (const row of pending) loos.trackPendingChange(row.id);
-    expect(pending).toHaveLength(1);
-    expect(pending[0]).toMatchObject({ type: "remove", payload: { reason: "permanently_closed" } });
-    expect((await getLoo(loo.id)).active).toBe(true);
-  });
+      expect(await getPendingChangesForLoo(loo.id)).toHaveLength(0);
+      expect(await getLoo(loo.id)).toMatchObject({
+        active: false,
+        removalCategory: "permanently_closed",
+      });
+    },
+  );
 });

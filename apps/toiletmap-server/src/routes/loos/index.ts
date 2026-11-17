@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
+import { every } from "hono/combine";
 import { optionalAuth } from "../../auth/middleware";
 import { LOO_ID_LENGTH } from "../../common/constants";
 import { validate } from "../../common/validator";
@@ -54,12 +55,21 @@ import {
 
 const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
 
-const anonRateLimitExceeded = async (
+/**
+ * The 1/min submission limit for writes that are queued for moderation:
+ * anonymous callers by IP, signed-in callers (blocked, or block status
+ * unknown) by user, so a blocked account cannot fill the queue faster than
+ * an anonymous caller can. Anonymous verifies share it too.
+ */
+const queuedWriteRateLimitExceeded = async (
   c: Context<{ Variables: AppVariables; Bindings: Env }>,
 ): Promise<Response | null> => {
-  const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({
-    key: `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`,
-  }) ?? Promise.resolve({ success: true }));
+  const user = c.get("user");
+  const key = user
+    ? `anon-write:user:${user.sub}`
+    : `anon-write:${c.req.header("cf-connecting-ip") ?? "unknown"}`;
+  const { success } = await (c.env.RATE_LIMIT_ANON_WRITE?.limit({ key }) ??
+    Promise.resolve({ success: true }));
   if (!success) {
     return c.json(
       {
@@ -74,10 +84,14 @@ const anonRateLimitExceeded = async (
 
 type AppContext = Context<{ Variables: AppVariables; Bindings: Env }>;
 
+const signedInWriteLimiters = every(rateLimiters.write, rateLimiters.writeIp);
+
 /**
- * Applies the per-user write rate limiter to authenticated mutations.
- * Anonymous mutations are limited separately (see anonRateLimitExceeded).
- * Like every Cloudflare limiter here, a missing binding fails open.
+ * Applies the write rate limiters to authenticated mutations: per user, and
+ * per IP so one person cannot multiply the per-user budget by switching
+ * accounts. Anonymous mutations are limited separately (see
+ * queuedWriteRateLimitExceeded). Like every Cloudflare limiter here, a
+ * missing binding fails open.
  */
 const authenticatedWriteRateLimit: MiddlewareHandler<{
   Variables: AppVariables;
@@ -87,7 +101,7 @@ const authenticatedWriteRateLimit: MiddlewareHandler<{
     await next();
     return;
   }
-  return rateLimiters.write(c, next);
+  return signedInWriteLimiters(c, next);
 };
 
 const CONFLICT_MESSAGE = "This toilet was changed by someone else while you were editing.";
@@ -378,18 +392,15 @@ loosRouter.post(
       const user = c.get("user");
 
       if (!(await canWriteDirectly(c, user))) {
-        // Anonymous or not trusted to write directly: queue for approval.
-        // Signed-in callers are already limited by the per-user write limiter.
-        if (!user) {
-          const limited = await anonRateLimitExceeded(c);
-          if (limited) return limited;
-        }
+        // Anonymous, blocked, or block status unknown: queue for approval.
+        const limited = await queuedWriteRateLimitExceeded(c);
+        if (limited) return limited;
 
         const { id: _id, ...payload } = c.req.valid("json");
         return queueForModeration(c, "create", payload, null, null);
       }
 
-      // Trusted (report:loo or access:admin): direct write
+      // Signed in and not blocked: direct write
       const validation = c.req.valid("json");
       const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
       const { id: requestedId, ...rest } = validation;
@@ -431,11 +442,9 @@ loosRouter.put(
       const looService = c.get("looService");
 
       if (!(await canWriteDirectly(c, user))) {
-        // Anonymous or not trusted to write directly: queue the diff for approval.
-        if (!user) {
-          const limited = await anonRateLimitExceeded(c);
-          if (limited) return limited;
-        }
+        // Anonymous, blocked, or block status unknown: queue the diff for approval.
+        const limited = await queuedWriteRateLimitExceeded(c);
+        if (limited) return limited;
 
         const existing = await looService.getMutationBase(id);
         // Untrusted callers can only suggest edits to toilets that exist.
@@ -452,7 +461,7 @@ loosRouter.put(
         return queueForModeration(c, "update", changes, id, baseUpdatedAt ?? existing.updatedAt);
       }
 
-      // Trusted (report:loo or access:admin): direct write
+      // Signed in and not blocked: direct write
       const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
 
       for (let attempt = 1; attempt <= MAX_UPDATE_ATTEMPTS; attempt++) {
@@ -504,7 +513,7 @@ loosRouter.put(
  * POST /loos/:id/report
  *
  * "Report a problem": the toilet is gone, never existed, is not public, or
- * duplicates another. Trusted callers (report:loo or access:admin) remove it
+ * duplicates another. Trusted callers (signed in, not blocked) remove it
  * from the map immediately (200, with `compressed: null`); everyone else gets
  * a 202 and a pending `remove` change. Refusals: 404 unknown, 409
  * `already_removed`, 409 `conflict` (stale `baseUpdatedAt`), 400 validation.
@@ -530,10 +539,8 @@ loosRouter.post(
         );
       }
 
-      if (!user) {
-        const limited = await anonRateLimitExceeded(c);
-        if (limited) return limited;
-      }
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
 
       const checked = await looService.checkReport(id, input, { baseUpdatedAt });
       if (checked.status !== "ok") return stateChangeResponse(c, checked);
@@ -584,10 +591,8 @@ loosRouter.post(
         return stateChangeResponse(c, result);
       }
 
-      if (!user) {
-        const limited = await anonRateLimitExceeded(c);
-        if (limited) return limited;
-      }
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
 
       const checked = await looService.checkRestore(id, { baseUpdatedAt });
       if (checked.status !== "ok") return stateChangeResponse(c, checked);
@@ -617,7 +622,7 @@ loosRouter.post(
     handleRoute(c, "loos.verify", async () => {
       const { id } = c.req.valid("param");
       if (!c.get("user")) {
-        const limited = await anonRateLimitExceeded(c);
+        const limited = await queuedWriteRateLimitExceeded(c);
         if (limited) return limited;
       }
 

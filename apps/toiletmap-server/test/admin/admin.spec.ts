@@ -587,7 +587,7 @@ describe("Admin Routes", () => {
 
     const body = new URLSearchParams({
       user_id: "auth0|user456",
-      permission: "report:loo",
+      permission: "access:admin",
       intent: "revoke",
       redirect_to: "/admin/users/admin?user=auth0%7Cuser456",
     }).toString();
@@ -606,6 +606,73 @@ describe("Admin Routes", () => {
     );
 
     expect(res.status).toBe(303);
-    expect(removePermissions).toHaveBeenCalledWith("auth0|user456", ["report:loo"]);
+    expect(removePermissions).toHaveBeenCalledWith("auth0|user456", ["access:admin"]);
   });
+
+  it("no longer toggles report:loo, which direct writes do not use", async () => {
+    const addPermissions = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue({
+      addPermissions,
+      removePermissions: vi.fn(),
+    } as unknown as Auth0ManagementClient);
+
+    const res = await app.request(
+      "/admin/users/admin/permissions",
+      {
+        method: "POST",
+        headers: {
+          ...authenticatedHeaders(),
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          user_id: "auth0|user789",
+          permission: "report:loo",
+          intent: "grant",
+        }).toString(),
+      },
+      env,
+    );
+
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toContain("permissionError=Unsupported");
+    expect(addPermissions).not.toHaveBeenCalled();
+  });
+
+  const ADMIN_HINT = "Blocking does not remove Admin access, so remove that below too.";
+
+  it.each([
+    [false, false, "To stop someone editing, block the user in the Auth0 dashboard."],
+    [true, false, "This user is blocked in Auth0, so their changes are queued for moderation."],
+    [false, true, `block the user in the Auth0 dashboard. ${ADMIN_HINT}`],
+    [true, true, `their changes are queued for moderation. ${ADMIN_HINT}`],
+  ])(
+    "offers only the admin toggle and explains blocking (blocked: %s, admin: %s)",
+    async (blocked, isAdmin, hint) => {
+      const adminPermission = {
+        permission_name: ADMIN_ROLE_ID,
+        resource_server_identifier: env.AUTH0_AUDIENCE,
+      };
+      vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue({
+        // The signed-in admin keeps access:admin; the user on the page has it only if isAdmin.
+        getUserPermissions: vi.fn((userId: string) =>
+          Promise.resolve(userId !== "auth0|someone" || isAdmin ? [adminPermission] : []),
+        ),
+        getUser: vi.fn().mockResolvedValue({ user_id: "auth0|someone", name: "Someone", blocked }),
+      } as unknown as Auth0ManagementClient);
+
+      const res = await app.request(
+        "/admin/users/admin?user=auth0%7Csomeone",
+        { headers: authenticatedHeaders() },
+        env,
+      );
+
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      expect(text).toContain('value="access:admin"');
+      expect(text).not.toContain("Loo contributions");
+      expect(text).not.toContain('value="report:loo"');
+      expect(text).toContain(hint);
+      if (!isAdmin) expect(text).not.toContain(ADMIN_HINT);
+    },
+  );
 });

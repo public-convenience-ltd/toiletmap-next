@@ -38,7 +38,7 @@ test.describe("drafts across sign-in", () => {
     await expect(form.name).toHaveValue(newName);
     await expect(form.notes).toHaveValue("Typed before signing in");
     await expect(form.save).toHaveText("Save 2 changes");
-    // Signed in with report:loo now: the save goes live, and there is no "Sign in" prompt.
+    // Signed in now: the save goes live, and there is no "Sign in" prompt.
     await expect(page.getByText("Your change will go live straight away.")).toBeVisible();
     await expect(
       page.getByText("A moderator will check your change before it appears."),

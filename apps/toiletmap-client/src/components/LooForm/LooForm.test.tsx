@@ -628,7 +628,7 @@ describe("LooForm (edit)", () => {
       `/loos/${LOO_ID}`,
     );
     expect(screen.getByRole("link", { name: "Back to map" })).toHaveAttribute("href", "/");
-    // Signing in no longer promises that edits go live (that needs report:loo).
+    // The prompt promises tracking, not that edits go live (a blocked account is queued too).
     expect(
       screen.getByRole("link", { name: "Sign in to keep track of your contributions" }),
     ).toHaveAttribute("href", `/auth/login?returnTo=${encodeURIComponent(`/loos/${LOO_ID}`)}`);
@@ -939,7 +939,7 @@ describe("LooForm review sheet", () => {
     ).toBeInTheDocument();
   });
 
-  it("tells a signed-in user without report:loo a moderator will check, too", async () => {
+  it("tells a signed-in user whose session has expired a moderator will check, too", async () => {
     const user = userEvent.setup();
     renderEdit(makeLoo(), true, { canWriteDirectly: false });
     expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
@@ -953,7 +953,7 @@ describe("LooForm review sheet", () => {
     expect(screen.queryByText(/go live/)).toBeNull();
   });
 
-  it("tells a trusted user their change goes live straight away", async () => {
+  it("tells a signed-in user their change goes live straight away", async () => {
     const user = userEvent.setup();
     renderEdit(makeLoo(), true, { canWriteDirectly: true });
     await changeName(user, "Renamed");
@@ -963,6 +963,25 @@ describe("LooForm review sheet", () => {
       within(reviewSheet()).getByText("Your change will go live straight away."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/moderator/)).toBeNull();
+  });
+
+  it("shows the queued screen when the server queues a save it was expected to apply", async () => {
+    // A user blocked in Auth0 looks signed in to the client; the API queues their change.
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(202, { queued: true, id: "pending-blocked" }));
+    renderEdit(makeLoo(), true, { canWriteDirectly: true });
+    await changeName(user, "Renamed");
+    expect(screen.getByText(LIVE_STRAIGHT_AWAY)).toBeInTheDocument();
+    await saveAndConfirm(user);
+
+    expect(
+      await screen.findByText("Thanks — a moderator will review your suggestion"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/go live/)).toBeNull();
+    // Already signed in: no sign-in prompt.
+    expect(screen.queryByRole("link", { name: /Sign in/ })).toBeNull();
+    expect(locationStub.href).toBe(START_HREF);
+    expect(applyLocalMutation).not.toHaveBeenCalled();
   });
 
   it("can be skipped for signed-in users", async () => {
@@ -1003,7 +1022,7 @@ const saveNotice = () => {
 };
 
 describe("LooForm save notice", () => {
-  it("tells a trusted user once, above the questions, that their change goes live", () => {
+  it("tells a signed-in user once, above the questions, that their change goes live", () => {
     renderEdit(makeLoo(), true, { canWriteDirectly: true });
     expect(screen.getAllByText(LIVE_STRAIGHT_AWAY)).toHaveLength(1);
     expect(screen.queryByText(MODERATOR_WILL_CHECK)).toBeNull();
@@ -1020,7 +1039,7 @@ describe("LooForm save notice", () => {
     expect(within(notice).queryByRole("link")).toBeNull();
   });
 
-  it("tells a signed-in user without report:loo a moderator will check, without a sign-in link", () => {
+  it("tells a signed-in user whose session has expired a moderator will check, without a sign-in link", () => {
     renderEdit(makeLoo(), true, { canWriteDirectly: false });
     expect(screen.getAllByText(MODERATOR_WILL_CHECK)).toHaveLength(1);
     expect(screen.queryByText(LIVE_STRAIGHT_AWAY)).toBeNull();

@@ -121,9 +121,9 @@ export interface ToiletDetailsPanelProps {
   saved?: boolean;
   onDismissSaved?: () => void;
   /**
-   * The viewer's changes go live straight away (signed in with `report:loo` or
-   * `access:admin`): the restore prompt then says it will be put back at once, and otherwise
-   * that a moderator will check first.
+   * The viewer's changes go live straight away (signed in with an unexpired session): the
+   * restore prompt then says it will be put back at once, and otherwise that a moderator will
+   * check first.
    */
   canWriteDirectly?: boolean;
   /** The viewer's location, for the distance in the summary. */
@@ -473,7 +473,10 @@ export default function ToiletDetailsPanel({
             ? `If ${current.name?.trim() || "this toilet"} is still here and open to the public, it will go back on the map straight away.`
             : `If ${current.name?.trim() || "this toilet"} is still here and open to the public, tell us and a moderator will check before it goes back on the map.`}
         </p>
-        {/* A trusted restore is applied straight away and the server ignores its details. */}
+        {/* A signed-in user's restore is applied straight away and the server ignores
+            its details. Known trade-off: a blocked user (or a session that expired
+            after render) looks signed in here, so their restore is queued with
+            no note; the server's 202 still shows the queued message. */}
         {!canWriteDirectly && (
           <>
             <label htmlFor={`${uid}-restore-details`} className={styles.restoreLabel}>

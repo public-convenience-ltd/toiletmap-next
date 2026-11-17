@@ -28,6 +28,8 @@ export type Auth0ManagementUser = {
   created_at?: string;
   updated_at?: string;
   logins_count?: number;
+  /** Set by Auth0's "Block user"; absent when the user has never been blocked. */
+  blocked?: boolean;
   app_metadata?: Record<string, unknown>;
   user_metadata?: Record<string, unknown>;
   identities?: Array<{
@@ -247,6 +249,23 @@ export class Auth0ManagementClient {
       }
       throw error;
     }
+  }
+
+  /**
+   * Whether the user is blocked in Auth0 (the dashboard's "Block user").
+   * Fetches only the `blocked` field. Throws when the lookup fails, including
+   * for an unknown user, so callers can tell "not blocked" from "unknown".
+   */
+  async isUserBlocked(userId: string): Promise<boolean> {
+    if (!userId) {
+      throw new Error("Auth0 user ID is required");
+    }
+    const params = new URLSearchParams({ fields: "blocked", include_fields: "true" });
+    const response = await this.request(`users/${encodeURIComponent(userId)}?${params}`, {
+      method: "GET",
+    });
+    const user = (await response.json()) as Pick<Auth0ManagementUser, "blocked">;
+    return user?.blocked === true;
   }
 
   async getUserPermissions(userId: string): Promise<Auth0PermissionRecord[]> {

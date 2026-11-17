@@ -73,8 +73,13 @@ interface RateLimiter {
 import type { LooService } from "./services/loo";
 import type { PendingChangeService } from "./services/pending-change/pending-change.service";
 
+/** Which credential authenticated the request (see `src/auth/auth-context.ts`). */
+export type AuthSource = "authorization-header" | "session-access-token" | "session-id-token";
+
 export type AppVariables = {
   user?: RequestUser;
+  /** Set with `user`. */
+  authSource?: AuthSource;
   looService: LooService;
   pendingChangeService: PendingChangeService;
   resultCount?: number;

@@ -154,6 +154,17 @@ export const rateLimiters = {
     name: "write",
   }),
 
+  /**
+   * Signed-in write operations per IP, across every account (20 req/min,
+   * sharing the write binding under its own key prefix).
+   */
+  writeIp: cloudflareRateLimit({
+    binding: "RATE_LIMIT_WRITE",
+    keyGenerator: (c) => `write-ip:${getClientIp(c)}`,
+    message: "Too many requests, please slow down",
+    name: "write-ip",
+  }),
+
   /** Admin operations (60 req/min, user or IP-based) */
   admin: cloudflareRateLimit({
     binding: "RATE_LIMIT_ADMIN",

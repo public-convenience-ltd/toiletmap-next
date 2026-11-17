@@ -89,7 +89,7 @@ The test auth server provides:
 
 Open the local login dialog and tailor the issued tokens before signing in:
 
-- Toggle **`access:admin`** / **`report:loo`** or add comma/newline-separated permissions
+- Toggle **`access:admin`** or add comma/newline-separated permissions (no permission is needed to edit loos: anyone signed in writes directly unless blocked in Auth0)
 - Override the subject, name, nickname, email, avatar, and contributor display name (`app_metadata.contributor_name`)
 - Edit the OAuth **scope** to test different combinations
 - Paste any JSON blob to merge custom claims into the ID token, access token, and `/userinfo` response (great for simulating Auth0 namespaces)

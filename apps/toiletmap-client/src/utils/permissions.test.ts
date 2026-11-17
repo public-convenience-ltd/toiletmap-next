@@ -10,31 +10,61 @@ const cookies = (values: Record<string, string>) => ({
   get: (name: string) => (name in values ? { value: values[name] } : undefined),
 });
 
+const NOW_MS = Date.parse("2026-11-17T09:00:00.000Z");
+const NOW_S = NOW_MS / 1000;
+
 describe("canWriteDirectlyFromToken", () => {
-  it("is true for report:loo or access:admin in the permissions claim", () => {
-    expect(canWriteDirectlyFromToken(token({ permissions: ["report:loo"] }))).toBe(true);
-    expect(canWriteDirectlyFromToken(token({ permissions: ["access:admin"] }))).toBe(true);
+  it("is true for any unexpired token, whatever its permissions", () => {
+    expect(canWriteDirectlyFromToken(token({ exp: NOW_S + 60 }), NOW_MS)).toBe(true);
+    expect(canWriteDirectlyFromToken(token({ exp: NOW_S + 60, permissions: [] }), NOW_MS)).toBe(
+      true,
+    );
+    expect(
+      canWriteDirectlyFromToken(token({ exp: NOW_S + 60, permissions: ["access:admin"] }), NOW_MS),
+    ).toBe(true);
   });
 
-  it("is false for other permissions, no claim, or an unreadable token", () => {
-    expect(canWriteDirectlyFromToken(token({ permissions: ["read:loo"] }))).toBe(false);
-    expect(canWriteDirectlyFromToken(token({ permissions: "report:loo" }))).toBe(false);
-    expect(canWriteDirectlyFromToken(token({ sub: "auth0|1" }))).toBe(false);
-    expect(canWriteDirectlyFromToken("not-a-jwt")).toBe(false);
-    expect(canWriteDirectlyFromToken("a.b!!.c")).toBe(false);
-    expect(canWriteDirectlyFromToken(undefined)).toBe(false);
+  it("is false for an expired token", () => {
+    expect(canWriteDirectlyFromToken(token({ exp: NOW_S }), NOW_MS)).toBe(false);
+    expect(canWriteDirectlyFromToken(token({ exp: NOW_S - 1 }), NOW_MS)).toBe(false);
+  });
+
+  it("is false without a readable exp, or for an unreadable token", () => {
+    expect(canWriteDirectlyFromToken(token({ sub: "auth0|1" }), NOW_MS)).toBe(false);
+    expect(canWriteDirectlyFromToken(token({ exp: "tomorrow" }), NOW_MS)).toBe(false);
+    expect(canWriteDirectlyFromToken("not-a-jwt", NOW_MS)).toBe(false);
+    expect(canWriteDirectlyFromToken("a.b!!.c", NOW_MS)).toBe(false);
+    expect(canWriteDirectlyFromToken(undefined, NOW_MS)).toBe(false);
+  });
+
+  it("uses the current time by default", () => {
+    const inAnHour = Math.floor(Date.now() / 1000) + 3600;
+    expect(canWriteDirectlyFromToken(token({ exp: inAnHour }))).toBe(true);
+    expect(canWriteDirectlyFromToken(token({ exp: 1 }))).toBe(false);
   });
 });
 
 describe("sessionCanWriteDirectly", () => {
-  it("needs both a signed-in session and a trusted token", () => {
-    const trusted = token({ permissions: ["report:loo"] });
-    expect(sessionCanWriteDirectly(cookies({ user_info: "x", access_token: trusted }))).toBe(true);
-    expect(sessionCanWriteDirectly(cookies({ access_token: trusted }))).toBe(false);
+  const live = token({ exp: NOW_S + 3600 });
+
+  it("is true for a signed-in session with an unexpired access token", () => {
+    expect(sessionCanWriteDirectly(cookies({ user_info: "x", access_token: live }), NOW_MS)).toBe(
+      true,
+    );
+  });
+
+  it("is false when not signed in, or the access token is missing or expired", () => {
+    expect(sessionCanWriteDirectly(cookies({ access_token: live }), NOW_MS)).toBe(false);
+    expect(sessionCanWriteDirectly(cookies({ user_info: "", access_token: live }), NOW_MS)).toBe(
+      false,
+    );
+    expect(sessionCanWriteDirectly(cookies({ user_info: "x" }), NOW_MS)).toBe(false);
     expect(
       sessionCanWriteDirectly(
-        cookies({ user_info: "x", access_token: token({ permissions: [] }) }),
+        cookies({ user_info: "x", access_token: token({ exp: NOW_S - 60 }) }),
+        NOW_MS,
       ),
     ).toBe(false);
+    expect(sessionCanWriteDirectly(cookies({}), NOW_MS)).toBe(false);
   });
 });

@@ -1,13 +1,13 @@
 import { type BrowserContext, test as base, expect, type Page } from "@playwright/test";
 import {
   type ApiLoo,
+  CONTRIBUTOR,
   createLooViaApi,
   e2eName,
   issueAccessToken,
   type LooInput,
   type MockUser,
   randomFixtureLocation,
-  UNTRUSTED_USER,
 } from "./api";
 import { deleteLoos, deletePendingChanges } from "./db";
 import { CLIENT_URL } from "./env";
@@ -178,25 +178,25 @@ export const authedTest = test.extend<AuthedTestFixtures>({
   },
 });
 
-type UntrustedWorkerFixtures = {
-  /** Cookies of a signed-in contributor without `report:loo` / `access:admin`. */
-  untrustedState: StorageState;
+type ContributorWorkerFixtures = {
+  /** Cookies of a signed-in contributor with no Auth0 permissions. */
+  contributorState: StorageState;
 };
 
 /**
- * Like `test`, but every page starts signed in as UNTRUSTED_USER: a signed-in
- * contributor whose edits, reports and restores are queued for a moderator (202).
+ * Like `test`, but every page starts signed in as CONTRIBUTOR: a signed-in user with no
+ * permissions, whose edits, reports and restores still go live straight away.
  */
-export const untrustedTest = test.extend<object, UntrustedWorkerFixtures>({
-  untrustedState: [
+export const contributorTest = test.extend<object, ContributorWorkerFixtures>({
+  contributorState: [
     // biome-ignore lint/correctness/noEmptyPattern: Playwright fixtures must destructure
     async ({}, use) => {
-      await use(await injectedSessionState(UNTRUSTED_USER));
+      await use(await injectedSessionState(CONTRIBUTOR));
     },
     { scope: "worker" },
   ],
-  storageState: async ({ untrustedState }, use) => {
-    await use(untrustedState);
+  storageState: async ({ contributorState }, use) => {
+    await use(contributorState);
   },
 });
 

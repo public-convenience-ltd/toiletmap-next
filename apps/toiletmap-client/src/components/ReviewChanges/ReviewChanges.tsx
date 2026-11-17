@@ -13,8 +13,8 @@ export interface ReviewChangesProps {
   /** The save succeeded and the page is navigating away: keep the buttons disabled. */
   saved?: boolean;
   /**
-   * The user's changes go live straight away (signed in with `report:loo` or `access:admin`).
-   * Everyone else's are checked by a moderator first; the sheet says which will happen.
+   * The user's changes go live straight away (signed in with an unexpired session). Anonymous
+   * suggestions are checked by a moderator first; the sheet says which will happen.
    */
   canWriteDirectly: boolean;
   onBack: () => void;

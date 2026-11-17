@@ -54,8 +54,9 @@ export interface ReportProblemProps {
   apiUrl: string;
   isAuthenticated: boolean;
   /**
-   * The user's reports go live straight away (signed in with `report:loo` or `access:admin`),
-   * so the confirm step can say for certain what will happen.
+   * The user's reports go live straight away (signed in with an unexpired session), so the
+   * confirm step says it will be removed at once. Only used for the copy: the server decides,
+   * and a blocked user's report is queued and shown as such.
    */
   canWriteDirectly?: boolean;
 }
@@ -239,8 +240,9 @@ export default function ReportProblem({
         </h1>
         <p>Nobody needs to report it again.</p>
         <div className={styles.actions}>
+          {/* Matches the toilet page's restore button: signed-in users restore it themselves. */}
           <Button htmlElement="a" variant="primary" href={`${looHref}?restore=1`}>
-            It's still here — ask to restore it
+            {trusted ? "It's still here — restore it" : "It's still here — ask to restore it"}
           </Button>
           <Button htmlElement="a" variant="secondary" href="/">
             Back to map
