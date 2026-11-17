@@ -8,7 +8,6 @@ import type {
   ReviewResult,
 } from "../../../services/pending-change/pending-change.service";
 import type { AppVariables, Env } from "../../../types";
-import { invalidateDumpCache } from "../../../utils/cache";
 import { Layout } from "../../components/Layout";
 
 type AdminContext = Context<{ Bindings: Env; Variables: AppVariables }>;
@@ -413,7 +412,6 @@ export const pendingApprove = async (c: AdminContext) => {
   if (result.status === "not_found") return redirectWithNotice(c, "not-found");
   if (result.status === "already_reviewed") return redirectWithNotice(c, "already-reviewed");
 
-  if (result.detail === "approved") await invalidateDumpCache(c.req.url);
   return redirectWithNotice(c, result.detail ?? "approved");
 };
 

@@ -19,6 +19,32 @@ const jsonContent = (schemaName: string): Record<string, MediaTypeObject> => ({
   },
 });
 
+const syncCursorSchema: SchemaObject = {
+  type: "string",
+  format: "date-time",
+  description:
+    "Server sync cursor: the database clock minus 120 seconds, read before the data was queried. Pass it back unchanged as `since` to `/api/loos/updates`; never substitute the client clock. The overlap means a row can be delivered twice, so apply updates idempotently.",
+  example: "2026-11-17T09:58:00.000Z",
+};
+
+const etagHeader = (description: string) => ({
+  description,
+  schema: { type: "string" as const },
+});
+
+const cacheControlHeader = (value: string) => ({
+  description: `\`${value}\``,
+  schema: { type: "string" as const, example: value },
+});
+
+const ifNoneMatchParameter = {
+  name: "If-None-Match",
+  in: "header" as const,
+  required: false,
+  description: "An ETag from an earlier response. A match returns 304 with no body.",
+  schema: { type: "string" as const },
+};
+
 const nullableBoolean: SchemaObject = { type: ["boolean", "null"] };
 const nullableString = (maxLength?: number): SchemaObject => ({
   type: ["string", "null"],
@@ -501,22 +527,63 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       count: { type: "number", example: 2 },
     },
   },
+  DumpResponse: {
+    type: "object",
+    required: ["data", "count", "cursor"],
+    properties: {
+      data: {
+        type: "array",
+        items: schemaRef("CompressedLoo"),
+      },
+      count: { type: "number", example: 2 },
+      cursor: syncCursorSchema,
+    },
+  },
+  RichDumpResponse: {
+    type: "object",
+    required: ["data", "count", "cursor"],
+    properties: {
+      data: {
+        type: "array",
+        items: schemaRef("Loo"),
+      },
+      count: { type: "number", example: 2 },
+      cursor: syncCursorSchema,
+    },
+  },
+  SavedLooResponse: {
+    allOf: [
+      schemaRef("Loo"),
+      {
+        type: "object",
+        required: ["compressed"],
+        properties: {
+          compressed: {
+            oneOf: [schemaRef("CompressedLoo"), { type: "null" }],
+            description:
+              "The loo's map tuple, exactly as `/api/loos/dump` will serve it, so clients can patch a cached map immediately. `null` when the loo is not on the map (inactive or without a location).",
+          },
+        },
+      },
+    ],
+  },
   UpdatesResponse: {
     type: "object",
-    required: ["upserted", "deleted"],
+    required: ["upserted", "deleted", "cursor"],
     properties: {
       upserted: {
         type: "array",
         items: schemaRef("CompressedLoo"),
-        description: "Loos that have been created or updated since the requested timestamp.",
+        description: "Loos on the map that were created or updated after `since`.",
       },
       deleted: {
         type: "array",
         items: { type: "string" },
         description:
-          "IDs of loos that have been deleted or deactivated since the requested timestamp.",
+          "IDs of loos that left the map (deactivated or without a location) after `since`.",
         example: ["9234", "1234"],
       },
+      cursor: syncCursorSchema,
     },
   },
 };
@@ -771,6 +838,7 @@ export const openApiDocument: OpenAPIObject = {
         responses: {
           200: {
             description: "Matching loos.",
+            headers: { "Cache-Control": cacheControlHeader("private, max-age=60") },
             content: jsonContent("LooListResponse"),
           },
           400: {
@@ -790,8 +858,8 @@ export const openApiDocument: OpenAPIObject = {
         },
         responses: {
           201: {
-            description: "Loo created.",
-            content: jsonContent("Loo"),
+            description: "Loo created. Includes its `compressed` map tuple.",
+            content: jsonContent("SavedLooResponse"),
           },
           400: {
             description: "Invalid request payload.",
@@ -810,19 +878,21 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Fetch incremental updates",
         description:
-          "Returns a list of loos that have been created, updated, or deleted since the provided timestamp.",
+          "Map changes since a sync cursor: loos created or updated (`upserted`) and loos that left the map (`deleted`). Pass the `cursor` from `/api/loos/dump` or the previous `/updates` response as `since`, and store the new `cursor` for next time. Never cached.",
         parameters: [
           {
             name: "since",
             in: "query",
             required: true,
-            description: "ISO 8601 timestamp (e.g. 2025-01-21T12:00:00.000Z).",
+            description:
+              "A `cursor` returned by `/api/loos/dump` or `/api/loos/updates` (ISO 8601). Do not send the client clock.",
             schema: { type: "string", format: "date-time" },
           },
         ],
         responses: {
           200: {
-            description: "Incremental updates.",
+            description: "Incremental updates and the next cursor.",
+            headers: { "Cache-Control": cacheControlHeader("no-store") },
             content: jsonContent("UpdatesResponse"),
           },
           400: {
@@ -836,11 +906,22 @@ export const openApiDocument: OpenAPIObject = {
       get: {
         tags: ["Loos"],
         summary: "Fetch a single loo",
-        parameters: [idPathParameter],
+        description:
+          "Revalidated on every use: send the previous `ETag` as `If-None-Match` to get a 304 while the loo is unchanged.",
+        parameters: [idPathParameter, ifNoneMatchParameter],
         responses: {
           200: {
             description: "Loo detail.",
+            headers: {
+              ETag: etagHeader(
+                'Weak per-record version: `W/"loo-<id>-<updatedAt epoch ms>-<body hash>"`. Also changes when joined data such as the area name does.',
+              ),
+              "Cache-Control": cacheControlHeader("private, max-age=0, must-revalidate"),
+            },
             content: jsonContent("Loo"),
+          },
+          304: {
+            description: "Not modified: the `If-None-Match` ETag is current.",
           },
           400: {
             description: "Invalid loo identifier.",
@@ -867,16 +948,18 @@ export const openApiDocument: OpenAPIObject = {
         responses: {
           200: {
             description:
-              "Existing loo updated, or returned unchanged when nothing differed. Anonymous no-op submissions return `{ queued: false, unchanged: true }`.",
+              "Existing loo updated, or returned unchanged when nothing differed; both include the `compressed` map tuple. Anonymous no-op submissions return `{ queued: false, unchanged: true }`.",
             content: {
               "application/json": {
-                schema: { anyOf: [schemaRef("Loo"), schemaRef("QueuedChangeResponse")] },
+                schema: {
+                  anyOf: [schemaRef("SavedLooResponse"), schemaRef("QueuedChangeResponse")],
+                },
               },
             },
           },
           201: {
-            description: "New loo created.",
-            content: jsonContent("Loo"),
+            description: "New loo created. Includes its `compressed` map tuple.",
+            content: jsonContent("SavedLooResponse"),
           },
           202: {
             description: "Anonymous change queued for moderation.",
@@ -941,27 +1024,38 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Dump all active loos",
         description:
-          "Returns a compressed list of all active loos. Optimized for initial map loading. Cached for 1 hour.",
+          "Every active loo with a location, as compressed `[id, geohash, filterMask]` tuples (or full records with `rich=true`), plus a sync `cursor` for `/api/loos/updates`. Browsers may cache it for 60s and revalidate in the background for 300s more; edits made meanwhile arrive through `/updates`. The ETag is a dataset version, so `If-None-Match` revalidation is cheap.",
         parameters: [
           {
             name: "rich",
             in: "query",
             required: false,
             description:
-              "Return full loo details instead of compressed summary. WARNING: Large response size.",
+              'Return full loo details instead of compressed tuples. WARNING: Large response size. Has its own ETag (`W/"dump-rich-..."`).',
             schema: { type: "boolean", default: false },
           },
+          ifNoneMatchParameter,
         ],
         responses: {
           200: {
-            description: "List of all active loos (compressed or full).",
+            description: "All active loos (compressed or full) and a sync cursor.",
+            headers: {
+              ETag: etagHeader(
+                'Weak dataset version: `W/"dump-<max updated_at epoch ms>-<row count>-<sum of updated_at epoch µs>"`. Changes on every write, including out-of-order commits.',
+              ),
+              "Cache-Control": cacheControlHeader("public, max-age=60, stale-while-revalidate=300"),
+            },
             content: {
               "application/json": {
                 schema: {
-                  oneOf: [schemaRef("CompressedLooListResponse"), schemaRef("LooListResponse")],
+                  oneOf: [schemaRef("DumpResponse"), schemaRef("RichDumpResponse")],
                 },
               },
             },
+          },
+          304: {
+            description:
+              "Not modified: the dataset has not changed since the `If-None-Match` ETag. Keep the cached body and its cursor.",
           },
         },
       },
