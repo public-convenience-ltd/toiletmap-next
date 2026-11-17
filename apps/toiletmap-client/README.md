@@ -257,7 +257,7 @@ This regenerates `worker-configuration.d.ts` with the latest environment variabl
 ## Performance Optimization
 
 - **Compressed data format**: Loos are fetched in a compressed format `[id, geohash, filterMask]`
-- **Client-side clustering**: Supercluster groups nearby markers for better map performance
+- **Client-side clustering**: Leaflet.markercluster groups nearby markers for better map performance
 - **IndexedDB caching**: Reduces redundant API calls
 - **Geohash decoding**: Client-side geohash decoding reduces data transfer size
 

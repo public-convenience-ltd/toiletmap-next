@@ -27,5 +27,5 @@ jobs:
         run: |
           BRANCH=$(echo "${HEAD_REF}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
           echo "Tearing down preview workers for branch: ${BRANCH}"
-          npx wrangler delete --name "${BRANCH}-toiletmap-server" || echo "Server worker not found, skipping"
-          npx wrangler delete --name "${BRANCH}-toiletmap-client" || echo "Client worker not found, skipping"
+          npx -y wrangler@4.156.1 delete --name "${BRANCH}-toiletmap-server" || echo "Server worker not found, skipping"
+          npx -y wrangler@4.156.1 delete --name "${BRANCH}-toiletmap-client" || echo "Client worker not found, skipping"
