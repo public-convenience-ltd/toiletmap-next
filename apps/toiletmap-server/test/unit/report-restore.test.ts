@@ -133,20 +133,18 @@ describe("canWriteDirectly", () => {
     AUTH0_MANAGEMENT_CLIENT_SECRET: "secret",
   };
 
-  /** Stubs the Auth0 Management API so the user currently holds what `lookup` returns. */
-  const stubManagement = (lookup: () => Promise<string[]>) => {
+  /** Stubs the Auth0 Management API so the user's block status is what `lookup` returns. */
+  const stubManagement = (lookup: () => Promise<boolean>) => {
     __adminRoleTestUtils.clearManagementClientCache();
-    const getUserPermissions = vi.fn(async () =>
-      (await lookup()).map((permission_name) => ({ permission_name })),
-    );
+    const isUserBlocked = vi.fn(lookup);
     vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue({
-      getUserPermissions,
+      isUserBlocked,
     } as unknown as Auth0ManagementClient);
-    return getUserPermissions;
+    return isUserBlocked;
   };
 
   beforeEach(() => {
-    __adminRoleTestUtils.clearPermissionCache();
+    __adminRoleTestUtils.clearBlockedCache();
     __adminRoleTestUtils.clearManagementClientCache();
   });
 
@@ -154,40 +152,96 @@ describe("canWriteDirectly", () => {
     vi.restoreAllMocks();
   });
 
-  it("refuses report:loo that Auth0 no longer grants, though the token still carries it", async () => {
-    stubManagement(async () => []);
-    expect(await check({ sub: "revoked", permissions: ["report:loo"] }, managementEnv)).toBe(false);
-  });
-
-  it("trusts report:loo or access:admin that Auth0 still grants, with one cached lookup", async () => {
-    const lookup = stubManagement(async () => ["report:loo"]);
-    const user = { sub: "contributor", permissions: ["report:loo"] };
-    expect(await check(user, managementEnv)).toBe(true);
-    expect(await check(user, managementEnv)).toBe(true);
-    expect(lookup).toHaveBeenCalledTimes(1);
-
-    stubManagement(async () => ["access:admin"]);
-    expect(await check({ sub: "admin", permissions: ["access:admin"] }, managementEnv)).toBe(true);
-  });
-
-  it("never grants from Auth0 alone a permission the token does not carry", async () => {
-    const lookup = stubManagement(async () => ["report:loo", "access:admin"]);
-    expect(await check({ sub: "plain", permissions: [] }, managementEnv)).toBe(false);
+  it("never trusts anonymous callers", async () => {
+    const lookup = stubManagement(async () => false);
+    expect(await check(undefined, managementEnv)).toBe(false);
     expect(lookup).not.toHaveBeenCalled();
   });
 
-  it("falls back to the token when the Management API lookup fails", async () => {
-    stubManagement(() => Promise.reject(new Error("auth0 down")));
-    expect(await check({ sub: "offline", permissions: ["report:loo"] }, managementEnv)).toBe(true);
+  it("trusts any signed-in user Auth0 has not blocked, whatever their permissions", async () => {
+    stubManagement(async () => false);
+    expect(await check({ sub: "plain", permissions: [] }, managementEnv)).toBe(true);
+    expect(await check({ sub: "no-claim" }, managementEnv)).toBe(true);
+    expect(await check({ sub: "admin", permissions: ["access:admin"] }, managementEnv)).toBe(true);
   });
 
-  it("trusts report:loo and access:admin only", async () => {
-    expect(await check(undefined)).toBe(false);
-    expect(await check({ sub: "a", permissions: [] })).toBe(false);
-    expect(await check({ sub: "b" })).toBe(false);
-    expect(await check({ sub: "c", permissions: ["report:loo"] })).toBe(true);
-    // No Auth0 Management config here, so the token's admin claim is used as-is.
-    expect(await check({ sub: "d", permissions: ["access:admin"] })).toBe(true);
+  it("queues a blocked user, even an admin, and caches the answer per user", async () => {
+    const lookup = stubManagement(async () => true);
+    const user = { sub: "blocked", permissions: ["access:admin"] };
+    expect(await check(user, managementEnv)).toBe(false);
+    expect(await check(user, managementEnv)).toBe(false);
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveBeenCalledWith("blocked");
+  });
+
+  it("looks the block status up again after 60 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      let blocked = false;
+      const lookup = stubManagement(async () => blocked);
+      const user = { sub: "later-blocked" };
+      expect(await check(user, managementEnv)).toBe(true);
+      blocked = true;
+      vi.advanceTimersByTime(59_000);
+      expect(await check(user, managementEnv)).toBe(true);
+      vi.advanceTimersByTime(2_000);
+      expect(await check(user, managementEnv)).toBe(false);
+      expect(lookup).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("queues when the block status cannot be confirmed, and retries after 10 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      let failing = true;
+      const lookup = stubManagement(() =>
+        failing ? Promise.reject(new Error("auth0 down")) : Promise.resolve(false),
+      );
+      expect(await check({ sub: "offline" }, managementEnv)).toBe(false);
+      failing = false;
+      vi.advanceTimersByTime(9_000);
+      expect(await check({ sub: "offline" }, managementEnv)).toBe(false);
+      expect(lookup).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(2_000);
+      expect(await check({ sub: "offline" }, managementEnv)).toBe(true);
+      expect(lookup).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("queues machine-to-machine tokens without a lookup, unless they carry access:admin", async () => {
+    const lookup = stubManagement(async () => false);
+    expect(await check({ sub: "app@clients", gty: "client-credentials" }, managementEnv)).toBe(
+      false,
+    );
+    expect(await check({ sub: "app@clients", permissions: ["access:admin"] }, managementEnv)).toBe(
+      true,
+    );
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("queues when the Management client cannot be created", async () => {
+    __adminRoleTestUtils.clearManagementClientCache();
+    vi.spyOn(Auth0ManagementClient, "fromEnv").mockImplementation(() => {
+      throw new Error("bad config");
+    });
+    expect(await check({ sub: "misconfigured" }, managementEnv)).toBe(false);
+  });
+
+  it("treats users as not blocked when the Management API is not configured", async () => {
+    const fromEnv = vi.spyOn(Auth0ManagementClient, "fromEnv");
+    expect(await check({ sub: "local", permissions: [] })).toBe(true);
+    expect(fromEnv).not.toHaveBeenCalled();
+  });
+
+  it("queues signed-in users in production when the Management API is not configured", async () => {
+    const fromEnv = vi.spyOn(Auth0ManagementClient, "fromEnv");
+    expect(await check({ sub: "prod-user" }, { ENVIRONMENT: "production" })).toBe(false);
+    expect(await check({ sub: "preview-user" }, { ENVIRONMENT: "preview" })).toBe(true);
+    expect(fromEnv).not.toHaveBeenCalled();
   });
 });
 

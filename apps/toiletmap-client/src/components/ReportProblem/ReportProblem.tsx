@@ -54,8 +54,9 @@ export interface ReportProblemProps {
   apiUrl: string;
   isAuthenticated: boolean;
   /**
-   * The user's reports go live straight away (signed in with `report:loo` or `access:admin`),
-   * so the confirm step can say for certain what will happen.
+   * The user's reports go live straight away (signed in with an unexpired session), so the
+   * confirm step says it will be removed at once. Only used for the copy: the server decides,
+   * and a blocked user's report is queued and shown as such.
    */
   canWriteDirectly?: boolean;
 }

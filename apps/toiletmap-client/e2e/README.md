@@ -147,11 +147,13 @@ and reuses the cookies.
   `Secure`.
 
 **Who writes directly.** The server applies a write (edit, add, report, restore)
-straight away only for tokens with `report:loo` or `access:admin`; everyone else
-is queued as a `pending_change` (202). The mock "Test User" has both, so
-`authedTest` and the `loos` fixture write directly. `untrustedTest` signs in as
-`UNTRUSTED_USER` (`support/api.ts`, no permissions) by injecting its cookies, so
-its writes are queued like an anonymous user's; plain `test` is signed out.
+straight away for anyone signed in, unless they are blocked in Auth0; anonymous
+writes are queued as a `pending_change` (202). The e2e server has no Auth0
+Management API, so nobody counts as blocked (blocked users are covered by the
+server's integration tests). The mock "Test User" (`access:admin`) backs
+`authedTest` and the `loos` fixture. `contributorTest` signs in as `CONTRIBUTOR`
+(`support/api.ts`, no permissions) by injecting its cookies, and still writes
+directly. Plain `test` is signed out, so it is the way to exercise the queued path.
 
 **Forms.** Every save goes through the review sheet ("Confirm and save"):
 `looForm(page).submit()` clicks both. The location picker has no lat/lng boxes:

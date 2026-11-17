@@ -307,7 +307,10 @@ describe("ReportProblem — confirm and submit", () => {
 
   it.each([
     ["anonymous users", { isAuthenticated: false }],
-    ["signed-in users without report:loo", { isAuthenticated: true, canWriteDirectly: false }],
+    [
+      "signed-in users whose session has expired",
+      { isAuthenticated: true, canWriteDirectly: false },
+    ],
   ])("tells %s a moderator checks first", async (_label, props) => {
     const user = setup(props);
     await choose(user, /permanently closed/);
@@ -399,6 +402,20 @@ describe("ReportProblem — confirm and submit", () => {
     // Signing in no longer promises that reports go live.
     expect(screen.getByText(/to keep track of your contributions/)).toBeInTheDocument();
     expect(screen.queryByText(/go live/)).toBeNull();
+  });
+
+  it("shows the queued result when the server queues a report it was expected to apply", async () => {
+    // A user blocked in Auth0 looks signed in to the client; the API queues their report.
+    onReport(202, { queued: true, id: "pending-blocked" });
+    const user = setup({ isAuthenticated: true, canWriteDirectly: true });
+    await choose(user, /permanently closed/);
+    await continueToConfirm(user);
+    await user.click(screen.getByRole("button", { name: "Report it" }));
+    expect(
+      await screen.findByText("Thanks — a moderator will review your report"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    expect(screen.queryByText(/straight away/)).toBeNull();
   });
 
   it("says 'Undo requested' when the undo is queued", async () => {

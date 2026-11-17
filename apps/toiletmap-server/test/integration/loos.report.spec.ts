@@ -1,12 +1,12 @@
 /**
- * Report a problem / restore / verify, and the trust rule for direct writes:
- * only `report:loo` or `access:admin` callers write directly; everyone else
- * (anonymous or signed in) is queued for moderation.
+ * Report a problem / restore / verify. Signed-in callers act directly; anonymous
+ * and blocked ones are queued (the trust rule itself is in loos.trust.spec.ts).
  */
 import { randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __moderationAlertTestUtils } from "../../src/services/moderation-alert";
 import { getPrismaClient, getTestContext } from "./setup";
+import { BLOCKED_SUB, useAuth0ManagementStub } from "./utils/auth0-management";
 import { cleanupManager } from "./utils/cleanup";
 import { createFixtureFactory } from "./utils/fixtures";
 import type {
@@ -31,24 +31,26 @@ import {
 
 const fixtures = createFixtureFactory();
 
-/** A `report:loo` contributor (the default test token). */
+/** Auth0's Management API is configured and stubbed for every test in this file. */
+useAuth0ManagementStub();
+
+/** Signed in with no permissions at all (the default test token): writes directly. */
 const trustedHeaders = () => ({ Authorization: `Bearer ${getTestContext().issueToken()}` });
 
-/** An admin without `report:loo`: still trusted. */
-const adminOnlyHeaders = () => ({
+/** An admin: trusted like anyone else signed in. */
+const adminHeaders = () => ({
   Authorization: `Bearer ${getTestContext().issueToken({
     sub: "auth0|admin-only",
     permissions: ["access:admin"],
   })}`,
 });
 
-/** Signed in, but without either permission: changes are queued. */
-const UNTRUSTED_NICKNAME = "queued-contributor";
-const untrustedHeaders = () => ({
+/** Signed in, but blocked in Auth0: changes are queued. */
+const BLOCKED_NICKNAME = "blocked-contributor";
+const blockedHeaders = () => ({
   Authorization: `Bearer ${getTestContext().issueToken({
-    sub: "auth0|untrusted-user",
-    permissions: [],
-    app_metadata: { nickname: UNTRUSTED_NICKNAME },
+    sub: BLOCKED_SUB,
+    app_metadata: { nickname: BLOCKED_NICKNAME },
   })}`,
 });
 
@@ -141,12 +143,12 @@ describe("POST /api/loos/:id/report", () => {
       expect(updates.upserted.some(([id]) => id === loo.id)).toBe(false);
     });
 
-    it("lets an admin without report:loo remove directly", async () => {
+    it("lets an admin remove directly", async () => {
       const loo = await fixtures.loos.create();
       const response = await post(
         `/api/loos/${loo.id}/report`,
         { reason: "permanently_closed" },
-        adminOnlyHeaders(),
+        adminHeaders(),
       );
       expect(response.status).toBe(200);
     });
@@ -272,7 +274,7 @@ describe("POST /api/loos/:id/report", () => {
       const response = await post(
         `/api/loos/${loo.id}/report`,
         { reason: "duplicate", duplicateOf: removed.id },
-        untrustedHeaders(),
+        blockedHeaders(),
       );
       expect(response.status).toBe(400);
       const error = await readJson<ErrorBody<{ duplicateOf?: FormattedFieldError }>>(response);
@@ -380,7 +382,7 @@ describe("POST /api/loos/:id/report", () => {
     });
   });
 
-  describe("untrusted callers", () => {
+  describe("queued callers", () => {
     it("queues an anonymous report as a pending remove change", async () => {
       const loo = await fixtures.loos.create();
       const response = await post(`/api/loos/${loo.id}/report`, {
@@ -403,19 +405,19 @@ describe("POST /api/loos/:id/report", () => {
       expect(live?.active).toBe(true);
     });
 
-    it("queues a signed-in report without report:loo and records the submitter", async () => {
+    it("queues a report from a blocked user and records the submitter", async () => {
       const loo = await fixtures.loos.create();
       const target = await fixtures.loos.create();
       const response = await post(
         `/api/loos/${loo.id}/report`,
         { reason: "duplicate", duplicateOf: target.id },
-        untrustedHeaders(),
+        blockedHeaders(),
       );
       expect(response.status).toBe(202);
       const row = await pendingRow((await readJson<QueuedBody>(response)).id);
       expect(row?.type).toBe("remove");
       expect(row?.payload).toEqual({ reason: "duplicate", duplicateOf: target.id });
-      expect(row?.submitted_by).toBe(UNTRUSTED_NICKNAME);
+      expect(row?.submitted_by).toBe(BLOCKED_NICKNAME);
     });
 
     it("refuses before queueing: 404, already removed and stale base", async () => {
@@ -523,7 +525,7 @@ describe("POST /api/loos/:id/restore", () => {
     expect(response.status).toBe(200);
   });
 
-  it("queues anonymous and signed-in untrusted restores", async () => {
+  it("queues anonymous and blocked users' restores", async () => {
     const loo = await removedLoo();
 
     const anonymous = await post(`/api/loos/${loo.id}/restore`, { details: "Open again" });
@@ -533,11 +535,11 @@ describe("POST /api/loos/:id/restore", () => {
     expect(anonRow?.payload).toEqual({ details: "Open again" });
     expect(anonRow?.base_updated_at?.getTime()).toBe(Date.parse(loo.updatedAt ?? ""));
 
-    const signedIn = await post(`/api/loos/${loo.id}/restore`, {}, untrustedHeaders());
-    expect(signedIn.status).toBe(202);
-    const signedInRow = await pendingRow((await readJson<QueuedBody>(signedIn)).id);
-    expect(signedInRow?.payload).toEqual({});
-    expect(signedInRow?.submitted_by).toBe(UNTRUSTED_NICKNAME);
+    const blocked = await post(`/api/loos/${loo.id}/restore`, {}, blockedHeaders());
+    expect(blocked.status).toBe(202);
+    const blockedRow = await pendingRow((await readJson<QueuedBody>(blocked)).id);
+    expect(blockedRow?.payload).toEqual({});
+    expect(blockedRow?.submitted_by).toBe(BLOCKED_NICKNAME);
 
     const live = await getPrismaClient().toilets.findUnique({ where: { id: loo.id } });
     expect(live?.active).toBe(false);
@@ -615,7 +617,7 @@ describe("POST /api/loos/:id/verify", () => {
     const loo = await fixtures.loos.create();
     const response = await callApi(`/api/loos/${loo.id}/verify`, {
       method: "POST",
-      headers: untrustedHeaders(),
+      headers: trustedHeaders(),
     });
     expect(response.status).toBe(200);
   });
@@ -645,7 +647,7 @@ describe("POST /api/loos/:id/verify", () => {
 
     const signedIn = await callApi(
       `/api/loos/${loo.id}/verify`,
-      { method: "POST", headers: untrustedHeaders() },
+      { method: "POST", headers: trustedHeaders() },
       { env: { RATE_LIMIT_ANON_WRITE: limiter } },
     );
     expect(signedIn.status).toBe(200);
@@ -710,63 +712,6 @@ describe("GET /api/loos/proximity filters", () => {
     expect(response.status).toBe(400);
     const error = await readJson<ErrorBody<Record<string, unknown>>>(response);
     expect(error.issues).toHaveProperty(field);
-  });
-});
-
-describe("direct writes require report:loo or access:admin", () => {
-  it("queues a PUT from a signed-in user without report:loo", async () => {
-    const loo = await fixtures.loos.create({ notes: "Original" });
-    const response = await callApi(
-      `/api/loos/${loo.id}`,
-      jsonRequest("PUT", { notes: "Suggested" }, untrustedHeaders()),
-    );
-    expect(response.status).toBe(202);
-    const row = await pendingRow((await readJson<QueuedBody>(response)).id);
-    expect(row?.type).toBe("update");
-    expect(row?.payload).toEqual({ notes: "Suggested" });
-    expect(row?.submitted_by).toBe(UNTRUSTED_NICKNAME);
-
-    const live = await getPrismaClient().toilets.findUnique({ where: { id: loo.id } });
-    expect(live?.notes).toBe("Original");
-  });
-
-  it("does not let an untrusted PUT create a loo", async () => {
-    const id = missingId();
-    const response = await callApi(
-      `/api/loos/${id}`,
-      jsonRequest("PUT", { name: "Nope" }, untrustedHeaders()),
-    );
-    expect(response.status).toBe(404);
-    expect(await getPrismaClient().toilets.findUnique({ where: { id } })).toBeNull();
-  });
-
-  it("queues a POST from a signed-in user without report:loo", async () => {
-    const name = `Queued create ${Date.now()}`;
-    const response = await post(
-      "/api/loos",
-      { name, location: uniqueLocation() },
-      untrustedHeaders(),
-    );
-    expect(response.status).toBe(202);
-    const row = await pendingRow((await readJson<QueuedBody>(response)).id);
-    expect(row?.type).toBe("create");
-    expect(await getPrismaClient().toilets.count({ where: { name } })).toBe(0);
-  });
-
-  it("writes a PUT directly for report:loo and for access:admin", async () => {
-    const loo = await fixtures.loos.create({ notes: "Original" });
-    const asContributor = await callApi(
-      `/api/loos/${loo.id}`,
-      jsonRequest("PUT", { notes: "By contributor" }, trustedHeaders()),
-    );
-    expect(asContributor.status).toBe(200);
-
-    const asAdmin = await callApi(
-      `/api/loos/${loo.id}`,
-      jsonRequest("PUT", { notes: "By admin" }, adminOnlyHeaders()),
-    );
-    expect(asAdmin.status).toBe(200);
-    expect((await readJson<SavedLooBody>(asAdmin)).notes).toBe("By admin");
   });
 });
 

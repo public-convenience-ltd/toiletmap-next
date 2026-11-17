@@ -54,9 +54,9 @@ export interface LooFormProps {
   apiUrl: string;
   isAuthenticated: boolean;
   /**
-   * The signed-in user's token carries `report:loo` or `access:admin`, so their saves go live
-   * straight away (everyone else's are checked by a moderator). Only used for the copy: the
-   * server decides.
+   * The user is signed in with an unexpired session, so their saves go live straight away
+   * (anonymous suggestions are checked by a moderator). Only used for the copy: the server
+   * decides, and queues a blocked user's save, which then shows the queued screen.
    */
   canWriteDirectly?: boolean;
   /** Where the add picker opens (from `?lat&lng&zoom`). The picker falls back to the URL itself. */
@@ -681,7 +681,8 @@ export default function LooForm({
           ? "No changes to save"
           : `Save ${changeCount} change${changeCount === 1 ? "" : "s"}`;
 
-  // Says for certain what a save will do: only trusted users' changes go live straight away.
+  // Says what a save will do: signed-in users' changes go live straight away (the server may
+  // still queue one, e.g. from a user blocked in Auth0, and the queued screen then says so).
   const actionStatus = !trusted
     ? MODERATOR_WILL_CHECK
     : mode === "edit" && changeCount === 0

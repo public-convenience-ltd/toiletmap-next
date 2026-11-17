@@ -185,7 +185,7 @@ describe("ToiletDetailsPanel", () => {
       ).toBeInTheDocument();
     });
 
-    it("says it goes back straight away for a trusted user", async () => {
+    it("says it goes back straight away for a signed-in user", async () => {
       const user = userEvent.setup();
       render(<ToiletDetailsPanel toilet={removedToilet} onClose={noop} canWriteDirectly />);
       await user.click(screen.getByRole("button", { name: /ask to restore/i }));
@@ -352,6 +352,19 @@ describe("ToiletDetailsPanel", () => {
       // Still removed until a moderator acts; no second restore button.
       expect(screen.getByText(/Removed from the map/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /ask to restore/i })).not.toBeInTheDocument();
+    });
+
+    it("says a moderator will review when a restore expected to apply is queued", async () => {
+      // A user blocked in Auth0 looks signed in to the client; the API queues their restore.
+      const user = userEvent.setup();
+      fetchMock.mockResolvedValue(jsonResponse(202, { queued: true, id: "pending-blocked" }));
+      render(<ToiletDetailsPanel toilet={removedToilet} onClose={noop} canWriteDirectly />);
+
+      await openPrompt(user);
+      await user.click(screen.getByRole("button", { name: "Restore it" }));
+
+      expect(await screen.findByText(RESTORE_QUEUED_MESSAGE)).toBeInTheDocument();
+      expect(screen.getByText(/Removed from the map/)).toBeInTheDocument();
     });
 
     it("keeps the prompt open with an error when the request fails", async () => {

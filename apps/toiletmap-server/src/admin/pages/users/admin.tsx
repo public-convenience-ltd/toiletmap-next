@@ -5,7 +5,6 @@ import {
   type KnownPermission,
   PERMISSION_LABELS,
   permissionDescription,
-  REPORT_LOO_PERMISSION,
 } from "../../../common/permissions";
 import {
   Auth0ManagementClient,
@@ -80,8 +79,6 @@ const buildRedirectUrl = (input: string | null, fallbackUser?: string) => {
   }
   return fallback;
 };
-
-const userPermissionOrder: KnownPermission[] = [ADMIN_PERMISSION, REPORT_LOO_PERMISSION];
 
 export const userAdministration = async (c: AdminContext) => {
   const managementClient = Auth0ManagementClient.fromEnv(c.env);
@@ -515,10 +512,18 @@ export const userAdministration = async (c: AdminContext) => {
                 <h2 class="section-title" style="margin: 0;">
                   Assign roles for {selectedUserName}
                 </h2>
+                <p class="section-description" style="margin-top: var(--space-3xs);">
+                  {selectedUser.blocked
+                    ? "This user is blocked in Auth0, so their changes are queued for moderation."
+                    : "Anyone signed in can edit loos. To stop someone editing, block the user in the Auth0 dashboard."}
+                  {permissionsByName.has(ADMIN_PERMISSION)
+                    ? " Blocking does not remove Admin access, so remove that below too."
+                    : null}
+                </p>
               </div>
             </div>
             <div class="permissions-grid">
-              {userPermissionOrder.map((permissionKey) => {
+              {KNOWN_PERMISSIONS.map((permissionKey) => {
                 const isGranted = permissionsByName.has(permissionKey);
                 const intent = isGranted ? "revoke" : "grant";
                 return (

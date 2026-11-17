@@ -76,7 +76,7 @@ const decodeBase64Url = (segment: string): string => {
  * checked: callers only use claims for cookie lifetimes and copy, never to decide whether a
  * token is trusted (the API verifies tokens on every request).
  */
-export function jwtPayload(token: string | null | undefined): Record<string, unknown> | null {
+function jwtPayload(token: string | null | undefined): Record<string, unknown> | null {
   if (typeof token !== "string") return null;
   const parts = token.split(".");
   if (parts.length !== 3 || !parts[1]) return null;

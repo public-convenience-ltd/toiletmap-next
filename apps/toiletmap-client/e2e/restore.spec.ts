@@ -1,6 +1,6 @@
 import { getLoo, issueAccessToken, reportLooViaApi } from "./support/api";
 import { getPendingChangesForLoo } from "./support/db";
-import { authedTest, expect, untrustedTest } from "./support/fixtures";
+import { authedTest, contributorTest, expect, test } from "./support/fixtures";
 import {
   detailsPanelHeading,
   mapCacheHas,
@@ -10,8 +10,8 @@ import {
 
 /**
  * A removed toilet's page explains why it was removed and offers "It's still here — ask to
- * restore" (POST /api/loos/:id/restore): trusted users put it straight back on the map,
- * everyone else's request is queued as a pending_change of type "restore".
+ * restore" (POST /api/loos/:id/restore): signed-in users put it straight back on the map,
+ * an anonymous request is queued as a pending_change of type "restore".
  */
 
 const RESTORE_BUTTON = "It's still here — ask to restore";
@@ -67,21 +67,48 @@ authedTest.describe("restore a removed toilet (trusted)", () => {
   });
 });
 
-untrustedTest.describe("restore a removed toilet (untrusted)", () => {
-  untrustedTest("a signed-in contributor's restore is queued", async ({ page, loos }) => {
-    const loo = await loos.create({}, "restore untrusted");
-    // The fixture factory signs in as the trusted Test User: remove it as them.
+contributorTest.describe("restore a removed toilet (signed in, no permissions)", () => {
+  contributorTest(
+    "a contributor with no permissions restores it straight away",
+    async ({ page, loos }) => {
+      const loo = await loos.create({}, "restore contributor");
+      // The fixture factory signs in as the default Test User: remove it as them.
+      await reportLooViaApi(await issueAccessToken(), loo.id, { reason: "not_public" });
+
+      await page.goto(`/loos/${loo.id}`);
+      await page.getByRole("button", { name: RESTORE_BUTTON }).click();
+      await expect(page.getByLabel("Anything we should know? (optional)")).toHaveCount(0);
+      await page.getByRole("button", { name: "Restore it" }).click();
+      await expect(page.getByText("Thanks — it's back on the map.")).toBeVisible();
+
+      expect(await getPendingChangesForLoo(loo.id)).toHaveLength(0);
+      expect((await getLoo(loo.id)).active).toBe(true);
+    },
+  );
+});
+
+test.describe("restore a removed toilet (anonymous)", () => {
+  test("an anonymous restore is queued with its note", async ({ page, loos }) => {
+    const loo = await loos.create({}, "restore anonymous");
     await reportLooViaApi(await issueAccessToken(), loo.id, { reason: "not_public" });
 
     await page.goto(`/loos/${loo.id}`);
     await page.getByRole("button", { name: RESTORE_BUTTON }).click();
+    await expect(
+      page.getByText(/tell us and a moderator will check before it goes back on the map\.$/),
+    ).toBeVisible();
+    await page.getByLabel("Anything we should know? (optional)").fill("Open again today");
     await page.getByRole("button", { name: "Restore it" }).click();
     await expect(page.getByText("Thanks — a moderator will review your request.")).toBeVisible();
 
     const pending = await getPendingChangesForLoo(loo.id);
     for (const row of pending) loos.trackPendingChange(row.id);
     expect(pending).toHaveLength(1);
-    expect(pending[0]).toMatchObject({ type: "restore", status: "pending" });
+    expect(pending[0]).toMatchObject({
+      type: "restore",
+      status: "pending",
+      payload: { details: "Open again today" },
+    });
     expect((await getLoo(loo.id)).active).toBe(false);
   });
 });
