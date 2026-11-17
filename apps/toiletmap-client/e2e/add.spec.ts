@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { e2eName, getLoo, randomFixtureLocation } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
-import { jsonBody, looForm, nextSave } from "./support/form";
+import { jsonBody, looForm, nextSave, waitForSaved } from "./support/form";
 import { detailsPanelHeading } from "./support/map";
 
 const nextFrames = (page: Page) =>
@@ -50,8 +50,7 @@ test.describe("add (signed in)", () => {
     const body = jsonBody(await post);
     expect(body).toMatchObject({ name, babyChange: true, location: target });
 
-    await page.waitForURL(/\/loos\/[0-9a-f]{24}$/);
-    const id = new URL(page.url()).pathname.split("/").pop() ?? "";
+    const id = await waitForSaved(page);
     loos.track(id);
     await expect(detailsPanelHeading(page)).toHaveText(name);
 

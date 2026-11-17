@@ -1,6 +1,6 @@
 import { e2eName, getLoo, type OpeningTimes, stable } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
-import { jsonBody, looForm, nextSave, openEditForm } from "./support/form";
+import { jsonBody, looForm, nextSave, openEditForm, waitForSaved } from "./support/form";
 import { detailsPanelHeading } from "./support/map";
 
 /**
@@ -46,7 +46,7 @@ test.describe("edit (signed in)", () => {
     expect(body.name).toBe(newName);
     expect(body.baseUpdatedAt).toBe(before.updatedAt);
 
-    await page.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(page, loo.id);
     await expect(detailsPanelHeading(page)).toHaveText(newName);
 
     const after = await getLoo(loo.id);
@@ -67,7 +67,7 @@ test.describe("edit (signed in)", () => {
     await form.save.click();
     const body = jsonBody(await put);
     expect(body).not.toHaveProperty("openingTimes");
-    await page.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(page, loo.id);
 
     const after = await getLoo(loo.id);
     expect(after.notes).toBe("New notes");
@@ -83,7 +83,7 @@ test.describe("edit (signed in)", () => {
     const put = nextSave(page, "PUT");
     await form.save.click();
     expect(jsonBody(await put)).toMatchObject({ notes: null });
-    await page.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(page, loo.id);
 
     expect((await getLoo(loo.id)).notes).toBeNull();
   });
@@ -143,7 +143,7 @@ test.describe("edit (signed in)", () => {
     await form.name.fill(newName);
     await form.save.click();
 
-    await page.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(page, loo.id);
     await expect(detailsPanelHeading(page)).toHaveText(newName);
   });
 });

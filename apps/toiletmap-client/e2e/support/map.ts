@@ -58,3 +58,120 @@ export async function waitForMapToSettle(map: Locator): Promise<void> {
     await frames();
   });
 }
+
+/** The record mapCache keeps under "loos-cache-v2" (src/api/mapCache.ts). */
+export interface MapCacheRecord {
+  schemaVersion: number;
+  cursor: string | null;
+  data: [string, string, number][];
+  rev: number;
+  syncedAt: number | null;
+}
+
+/**
+ * Reads the client's map cache straight from IndexedDB (idb-keyval's default
+ * "keyval-store" / "keyval" store). Creates the store the way idb-keyval does
+ * if the database does not exist yet, so probing early cannot break the app.
+ */
+export function readMapCache(page: Page): Promise<MapCacheRecord | null> {
+  return page.evaluate(
+    () =>
+      new Promise<MapCacheRecord | null>((resolve, reject) => {
+        const open = indexedDB.open("keyval-store");
+        open.onupgradeneeded = () => open.result.createObjectStore("keyval");
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const request = db
+            .transaction("keyval", "readonly")
+            .objectStore("keyval")
+            .get("loos-cache-v2");
+          request.onsuccess = () => {
+            db.close();
+            resolve((request.result as MapCacheRecord | undefined) ?? null);
+          };
+          request.onerror = () => {
+            db.close();
+            reject(request.error);
+          };
+        };
+      }),
+  );
+}
+
+/** Waits until the map has stored a snapshot with a server cursor (a warm cache). */
+export async function waitForWarmMapCache(page: Page): Promise<MapCacheRecord> {
+  let record: MapCacheRecord | null = null;
+  await expect
+    .poll(
+      async () => {
+        record = await readMapCache(page);
+        return !!record?.cursor && record.data.length > 0;
+      },
+      { message: "the map should store the dump and its cursor in IndexedDB" },
+    )
+    .toBe(true);
+  return record as unknown as MapCacheRecord;
+}
+
+/**
+ * Asks the map to sync now, the way returning to the tab does
+ * (useMapData listens for `visibilitychange` while visible), instead of
+ * waiting for the 60s poll.
+ */
+export async function triggerMapSync(page: Page): Promise<void> {
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+}
+
+/** The highlighted (selected) marker: the taller icon. */
+export const selectedMarker = (page: Page) => page.locator("#map .loo-marker svg[height='44']");
+
+/**
+ * Clicks the plain marker drawn where `box` (a marker's bounding box) was.
+ * Both icons are anchored bottom-centre, so after closing the panel the plain
+ * marker sits where the highlighted one did. The click is dispatched on the
+ * marker element itself: the floating controls can cover that spot (see the
+ * fixme in map.spec.ts), and this test is about data, not hit-testing.
+ */
+export async function clickMarkerAt(
+  page: Page,
+  box: { x: number; y: number; width: number; height: number },
+): Promise<void> {
+  const markers = page.locator("#map .loo-marker");
+  const findIndex = () =>
+    markers.evaluateAll(
+      (elements, b) =>
+        elements.findIndex((el) => {
+          const r = el.getBoundingClientRect();
+          return (
+            Math.abs(r.left + r.width / 2 - (b.x + b.width / 2)) < 2 &&
+            Math.abs(r.bottom - (b.y + b.height)) < 2
+          );
+        }),
+      box,
+    );
+  let index = -1;
+  await expect
+    .poll(
+      async () => {
+        index = await findIndex();
+        return index;
+      },
+      { message: "a marker should be drawn at the toilet's position" },
+    )
+    .toBeGreaterThanOrEqual(0);
+  await markers.nth(index).dispatchEvent("click");
+}
+
+/**
+ * Indices of the drawn markers other than the selected (highlighted) one. The
+ * details panel can cover most of the map, so callers dispatch the click on
+ * the marker element rather than relying on hit-testing.
+ */
+export function otherMarkerIndices(page: Page): Promise<number[]> {
+  return page
+    .locator("#map .loo-marker")
+    .evaluateAll((elements) =>
+      elements.flatMap((el, i) => (el.querySelector("svg[height='44']") ? [] : [i])),
+    );
+}

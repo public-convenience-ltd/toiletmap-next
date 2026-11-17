@@ -1,6 +1,6 @@
 import { e2eName, getLoo } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
-import { looForm, openEditForm } from "./support/form";
+import { looForm, openEditForm, waitForSaved } from "./support/form";
 
 /**
  * Optimistic concurrency (baseUpdatedAt → 409): two people edit the same
@@ -22,7 +22,7 @@ test.describe("edit conflicts", () => {
     const aliceName = e2eName("conflict renamed by alice");
     await aliceForm.name.fill(aliceName);
     await aliceForm.save.click();
-    await alice.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(alice, loo.id);
 
     await bobForm.notes.fill("Notes from Bob");
     await bobForm.save.click();
@@ -37,7 +37,7 @@ test.describe("edit conflicts", () => {
     await expect(bobForm.notes).toHaveValue("Notes from Bob");
     await expect(bobForm.save).toHaveText("Save 1 change");
     await bobForm.save.click();
-    await bob.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(bob, loo.id);
 
     const after = await getLoo(loo.id);
     expect(after.name).toBe(aliceName);
@@ -56,7 +56,7 @@ test.describe("edit conflicts", () => {
 
     await aliceForm.notes.fill("Open Sundays since June");
     await aliceForm.save.click();
-    await alice.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(alice, loo.id);
 
     await bobForm.notes.fill("Closed Sundays, key at café");
     await bobForm.save.click();
@@ -70,7 +70,7 @@ test.describe("edit conflicts", () => {
     await bobForm.loadLatest.click();
     await expect(bobForm.notes).toHaveValue("Closed Sundays, key at café");
     await bobForm.save.click();
-    await bob.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(bob, loo.id);
 
     expect((await getLoo(loo.id)).notes).toBe("Closed Sundays, key at café");
   });
@@ -86,7 +86,7 @@ test.describe("edit conflicts", () => {
 
     await otherForm.notes.fill("Someone else's note");
     await otherForm.save.click();
-    await other.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(other, loo.id);
 
     await form.facility("Accessible", "No").click();
     await form.save.click();
@@ -95,7 +95,7 @@ test.describe("edit conflicts", () => {
     await form.loadLatest.click();
     await expect(form.notes).toHaveValue("Someone else's note");
     await form.save.click();
-    await page.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(page, loo.id);
 
     const after = await getLoo(loo.id);
     expect(after.accessible).toBe(false);
