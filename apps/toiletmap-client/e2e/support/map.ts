@@ -27,14 +27,44 @@ export const detailsToggle = (page: Page) =>
   detailsPanel(page).getByRole("button", { name: "Details", exact: true });
 
 /**
- * Expands the details panel from the summary a marker tap (or deep link) opens, so the
- * opening hours, facilities and the verify / edit / report actions are on screen.
+ * Makes sure the details panel is expanded, so the opening hours, facilities and the
+ * verify / edit / report actions are on screen. The panel opens expanded (a marker tap, a
+ * deep link, Back/Forward), so this only clicks "Details" if it has been collapsed:
+ * clicking it on an expanded panel would collapse it.
  */
 export async function expandDetails(page: Page): Promise<void> {
   const toggle = detailsToggle(page);
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await toggle.click();
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
+
+/** Collapses the details panel to its summary with the "Details" toggle (if expanded). */
+export async function collapseDetails(page: Page): Promise<void> {
+  const toggle = detailsToggle(page);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) !== "false") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+}
+
+/** Asserts the panel is open expanded, as every open (tap, deep link, Back/Forward) is. */
+export async function expectDetailsExpanded(page: Page): Promise<void> {
+  await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "true");
+}
+
+/**
+ * Closes the details panel with Escape from inside it (its heading, where focus goes on
+ * open). The panel opens expanded, so the first Escape collapses it to the summary and the
+ * second closes it.
+ */
+export async function closeDetailsWithEscape(page: Page): Promise<void> {
+  await expectDetailsExpanded(page);
+  await detailsPanelHeading(page).focus();
+  await page.keyboard.press("Escape");
+  await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "false");
+  await expect(detailsPanel(page)).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(detailsPanel(page)).toHaveCount(0);
 }
 
 /**

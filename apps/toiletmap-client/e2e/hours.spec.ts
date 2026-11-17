@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { getLoo } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
 import { jsonBody, nextSave, openEditForm, waitForSaved } from "./support/form";
-import { detailsPanel, expandDetails } from "./support/map";
+import { detailsPanel, expectDetailsExpanded } from "./support/map";
 
 /**
  * The opening hours question (design-system OpeningHoursInput): Don't know / Open 24/7 /
@@ -71,8 +71,8 @@ test.describe("opening hours", () => {
     await waitForSaved(page, loo.id);
     expect((await getLoo(loo.id)).openingTimes).toEqual(expected);
     // The details panel reads the saved hours back: a week that isn't the same every day is
-    // shown as a Monday-to-Sunday table (in its Details, below the compact summary).
-    await expandDetails(page);
+    // shown as a Monday-to-Sunday table (in its details, which the panel opens with).
+    await expectDetailsExpanded(page);
     const rows = detailsPanel(page).getByRole("table").getByRole("row");
     await expect(rows).toHaveCount(7);
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];

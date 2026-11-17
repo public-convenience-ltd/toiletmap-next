@@ -4,7 +4,10 @@ import { authedTest, expect, test } from "./support/fixtures";
 import { openEditForm, QUESTIONS, SAVED_BANNER_TEXT, waitForSaved } from "./support/form";
 import {
   clickMarkerAt,
+  closeDetailsWithEscape,
+  collapseDetails,
   detailsPanelHeading,
+  expectDetailsExpanded,
   firstUnobscuredMarker,
   otherMarkerIndices,
   readMapCache,
@@ -117,8 +120,8 @@ authedTest.describe("freshness after a signed-in edit", () => {
       // Close the panel and open the toilet again from its marker: same document, new name.
       const box = await selectedMarker(page).boundingBox();
       if (!box) throw new Error("the selected marker has no bounding box");
-      await page.keyboard.press("Escape");
-      await expect(page.locator(".toilet-panel")).toHaveCount(0);
+      // It opened expanded: Escape collapses it, then closes it.
+      await closeDetailsWithEscape(page);
       await expect(page).toHaveURL(HOME_URL);
       await tagDocument(page);
       await clickMarkerAt(page, box);
@@ -255,6 +258,9 @@ test.describe("freshness of the cached map", () => {
     const firstId = idOf(page);
     await expect(detailsPanelHeading(page)).toHaveText((await getLoo(firstId)).name ?? "Toilet");
     expect(await historyLength()).toBe(startLength + 1);
+    // It opens expanded. Collapse it, so the next toilet is seen to open expanded afresh.
+    await expectDetailsExpanded(page);
+    await collapseDetails(page);
 
     // Switching to another toilet replaces the entry instead of adding one.
     await expect.poll(async () => (await otherMarkerIndices(page)).length).toBeGreaterThan(0);
@@ -270,6 +276,7 @@ test.describe("freshness of the cached map", () => {
     const secondName = (await getLoo(secondId)).name ?? "Toilet";
     await expect(detailsPanelHeading(page)).toHaveText(secondName);
     expect(await historyLength()).toBe(startLength + 1);
+    await expectDetailsExpanded(page);
 
     // Back: the panel closes and the address bar shows the map.
     await page.goBack();
@@ -280,10 +287,11 @@ test.describe("freshness of the cached map", () => {
     await page.goForward();
     await expect(page).toHaveURL(new RegExp(`/loos/${secondId}$`));
     await expect(detailsPanelHeading(page)).toHaveText(secondName);
+    await expectDetailsExpanded(page);
 
-    // Closing steps back over the map's own entry, so Back won't reopen it.
-    await page.keyboard.press("Escape");
-    await expect(page.locator(".toilet-panel")).toHaveCount(0);
+    // Closing steps back over the map's own entry, so Back won't reopen it. Forward reopened
+    // it expanded, so Escape collapses it first, then closes it.
+    await closeDetailsWithEscape(page);
     await expect(page).toHaveURL(HOME_URL);
     expect(await historyLength()).toBe(startLength + 1);
     expect(await sameDocument(page), "Back/Forward stayed within the page").toBe(true);

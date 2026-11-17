@@ -1,6 +1,6 @@
 import { getLoo } from "./support/api";
 import { expect, test } from "./support/fixtures";
-import { detailsPanelHeading, expandDetails } from "./support/map";
+import { detailsPanelHeading, expectDetailsExpanded } from "./support/map";
 
 /** "Yes, it's still here" (POST /api/loos/:id/verify) works for anyone and bumps verified_at only. */
 
@@ -15,8 +15,8 @@ test.describe("verify", () => {
 
     await page.goto(`/loos/${loo.id}`);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
-    // The deep link opens the summary; the verify prompt is in the details.
-    await expandDetails(page);
+    // The deep link opens the panel expanded: the verify prompt is in its details.
+    await expectDetailsExpanded(page);
     await expect(page.getByText(/^Last updated: /)).toBeVisible();
 
     const sent = page.waitForResponse(
@@ -36,7 +36,7 @@ test.describe("verify", () => {
 
     // A fresh load shows the stored date too.
     await page.reload();
-    await expandDetails(page);
+    await expectDetailsExpanded(page);
     await expect(page.getByText(`Last verified: ${formatDate(new Date())}`)).toBeVisible();
   });
 });

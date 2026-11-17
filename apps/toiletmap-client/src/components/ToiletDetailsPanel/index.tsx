@@ -128,8 +128,6 @@ export interface ToiletDetailsPanelProps {
   canWriteDirectly?: boolean;
   /** The viewer's location, for the distance in the summary. */
   userLocation?: LatLng | null;
-  /** Open with the details showing (the summary is the default). `?restore=1` also opens them. */
-  initialExpanded?: boolean;
   /** Where focus returns when the panel closes; the map's search input otherwise. */
   returnFocusTo?: HTMLElement | null;
   /**
@@ -142,14 +140,16 @@ export interface ToiletDetailsPanelProps {
 }
 
 /**
- * The toilet details panel. A marker tap shows the compact summary (name, distance, open now,
- * key features, Directions and Details); Details expands the rest.
+ * The toilet details panel. It always opens expanded: the summary (name, distance, open now,
+ * key features, Directions and the Details toggle) with the rest (hours, facilities, the
+ * verify / edit / report actions) below it. The Details toggle or the sheet's handle
+ * collapses it to the summary alone, and expands it again.
  *
- * - Below 768px: a non-modal bottom sheet (peek / expanded, capped at 60% of the map).
+ * - Below 768px: a non-modal bottom sheet (expanded / peek, capped at 60% of the map).
  * - From 768px: a floating card on the left, under the search bar, scrolling inside.
  *
  * Close (the X) always closes. Escape inside the panel collapses the details first, then
- * closes, as do the sheet's handle and the Details toggle. Focus moves to the heading on open
+ * closes; dragging the sheet's handle down does the same. Focus moves to the heading on open
  * and back to `returnFocusTo` (or the search box) on close.
  *
  * On short screens (a phone in landscape, ≥768px wide but ≤560px tall) the card scrolls as a
@@ -167,7 +167,6 @@ export default function ToiletDetailsPanel({
   onDismissSaved,
   canWriteDirectly = false,
   userLocation = null,
-  initialExpanded = false,
   returnFocusTo,
   onLayoutChange,
   cardTop,
@@ -176,9 +175,10 @@ export default function ToiletDetailsPanel({
   const uid = useId();
   const titleId = `${uid}-title`;
   const detailsId = `${uid}-details`;
-  const [expanded, setExpanded] = useState(
-    () => initialExpanded || (hasRestoreParam(toilet.id) && (removed || toilet.active === false)),
-  );
+  // Every open starts expanded (marker tap, deep link, Back/Forward, another toilet: LooMap
+  // keys the panel by toilet id, so each toilet mounts afresh). The first layout report is
+  // therefore the expanded size, which LooMap pans the marker clear of.
+  const [expanded, setExpanded] = useState(true);
   const panelState: PanelState = expanded ? "expanded" : "peek";
 
   const rootRef = useRef<HTMLElement>(null);

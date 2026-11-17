@@ -145,50 +145,74 @@ describe("onLayoutChange (ResizeObserver)", () => {
   /** The box the next mounted panel starts with. */
   const panelDefaults = document.createElement("i");
 
-  it("reports the desktop card's left strip, then again when it grows on expand", async () => {
+  it("reports the expanded desktop card's left strip on open, then again on collapse", async () => {
     setViewport("card");
     boxes.set(mapContainer, { top: 0, left: 0, width: 1280, height: 720 });
-    boxes.set(panelDefaults, { top: 88, left: 16, width: 400, height: 180 });
+    boxes.set(panelDefaults, { top: 88, left: 16, width: 400, height: 600 });
     const onLayoutChange = vi.fn<(layout: PanelLayout) => void>();
     render(<ToiletDetailsPanel toilet={toilet} onClose={noop} onLayoutChange={onLayoutChange} />, {
       container: mapContainer,
     });
-    expect(onLayoutChange).toHaveBeenLastCalledWith({
+    // The very first report is already the expanded card: the map pans clear of it at once.
+    expect(onLayoutChange.mock.calls[0]?.[0]).toEqual({
       mode: "card",
-      state: "peek",
+      state: "expanded",
       occludes: { top: 0, right: 0, bottom: 0, left: 416 },
     });
+    expect(onLayoutChange.mock.calls.every(([layout]) => layout.state === "expanded")).toBe(true);
     // The panel and the map container are both observed.
     expect(observers.flatMap((o) => o.targets)).toEqual(
       expect.arrayContaining([panel(), mapContainer]),
     );
 
     const user = userEvent.setup();
-    boxes.set(panel(), { top: 88, left: 16, width: 400, height: 600 });
+    boxes.set(panel(), { top: 88, left: 16, width: 400, height: 180 });
     await user.click(screen.getByRole("button", { name: "Details" }));
     expect(onLayoutChange).toHaveBeenLastCalledWith({
       mode: "card",
-      state: "expanded",
+      state: "peek",
       occludes: { top: 0, right: 0, bottom: 0, left: 416 },
     });
   });
 
-  it("reports the sheet's bottom strip as it resizes, without repeats", () => {
+  it("reports the expanded sheet on open, capped by the CSS at 60% of the map", () => {
     setViewport("sheet");
     boxes.set(mapContainer, { top: 0, left: 0, width: 412, height: 800 });
-    boxes.set(panelDefaults, { top: 600, left: 0, width: 412, height: 200 });
+    boxes.set(panelDefaults, { top: 320, left: 0, width: 412, height: 480 });
     const onLayoutChange = vi.fn<(layout: PanelLayout) => void>();
     render(<ToiletDetailsPanel toilet={toilet} onClose={noop} onLayoutChange={onLayoutChange} />, {
       container: mapContainer,
     });
+    // No peek-sized report first: a phone's marker is panned above the 60% sheet straight away.
+    expect(onLayoutChange.mock.calls[0]?.[0]).toEqual({
+      mode: "sheet",
+      state: "expanded",
+      occludes: { top: 0, right: 0, bottom: 480, left: 0 },
+    });
+    expect(onLayoutChange.mock.calls.every(([layout]) => layout.state === "expanded")).toBe(true);
+  });
+
+  it("reports the sheet's bottom strip as it resizes, without repeats", async () => {
+    setViewport("sheet");
+    boxes.set(mapContainer, { top: 0, left: 0, width: 412, height: 800 });
+    boxes.set(panelDefaults, { top: 320, left: 0, width: 412, height: 480 });
+    const onLayoutChange = vi.fn<(layout: PanelLayout) => void>();
+    render(<ToiletDetailsPanel toilet={toilet} onClose={noop} onLayoutChange={onLayoutChange} />, {
+      container: mapContainer,
+    });
+    const calls = onLayoutChange.mock.calls.length;
+    resize();
+    expect(onLayoutChange).toHaveBeenCalledTimes(calls);
+
+    // Collapsed with the handle, the sheet shrinks to the summary.
+    const user = userEvent.setup();
+    boxes.set(panel(), { top: 600, left: 0, width: 412, height: 200 });
+    await user.click(screen.getByRole("button", { name: "Toilet details" }));
     expect(onLayoutChange).toHaveBeenLastCalledWith({
       mode: "sheet",
       state: "peek",
       occludes: { top: 0, right: 0, bottom: 200, left: 0 },
     });
-    const calls = onLayoutChange.mock.calls.length;
-    resize();
-    expect(onLayoutChange).toHaveBeenCalledTimes(calls);
 
     // The content grows (e.g. a notice appears): the sheet's top moves up.
     boxes.set(panel(), { top: 480, left: 0, width: 412, height: 320 });
@@ -197,27 +221,6 @@ describe("onLayoutChange (ResizeObserver)", () => {
       mode: "sheet",
       state: "peek",
       occludes: { top: 0, right: 0, bottom: 320, left: 0 },
-    });
-  });
-
-  it("reports the expanded sheet, capped by the CSS at 60% of the map", () => {
-    setViewport("sheet");
-    boxes.set(mapContainer, { top: 0, left: 0, width: 412, height: 800 });
-    boxes.set(panelDefaults, { top: 320, left: 0, width: 412, height: 480 });
-    const onLayoutChange = vi.fn<(layout: PanelLayout) => void>();
-    render(
-      <ToiletDetailsPanel
-        toilet={toilet}
-        onClose={noop}
-        initialExpanded
-        onLayoutChange={onLayoutChange}
-      />,
-      { container: mapContainer },
-    );
-    expect(onLayoutChange).toHaveBeenLastCalledWith({
-      mode: "sheet",
-      state: "expanded",
-      occludes: { top: 0, right: 0, bottom: 480, left: 0 },
     });
   });
 

@@ -4,6 +4,7 @@
  */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "preact/hooks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LooDetail } from "../../api/loos";
 import LooMap from "./index";
@@ -82,7 +83,11 @@ vi.mock("./MapMarkers", () => ({
   },
 }));
 
-/** What the stub panel was last rendered with, so tests can report layouts through it. */
+/**
+ * What the stub panel was last rendered with, so tests can report layouts through it.
+ * `firstLayout`, when set, is reported from the stub's mount effect, the way the real panel
+ * reports its first measurement (before the map's fallback frame).
+ */
 const panel = vi.hoisted(() => ({
   props: null as null | {
     onLayoutChange?: (layout: PanelLayout) => void;
@@ -90,10 +95,14 @@ const panel = vi.hoisted(() => ({
     onClose: () => void;
     toilet: { name: string };
   },
+  firstLayout: null as null | PanelLayout,
 }));
 vi.mock("../ToiletDetailsPanel", () => ({
   default: function PanelStub(props: NonNullable<typeof panel.props>) {
     panel.props = props;
+    useEffect(() => {
+      if (panel.firstLayout) props.onLayoutChange?.(panel.firstLayout);
+    }, []);
     return (
       <section data-testid="panel">
         <h2>{props.toilet.name}</h2>
@@ -196,6 +205,7 @@ beforeEach(() => {
   fakeLayers.length = 0;
   focusMarker.mockClear();
   panel.props = null;
+  panel.firstLayout = null;
   sheetHeight = 300;
   setReducedMotion(false);
   mockLayoutRects();
@@ -245,7 +255,7 @@ describe("LooMap keeps the selected marker in view", () => {
     expect(fakeMap.panBy).toHaveBeenCalledWith([0, 44], { animate: false });
   });
 
-  it("pans just enough when a marker is tapped, and again when the panel expands", async () => {
+  it("pans just enough when a marker is tapped (measuring the panel until it reports)", async () => {
     const user = userEvent.setup();
     render(<LooMap apiUrl="" />);
     await user.click(screen.getByRole("button", { name: "Marker bbb" }));
@@ -260,14 +270,28 @@ describe("LooMap keeps the selected marker in view", () => {
       paddingBottomRight: [SIDE, 316],
       animate: true,
     });
+  });
 
-    const expanded: PanelLayout = {
-      mode: "sheet",
-      state: "expanded",
-      occludes: { top: 0, right: 0, bottom: 480, left: 0 },
-    };
-    act(() => panel.props?.onLayoutChange?.(expanded));
-    expect(fakeMap.panInside).toHaveBeenCalledTimes(2);
+  // The panel opens expanded: its first report is the expanded size. The measured box stays
+  // the default 300px sheet, so a pan from the measurement instead would show as 316 below.
+  const EXPANDED_SHEET: PanelLayout = {
+    mode: "sheet",
+    state: "expanded",
+    occludes: { top: 0, right: 0, bottom: 480, left: 0 },
+  };
+
+  it("keeps a tapped marker above the expanded sheet from the first open, and on collapse", async () => {
+    panel.firstLayout = EXPANDED_SHEET;
+    const user = userEvent.setup();
+    render(<LooMap apiUrl="" />);
+    await user.click(screen.getByRole("button", { name: "Marker bbb" }));
+    await screen.findByRole("heading", { name: "Toilet bbb" });
+    await waitFor(() => expect(fakeMap.panInside).toHaveBeenCalled());
+    await nextFrame();
+
+    // One pan, already clear of the 60% sheet: never a peek-sized pan first.
+    expect(fakeMap.panBy).not.toHaveBeenCalled();
+    expect(fakeMap.panInside).toHaveBeenCalledTimes(1);
     expect(fakeMap.panInside).toHaveBeenLastCalledWith([51.5, -0.1], {
       paddingTopLeft: [SIDE, TOP],
       paddingBottomRight: [SIDE, 496],
@@ -277,11 +301,57 @@ describe("LooMap keeps the selected marker in view", () => {
     // Sub-pixel jitter from the ResizeObserver doesn't move the map again.
     act(() =>
       panel.props?.onLayoutChange?.({
-        ...expanded,
-        occludes: { ...expanded.occludes, bottom: 481 },
+        ...EXPANDED_SHEET,
+        occludes: { ...EXPANDED_SHEET.occludes, bottom: 481 },
+      }),
+    );
+    expect(fakeMap.panInside).toHaveBeenCalledTimes(1);
+
+    // Collapsed to the summary: re-checked against the smaller sheet.
+    act(() =>
+      panel.props?.onLayoutChange?.({
+        mode: "sheet",
+        state: "peek",
+        occludes: { top: 0, right: 0, bottom: 200, left: 0 },
       }),
     );
     expect(fakeMap.panInside).toHaveBeenCalledTimes(2);
+    expect(fakeMap.panInside).toHaveBeenLastCalledWith([51.5, -0.1], {
+      paddingTopLeft: [SIDE, TOP],
+      paddingBottomRight: [SIDE, 216],
+      animate: true,
+    });
+  });
+
+  it("keeps the marker clear of the expanded sheet when switching toilets", async () => {
+    panel.firstLayout = EXPANDED_SHEET;
+    const user = userEvent.setup();
+    render(<LooMap apiUrl="" />);
+    await user.click(screen.getByRole("button", { name: "Marker aaa" }));
+    await screen.findByRole("heading", { name: "Toilet aaa" });
+    await waitFor(() => expect(fakeMap.panInside).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: "Marker bbb" }));
+    await screen.findByRole("heading", { name: "Toilet bbb" });
+    await waitFor(() => expect(fakeMap.panInside).toHaveBeenCalledTimes(2));
+    await nextFrame();
+    expect(fakeMap.panInside).toHaveBeenCalledTimes(2);
+    expect(fakeMap.panInside).toHaveBeenLastCalledWith([51.5, -0.1], {
+      paddingTopLeft: [SIDE, TOP],
+      paddingBottomRight: [SIDE, 496],
+      animate: true,
+    });
+  });
+
+  it("centres a deep-linked toilet above the expanded sheet it opens with", async () => {
+    panel.firstLayout = EXPANDED_SHEET;
+    window.history.replaceState(null, "", "/loos/aaa");
+    render(<LooMap apiUrl="" initialToiletId="aaa" />);
+    await screen.findByRole("heading", { name: "Toilet aaa" });
+    await waitFor(() => expect(fakeMap.panBy).toHaveBeenCalled());
+    await nextFrame();
+    // Free area: y 128…304 (centre 216) in an 800px container (centre 400).
+    expect(fakeMap.panBy).toHaveBeenCalledTimes(1);
+    expect(fakeMap.panBy).toHaveBeenCalledWith([0, 184], { animate: false });
   });
 
   it("ignores the freshness notice while it is hidden in the panel (no phantom left inset)", async () => {
@@ -301,18 +371,19 @@ describe("LooMap keeps the selected marker in view", () => {
     });
   });
 
-  it("keeps the marker clear of a desktop card on the left", async () => {
+  it("keeps the marker clear of the expanded desktop card on the left from the first open", async () => {
+    panel.firstLayout = {
+      mode: "card",
+      state: "expanded",
+      occludes: { top: 0, right: 0, bottom: 0, left: 412 - 100 },
+    };
     const user = userEvent.setup();
     render(<LooMap apiUrl="" />);
     await user.click(screen.getByRole("button", { name: "Marker aaa" }));
     await screen.findByRole("heading", { name: "Toilet aaa" });
-    act(() =>
-      panel.props?.onLayoutChange?.({
-        mode: "card",
-        state: "expanded",
-        occludes: { top: 0, right: 0, bottom: 0, left: 412 - 100 },
-      }),
-    );
+    await waitFor(() => expect(fakeMap.panInside).toHaveBeenCalled());
+    await nextFrame();
+    expect(fakeMap.panInside).toHaveBeenCalledTimes(1);
     expect(fakeMap.panInside).toHaveBeenLastCalledWith([51.5, -0.1], {
       paddingTopLeft: [312 + SIDE, TOP],
       paddingBottomRight: [SIDE, 16],

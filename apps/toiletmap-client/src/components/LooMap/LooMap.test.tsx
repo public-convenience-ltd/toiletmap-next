@@ -617,6 +617,14 @@ describe("LooMap freshness", () => {
     expect(mapNotice).not.toHaveClass("map-freshness-notice--shown");
     expect(mapNotice).toHaveTextContent("Offline — showing saved data");
 
+    // The panel opens expanded: the first Escape (focus is on its heading) collapses it, and
+    // the notice stays in the panel; the second closes it.
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Details" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(mapNotice).toHaveClass("map-freshness-notice--in-panel");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(container.querySelector(".toilet-panel")).toBeNull());
     expect(mapNotice).toHaveClass("map-freshness-notice--shown");

@@ -197,14 +197,19 @@ save, use `waitForSaved` (`support/form.ts`): it waits for the redirect to
 `/loos/<id>?saved=1`, the banner, and the param being stripped.
 
 **Details panel and phone layout.** `panel.spec.ts` covers the Phase 4 panel on
-every project: a marker tap or deep link opens the summary (at most 30% of a
-phone screen, with the map still draggable around it), Details expands it (at
-most 60% of the map on phones, scrolling inside; a card of at most 400px on the
-left on desktop), Escape and Close collapse then close, focus moves to the
+every project: a marker tap or deep link opens it expanded (at most 60% of the
+map on phones, scrolling inside, with the map still draggable around it; a card
+of at most 400px on the left on desktop), Details or the sheet's handle
+collapses it to the summary (at most 30% of a phone screen) and expands it
+again, Escape collapses then closes, Close closes at once, focus moves to the
 heading and back to the marker, and the selected marker's box never touches the
-panel or a floating control (`[data-map-control]`). Deep links open the
-summary, so tests that use the verify / edit / report actions call
-`expandDetails` (`support/map.ts`) first. On a phone in landscape
+panel or a floating control (`[data-map-control]`), expanded or collapsed.
+Every open (marker tap, deep link, switching toilets, Back/Forward) is
+expanded, so the verify / edit / report actions are on screen straight away:
+assert that with `expectDetailsExpanded` (`support/map.ts`) rather than
+clicking Details, which would collapse the panel. `expandDetails` and
+`collapseDetails` only click when the panel is in the other state, and
+`closeDetailsWithEscape` presses Escape twice (collapse, then close). On a phone in landscape
 (`mobile-landscape`: wide enough for the card, but short) a toilet with notices
 keeps Directions reachable by scrolling the card, its marker clear of the card,
 and the page free of horizontal overflow. `layout.spec.ts` checks that the

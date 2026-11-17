@@ -109,9 +109,20 @@ const jsonResponse = (status: number, body: unknown) =>
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
-/** Renders the panel with its details open (where the Phase 3 actions live). */
+/**
+ * Renders the panel as it opens: expanded, with its details (where the Phase 3 actions live)
+ * showing.
+ */
 const renderExpanded = (props: Partial<ToiletDetailsPanelProps> = {}) =>
-  render(<ToiletDetailsPanel toilet={toilet} onClose={noop} initialExpanded {...props} />);
+  render(<ToiletDetailsPanel toilet={toilet} onClose={noop} {...props} />);
+
+/** Renders the panel, then collapses it to the summary with the Details toggle. */
+const renderCollapsed = (props: Partial<ToiletDetailsPanelProps> = {}) => {
+  const result = renderExpanded(props);
+  fireEvent.click(detailsToggle());
+  expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
+  return result;
+};
 
 beforeEach(() => {
   vi.stubGlobal("localStorage", memoryStorage());
@@ -130,18 +141,25 @@ afterEach(() => {
 
 describe("ToiletDetailsPanel", () => {
   describe("summary", () => {
-    it("opens as the compact summary, with no notices by default", () => {
+    it("opens expanded, the details below the summary, with no notices by default", () => {
       render(<ToiletDetailsPanel toilet={toilet} onClose={noop} />);
       expect(screen.getByRole("heading", { level: 2, name: "High Street toilets" })).toBeVisible();
       expect(screen.getByRole("link", { name: /directions/i })).toBeInTheDocument();
-      expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
-      // The details aren't rendered until asked for.
-      expect(screen.queryByText(VERIFY_PROMPT)).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: /opening hours/i })).not.toBeInTheDocument();
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("region", { name: "High Street toilets" })).toHaveAttribute(
+        "data-state",
+        "expanded",
+      );
+      const details = document.getElementById(detailsToggle().getAttribute("aria-controls") ?? "");
+      expect(details).toContainElement(screen.getByText(VERIFY_PROMPT));
+      expect(details).toContainElement(screen.getByRole("heading", { name: /opening hours/i }));
       expect(screen.queryByText(SAVED_MESSAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(new RegExp(REMOVED_MESSAGE))).not.toBeInTheDocument();
       expect(screen.queryByText(PENDING_MESSAGE)).not.toBeInTheDocument();
-      expect(screen.queryAllByRole("status")).toHaveLength(0);
+      // No notices in the summary; the details' only live region (for verifying) is empty.
+      const statuses = screen.queryAllByRole("status");
+      expect(statuses.filter((el) => !details?.contains(el))).toHaveLength(0);
+      expect(statuses.map((el) => el.textContent)).toEqual([""]);
     });
 
     it("is a region named by its heading", () => {
@@ -183,7 +201,8 @@ describe("ToiletDetailsPanel", () => {
       [{ noPayment: false, paymentDetails: null }, "Paid"],
       [{ noPayment: false, paymentDetails: " 20p " }, "Paid: 20p"],
     ] as const)("shows payment %j as a text chip, not an icon", (fields, text) => {
-      render(<ToiletDetailsPanel toilet={{ ...toilet, ...fields }} onClose={noop} />);
+      // The summary on its own (the details' payment row has its own icon).
+      renderCollapsed({ toilet: { ...toilet, ...fields } });
       const chip = screen.getByTestId("payment");
       expect(chip).toHaveTextContent(new RegExp(`^${text}$`));
       expect(chip.parentElement).toBe(screen.getByTestId("open-now").parentElement);
@@ -301,9 +320,19 @@ describe("ToiletDetailsPanel", () => {
   });
 
   describe("expand, collapse and close", () => {
-    it("Details expands and collapses the rest", async () => {
+    it("Details collapses the open panel to the summary, and expands it again", async () => {
       const user = userEvent.setup();
       render(<ToiletDetailsPanel toilet={toilet} onClose={noop} />);
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
+      await user.click(detailsToggle());
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("region", { name: "High Street toilets" })).toHaveAttribute(
+        "data-state",
+        "peek",
+      );
+      // The details aren't rendered while collapsed.
+      expect(screen.queryByText(VERIFY_PROMPT)).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /opening hours/i })).not.toBeInTheDocument();
       await user.click(detailsToggle());
       expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
       const detailsId = detailsToggle().getAttribute("aria-controls");
@@ -311,9 +340,25 @@ describe("ToiletDetailsPanel", () => {
       expect(document.getElementById(detailsId ?? "")).toContainElement(
         screen.getByText(VERIFY_PROMPT),
       );
+    });
+
+    it("opens each toilet expanded, also after the last one was collapsed", async () => {
+      const user = userEvent.setup();
+      const other: LooDetail = { ...toilet, id: DUP, name: "Station toilets" };
+      // LooMap keys the panel by toilet id, so switching toilets mounts a new one.
+      const { rerender } = render(
+        <ToiletDetailsPanel key={toilet.id} toilet={toilet} onClose={noop} />,
+      );
       await user.click(detailsToggle());
       expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
-      expect(screen.queryByText(VERIFY_PROMPT)).not.toBeInTheDocument();
+      rerender(<ToiletDetailsPanel key={other.id} toilet={other} onClose={noop} />);
+      expect(screen.getByRole("heading", { level: 2, name: "Station toilets" })).toBeVisible();
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText(VERIFY_PROMPT)).toBeInTheDocument();
+      // And back again (Back/Forward): expanded again too.
+      rerender(<ToiletDetailsPanel key={toilet.id} toilet={toilet} onClose={noop} />);
+      expect(screen.getByRole("heading", { level: 2, name: "High Street toilets" })).toBeVisible();
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
     });
 
     it.each(["card", "sheet"] as const)(
@@ -392,20 +437,45 @@ describe("ToiletDetailsPanel", () => {
   describe("mobile bottom sheet", () => {
     beforeEach(() => setViewport("sheet"));
 
-    it("renders as a non-modal sheet with a handle that toggles the details", async () => {
+    it("renders as a non-modal sheet that opens expanded, its handle toggling the details", async () => {
       const user = userEvent.setup();
       const { container } = render(<ToiletDetailsPanel toilet={toilet} onClose={noop} />);
       const region = screen.getByRole("region", { name: "High Street toilets" });
       expect(region).toHaveClass("bottom-sheet", "toilet-panel");
-      expect(region).toHaveAttribute("data-state", "peek");
+      expect(region).toHaveAttribute("data-state", "expanded");
       expect(container.querySelector('[aria-modal="true"]')).toBeNull();
       const handle = screen.getByRole("button", { name: "Toilet details" });
-      expect(handle).toHaveAttribute("aria-expanded", "false");
-      await user.click(handle);
-      expect(region).toHaveAttribute("data-state", "expanded");
       expect(handle).toHaveAttribute("aria-expanded", "true");
       expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
       expect(screen.getByText(VERIFY_PROMPT)).toBeInTheDocument();
+
+      await user.click(handle);
+      expect(region).toHaveAttribute("data-state", "peek");
+      expect(handle).toHaveAttribute("aria-expanded", "false");
+      expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText(VERIFY_PROMPT)).not.toBeInTheDocument();
+
+      await user.click(handle);
+      expect(region).toHaveAttribute("data-state", "expanded");
+      expect(handle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText(VERIFY_PROMPT)).toBeInTheDocument();
+    });
+
+    it("collapses when the handle is dragged down, and closes on a second drag", () => {
+      const onClose = vi.fn();
+      renderExpanded({ onClose });
+      const region = screen.getByRole("region", { name: "High Street toilets" });
+      const handle = screen.getByRole("button", { name: "Toilet details" });
+      const dragDown = () => {
+        fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientY: 100 });
+        fireEvent.pointerMove(handle, { pointerId: 1, clientY: 200 });
+        fireEvent.pointerUp(handle, { pointerId: 1, clientY: 200 });
+      };
+      dragDown();
+      expect(region).toHaveAttribute("data-state", "peek");
+      expect(onClose).not.toHaveBeenCalled();
+      dragDown();
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it("keeps the summary a direct child of the scrolling body, so it can stay pinned", () => {
@@ -455,10 +525,7 @@ describe("ToiletDetailsPanel", () => {
       const user = userEvent.setup();
       render(<ToiletDetailsPanel toilet={toilet} onClose={noop} />);
       const region = screen.getByRole("region", { name: "High Street toilets" });
-      // At peek the summary isn't pinned: nothing to pad.
-      expect(region.style.getPropertyValue("--panel-summary-height")).toBe("");
-
-      await user.click(detailsToggle());
+      // It opens expanded: the summary is pinned from the start.
       expect(region).toHaveAttribute("data-state", "expanded");
       expect(region.style.getPropertyValue("--panel-summary-height")).toBe("132px");
 
@@ -471,8 +538,13 @@ describe("ToiletDetailsPanel", () => {
       for (const o of observers) o.callback([], {} as ResizeObserver);
       expect(region.style.getPropertyValue("--panel-summary-height")).toBe("180px");
 
+      // At peek the summary isn't pinned: nothing to pad.
       await user.click(detailsToggle());
+      expect(region).toHaveAttribute("data-state", "peek");
       expect(region.style.getPropertyValue("--panel-summary-height")).toBe("");
+
+      await user.click(detailsToggle());
+      expect(region.style.getPropertyValue("--panel-summary-height")).toBe("180px");
     });
 
     it("Escape collapses expanded → peek → closes", () => {
@@ -745,9 +817,9 @@ describe("ToiletDetailsPanel", () => {
         await waitFor(() => expect(heading).toHaveFocus());
       };
 
-      it("opens the prompt in the details", async () => {
+      it("opens the prompt in the details, expanding a collapsed panel", async () => {
         const user = userEvent.setup();
-        render(<ToiletDetailsPanel toilet={removedToilet} onClose={noop} />);
+        renderCollapsed({ toilet: removedToilet });
         await openPrompt(user);
         expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
       });
@@ -858,7 +930,8 @@ describe("ToiletDetailsPanel", () => {
         expect(
           screen.queryByRole("heading", { name: "Is it still here?" }),
         ).not.toBeInTheDocument();
-        expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
+        // Open as always, just without the prompt.
+        expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
         expect(location.search).toBe("");
       });
     });

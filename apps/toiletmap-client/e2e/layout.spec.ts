@@ -3,7 +3,13 @@ import { e2eName } from "./support/api";
 import { expect, test } from "./support/fixtures";
 import { openEditForm } from "./support/form";
 import { expectNoHorizontalOverflow } from "./support/layout";
-import { expandDetails, waitForMap } from "./support/map";
+import {
+  collapseDetails,
+  detailsToggle,
+  expandDetails,
+  expectDetailsExpanded,
+  waitForMap,
+} from "./support/map";
 
 test.describe("layout", () => {
   test("home has no horizontal overflow", async ({ page }) => {
@@ -185,6 +191,8 @@ test.describe("map page layout on phones", () => {
 
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(page.locator(".toilet-panel h2")).toBeVisible();
+    // Not collapsed either: it is still open expanded, as it opened.
+    await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "true");
     await expect(page).toHaveURL(new RegExp(`/loos/${loo.id}$`));
   });
 
@@ -204,8 +212,12 @@ test.describe("map page layout on phones", () => {
     await waitForMap(page);
     await expectNoHorizontalOverflow(page);
 
+    // Opened expanded, then collapsed to the summary, then expanded again.
     await page.goto(`/loos/${loo.id}`);
     await expect(page.locator(".toilet-panel h2")).toBeVisible();
+    await expectDetailsExpanded(page);
+    await expectNoHorizontalOverflow(page);
+    await collapseDetails(page);
     await expectNoHorizontalOverflow(page);
     await expandDetails(page);
     await expectNoHorizontalOverflow(page);

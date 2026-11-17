@@ -1,6 +1,7 @@
 import { getLoo } from "./support/api";
 import { expect, test } from "./support/fixtures";
 import {
+  closeDetailsWithEscape,
   deepLinkSpot,
   detailsPanelHeading,
   firstUnobscuredMarker,
@@ -21,7 +22,7 @@ test.describe("map", () => {
     await expect(page.locator("#map .loo-marker, #map .marker-cluster").first()).toBeVisible();
   });
 
-  test("/loos/:id deep link opens the details panel; Escape closes it; a marker reopens it", async ({
+  test("/loos/:id deep link opens the details panel; Escape collapses, then closes it; a marker reopens it", async ({
     page,
     loos,
   }) => {
@@ -38,8 +39,8 @@ test.describe("map", () => {
     const box = await highlighted.boundingBox();
     if (!box) throw new Error("highlighted marker has no bounding box");
 
-    await page.keyboard.press("Escape");
-    await expect(page.locator(".toilet-panel")).toHaveCount(0);
+    // It opens expanded: Escape collapses it first, then closes it.
+    await closeDetailsWithEscape(page);
     await expect(page).toHaveURL(/\/$/);
 
     // The deep link left the marker clear of the floating controls (see the test below), so

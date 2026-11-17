@@ -29,7 +29,10 @@ export interface ToiletSummaryProps {
   notices?: ComponentChildren;
 }
 
-/** The compact top of the panel: what a marker tap shows. */
+/**
+ * The compact top of the panel, above the details it opens with: all that shows once the
+ * Details toggle (or the sheet's handle) collapses it.
+ */
 export default function ToiletSummary({
   name,
   titleId,

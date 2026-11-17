@@ -3,20 +3,23 @@ import type { OpeningTimes } from "./support/api";
 import { expect, test } from "./support/fixtures";
 import { expectNoHorizontalOverflow } from "./support/layout";
 import {
+  collapseDetails,
   deepLinkSpot,
   detailsPanel,
   detailsPanelHeading,
   detailsToggle,
   expandDetails,
+  expectDetailsExpanded,
   selectedMarker,
   waitForMap,
   waitForMapToSettle,
 } from "./support/map";
 
 /**
- * Phase 4: the details panel. A marker tap (or a /loos/:id deep link) opens a compact
- * summary; "Details" expands the rest. Below 768px it is a non-modal bottom sheet (summary
- * ≤ 30% of the screen, expanded ≤ 60% of the map, scrolling inside); from 768px a card of
+ * Phase 4: the details panel. A marker tap (or a /loos/:id deep link) opens it expanded: the
+ * summary with the details below; "Details" (or the sheet's handle) collapses it to the
+ * summary and expands it again. Below 768px it is a non-modal bottom sheet (expanded ≤ 60% of
+ * the map, scrolling inside; collapsed, the summary ≤ 30% of the screen); from 768px a card of
  * at most 400px on the left, below the search bar. Either way the selected marker is kept
  * clear of the panel and the floating map controls.
  */
@@ -131,14 +134,26 @@ async function expectSelectedMarkerClear(page: Page, when: string) {
   }).toPass({ timeout: 10_000, intervals: [200, 400, 800] });
 }
 
-/** Drags the map by (dx, dy) from `from`, waiting for Leaflet's inertia to die down first. */
+/**
+ * Drags the map by (dx, dy) from `from`, waiting for Leaflet's inertia to die down first. A
+ * drag that would take the pointer off the map (and possibly off the screen) is made as a few
+ * shorter drags from the same point: on a phone a deep-linked marker sits above the expanded
+ * sheet, high on the map, so dragging it down to the bottom edge is a long way.
+ */
 async function dragMap(page: Page, from: { x: number; y: number }, dx: number, dy: number) {
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move(from.x + dx, from.y + dy, { steps: 10 });
-  await page.waitForTimeout(200);
-  await page.mouse.up();
-  await waitForMapToSettle(page.locator("#map"));
+  const map = (await page.locator("#map").boundingBox()) as Box;
+  const inMap = (x: number, y: number) =>
+    x >= map.x + 8 && x <= map.x + map.width - 8 && y >= map.y + 8 && y <= map.y + map.height - 8;
+  let pieces = 1;
+  while (pieces < 4 && !inMap(from.x + dx / pieces, from.y + dy / pieces)) pieces += 1;
+  for (let i = 0; i < pieces; i += 1) {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + dx / pieces, from.y + dy / pieces, { steps: 10 });
+    await page.waitForTimeout(200);
+    await page.mouse.up();
+    await waitForMapToSettle(page.locator("#map"));
+  }
 }
 
 /** Taps (touch projects) or clicks a locator: a real hit-tested user action. */
@@ -184,7 +199,7 @@ async function detailsRegion(page: Page): Promise<Locator> {
 }
 
 test.describe("details panel", () => {
-  test("a marker tap opens a compact summary, with the marker in view and the map still usable", async ({
+  test("a marker tap opens the panel expanded, with the marker in view and the map still usable", async ({
     page,
     loos,
   }, testInfo) => {
@@ -224,20 +239,22 @@ test.describe("details panel", () => {
     await expect(detailsPanelHeading(page)).toBeFocused();
     await expect(page.getByRole("region", { name: loo.name ?? "" })).toBeVisible();
 
-    // The summary: open-now chip, key features, Directions and a collapsed Details toggle.
+    // Expanded: the summary (open-now chip, key features, Directions, an expanded Details
+    // toggle) with the details below it.
     await expect(detailsPanel(page).getByTestId("open-now")).toHaveText("Open 24 hours");
     await expect(detailsPanel(page).getByRole("list", { name: "Key features" })).toBeVisible();
-    await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByRole("button", { name: "Yes, it's still here" })).toHaveCount(0);
+    await expectDetailsExpanded(page);
+    await expect(page.getByRole("button", { name: "Yes, it's still here" })).toHaveCount(1);
 
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     const panel = await settledBox(detailsPanel(page));
     if (isSheet(page)) {
-      expect(panel.height, "the summary sheet takes at most 30% of the screen").toBeLessThanOrEqual(
-        viewport.height * 0.3,
+      expect(panel.height, "the expanded sheet is capped at 60% of the map").toBeLessThanOrEqual(
+        map.height * 0.6 + 1,
       );
       expect(Math.round(panel.y + panel.height)).toBe(Math.round(map.y + map.height));
     }
+    // The marker is panned clear of the expanded panel from the start.
     await expectSelectedMarkerClear(page, "after the tap");
 
     // The map stays usable around the panel: the free area is the map, and drags pan it.
@@ -256,9 +273,36 @@ test.describe("details panel", () => {
       .poll(() => pane.evaluate((el) => (el as HTMLElement).style.transform))
       .not.toBe(transform);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
+    await expectDetailsExpanded(page);
+
+    // Collapsing (the sheet's handle on a phone, Details on the card) leaves the summary alone.
+    if (isSheet(page)) {
+      const handle = detailsPanel(page).getByRole("button", { name: "Toilet details" });
+      await expect(handle).toHaveAttribute("aria-expanded", "true");
+      await tapOrClick(handle, testInfo);
+      await expect(handle).toHaveAttribute("aria-expanded", "false");
+      await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "false");
+    } else {
+      await collapseDetails(page);
+    }
+    await expect(page.getByRole("button", { name: "Yes, it's still here" })).toHaveCount(0);
+    const summary = await settledBox(detailsPanel(page));
+    if (isSheet(page)) {
+      expect(
+        summary.height,
+        "the summary sheet takes at most 30% of the screen",
+      ).toBeLessThanOrEqual(viewport.height * 0.3);
+      expect(Math.round(summary.y + summary.height)).toBe(Math.round(map.y + map.height));
+    }
+    await expectSelectedMarkerClear(page, "collapsed");
+
+    // And Details expands it again.
+    await expandDetails(page);
+    await expect(page.getByRole("button", { name: "Yes, it's still here" })).toHaveCount(1);
+    await expectSelectedMarkerClear(page, "expanded again");
   });
 
-  test("Details expands within the cap and scrolls inside; Escape collapses, then closes; Close closes", async ({
+  test("the panel opens expanded within the cap and scrolls inside; Escape collapses, then closes; Close closes", async ({
     page,
     loos,
   }) => {
@@ -277,9 +321,10 @@ test.describe("details panel", () => {
     await page.goto(`/loos/${loo.id}`);
     await waitForMap(page);
     await expect(detailsPanelHeading(page)).toBeFocused();
+    // A deep link opens expanded too, its marker clear of the expanded panel.
+    await expectDetailsExpanded(page);
     await expectSelectedMarkerClear(page, "deep link");
 
-    await expandDetails(page);
     const map = (await page.locator("#map").boundingBox()) as Box;
     const panel = await settledBox(detailsPanel(page));
     if (isSheet(page)) {
@@ -341,7 +386,7 @@ test.describe("details panel", () => {
     await expect(details.getByText(/Line 8: the entrance/)).toBeAttached();
     await expect(details.getByRole("row")).toHaveCount(7);
     await expect(details.locator('[aria-current="date"]')).toHaveCount(1);
-    await expectSelectedMarkerClear(page, "after expanding");
+    await expectSelectedMarkerClear(page, "expanded");
 
     // Escape inside the panel collapses the details first...
     await detailsToggle(page).focus();
@@ -375,10 +420,10 @@ test.describe("details panel", () => {
       })
       .toBe(true);
 
-    // Close (the X) closes straight away, even with the details expanded.
+    // Close (the X) closes straight away, even with the details expanded (as it opens).
     await page.goto(`/loos/${loo.id}`);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
-    await expandDetails(page);
+    await expectDetailsExpanded(page);
     await detailsPanel(page).getByRole("button", { name: "Close", exact: true }).click();
     await expect(detailsPanel(page)).toHaveCount(0);
     await expect(page).toHaveURL(/\/$/);
@@ -394,7 +439,7 @@ test.describe("details panel", () => {
     );
     await page.goto(`/loos/${loo.id}`);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
-    await expandDetails(page);
+    await expectDetailsExpanded(page);
     const details = await detailsRegion(page);
     await expect(details.getByText("Open 24 hours, every day", { exact: true })).toBeVisible();
     await expect(details.getByRole("table")).toHaveCount(0);
@@ -405,7 +450,8 @@ test.describe("details panel", () => {
     const loo = await loos.create({ location: deepLinkSpot(), notes: LONG_NOTES }, "panel actions");
     await page.goto(`/loos/${loo.id}`);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
-    await expandDetails(page);
+    // The panel opens expanded: the actions are in its details straight away.
+    await expectDetailsExpanded(page);
 
     const panel = detailsPanel(page);
     const actions = [
@@ -466,8 +512,10 @@ test.describe("details panel", () => {
 
     const map = (await page.locator("#map").boundingBox()) as Box;
     const search = (await page.locator("search").boundingBox()) as Box;
-    for (const state of ["summary", "details"] as const) {
-      if (state === "details") await expandDetails(page);
+    // It opens expanded; then collapsed to the summary.
+    for (const state of ["details", "summary"] as const) {
+      if (state === "details") await expectDetailsExpanded(page);
+      else await collapseDetails(page);
       const card = await settledBox(detailsPanel(page));
       expect(card.width, `${state}: at most 400px wide`).toBeLessThanOrEqual(400);
       expect(card.x - map.x, `${state}: on the left`).toBeLessThanOrEqual(32);
@@ -503,13 +551,16 @@ test.describe("details panel", () => {
     // of reach: scrolled to, it is on screen, inside the card, and nothing covers it.
     expect(await panel.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
     const directions = panel.getByRole("link", { name: "Directions" });
-    for (const state of ["summary", "details"] as const) {
+    // It opens expanded; then collapsed to the summary.
+    for (const state of ["details", "summary"] as const) {
       if (state === "details") {
-        await expandDetails(page);
-        // The details below don't take its place: scroll back up to it.
+        await expectDetailsExpanded(page);
+        // The details below don't take its place: scroll to the bottom, then back up to it.
         await panel.evaluate((el) => {
           el.scrollTop = el.scrollHeight;
         });
+      } else {
+        await collapseDetails(page);
       }
       await directions.scrollIntoViewIfNeeded();
       await expect(directions, `${state}: Directions is on screen`).toBeInViewport();
