@@ -1,0 +1,107 @@
+/* ── BottomSheet ──────────────────────────────────────────
+ * Non-modal, pinned to the bottom of its positioned container. Height follows the content,
+ * capped by --bottom-sheet-max-height; the body scrolls inside.
+ *
+ * --bottom-sheet-padding-bottom: the body's bottom padding (--space-s by default). The larger
+ * of it and the safe-area inset is used, never their sum.
+ */
+
+.bottom-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+  max-height: var(--bottom-sheet-max-height, 60%);
+  background: var(--color-base-white);
+  color: var(--color-primary-navy);
+  border-radius: var(--space-s) var(--space-s) 0 0;
+  box-shadow: 0 -4px 24px rgba(10, 22, 94, 0.14);
+  animation: bottom-sheet-in 0.2s ease-out;
+  transition: transform 0.2s ease-out;
+}
+
+.bottom-sheet--dragging {
+  transition: none;
+}
+
+@keyframes bottom-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* A 20px band (the grip and a little air); the hit area grows to --tap-min upwards, over the
+ * map, so it takes nothing from the content below. */
+.bottom-sheet__handle {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 20px;
+  padding: 8px 0 0;
+  margin: 0;
+  border: 0;
+  border-radius: var(--space-s) var(--space-s) 0 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: grab;
+  /* The handle drags: don't let the browser scroll or zoom from it. */
+  touch-action: none;
+}
+
+.bottom-sheet__handle::before {
+  content: "";
+  position: absolute;
+  inset: calc(20px - var(--tap-min, 44px)) 0 0;
+}
+
+.bottom-sheet--dragging .bottom-sheet__handle {
+  cursor: grabbing;
+}
+
+.bottom-sheet__handle:focus {
+  outline: none;
+}
+
+.bottom-sheet__handle:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: -4px;
+}
+
+/* The grip is the handle's only visible sign: solid neutral grey (#807f7f, about 4:1 on white),
+ * so it meets the 3:1 asked of non-text graphics. */
+.bottom-sheet__grip {
+  display: block;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-neutral-grey);
+}
+
+.bottom-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: max(
+    var(--bottom-sheet-padding-bottom, var(--space-s, 1rem)),
+    var(--safe-bottom, env(safe-area-inset-bottom, 0px))
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet {
+    animation: none;
+    transition: none;
+  }
+}

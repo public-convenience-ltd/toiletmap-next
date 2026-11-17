@@ -1,130 +1,50 @@
-import {
-  DAYS,
-  formatRange,
-  isOpenNow,
-  londonClock,
-  summariseOpeningTimes,
-} from "@toiletmap/opening-hours";
-import type { ComponentChildren } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
-import type { IconName } from "toiletmap-design-system";
-import { Banner, Button, Icon, Stack } from "toiletmap-design-system";
+import { londonClock } from "@toiletmap/opening-hours";
+import type { ComponentChildren, JSX } from "preact";
+import { useEffect, useId, useRef, useState } from "preact/hooks";
+import { BottomSheet, Button, Icon } from "toiletmap-design-system";
 import { type LooDetail, peekLooDetail } from "../../api/loos";
 import {
   type ChangeOutcome,
   type PendingChange,
   readPendingChange,
   rememberPendingChange,
-  removalCategoryLabel,
   restoreLoo,
   verifyLoo,
 } from "../../api/reports";
+import {
+  directionsUrl,
+  distanceText,
+  keyFeatures,
+  type LatLng,
+  openStatus,
+  paymentText,
+  REMOVED_MESSAGE,
+  removalSummary,
+} from "./format";
+import {
+  type PanelLayout,
+  type PanelState,
+  useLayoutReporter,
+  usePanelMode,
+  useSummaryHeight,
+} from "./layout";
+import ToiletDetails, { type VerifyState } from "./ToiletDetails";
 import styles from "./ToiletDetailsPanel.module.css";
+import ToiletSummary from "./ToiletSummary";
 
-const FEATURES: Array<{ key: keyof LooDetail; label: string; icon: IconName }> = [
-  { key: "accessible", label: "Accessible", icon: "wheelchair-move" },
-  { key: "allGender", label: "All Gender", icon: "person-dress" },
-  { key: "men", label: "Men", icon: "person" },
-  { key: "women", label: "Women", icon: "person-dress" },
-  { key: "children", label: "Children", icon: "child" },
-  { key: "babyChange", label: "Baby Change", icon: "baby" },
-  { key: "radar", label: "Radar Key", icon: "key" },
-  { key: "automatic", label: "Automatic", icon: "gear" },
-];
+export type { LatLng } from "./format";
+export { freshnessLine, REMOVED_MESSAGE, removalSummary } from "./format";
+export type { Occludes, PanelLayout, PanelMode, PanelState } from "./layout";
+export { VERIFIED_MESSAGE, VERIFY_LABEL } from "./ToiletDetails";
 
-/** Today's index (Mon = 0) in UK local time, matching how the hours are stored. */
-function todayIndex(now: Date): number {
-  return londonClock(now).dayIndex;
-}
-
-function formatDayHours(day: [string, string] | [] | undefined): string {
-  if (day === undefined) return "Not known";
-  return formatRange(day);
-}
-
-function openNowText(openingTimes: LooDetail["openingTimes"], now: Date): string | null {
-  const status = isOpenNow(openingTimes, now);
-  if (status.state === "open") {
-    return status.closesAt ? `Open now · closes ${status.closesAt}` : "Open now";
-  }
-  if (status.state === "closed") {
-    return status.opensAt ? `Closed now · opens ${status.opensAt}` : "Closed now";
-  }
-  return null;
-}
-
-/**
- * The freshness line: whichever of the last verification and the last edit is more recent,
- * with the matching label (verifying doesn't bump `updatedAt`, and an edit doesn't verify).
- */
-export function freshnessLine(
-  verifiedAt: string | null | undefined,
-  updatedAt: string | null | undefined,
-): string {
-  const time = (iso: string | null | undefined) => {
-    const ms = iso ? Date.parse(iso) : Number.NaN;
-    return Number.isFinite(ms) ? ms : null;
-  };
-  const verified = time(verifiedAt);
-  const updated = time(updatedAt);
-  if (verified !== null && (updated === null || verified >= updated)) {
-    return `Last verified: ${formatUpdatedAt(verifiedAt ?? null)}`;
-  }
-  return `Last updated: ${formatUpdatedAt(updated === null ? null : (updatedAt ?? null))}`;
-}
-
-function formatUpdatedAt(iso: string | null): string {
-  if (!iso) return "Unknown";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(iso));
-}
-
-function FeatureStatus({ value }: { value: boolean | null | undefined }) {
-  if (value === true) {
-    return (
-      <Icon icon="check" size="medium" style={{ color: "var(--color-success)" }} aria-label="Yes" />
-    );
-  }
-  if (value === false) {
-    return (
-      <Icon
-        icon="xmark"
-        size="medium"
-        style={{ color: "var(--color-accent-pink)" }}
-        aria-label="No"
-      />
-    );
-  }
-  return (
-    <Icon
-      icon="question"
-      size="medium"
-      style={{ color: "var(--color-neutral-grey)" }}
-      aria-label="Unknown"
-    />
-  );
-}
-
-export const REMOVED_MESSAGE = "This toilet has been removed from the map";
 export const SAVED_MESSAGE = "Thanks — your changes are live.";
 export const PENDING_MESSAGE = "You suggested a change to this toilet — it's awaiting review.";
-export const VERIFIED_MESSAGE = "Thanks!";
 export const RESTORED_MESSAGE = "Thanks — it's back on the map.";
 export const RESTORE_QUEUED_MESSAGE = "Thanks — a moderator will review your request.";
-
-/**
- * "Removed from the map: <category> — <reason>" for a removed toilet, or null when neither is
- * recorded (the generic {@link REMOVED_MESSAGE} is shown instead).
- */
-export function removalSummary(toilet: LooDetail): string | null {
-  const label = removalCategoryLabel(toilet.removalCategory);
-  const reason = typeof toilet.removalReason === "string" ? toilet.removalReason.trim() : "";
-  if (!label && !reason) return null;
-  return `Removed from the map${label ? `: ${label}` : ""}${reason ? ` — ${reason}` : ""}`;
-}
+/** The restore button, for someone whose restore a moderator checks first. */
+export const RESTORE_BUTTON_LABEL = "It's still here — ask to restore";
+/** The restore button, for someone whose restore goes live straight away. */
+export const RESTORE_NOW_BUTTON_LABEL = "It's still here — restore it";
 
 /** Reads (without consuming) `?restore=1` when the address bar is on this toilet's page. */
 function hasRestoreParam(id: string): boolean {
@@ -148,19 +68,48 @@ function stripRestoreParam() {
   );
 }
 
-type VerifyState =
-  | { status: "idle" | "sending" }
-  | { status: "done"; verifiedAt: string }
-  | { status: "error"; message: string };
+/** Where focus goes when the panel closes: the opener, else the map's search box. */
+function focusReturnTarget(returnFocusTo: HTMLElement | null | undefined) {
+  const target =
+    returnFocusTo?.isConnected === true
+      ? returnFocusTo
+      : document.querySelector<HTMLElement>('input[type="search"]');
+  target?.focus({ preventScroll: true });
+}
 
 type RestoreState = { status: "idle" | "sending" } | { status: "done"; outcome: ChangeOutcome };
 
-interface ToiletDetailsPanelProps {
+type NoticeTone = "success" | "info" | "warning" | "error";
+
+/** One slim notice line in the summary. */
+function NoticeLine({
+  tone,
+  children,
+  action,
+}: {
+  tone: NoticeTone;
+  children: ComponentChildren;
+  action?: ComponentChildren;
+}) {
+  return (
+    <div className={styles.notice} data-tone={tone}>
+      <Icon
+        icon={tone === "success" ? "check" : tone === "info" ? "info" : "warning"}
+        size="small"
+        class={styles.noticeIcon}
+      />
+      <div className={styles.noticeText}>{children}</div>
+      {action}
+    </div>
+  );
+}
+
+export interface ToiletDetailsPanelProps {
   toilet: LooDetail;
   onClose: () => void;
   /** Base URL for API calls; "" (the same-origin /api proxy) by default. */
   apiUrl?: string;
-  /** Optional message shown at the top of the panel (e.g. the "changes are live" banner). */
+  /** Optional slim message in the summary (e.g. an offline / stale-data notice). */
   notice?: ComponentChildren;
   /**
    * The toilet is no longer on the map (deleted, or marked inactive since it was opened).
@@ -168,7 +117,7 @@ interface ToiletDetailsPanelProps {
    * `active` is false is shown as removed without this.
    */
   removed?: boolean;
-  /** Show the dismissible "your changes are live" banner (after a save, `?saved=1`). */
+  /** Show the dismissible "your changes are live" notice (after a save, `?saved=1`). */
   saved?: boolean;
   onDismissSaved?: () => void;
   /**
@@ -177,8 +126,37 @@ interface ToiletDetailsPanelProps {
    * that a moderator will check first.
    */
   canWriteDirectly?: boolean;
+  /** The viewer's location, for the distance in the summary. */
+  userLocation?: LatLng | null;
+  /** Open with the details showing (the summary is the default). `?restore=1` also opens them. */
+  initialExpanded?: boolean;
+  /** Where focus returns when the panel closes; the map's search input otherwise. */
+  returnFocusTo?: HTMLElement | null;
+  /**
+   * Called whenever the panel's size or position changes (contract P1): what it covers of the
+   * map container, so the map can keep the selected marker clear of it.
+   */
+  onLayoutChange?: (layout: PanelLayout) => void;
+  /** Desktop card: px from the top of the map container (below the search bar). */
+  cardTop?: number;
 }
 
+/**
+ * The toilet details panel. A marker tap shows the compact summary (name, distance, open now,
+ * key features, Directions and Details); Details expands the rest.
+ *
+ * - Below 768px: a non-modal bottom sheet (peek / expanded, capped at 60% of the map).
+ * - From 768px: a floating card on the left, under the search bar, scrolling inside.
+ *
+ * Close (the X) always closes. Escape inside the panel collapses the details first, then
+ * closes, as do the sheet's handle and the Details toggle. Focus moves to the heading on open
+ * and back to `returnFocusTo` (or the search box) on close.
+ *
+ * On short screens (a phone in landscape, ≥768px wide but ≤560px tall) the card scrolls as a
+ * whole, so its summary, notices and actions can't be squeezed out of reach.
+ *
+ * Positions itself absolutely: render it directly inside the (positioned) map container.
+ */
 export default function ToiletDetailsPanel({
   toilet,
   onClose,
@@ -188,10 +166,30 @@ export default function ToiletDetailsPanel({
   saved = false,
   onDismissSaved,
   canWriteDirectly = false,
+  userLocation = null,
+  initialExpanded = false,
+  returnFocusTo,
+  onLayoutChange,
+  cardTop,
 }: ToiletDetailsPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const mode = usePanelMode();
+  const uid = useId();
+  const titleId = `${uid}-title`;
+  const detailsId = `${uid}-details`;
+  const [expanded, setExpanded] = useState(
+    () => initialExpanded || (hasRestoreParam(toilet.id) && (removed || toilet.active === false)),
+  );
+  const panelState: PanelState = expanded ? "expanded" : "peek";
+
+  const rootRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const detailsToggleRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef(returnFocusTo);
+  returnFocusRef.current = returnFocusTo;
+
   const now = new Date();
-  const today = todayIndex(now);
+  const today = londonClock(now).dayIndex;
 
   /** The toilet as changed by an action in this panel (a restore), until the prop changes. */
   const [local, setLocal] = useState<{ base: LooDetail; value: LooDetail } | null>(null);
@@ -202,7 +200,7 @@ export default function ToiletDetailsPanel({
   const [pending, setPending] = useState<PendingChange | null>(() => readPendingChange(toilet.id));
   const restoreHeadingRef = useRef<HTMLHeadingElement>(null);
   const restoreResultRef = useRef<HTMLDivElement>(null);
-  const restoreActionsRef = useRef<HTMLDivElement>(null);
+  const restoreActionRef = useRef<HTMLDivElement>(null);
 
   const override = local && local.base === toilet ? local.value : null;
   // When the map says the toilet has gone, its refetched (inactive) detail may be cached:
@@ -211,20 +209,33 @@ export default function ToiletDetailsPanel({
   const current: LooDetail =
     override ?? (peeked && peeked.id === toilet.id && peeked.active === false ? peeked : toilet);
   const isRemoved = override ? override.active === false : removed || current.active === false;
-  const openNow = isRemoved ? null : openNowText(current.openingTimes, now);
   /** We have the removed record itself, so it can be restored from here. */
   const canRestore = isRemoved && current.active === false;
-  const summary = isRemoved && current.active === false ? removalSummary(current) : null;
+  const summary = canRestore ? removalSummary(current) : null;
   const duplicateOf =
     isRemoved && typeof current.duplicateOf === "string" && current.duplicateOf
       ? current.duplicateOf
       : null;
 
   const looHref = `/loos/${encodeURIComponent(toilet.id)}`;
-  const directionsUrl =
-    current.location && !isRemoved
-      ? `https://maps.apple.com/?dirflg=w&daddr=${current.location.lat},${current.location.lng}`
-      : null;
+  const directionsHref = current.location && !isRemoved ? directionsUrl(current.location) : null;
+
+  useLayoutReporter(rootRef, mode, panelState, onLayoutChange);
+  // The expanded sheet's summary is sticky: its scroller pads its top by the summary's height.
+  useSummaryHeight(rootRef, summaryRef, mode === "sheet" && expanded);
+
+  // Focus the heading on open, and hand focus back on close if it was still in the panel
+  // (closed from outside: Escape on the map, Back, another marker).
+  useEffect(() => {
+    headingRef.current?.focus({ preventScroll: true });
+    return () => {
+      const root = rootRef.current;
+      const active = document.activeElement;
+      if (!active || active === document.body || root?.contains(active)) {
+        focusReturnTarget(returnFocusRef.current);
+      }
+    };
+  }, []);
 
   // `?restore=1` (e.g. from the add form's "Is it back? Restore it") opens the restore prompt.
   useEffect(() => {
@@ -240,6 +251,34 @@ export default function ToiletDetailsPanel({
   useEffect(() => {
     if (restore.status === "done") restoreResultRef.current?.focus();
   }, [restore.status]);
+
+  const setPanelState = (next: PanelState) => {
+    if (next === "peek") {
+      // Focus inside the details would be lost when they unmount: keep it on the toggle.
+      const details = document.getElementById(detailsId);
+      if (details?.contains(document.activeElement)) detailsToggleRef.current?.focus();
+    }
+    setExpanded(next === "expanded");
+  };
+
+  const close = () => {
+    focusReturnTarget(returnFocusRef.current);
+    onClose();
+  };
+
+  /** Escape: collapse the details first, then close (legacy behaviour). */
+  const dismiss = () => {
+    if (expanded) setPanelState("peek");
+    else close();
+  };
+
+  const onCardKeyDown = (event: JSX.TargetedKeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    event.preventDefault();
+    // Scoped to the panel: the map's own Escape handler would close it outright.
+    event.stopPropagation();
+    dismiss();
+  };
 
   const onVerify = async () => {
     if (verify.status === "sending") return;
@@ -280,11 +319,16 @@ export default function ToiletDetailsPanel({
     setRestore({ status: "done", outcome: result });
   };
 
+  const openRestore = () => {
+    setExpanded(true);
+    setRestoreOpen(true);
+  };
+
   const cancelRestore = () => {
     setRestoreOpen(false);
     setRestore({ status: "idle" });
     // The prompt's trigger comes back on the next render.
-    requestAnimationFrame(() => restoreActionsRef.current?.querySelector("button")?.focus());
+    requestAnimationFrame(() => restoreActionRef.current?.querySelector("button")?.focus());
   };
 
   const restoreSucceeded =
@@ -300,14 +344,14 @@ export default function ToiletDetailsPanel({
     const r = restore.outcome;
     switch (r.kind) {
       case "applied":
-        return <Banner variant="success">{RESTORED_MESSAGE}</Banner>;
+        return <NoticeLine tone="success">{RESTORED_MESSAGE}</NoticeLine>;
       case "queued":
-        return <Banner variant="success">{RESTORE_QUEUED_MESSAGE}</Banner>;
+        return <NoticeLine tone="success">{RESTORE_QUEUED_MESSAGE}</NoticeLine>;
       case "notRemoved":
-        return <Banner variant="info">It's already back on the map.</Banner>;
+        return <NoticeLine tone="info">It's already back on the map.</NoticeLine>;
       case "conflict":
         return (
-          <Banner variant="warning">
+          <NoticeLine tone="warning">
             Someone else changed this toilet since you opened it.{" "}
             <button
               type="button"
@@ -317,66 +361,108 @@ export default function ToiletDetailsPanel({
               Reload
             </button>{" "}
             to see the latest version.
-          </Banner>
+          </NoticeLine>
         );
       case "notFound":
         return (
-          <Banner variant="error">We couldn't find this toilet — it may have been deleted.</Banner>
+          <NoticeLine tone="error">
+            We couldn't find this toilet — it may have been deleted.
+          </NoticeLine>
         );
       case "auth":
         return (
-          <Banner variant="error">
+          <NoticeLine tone="error">
             Your sign-in has expired.{" "}
             <a href={`/auth/login?returnTo=${encodeURIComponent(`${looHref}?restore=1`)}`}>
               Sign in again
             </a>{" "}
             to restore it.
-          </Banner>
+          </NoticeLine>
         );
       case "rateLimited":
         return (
-          <Banner variant="error">
+          <NoticeLine tone="error">
             You've sent a lot of requests in a short time. Please try again later.
-          </Banner>
+          </NoticeLine>
         );
       case "error":
-        return <Banner variant="error">{r.message}</Banner>;
+        return <NoticeLine tone="error">{r.message}</NoticeLine>;
       default:
         return null;
     }
   })();
 
-  const removedNotice = isRemoved ? (
-    <div role="status" className={styles.removedNotice}>
-      <Banner variant="info">
-        <p className={styles.removedText}>{summary ?? `${REMOVED_MESSAGE}.`}</p>
-        {duplicateOf && (
-          <p className={styles.removedText}>
-            <a href={`/loos/${encodeURIComponent(duplicateOf)}`}>See the toilet it duplicates</a>
-          </p>
-        )}
-        {canRestore && !restoreOpen && !restoreSucceeded && (
-          <div className={styles.removedActions} ref={restoreActionsRef}>
-            <Button
-              htmlElement="button"
-              type="button"
-              variant="secondary"
-              onClick={() => setRestoreOpen(true)}
-            >
-              It's still here — ask to restore
-            </Button>
+  const notices =
+    notice || isRemoved || showSaved || showPending || restoreResult ? (
+      <div className={styles.notices}>
+        {isRemoved && (
+          <div role="status">
+            <NoticeLine tone="warning">
+              <p className={styles.noticeParagraph}>{summary ?? `${REMOVED_MESSAGE}.`}</p>
+              {duplicateOf && (
+                <p className={styles.noticeParagraph}>
+                  <a href={`/loos/${encodeURIComponent(duplicateOf)}`}>
+                    See the toilet it duplicates
+                  </a>
+                </p>
+              )}
+            </NoticeLine>
           </div>
         )}
-      </Banner>
-    </div>
-  ) : null;
+        {restoreResult && (
+          <div ref={restoreResultRef} tabIndex={-1} role="status" className={styles.focusTarget}>
+            {restoreResult}
+          </div>
+        )}
+        {showSaved && (
+          <div role="status">
+            <NoticeLine
+              tone="success"
+              action={
+                onDismissSaved && (
+                  <button
+                    type="button"
+                    className={styles.noticeDismiss}
+                    aria-label="Dismiss message"
+                    onClick={onDismissSaved}
+                  >
+                    <Icon icon="xmark" size="small" />
+                  </button>
+                )
+              }
+            >
+              {SAVED_MESSAGE}
+            </NoticeLine>
+          </div>
+        )}
+        {showPending && (
+          <div role="status">
+            <NoticeLine tone="info">{PENDING_MESSAGE}</NoticeLine>
+          </div>
+        )}
+        {notice && <div className={styles.noticeSlot}>{notice}</div>}
+      </div>
+    ) : null;
+
+  const restoreAction =
+    canRestore && !restoreOpen && !restoreSucceeded ? (
+      <div className={styles.restoreAction} ref={restoreActionRef}>
+        <Button htmlElement="button" type="button" variant="primary" onClick={openRestore}>
+          {canWriteDirectly ? RESTORE_NOW_BUTTON_LABEL : RESTORE_BUTTON_LABEL}
+        </Button>
+      </div>
+    ) : null;
 
   const restorePrompt =
     canRestore && restoreOpen ? (
-      <form className={styles.restorePrompt} onSubmit={onRestore} aria-labelledby="restore-heading">
+      <form
+        className={styles.restorePrompt}
+        onSubmit={onRestore}
+        aria-labelledby={`${uid}-restore-heading`}
+      >
         <h3
-          id="restore-heading"
-          className={styles.colHeading}
+          id={`${uid}-restore-heading`}
+          className={styles.sectionHeading}
           tabIndex={-1}
           ref={restoreHeadingRef}
         >
@@ -390,11 +476,11 @@ export default function ToiletDetailsPanel({
         {/* A trusted restore is applied straight away and the server ignores its details. */}
         {!canWriteDirectly && (
           <>
-            <label htmlFor={`restore-details-${toilet.id}`} className={styles.restoreLabel}>
+            <label htmlFor={`${uid}-restore-details`} className={styles.restoreLabel}>
               Anything we should know? (optional)
             </label>
             <textarea
-              id={`restore-details-${toilet.id}`}
+              id={`${uid}-restore-details`}
               className={`text-area ${styles.restoreTextarea}`}
               rows={3}
               maxLength={2000}
@@ -403,7 +489,7 @@ export default function ToiletDetailsPanel({
             />
           </>
         )}
-        <div className={styles.removedActions}>
+        <div className={styles.detailActions}>
           <Button
             htmlElement="button"
             type="submit"
@@ -425,219 +511,69 @@ export default function ToiletDetailsPanel({
       </form>
     ) : null;
 
-  const notices =
-    notice || isRemoved || showSaved || showPending || restoreResult ? (
-      <div className={styles.notices}>
-        {removedNotice}
-        {restorePrompt}
-        {restoreResult && (
-          <div ref={restoreResultRef} tabIndex={-1} role="status" className={styles.focusTarget}>
-            {restoreResult}
-          </div>
-        )}
-        {showSaved && (
-          <div role="status">
-            <Banner variant="success">
-              <div className={styles.noticeRow}>
-                <span>{SAVED_MESSAGE}</span>
-                {onDismissSaved && (
-                  <button
-                    type="button"
-                    className={styles.noticeDismiss}
-                    aria-label="Dismiss message"
-                    onClick={onDismissSaved}
-                  >
-                    <Icon icon="xmark" size="small" />
-                  </button>
-                )}
-              </div>
-            </Banner>
-          </div>
-        )}
-        {showPending && (
-          <div role="status">
-            <Banner variant="info">{PENDING_MESSAGE}</Banner>
-          </div>
-        )}
-        {notice}
-      </div>
-    ) : null;
+  const summaryView = (
+    <ToiletSummary
+      name={current.name?.trim() || "Toilet"}
+      titleId={titleId}
+      headingRef={headingRef}
+      summaryRef={summaryRef}
+      distance={isRemoved ? null : distanceText(userLocation, current.location)}
+      status={isRemoved ? null : openStatus(current.openingTimes, now)}
+      features={isRemoved ? [] : keyFeatures(current)}
+      payment={isRemoved ? null : paymentText(current)}
+      directionsHref={directionsHref}
+      restoreAction={restoreAction}
+      expanded={expanded}
+      detailsId={detailsId}
+      detailsToggleRef={detailsToggleRef}
+      onToggleDetails={() => setPanelState(expanded ? "peek" : "expanded")}
+      onClose={close}
+      notices={notices}
+    />
+  );
 
-  const verifiedAt = verify.status === "done" ? verify.verifiedAt : current.verifiedAt;
+  const detailsView = expanded ? (
+    <ToiletDetails
+      id={detailsId}
+      toilet={current}
+      isRemoved={isRemoved}
+      today={today}
+      verify={verify}
+      onVerify={onVerify}
+      verifiedAt={verify.status === "done" ? verify.verifiedAt : current.verifiedAt}
+      restorePrompt={restorePrompt}
+    />
+  ) : null;
 
-  if (!isExpanded) {
+  if (mode === "sheet") {
     return (
-      <div className={styles.collapsed}>
-        <div className={styles.collapsedHeader}>
-          <h2 className={styles.name}>{current.name ?? "Toilet"}</h2>
-          <Button htmlElement="button" variant="secondary" onClick={onClose}>
-            <Icon icon="xmark" size="small" />
-            Close
-          </Button>
-        </div>
-        {notices}
-        <div className={styles.collapsedActions}>
-          {directionsUrl && (
-            <Button
-              htmlElement="a"
-              variant="primary"
-              href={directionsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Icon icon="diamond-turn-right" size="small" />
-              Directions
-            </Button>
-          )}
-          <Button htmlElement="button" variant="secondary" onClick={() => setIsExpanded(true)}>
-            <Icon icon="list" size="small" />
-            Details
-          </Button>
-        </div>
-      </div>
+      <BottomSheet
+        sheetRef={rootRef}
+        class={`toilet-panel ${styles.panel} ${styles.sheet}`}
+        state={panelState}
+        onStateChange={setPanelState}
+        onDismiss={close}
+        aria-labelledby={titleId}
+        handleLabel="Toilet details"
+        controls={expanded ? detailsId : undefined}
+      >
+        {summaryView}
+        {detailsView}
+      </BottomSheet>
     );
   }
 
   return (
-    <div className={styles.expanded}>
-      <div className={styles.expandedHeader}>
-        <Button htmlElement="button" variant="secondary" onClick={onClose}>
-          <Icon icon="xmark" size="small" />
-          Close
-        </Button>
-      </div>
-
-      <div className={styles.expandedContent}>
-        {notices}
-        <div className={styles.grid}>
-          {/* Column 1: Details */}
-          <Stack space="m">
-            <h2 className={styles.name}>{current.name ?? "Toilet"}</h2>
-            {directionsUrl && (
-              <div className={styles.directionsWrapper}>
-                <Button
-                  htmlElement="a"
-                  variant="primary"
-                  href={directionsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Icon icon="diamond-turn-right" size="small" />
-                  Directions
-                </Button>
-              </div>
-            )}
-            {!isRemoved && (
-              <div>
-                <p className={styles.verifyPrompt}>Is this toilet still here?</p>
-                <div className={styles.verifyActions}>
-                  {verify.status !== "done" && (
-                    <Button
-                      htmlElement="button"
-                      type="button"
-                      variant="primary"
-                      onClick={onVerify}
-                      disabled={verify.status === "sending"}
-                      aria-busy={verify.status === "sending"}
-                    >
-                      <Icon icon="check" size="small" />
-                      Yes, it's still here
-                    </Button>
-                  )}
-                  <Button htmlElement="a" variant="secondary" href={`${looHref}/edit`}>
-                    <Icon icon="pen-to-square" size="small" />
-                    Suggest an edit
-                  </Button>
-                  <Button htmlElement="a" variant="secondary" href={`${looHref}/remove`}>
-                    <Icon icon="warning" size="small" />
-                    Report a problem
-                  </Button>
-                </div>
-                <div role="status" className={styles.verifyStatus}>
-                  {verify.status === "done" && (
-                    <span className={styles.verifyThanks}>
-                      <Icon icon="check" size="small" />
-                      {VERIFIED_MESSAGE}
-                    </span>
-                  )}
-                  {verify.status === "error" && (
-                    <span className={styles.verifyError}>{verify.message}</span>
-                  )}
-                </div>
-              </div>
-            )}
-            {current.notes?.trim() && (
-              <div>
-                <h3 className={styles.colHeading}>Notes</h3>
-                <p className={styles.notes}>{current.notes.trim()}</p>
-              </div>
-            )}
-            <p className={styles.updatedAt}>{freshnessLine(verifiedAt, current.updatedAt)}</p>
-          </Stack>
-
-          {/* Column 2: Features */}
-          <div>
-            <h3 className={styles.colHeading}>Features</h3>
-            <ul className={styles.featureList}>
-              {FEATURES.map(({ key, label, icon }) => (
-                <li key={key} className={styles.featureItem}>
-                  <span className={styles.featureLabel}>
-                    <Icon icon={icon} size="medium" />
-                    {label}
-                  </span>
-                  <FeatureStatus value={current[key] as boolean | null | undefined} />
-                </li>
-              ))}
-            </ul>
-            {current.noPayment === false && (
-              <div className={styles.feeSection}>
-                <h4 className={styles.feeHeading}>Fee</h4>
-                <p className={styles.feeDetail}>{current.paymentDetails ?? "Unknown"}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Column 3: Opening Hours */}
-          <div>
-            <h3 className={styles.colHeading}>
-              <Icon icon="clock" size="small" />
-              Opening Hours
-            </h3>
-            {current.openingTimes === null || current.openingTimes === undefined ? (
-              <p className={styles.hoursUnknown}>Opening hours not known</p>
-            ) : (
-              <>
-                {openNow && (
-                  <p className={styles.openNow} data-testid="open-now">
-                    {openNow}
-                  </p>
-                )}
-                <p className={styles.hoursSummary}>{summariseOpeningTimes(current.openingTimes)}</p>
-                <ul className={styles.hoursList}>
-                  {DAYS.map((day, i) => {
-                    const dayEntry = current.openingTimes?.[i];
-                    return (
-                      <li
-                        key={day}
-                        className={`${styles.hoursRow}${i === today ? ` ${styles.today}` : ""}`}
-                      >
-                        <span className={styles.dayName}>{day}</span>
-                        <span className={styles.dayHours}>{formatDayHours(dayEntry)}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            )}
-            {!isRemoved && (
-              <p className={styles.hoursNote}>
-                Hours may vary with national holidays or seasonal changes.{" "}
-                <a href={`${looHref}/edit#hours`}>Edit this toilet</a> if out of date.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <section
+      ref={rootRef}
+      className={`toilet-panel ${styles.panel} ${styles.card}`}
+      aria-labelledby={titleId}
+      data-state={panelState}
+      style={cardTop === undefined ? undefined : { "--toilet-panel-top": `${cardTop}px` }}
+      onKeyDown={onCardKeyDown}
+    >
+      {summaryView}
+      {detailsView && <div className={styles.cardBody}>{detailsView}</div>}
+    </section>
   );
 }

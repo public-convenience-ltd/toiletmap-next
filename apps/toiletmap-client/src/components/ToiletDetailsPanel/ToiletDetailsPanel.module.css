@@ -1,217 +1,304 @@
-/* ── Collapsed state ─────────────────────────────────────── */
+/* ── Containers ──────────────────────────────────────────────
+ * The panel positions itself inside the map container. Rules use two classes so they win
+ * over any older `.toilet-panel` placement rule whatever the stylesheet order.
+ */
 
-.collapsed {
-  padding: var(--space-s) var(--space-m) var(--space-m);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
+.panel {
+  /* Secondary text: 6.4:1 on white (the DS neutral grey, #807f7f, is only 4:1). */
+  --panel-muted: #5f5e5e;
+  /* Secondary text never below 14px; body text (hours, notes) is --text-0, 16px and up. */
+  --panel-text-small: max(0.875rem, var(--text--1));
+  color: var(--color-primary-navy);
+  font-family: var(--font-family);
 }
 
-.collapsedHeader {
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Mobile: the DS BottomSheet places it; keep it over the map's floating buttons. The body
+ * pads the bottom by the larger of --space-s and the safe area, so the content adds none. */
+.panel.sheet {
+  z-index: 1500;
+  --bottom-sheet-padding-bottom: var(--space-s);
+}
+
+/* Desktop (≥768px): a floating card on the left, below the search bar. */
+.panel.card {
+  --toilet-panel-gap: var(--space-s);
+  position: absolute;
+  top: var(--toilet-panel-top, calc(var(--space-s) + 3.75rem + var(--space-xs)));
+  left: calc(var(--toilet-panel-gap) + var(--safe-left, 0px));
+  right: auto;
+  bottom: auto;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, 40vw);
+  /* No --safe-bottom: from 768px the footer below the map already pads the safe area. */
+  max-height: calc(
+    100% -
+    var(--toilet-panel-top, calc(var(--space-s) + 3.75rem + var(--space-xs))) -
+    var(--toilet-panel-gap)
+  );
+  overflow: hidden;
+  background: var(--color-base-white);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(10, 22, 94, 0.18);
+}
+
+.cardBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--color-light-grey);
+  scrollbar-color: var(--color-neutral-grey) transparent;
+}
+
+/* ── Summary ─────────────────────────────────────────────── */
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-xs) var(--space-s) var(--space-s);
+}
+
+/* The handle above is the top padding; the sheet's body pads the bottom. Side padding keeps
+ * clear of a landscape phone's notch and rounded corners. */
+.sheet .summary {
+  padding: 0 calc(var(--space-s) + var(--safe-right, 0px)) 0
+    calc(var(--space-s) + var(--safe-left, 0px));
+}
+
+/* Expanded, the name, X and Directions stay in view while the details scroll beneath (the
+ * card's summary sits above its own scroller, so it never moves). */
+.sheet[data-state="expanded"] .summary {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: var(--space-xs);
+  background: var(--color-base-white);
+  border-bottom: 1px solid var(--color-light-grey);
+}
+
+/* Something focused beneath the pinned summary (Tab through the details) scrolls clear of it:
+ * the sheet's scroller pads its top by the summary's height, which the panel measures. */
+.sheet[data-state="expanded"] :global(.bottom-sheet__body) {
+  scroll-padding-top: var(--panel-summary-height, 0px);
+}
+
+.summaryHeader {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-s);
+  gap: var(--space-2xs);
 }
 
-.collapsedActions {
-  display: flex;
-  gap: var(--space-s);
-  flex-wrap: wrap;
-}
-
-/* ── Expanded state ──────────────────────────────────────── */
-
-.expanded {
-  max-height: 70vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.expandedHeader {
-  display: flex;
-  justify-content: flex-end;
-  padding: var(--space-s) var(--space-m) 0;
-  flex-shrink: 0;
-}
-
-.expandedContent {
+.titleBlock {
   flex: 1;
-  overflow-y: auto;
-  padding: var(--space-xs) var(--space-m) var(--space-l);
-  scrollbar-color: var(--color-primary-navy) var(--color-light-grey);
+  min-width: 0;
 }
-
-/* Directions button — prevent flex column from stretching it full-width */
-.directionsWrapper {
-  display: flex;
-  width: fit-content;
-}
-
-/* 3-col grid → 1 col on small screens */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-l);
-  align-items: start;
-}
-
-@media (max-width: 640px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── Typography ──────────────────────────────────────────── */
 
 .name {
+  margin: 0;
   font-size: var(--text-1);
   font-weight: 700;
+  line-height: 1.25;
   color: var(--color-primary-navy);
-  margin: 0;
-}
-
-.colHeading {
-  font-size: var(--text-0);
-  font-weight: 700;
-  margin: 0 0 var(--space-s);
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-/* ── Details column ──────────────────────────────────────── */
-
-.verifyPrompt {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--text-0);
-}
-
-.verifyActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-s);
-  flex-wrap: wrap;
-}
-
-.verifyNoSpan {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-size: var(--text--1);
-}
-
-.updatedAt {
-  font-size: var(--text--1);
-  color: var(--color-neutral-grey);
-  margin: 0;
-}
-
-/* ── Features column ─────────────────────────────────────── */
-
-.featureList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.featureItem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2xs) 0;
-  border-bottom: 1px solid var(--color-light-grey);
-  font-size: var(--text-0);
-}
-
-.featureLabel {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.feeSection {
-  margin-top: var(--space-s);
-}
-
-.feeHeading {
-  font-size: var(--text--1);
-  font-weight: 700;
-  margin: 0 0 var(--space-3xs);
-}
-
-.feeDetail {
-  font-size: var(--text--1);
-  margin: 0;
-  color: var(--color-neutral-grey);
-}
-
-/* ── Opening hours column ────────────────────────────────── */
-
-.hoursList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.hoursRow {
-  display: flex;
-  justify-content: space-between;
-  padding: var(--space-3xs) var(--space-xs);
-  font-size: var(--text--1);
-  border-radius: var(--space-3xs);
-}
-
-.today {
-  background: var(--color-frost-ice);
-  font-weight: 700;
-}
-
-.dayName {
-  color: var(--color-primary-navy);
-}
-
-.dayHours {
-  color: var(--color-neutral-grey);
-}
-
-.hoursUnknown {
-  font-size: var(--text--1);
-  color: var(--color-neutral-grey);
-  margin: 0;
-}
-
-.notes {
-  font-size: var(--text--1);
-  margin: 0;
-  white-space: pre-line;
   overflow-wrap: anywhere;
 }
 
-.hoursNote {
-  font-size: var(--text--2);
-  color: var(--color-neutral-grey);
-  margin: var(--space-xs) 0 0;
+.name:focus {
+  outline: none;
 }
 
-.hoursNote a {
+.name:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3xs) var(--space-2xs);
+  margin: var(--space-3xs) 0 0;
+  font-size: var(--panel-text-small);
+}
+
+.distance {
+  color: var(--panel-muted);
+  font-weight: 600;
+}
+
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  line-height: 1.4;
+  background: var(--color-light-grey);
+  color: #4a4a4a;
+}
+
+.statusChip[data-tone="open"] {
+  background: #e2f5f0;
+  color: #0f6b5a;
+}
+
+.statusChip[data-tone="closed"] {
+  background: #fde8ed;
+  color: #a51d3b;
+}
+
+/* "Free", "Paid", "Paid: 20p": words, as one £ icon can't tell free from paid. */
+.paymentChip {
+  display: inline-block;
+  max-width: 14rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  line-height: 1.4;
+  background: var(--color-frost-ice);
+  color: var(--color-primary-navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.closeButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min, 36px);
+  height: var(--tap-min, 36px);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-light-grey);
+  color: var(--color-primary-navy);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .closeButton:hover {
+    background: #e8e8ee;
+  }
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: 2px;
+}
+
+.keyFeatures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.keyFeature {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--color-frost-ice);
   color: var(--color-primary-navy);
 }
 
-/* ── Notices (saved / removed) ───────────────────────────── */
+.summaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.detailsToggle {
+  font: inherit;
+}
+
+.chevron {
+  transition: transform 0.15s ease;
+}
+
+.detailsToggle[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Notices (slim lines in the summary) ─────────────────── */
 
 .notices {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-s);
+  gap: var(--space-3xs);
 }
 
-.noticeRow {
+.notice {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-s);
+  align-items: flex-start;
+  gap: var(--space-2xs);
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: 6px;
+  font-size: var(--panel-text-small);
+  line-height: 1.4;
+  background: var(--color-frost-ice);
+  color: var(--color-primary-navy);
+}
+
+.notice[data-tone="success"] {
+  background: #e2f5f0;
+}
+
+.notice[data-tone="warning"] {
+  background: #fff3dc;
+}
+
+.notice[data-tone="error"] {
+  background: #fde8ed;
+  color: #8c1631;
+}
+
+.noticeIcon {
+  flex-shrink: 0;
+  margin-top: 0.15em;
+}
+
+.noticeText {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.noticeText a {
+  color: inherit;
+}
+
+.noticeParagraph {
+  margin: 0;
+}
+
+.noticeParagraph + .noticeParagraph {
+  margin-top: var(--space-3xs);
+}
+
+.noticeSlot {
+  font-size: var(--panel-text-small);
 }
 
 .noticeDismiss {
@@ -219,97 +306,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 28px;
+  min-height: 28px;
+  margin: -0.25rem -0.25rem -0.25rem 0;
   padding: 0;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   cursor: pointer;
-  border-radius: var(--space-3xs, 4px);
 }
 
 .noticeDismiss:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
-}
-
-/* ── Verify / report actions ─────────────────────────────── */
-
-.verifyStatus:empty {
-  display: none;
-}
-
-.verifyStatus {
-  margin-top: var(--space-2xs);
-  font-size: var(--text--1);
-}
-
-.verifyThanks {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  font-weight: 700;
-  color: var(--color-success);
-}
-
-.verifyError {
-  color: var(--color-accent-pink);
-  font-weight: 700;
-}
-
-/* ── Removed / restore ───────────────────────────────────── */
-
-.removedText {
-  margin: 0;
-}
-
-.removedText + .removedText {
-  margin-top: var(--space-3xs);
-}
-
-.removedText a {
-  color: inherit;
-}
-
-.removedActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin-top: var(--space-xs);
-}
-
-.restorePrompt {
-  padding: var(--space-s);
-  border: 1.5px solid var(--color-primary-navy);
-  border-radius: 8px;
-  background: var(--color-base-white);
-}
-
-.restorePrompt h3:focus {
-  outline: none;
-}
-
-.restorePrompt h3:focus-visible {
-  outline: 2px solid var(--color-accent-turquoise);
-  outline-offset: 2px;
-}
-
-.restoreText {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--text--1);
-}
-
-.restoreLabel {
-  display: block;
-  font-weight: 700;
-  font-size: var(--text--1);
-  margin-bottom: var(--space-3xs);
-}
-
-/* Never below 16px, so iOS doesn't zoom on focus. */
-.restoreTextarea {
-  font-size: max(16px, var(--text-0));
 }
 
 .focusTarget:focus {
@@ -326,23 +336,348 @@
   cursor: pointer;
 }
 
-/* Touch screens: 44px targets for the panel's actions. */
+/* ── Details ─────────────────────────────────────────────── */
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  padding: var(--space-xs) var(--space-s) var(--space-s);
+}
+
+/* As the sheet's summary: clear of the side safe areas, bottom padded by the sheet. */
+.sheet .details {
+  padding: var(--space-xs) calc(var(--space-s) + var(--safe-right, 0px)) 0
+    calc(var(--space-s) + var(--safe-left, 0px));
+}
+
+.section {
+  min-width: 0;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  margin: 0 0 var(--space-3xs);
+  font-size: var(--text-0);
+  font-weight: 700;
+}
+
+.sectionHeading:focus {
+  outline: none;
+}
+
+.sectionHeading:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: 2px;
+}
+
+.muted {
+  margin: 0;
+  font-size: var(--panel-text-small);
+  color: var(--panel-muted);
+}
+
+.hoursSummary {
+  margin: 0;
+  font-size: var(--text-0);
+}
+
+.hoursTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-0);
+}
+
+.hoursTable th,
+.hoursTable td {
+  padding: 0.2rem var(--space-2xs);
+  font-weight: inherit;
+  vertical-align: top;
+}
+
+.hoursTable th {
+  text-align: left;
+}
+
+.hoursTable td {
+  text-align: right;
+  color: #4a4a4a;
+}
+
+/* Today: highlighted (and aria-current="date"), no extra pill. */
+.hoursTable tr.today {
+  background: var(--color-frost-ice);
+  font-weight: 700;
+}
+
+.hoursTable tr.today td {
+  color: var(--color-primary-navy);
+}
+
+.hoursTable tr.today th {
+  border-radius: 4px 0 0 4px;
+}
+
+.hoursTable tr.today td {
+  border-radius: 0 4px 4px 0;
+}
+
+.smallNote {
+  margin: var(--space-3xs) 0 0;
+  font-size: var(--panel-text-small);
+  color: var(--panel-muted);
+}
+
+/* Icon rows, two columns from about 340px: the answer is an icon (Yes / No for screen
+ * readers), so labels fit on one line. */
+.facilities {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  align-items: start;
+  column-gap: var(--space-s);
+  margin: 0;
+}
+
+.facility {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+  min-height: 2rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--color-light-grey);
+  font-size: var(--panel-text-small);
+}
+
+.facilityWide {
+  grid-column: 1 / -1;
+}
+
+.facility dt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  min-width: 0;
+}
+
+.facilityLabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.facility dd {
+  margin: 0;
+  text-align: right;
+}
+
+.answer {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.facility[data-answer="yes"] .answer {
+  color: #0f6b5a;
+}
+
+.facility[data-answer="no"] .answer {
+  color: #a51d3b;
+}
+
+.payment {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.unknownFacilities {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--panel-text-small);
+  color: var(--panel-muted);
+}
+
+.inlineLink {
+  color: var(--color-primary-navy);
+  font-weight: 600;
+}
+
+.notes {
+  margin: 0;
+  font-size: var(--text-0);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.freshness {
+  margin: 0 0 var(--space-3xs);
+  font-size: var(--panel-text-small);
+  color: var(--panel-muted);
+}
+
+/* "Still here? [Yes]": a compact, secondary check, so Directions stays the one primary
+ * action. */
+.verifyRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: var(--panel-text-small);
+}
+
+.verifyPrompt {
+  font-weight: 600;
+}
+
+.compactButton {
+  padding-inline: var(--space-xs);
+}
+
+.verifyStatus:empty {
+  display: none;
+}
+
+.verifyThanks {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  font-weight: 700;
+  color: #0f6b5a;
+}
+
+.verifyError {
+  font-weight: 700;
+  color: #a51d3b;
+}
+
+/* Suggest an edit · Report a problem: one row of text buttons (fits 360px). */
+.secondaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-s);
+  margin-top: var(--space-2xs);
+}
+
+.textAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  min-height: var(--tap-min, 36px);
+  font-size: var(--panel-text-small);
+  font-weight: 600;
+  color: var(--color-primary-navy);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  white-space: nowrap;
+}
+
+.textAction:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (hover: hover) {
+  .textAction:hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+/* ── Restore ─────────────────────────────────────────────── */
+
+.restoreAction {
+  display: contents;
+}
+
+.restorePrompt {
+  padding: var(--space-xs);
+  border: 1.5px solid var(--color-primary-navy);
+  border-radius: 8px;
+  background: var(--color-base-white);
+}
+
+.restoreText {
+  margin: 0 0 var(--space-2xs);
+  font-size: var(--text-0);
+}
+
+.restoreLabel {
+  display: block;
+  margin-bottom: var(--space-3xs);
+  font-size: var(--panel-text-small);
+  font-weight: 700;
+}
+
+/* Never below 16px, so iOS doesn't zoom on focus. */
+.restoreTextarea {
+  margin-bottom: var(--space-2xs);
+  font-size: max(16px, var(--text-0));
+}
+
+/* ── Short screens ───────────────────────────────────────────
+ * A phone in landscape is ≥768px wide but only 360–430px tall: the card below the search bar
+ * would leave its details a sliver to scroll, and pin the summary even when a notice pushes
+ * Directions out of reach. There it scrolls as one, so everything stays reachable, and the
+ * map stays visible to its right (the sheet would cover the whole width).
+ */
+@media (min-width: 768px) and (max-height: 560px) {
+  .panel.card {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: var(--color-neutral-grey) transparent;
+  }
+
+  .panel.card .cardBody {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+}
+
+/* A short sheet (a small phone in landscape) is too low to pin the summary: let it scroll. */
+@media (max-height: 560px) {
+  .sheet[data-state="expanded"] .summary {
+    position: static;
+  }
+
+  .sheet[data-state="expanded"] :global(.bottom-sheet__body) {
+    scroll-padding-top: 0;
+  }
+}
+
+/* ── Touch: 44px targets ─────────────────────────────────── */
+
 @media (pointer: coarse) {
-  .verifyActions :global(.button),
-  .removedActions :global(.button),
-  .directionsWrapper :global(.button),
-  .expandedHeader :global(.button) {
-    min-height: 44px;
+  .closeButton {
+    width: var(--tap-min, 44px);
+    height: var(--tap-min, 44px);
+  }
+
+  .noticeDismiss {
+    min-width: var(--tap-min, 44px);
+    min-height: var(--tap-min, 44px);
+    margin: -0.5rem -0.5rem -0.5rem 0;
+  }
+
+  .summaryActions :global(.button),
+  .detailActions :global(.button) {
+    min-height: var(--tap-min, 44px);
     border-radius: 22px;
   }
 }
 
-.openNow {
-  margin: 0 0 var(--space-3xs, 0.25rem);
-  font-weight: 700;
-}
-
-.hoursSummary {
-  margin: 0 0 var(--space-2xs, 0.5rem);
-  color: var(--color-neutral-grey, inherit);
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
 }
