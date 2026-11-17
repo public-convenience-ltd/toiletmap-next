@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { IconButton } from "toiletmap-design-system";
-import { getLooById, getLooDetail, type LooDetail } from "../../api/loos";
+import { getLooById, getLooDetail, type LooDetail, peekLooDetail } from "../../api/loos";
 import { type ActiveFilters, DEFAULT_FILTERS, type FilterKey } from "../../types/filters";
 import DevTools from "../DevTools";
 import DevToolsButton from "../DevToolsButton";
@@ -20,6 +20,7 @@ import {
   initialLoadOutcome,
   interpretRefetch,
   isGoneFromMap,
+  looPath,
   type MapDataChange,
   selectionNeedsRefresh,
 } from "./selection";
@@ -82,9 +83,6 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   };
 
   const isDev = import.meta.env.DEV || import.meta.env.MODE === "preview";
-  // True while we're waiting for the initial toilet from the URL to load
-  const isInitialLoading = useRef(!!initialToiletId);
-
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -116,22 +114,59 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   /** True once the user has selected or closed anything (marker, Back/Forward, Escape). */
   const selectionMadeRef = useRef(false);
 
+  /**
+   * Id of the toilet being shown, updated as soon as the selection changes (selectedRef
+   * only catches up on the next render).
+   */
+  const shownIdRef = useRef<string | null>(null);
+  /**
+   * Bumped by every selection and every Back/Forward, so a Back/Forward fetch that
+   * resolves after the user has moved on is dropped.
+   */
+  const navigationRef = useRef(0);
+
   /** Show a toilet (or nothing), resetting per-toilet notices. */
   const showToilet = (toilet: LooDetail | null) => {
+    shownIdRef.current = toilet?.id ?? null;
     setSelectedToilet(toilet);
     setRemovedId(toilet && toilet.active === false ? toilet.id : null);
   };
 
-  /**
-   * A selection made by the user. If the initial /loos/{id} toilet is still loading, it
-   * wins over that load: the address bar follows it at once and the late initial result
-   * is dropped (see initialLoadOutcome).
-   */
-  const selectToilet = (toilet: LooDetail | null) => {
+  /** A selection change that takes over from the initial /loos/{id} load, if still pending. */
+  const takeOverSelection = (toilet: LooDetail | null) => {
     selectionMadeRef.current = true;
-    isInitialLoading.current = false;
     shouldCenterRef.current = false;
     showToilet(toilet);
+  };
+
+  /**
+   * A selection made by the user (marker, close, Escape). If the initial /loos/{id} toilet
+   * is still loading, it wins over that load and the late initial result is dropped (see
+   * initialLoadOutcome).
+   *
+   * The address bar follows at once, against the URL as it is now: push only when opening
+   * the panel from nothing, replace when switching toilets, and step back over our own
+   * pushed entry when closing (so Back doesn't reopen what was just closed). This is done
+   * here rather than in an effect, because effects run after the next paint, by which time
+   * a Back/Forward may have moved the URL on and the stale change would be written over it.
+   */
+  const selectToilet = (toilet: LooDetail | null) => {
+    const prevId = shownIdRef.current;
+    const nextId = toilet?.id ?? null;
+    navigationRef.current++;
+    takeOverSelection(toilet);
+    // Unchanged (a revalidated copy, or a second close before Back has landed): the address
+    // bar is, or is on its way to being, right already.
+    if (prevId === nextId) return;
+    const op = historyOpFor(prevId, nextId, window.location.pathname);
+    if (!op) return;
+    if (op.kind === "push") {
+      history.pushState(PUSHED_STATE, "", op.url);
+    } else if (nextId === null && isPushedEntry(history.state)) {
+      history.back();
+    } else {
+      history.replaceState(history.state, "", op.url);
+    }
   };
 
   // Pre-select toilet when navigating directly to /loos/{id} and pan the map to it
@@ -145,7 +180,6 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
         selectionMadeRef.current,
         window.location.pathname,
       );
-      isInitialLoading.current = false;
       if (outcome.kind === "ignore") return;
       if (outcome.kind === "reset") {
         // The toilet couldn't be loaded: don't leave the address bar on a page we don't show.
@@ -165,44 +199,43 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
     });
   }, [apiUrl, initialToiletId]);
 
-  // Keep the address bar in step with the selection without a full page reload: push only
-  // when opening the panel from nothing, replace when switching toilets, and step back over
-  // our own pushed entry when closing (so Back doesn't reopen what was just closed).
-  // Skip while the initial toilet is still loading to avoid a flash to "/".
-  const prevSelectedIdRef = useRef<string | null>(null);
-  const selectedId = selectedToilet?.id ?? null;
+  // Back/Forward: make the selection follow the address bar. This never writes to history
+  // (the browser already has); a cached copy shows at once, then the server's answer.
   useEffect(() => {
-    const prevId = prevSelectedIdRef.current;
-    prevSelectedIdRef.current = selectedId;
-    if (isInitialLoading.current) return;
-    const op = historyOpFor(prevId, selectedId, window.location.pathname);
-    if (!op) return;
-    if (op.kind === "push") {
-      history.pushState(PUSHED_STATE, "", op.url);
-    } else if (selectedId === null && isPushedEntry(history.state)) {
-      history.back();
-    } else {
-      history.replaceState(history.state, "", op.url);
-    }
-  }, [selectedId]);
-
-  // Back/Forward: make the selection follow the address bar.
-  useEffect(() => {
+    const panTo = (detail: LooDetail) => {
+      const m = map.current;
+      if (detail.location && m && !m.getBounds().contains(detail.location)) {
+        m.setView([detail.location.lat, detail.location.lng], Math.max(m.getZoom(), 15));
+      }
+    };
     const onPopState = () => {
+      const navigation = ++navigationRef.current;
       const id = idFromPath(window.location.pathname);
-      if (id === (selectedRef.current?.id ?? null)) return;
+      if (id === shownIdRef.current) return;
       if (id === null) {
-        selectToilet(null);
+        takeOverSelection(null);
         return;
       }
+      const cached = peekLooDetail(id);
+      if (cached) {
+        takeOverSelection(cached);
+        panTo(cached);
+      }
       getLooById(apiUrl, id).then((detail) => {
-        // Ignore if unmounted, or the user has navigated again since.
-        if (!mountedRef.current || idFromPath(window.location.pathname) !== id) return;
-        selectToilet(detail);
-        const m = map.current;
-        if (detail?.location && m && !m.getBounds().contains(detail.location)) {
-          m.setView([detail.location.lat, detail.location.lng], Math.max(m.getZoom(), 15));
+        // Ignore if unmounted, or the user has selected or navigated again since.
+        if (!mountedRef.current || navigationRef.current !== navigation) return;
+        if (idFromPath(window.location.pathname) !== id) return;
+        if (!detail) {
+          // getLooById falls back to the cached copy on failure, so with one shown this is
+          // a 404: the toilet is gone. With nothing to show, don't leave the address bar
+          // on a toilet that isn't open (as for the initial /loos/{id} load).
+          if (cached) setRemovedId(id);
+          else history.replaceState(history.state, "", looPath(null));
+          return;
         }
+        if (detail === cached) return;
+        takeOverSelection(detail);
+        if (!cached) panTo(detail);
       });
     };
     window.addEventListener("popstate", onPopState);
@@ -252,15 +285,16 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
     return () => cancelAnimationFrame(frame);
   }, [selectedToilet]);
 
-  // Close the details panel when the user presses Escape
+  // Close the details panel when the user presses Escape. Listening for the map's whole
+  // lifetime (not from an effect per open panel, which only runs after the next paint)
+  // means Escape works as soon as the panel is on screen.
   useEffect(() => {
-    if (!selectedToilet) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") selectToilet(null);
+      if (e.key === "Escape" && shownIdRef.current !== null) selectToilet(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedToilet]);
+  }, []);
 
   return (
     <div className="loo-map-container">

@@ -52,7 +52,8 @@ vi.mock("./useMapData", () => ({ useMapData: () => mapState.current }));
 
 const getLooById = vi.hoisted(() => vi.fn());
 const getLooDetail = vi.hoisted(() => vi.fn());
-vi.mock("../../api/loos", () => ({ getLooById, getLooDetail }));
+const peekLooDetail = vi.hoisted(() => vi.fn());
+vi.mock("../../api/loos", () => ({ getLooById, getLooDetail, peekLooDetail }));
 
 const looFor = (id: string, overrides: Partial<LooDetail> = {}): LooDetail => ({
   id,
@@ -98,6 +99,8 @@ beforeEach(() => {
   setMapData();
   getLooById.mockReset();
   getLooById.mockImplementation(async (_api: string, id: string) => looFor(id));
+  peekLooDetail.mockReset();
+  peekLooDetail.mockReturnValue(null);
   getLooDetail.mockReset();
   getLooDetail.mockImplementation(async (_api: string, id: string) => ({
     loo: looFor(id),
@@ -217,6 +220,147 @@ describe("LooMap history", () => {
     // Following the address bar never writes to history itself.
     expect(push).not.toHaveBeenCalled();
     expect(window.location.pathname).toBe("/loos/bbb");
+  });
+});
+
+/** The map's own history entry, as pushState(PUSHED_STATE, …) leaves it. */
+const PUSHED = { toiletmapSelection: true };
+
+/**
+ * Emulates the browser's session history for Back/Forward: two entries, "/" and the map's
+ * pushed `/loos/<id>`, with `history.back()`/`forward()` moving between them and firing
+ * popstate asynchronously, as browsers do.
+ */
+function fakeTwoEntryHistory(id: string) {
+  const go = (to: "/" | "toilet") => {
+    if (to === "/") window.history.replaceState(null, "", "/");
+    else window.history.replaceState(PUSHED, "", `/loos/${id}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+  const back = vi.spyOn(window.history, "back").mockImplementation(() => {
+    setTimeout(() => go("/"));
+  });
+  return { back, go };
+}
+
+/** Lets Preact render (a microtask) without running effects, which wait for the next frame. */
+const renderOnly = async () => {
+  for (let i = 0; i < 3; i++) await Promise.resolve();
+};
+
+describe("LooMap Back/Forward races", () => {
+  it("Forward straight after Back reopens the panel (the close isn't replayed onto the new URL)", async () => {
+    const user = userEvent.setup();
+    render(<LooMap apiUrl="" />);
+    await user.click(screen.getByRole("button", { name: "Marker aaa" }));
+    await panelHeading("Toilet aaa");
+    expect(window.location.pathname).toBe("/loos/aaa");
+    const { back, go } = fakeTwoEntryHistory("aaa");
+
+    // Back: the panel closes (rendered), but effects for that render haven't run yet when
+    // Forward arrives.
+    go("/");
+    await renderOnly();
+    expect(screen.queryByRole("heading", { name: "Toilet aaa" })).not.toBeInTheDocument();
+    go("toilet");
+
+    await panelHeading("Toilet aaa");
+    // Let any deferred effect run: nothing may step back off the restored entry.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 150));
+    });
+    expect(back).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/loos/aaa");
+    expect(screen.getByRole("heading", { name: "Toilet aaa" })).toBeInTheDocument();
+  });
+
+  it("a slow Forward fetch overtaken by Back doesn't reopen the panel", async () => {
+    const user = userEvent.setup();
+    render(<LooMap apiUrl="" />);
+    await user.click(screen.getByRole("button", { name: "Marker aaa" }));
+    await panelHeading("Toilet aaa");
+    const { go } = fakeTwoEntryHistory("aaa");
+    go("/");
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Toilet aaa" })).not.toBeInTheDocument(),
+    );
+
+    let resolveForward: (loo: LooDetail) => void = () => undefined;
+    getLooById.mockReturnValueOnce(
+      new Promise<LooDetail>((r) => {
+        resolveForward = r;
+      }),
+    );
+    act(() => go("toilet"));
+    act(() => go("/"));
+    await act(async () => {
+      resolveForward(looFor("aaa"));
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("heading", { name: "Toilet aaa" })).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("shows the cached copy at once on Forward, then the server's", async () => {
+    const user = userEvent.setup();
+    render(<LooMap apiUrl="" />);
+    await user.click(screen.getByRole("button", { name: "Marker aaa" }));
+    await panelHeading("Toilet aaa");
+    const { go } = fakeTwoEntryHistory("aaa");
+    act(() => go("/"));
+
+    let resolveForward: (loo: LooDetail) => void = () => undefined;
+    getLooById.mockReturnValueOnce(
+      new Promise<LooDetail>((r) => {
+        resolveForward = r;
+      }),
+    );
+    peekLooDetail.mockReturnValue(looFor("aaa", { name: "Cached copy" }));
+    act(() => go("toilet"));
+    await panelHeading("Cached copy");
+    await act(async () => {
+      resolveForward(looFor("aaa", { name: "Server copy" }));
+      await Promise.resolve();
+    });
+    await panelHeading("Server copy");
+    expect(window.location.pathname).toBe("/loos/aaa");
+  });
+
+  it("Escape closes a panel Forward just reopened, before its effects have run", async () => {
+    const user = userEvent.setup();
+    render(<LooMap apiUrl="" />);
+    await user.click(screen.getByRole("button", { name: "Marker aaa" }));
+    await panelHeading("Toilet aaa");
+    const { back, go } = fakeTwoEntryHistory("aaa");
+    act(() => go("/"));
+    getLooById.mockReturnValueOnce(new Promise(() => undefined));
+    peekLooDetail.mockReturnValue(looFor("aaa"));
+
+    go("toilet");
+    await renderOnly();
+    expect(screen.getByRole("heading", { name: "Toilet aaa" })).toBeInTheDocument();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    // A second close before Back lands must not step back twice.
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Toilet aaa" })).not.toBeInTheDocument(),
+    );
+    expect(back).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+  });
+
+  it("resets the address bar to / when the toilet Forward lands on can't be loaded", async () => {
+    const user = userEvent.setup();
+    render(<LooMap apiUrl="" />);
+    await user.click(screen.getByRole("button", { name: "Marker aaa" }));
+    await panelHeading("Toilet aaa");
+    const { go } = fakeTwoEntryHistory("aaa");
+    act(() => go("/"));
+
+    getLooById.mockResolvedValueOnce(null);
+    act(() => go("toilet"));
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
   });
 });
 
