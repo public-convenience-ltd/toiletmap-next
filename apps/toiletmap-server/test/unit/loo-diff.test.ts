@@ -43,6 +43,8 @@ const buildExisting = (overrides: Partial<LooDiffBase> = {}): LooDiffBase => ({
   noPayment: false,
   paymentDetails: "20p",
   removalReason: null,
+  removalCategory: null,
+  duplicateOf: null,
   radar: null,
   openingTimes: weekdayHours,
   location: { lat: 51.5308, lng: -0.1238 },

@@ -61,6 +61,8 @@ const SCALAR_KEYS = [
   "noPayment",
   "paymentDetails",
   "removalReason",
+  "removalCategory",
+  "duplicateOf",
 ] as const satisfies readonly ScalarKey[];
 
 /**
@@ -130,4 +132,31 @@ export const isStaleBase = (
   if (!currentUpdatedAt) return false;
   const base = baseUpdatedAt instanceof Date ? baseUpdatedAt.getTime() : Date.parse(baseUpdatedAt);
   return base !== Date.parse(currentUpdatedAt);
+};
+
+/**
+ * When a change puts a removed loo back on the map (`active: true`), also
+ * clear its removal category, reason and duplicate link, as
+ * `LooService.restore` does, so a reactivated loo never carries a stale
+ * removal (which a later removal without a reason would otherwise surface
+ * again). Fields the change sets itself are left as given. Returns `changes`
+ * unchanged otherwise.
+ */
+export const clearRemovalOnReactivate = (
+  changes: LooMutationAttributes,
+  existing: Pick<LooDiffBase, "active" | "removalCategory" | "removalReason" | "duplicateOf">,
+): LooMutationAttributes => {
+  if (changes.active !== true || existing.active === true) return changes;
+  return {
+    ...changes,
+    ...(existing.removalCategory !== null && changes.removalCategory === undefined
+      ? { removalCategory: null }
+      : {}),
+    ...(existing.removalReason !== null && changes.removalReason === undefined
+      ? { removalReason: null }
+      : {}),
+    ...(existing.duplicateOf !== null && changes.duplicateOf === undefined
+      ? { duplicateOf: null }
+      : {}),
+  };
 };

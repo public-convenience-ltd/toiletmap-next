@@ -16,7 +16,11 @@ import {
   triStateFilterSchema,
 } from "../../common/schemas";
 import { LOO_ID_LENGTH } from "../../services/loo";
-import { CoordinatesSchema, LooSearchSortOptions } from "../../services/loo/types";
+import {
+  CoordinatesSchema,
+  LooSearchSortOptions,
+  REMOVAL_CATEGORIES,
+} from "../../services/loo/types";
 
 export const proximitySchema = z
   .object({
@@ -34,6 +38,19 @@ export const proximitySchema = z
       .positive()
       .max(MAX_PROXIMITY_RADIUS, `radius must be <= ${MAX_PROXIMITY_RADIUS} meters`)
       .default(DEFAULT_PROXIMITY_RADIUS),
+    /** `true` also returns removed (inactive) loos, e.g. to offer "Is it back? Restore it". */
+    includeInactive: z
+      .preprocess(
+        (value) => (typeof value === "string" ? value.trim().toLowerCase() : value),
+        z.enum(["true", "false"]).optional(),
+      )
+      .transform((value) => value === "true"),
+    /** A loo id to leave out of the results (the loo being edited). */
+    exclude: z
+      .string()
+      .trim()
+      .length(LOO_ID_LENGTH, `exclude must be exactly ${LOO_ID_LENGTH} characters`)
+      .optional(),
   })
   .strict();
 
@@ -84,6 +101,72 @@ export const updateMutationSchema = baseMutationSchema.extend({
     .datetime({ offset: true, message: "baseUpdatedAt must be an ISO-8601 datetime" })
     .optional(),
 });
+
+const optionalBaseUpdatedAt = z.iso
+  .datetime({ offset: true, message: "baseUpdatedAt must be an ISO-8601 datetime" })
+  .optional();
+
+const looIdString = z
+  .string()
+  .trim()
+  .regex(/^[0-9a-f]{24}$/i, `must be a ${LOO_ID_LENGTH} character hexadecimal id`)
+  .transform((value) => value.toLowerCase());
+
+/**
+ * POST /loos/:id/report. `details` is required for `other`, `duplicateOf` for
+ * `duplicate` (and only allowed there).
+ */
+export const reportSchema = z
+  .object({
+    reason: z.enum(REMOVAL_CATEGORIES, {
+      message: `reason must be one of: ${REMOVAL_CATEGORIES.join(", ")}`,
+    }),
+    details: z
+      .string()
+      .trim()
+      .max(2000, "details must be at most 2000 characters")
+      .optional()
+      .transform((value) => (value ? value : undefined)),
+    duplicateOf: looIdString.optional(),
+    baseUpdatedAt: optionalBaseUpdatedAt,
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.reason === "other" && !value.details) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["details"],
+        message: "Tell us what is wrong with this toilet",
+      });
+    }
+    if (value.reason === "duplicate" && !value.duplicateOf) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["duplicateOf"],
+        message: "Choose the toilet this one duplicates",
+      });
+    }
+    if (value.reason !== "duplicate" && value.duplicateOf !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["duplicateOf"],
+        message: "duplicateOf is only allowed when the reason is duplicate",
+      });
+    }
+  });
+
+/** POST /loos/:id/restore */
+export const restoreSchema = z
+  .object({
+    details: z
+      .string()
+      .trim()
+      .max(2000, "details must be at most 2000 characters")
+      .optional()
+      .transform((value) => (value ? value : undefined)),
+    baseUpdatedAt: optionalBaseUpdatedAt,
+  })
+  .strict();
 
 export const searchQuerySchema = z.object({
   search: z.preprocess(normalizeOptionalString, optionalTrimmedFilter(200)),

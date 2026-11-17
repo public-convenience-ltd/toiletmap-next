@@ -1,12 +1,40 @@
 import worker from "../../../src/index";
+import type { Env } from "../../../src/types";
 import { buildTestEnv, createTestExecutionContext } from "./env";
 
 const baseUrl = "https://integration.test";
 
 /** Invokes the Worker's fetch handler directly, without a network hop. */
-export const callApi = (path: string, init?: RequestInit): Promise<Response> => {
+export const callApi = (
+  path: string,
+  init?: RequestInit,
+  options: { env?: Partial<Env>; ctx?: ExecutionContext } = {},
+): Promise<Response> => {
   const request = new Request(`${baseUrl}${path}`, init);
-  return worker.fetch(request, buildTestEnv(), createTestExecutionContext());
+  return worker.fetch(
+    request,
+    buildTestEnv(options.env),
+    options.ctx ?? createTestExecutionContext(),
+  );
+};
+
+/**
+ * An ExecutionContext that keeps everything passed to `waitUntil`, so a test
+ * can await background work (e.g. moderation alerts).
+ */
+export const createCapturingExecutionContext = () => {
+  const tasks: Promise<unknown>[] = [];
+  const ctx: ExecutionContext = {
+    waitUntil: (promise: Promise<unknown>) => {
+      tasks.push(promise);
+    },
+    passThroughOnException: () => undefined,
+    props: undefined,
+    get exports(): Cloudflare.Exports {
+      throw new Error("ctx.exports is not available in tests.");
+    },
+  };
+  return { ctx, settle: () => Promise.allSettled(tasks) };
 };
 
 /**

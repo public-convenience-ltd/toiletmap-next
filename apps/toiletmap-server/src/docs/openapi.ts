@@ -7,6 +7,7 @@ import type {
 } from "openapi3-ts/oas31";
 import { RECENT_WINDOW_DAYS } from "../common/constants";
 import { LOO_ID_LENGTH } from "../services/loo";
+import { REMOVAL_CATEGORIES } from "../services/loo/types";
 import { openApiInfo, openApiServers, openApiTags } from "./config";
 
 const schemaRef = (name: string): ReferenceObject => ({
@@ -65,6 +66,13 @@ const jsonValueSchema: SchemaObject = {
     { type: "object", additionalProperties: true },
     { type: "null" },
   ],
+};
+
+const idSchemaInline: SchemaObject = {
+  type: "string",
+  minLength: LOO_ID_LENGTH,
+  maxLength: LOO_ID_LENGTH,
+  pattern: "^[a-f0-9]{24}$",
 };
 
 const schemas: Record<string, SchemaObject | ReferenceObject> = {
@@ -268,6 +276,69 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       current: schemaRef("Loo"),
     },
   },
+  ReportLooRequest: {
+    type: "object",
+    required: ["reason"],
+    additionalProperties: false,
+    properties: {
+      reason: {
+        type: "string",
+        enum: [...REMOVAL_CATEGORIES],
+        description:
+          "permanently_closed, does_not_exist (or in the wrong place), not_public, duplicate, or other.",
+      },
+      details: {
+        type: "string",
+        maxLength: 2000,
+        description:
+          "Free text, stored as `removalReason`. Required for `other`; otherwise a default sentence for the reason is stored.",
+      },
+      duplicateOf: {
+        ...idSchemaInline,
+        description:
+          "Required for `duplicate` (and only allowed there): an active loo other than this one.",
+      },
+      baseUpdatedAt: {
+        type: "string",
+        format: "date-time",
+        description: "The `updatedAt` the client loaded. A mismatch returns 409 `conflict`.",
+      },
+    },
+  },
+  RestoreLooRequest: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      details: {
+        type: "string",
+        maxLength: 2000,
+        description:
+          "Optional note for the moderator. Kept on queued restores only; a direct (trusted) restore does not store it and answers with `detailsIgnored: true`.",
+      },
+      baseUpdatedAt: {
+        type: "string",
+        format: "date-time",
+        description: "The `updatedAt` the client loaded. A mismatch returns 409 `conflict`.",
+      },
+    },
+  },
+  StateConflictResponse: {
+    type: "object",
+    required: ["message", "error", "current"],
+    properties: {
+      message: { type: "string" },
+      error: { type: "string", enum: ["already_removed", "not_removed"] },
+      current: schemaRef("Loo"),
+    },
+  },
+  VerifyResponse: {
+    type: "object",
+    required: ["id", "verifiedAt"],
+    properties: {
+      id: { type: "string", example: "0123456789abcdef01234567" },
+      verifiedAt: { type: "string", format: "date-time" },
+    },
+  },
   QueuedChangeResponse: {
     type: "object",
     required: ["queued"],
@@ -315,6 +386,15 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       noPayment: nullableBoolean,
       paymentDetails: nullableString(),
       removalReason: nullableString(),
+      removalCategory: {
+        type: ["string", "null"],
+        enum: [...REMOVAL_CATEGORIES, null],
+        description: "Why the loo was removed from the map. Null while it is active.",
+      },
+      duplicateOf: {
+        ...nullableString(LOO_ID_LENGTH),
+        description: "For a removed duplicate, the id of the loo it duplicates.",
+      },
       radar: nullableBoolean,
       openingTimes: {
         anyOf: [schemaRef("OpeningTimes"), { type: "null" }],
@@ -346,6 +426,11 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
             type: "number",
             description: "Distance from the requested point in meters.",
             example: 73.2,
+          },
+          active: {
+            type: ["boolean", "null"],
+            description:
+              "False for removed loos, which are only returned with `includeInactive=true`.",
           },
         },
       },
@@ -381,6 +466,15 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       noPayment: nullableBoolean,
       paymentDetails: nullableString(),
       removalReason: nullableString(),
+      removalCategory: {
+        type: ["string", "null"],
+        enum: [...REMOVAL_CATEGORIES, null],
+        description: "Why the loo was removed from the map. Null while it is active.",
+      },
+      duplicateOf: {
+        ...nullableString(LOO_ID_LENGTH),
+        description: "For a removed duplicate, the id of the loo it duplicates.",
+      },
       openingTimes: {
         anyOf: [schemaRef("OpeningTimes"), { type: "null" }],
       },
@@ -562,6 +656,22 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
             oneOf: [schemaRef("CompressedLoo"), { type: "null" }],
             description:
               "The loo's map tuple, exactly as `/api/loos/dump` will serve it, so clients can patch a cached map immediately. `null` when the loo is not on the map (inactive or without a location).",
+          },
+        },
+      },
+    ],
+  },
+  RestoredLooResponse: {
+    allOf: [
+      schemaRef("SavedLooResponse"),
+      {
+        type: "object",
+        properties: {
+          detailsIgnored: {
+            type: "boolean",
+            enum: [true],
+            description:
+              "Present when the request carried `details`. Direct restores do not store the note; only queued restores keep it for the moderator.",
           },
         },
       },
@@ -850,7 +960,9 @@ export const openApiDocument: OpenAPIObject = {
       post: {
         tags: ["Loos"],
         summary: "Create a loo",
-        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        description:
+          "Callers with `report:loo` or `access:admin` create the loo directly (201). Everyone else has the new loo queued for moderation (202).",
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: {
           required: true,
           description: "Attributes to set for the new loo.",
@@ -864,6 +976,10 @@ export const openApiDocument: OpenAPIObject = {
           400: {
             description: "Invalid request payload.",
             content: jsonContent("ValidationErrorResponse"),
+          },
+          202: {
+            description: "Queued for moderation.",
+            content: jsonContent("QueuedChangeResponse"),
           },
           401: authErrorResponse,
           409: {
@@ -937,7 +1053,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Update (or create) a loo",
         description:
-          "Authenticated callers write directly; an unknown id creates the loo. Anonymous callers can only suggest changes to existing loos: the changed fields are queued for moderation. Only fields that differ from the stored record are applied or queued.",
+          "Callers with the `report:loo` or `access:admin` permission write directly; an unknown id creates the loo. Everyone else (anonymous, or signed in without those permissions) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: {
@@ -962,7 +1078,7 @@ export const openApiDocument: OpenAPIObject = {
             content: jsonContent("SavedLooResponse"),
           },
           202: {
-            description: "Anonymous change queued for moderation.",
+            description: "Change queued for moderation (anonymous, or no direct-write permission).",
             content: jsonContent("QueuedChangeResponse"),
           },
           400: {
@@ -982,6 +1098,100 @@ export const openApiDocument: OpenAPIObject = {
             description: "Too many writes.",
             content: jsonContent("ErrorResponse"),
           },
+        },
+      },
+    },
+    "/api/loos/{id}/report": {
+      post: {
+        tags: ["Loos"],
+        summary: "Report a problem (remove a loo from the map)",
+        description:
+          "Callers with `report:loo` or `access:admin` remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation. Anonymous callers are rate limited.",
+        parameters: [idPathParameter],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
+        requestBody: { required: true, content: jsonContent("ReportLooRequest") },
+        responses: {
+          200: {
+            description: "Removed. `compressed` is null: drop the loo from any cached map.",
+            content: jsonContent("SavedLooResponse"),
+          },
+          202: {
+            description: "Queued for moderation.",
+            content: jsonContent("QueuedChangeResponse"),
+          },
+          400: {
+            description:
+              "Invalid body: unknown reason, missing details for `other`, or a missing/invalid `duplicateOf` (unknown, removed, or this loo).",
+            content: jsonContent("ValidationErrorResponse"),
+          },
+          404: { description: "Loo not found.", content: jsonContent("ErrorResponse") },
+          409: {
+            description:
+              "`already_removed` (StateConflictResponse) or a stale `baseUpdatedAt` (`conflict`, ConflictResponse).",
+            content: {
+              "application/json": {
+                schema: {
+                  anyOf: [schemaRef("StateConflictResponse"), schemaRef("ConflictResponse")],
+                },
+              },
+            },
+          },
+          429: { description: "Too many writes.", content: jsonContent("ErrorResponse") },
+        },
+      },
+    },
+    "/api/loos/{id}/restore": {
+      post: {
+        tags: ["Loos"],
+        summary: "Restore a removed loo",
+        description:
+          "Callers with `report:loo` or `access:admin` put the loo back on the map and clear its removal category, reason and duplicate link (kept in the audit history). Everyone else queues a `restore` change. The body is optional.",
+        parameters: [idPathParameter],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
+        requestBody: { required: false, content: jsonContent("RestoreLooRequest") },
+        responses: {
+          200: {
+            description:
+              "Restored, with its `compressed` map tuple. `detailsIgnored: true` when `details` was sent: direct restores do not store it.",
+            content: jsonContent("RestoredLooResponse"),
+          },
+          202: {
+            description: "Queued for moderation.",
+            content: jsonContent("QueuedChangeResponse"),
+          },
+          400: { description: "Invalid body.", content: jsonContent("ValidationErrorResponse") },
+          404: { description: "Loo not found.", content: jsonContent("ErrorResponse") },
+          409: {
+            description:
+              "`not_removed` (StateConflictResponse) or a stale `baseUpdatedAt` (`conflict`, ConflictResponse).",
+            content: {
+              "application/json": {
+                schema: {
+                  anyOf: [schemaRef("StateConflictResponse"), schemaRef("ConflictResponse")],
+                },
+              },
+            },
+          },
+          429: { description: "Too many writes.", content: jsonContent("ErrorResponse") },
+        },
+      },
+    },
+    "/api/loos/{id}/verify": {
+      post: {
+        tags: ["Loos"],
+        summary: "Confirm a loo is still there",
+        description:
+          "Anyone may verify; anonymous callers are rate limited. Sets `verifiedAt` to now and changes nothing else (`updatedAt` is unchanged). No request body.",
+        parameters: [idPathParameter],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
+        responses: {
+          200: { description: "Verified.", content: jsonContent("VerifyResponse") },
+          404: { description: "Loo not found.", content: jsonContent("ErrorResponse") },
+          409: {
+            description: "`removed`: the loo is not on the map.",
+            content: jsonContent("ErrorResponse"),
+          },
+          429: { description: "Too many writes.", content: jsonContent("ErrorResponse") },
         },
       },
     },
@@ -1161,10 +1371,25 @@ export const openApiDocument: OpenAPIObject = {
               default: 1000,
             },
           },
+          {
+            name: "includeInactive",
+            in: "query",
+            required: false,
+            description:
+              "Also return removed (inactive) loos, flagged `active: false`. Default: active loos only.",
+            schema: { type: "boolean", default: false },
+          },
+          {
+            name: "exclude",
+            in: "query",
+            required: false,
+            description: "A loo id to leave out (e.g. the loo being edited).",
+            schema: idSchemaInline,
+          },
         ],
         responses: {
           200: {
-            description: "Loos ordered by distance from the supplied coordinates.",
+            description: "Loos ordered by distance (nearest first). Cached for 60 seconds.",
             content: jsonContent("NearbyLooListResponse"),
           },
           400: {

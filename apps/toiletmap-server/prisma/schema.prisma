@@ -58,6 +58,10 @@ model toilets {
   area_id         String?                   @db.Char(24)
   opening_times   Json?
   location        Json?                     @default(dbgenerated("(st_asgeojson((geography)::geometry))::jsonb"))
+  /// Why the toilet was removed: permanently_closed | does_not_exist | not_public | duplicate | other
+  removal_category String?
+  /// The toilet this one duplicates (FK toilets.id, ON DELETE SET NULL; no Prisma relation)
+  duplicate_of    String?                   @db.Char(24)
   areas           areas?                    @relation(fields: [area_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "toilets___area_id_fk")
 
   @@index([verified_at])
@@ -119,6 +123,8 @@ model pending_change {
   reviewed_at     DateTime? @db.Timestamptz(6)
   /// updated_at of the toilet the change was computed against (update changes only)
   base_updated_at DateTime? @db.Timestamptz(6)
+  /// Contributor name of a signed-in submitter without direct-write permission (null when anonymous)
+  submitted_by    String?
 
   @@index([status])
   @@index([submitted_at])

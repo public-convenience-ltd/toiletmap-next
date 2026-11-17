@@ -24,6 +24,8 @@ const BASE_COLUMNS: readonly Prisma.Sql[] = [
   Prisma.sql`loo.no_payment`,
   Prisma.sql`loo.payment_details`,
   Prisma.sql`loo.removal_reason`,
+  Prisma.sql`loo.removal_category`,
+  Prisma.sql`loo.duplicate_of`,
   Prisma.sql`loo.opening_times`,
   Prisma.sql`loo.radar`,
   Prisma.sql`loo.location`,
@@ -252,19 +254,37 @@ export const buildSelectByIdsQuery = (ids: readonly string[]) => {
   `;
 };
 
+export type ProximityOptions = {
+  /** Include removed (inactive) loos. Defaults to active loos only. */
+  includeInactive?: boolean;
+  /** Leave this loo out of the results (e.g. the one being edited). */
+  excludeId?: string;
+};
+
 /**
- * Builds a SQL query to find loos within a certain radius of a point.
- * Uses PostGIS `ST_DistanceSphere` for calculation.
+ * Builds a SQL query to find loos within a certain radius of a point, nearest
+ * first. Uses PostGIS `ST_DistanceSphere` for calculation. Only active loos are
+ * returned unless `includeInactive` is set.
  */
-export const buildProximityQuery = (lat: number, lng: number, radius: number) => {
+export const buildProximityQuery = (
+  lat: number,
+  lng: number,
+  radius: number,
+  { includeInactive = false, excludeId }: ProximityOptions = {},
+) => {
   const distanceSql = Prisma.sql`ST_DistanceSphere(
     loo.geography::geometry,
     ST_MakePoint(${lng}, ${lat})
   )`;
 
+  const conditions: Prisma.Sql[] = [Prisma.sql`${distanceSql} <= ${radius}`];
+  if (!includeInactive) conditions.push(Prisma.sql`loo.active = TRUE`);
+  if (excludeId) conditions.push(Prisma.sql`loo.id <> ${excludeId}`);
+
   return Prisma.sql`
     ${buildSelectClause(Prisma.sql`${distanceSql} AS distance`)}
     ${LOO_FROM_WITH_AREA}
-    WHERE ${distanceSql} <= ${radius}
+    WHERE ${Prisma.join(conditions, " AND ")}
+    ORDER BY distance ASC, loo.id ASC
   `;
 };

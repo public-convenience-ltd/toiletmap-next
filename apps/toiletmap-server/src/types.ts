@@ -48,6 +48,13 @@ export interface Env {
   ENVIRONMENT?: "production" | "preview" | "development";
   ALLOWED_ORIGINS?: string; // Comma-separated list of allowed CORS origins
 
+  /**
+   * Optional Slack incoming-webhook URL (a secret). When set, a counts-only
+   * "N changes awaiting review" message is posted whenever a change is queued
+   * for moderation. Unset (the default) disables alerts.
+   */
+  MODERATION_SLACK_WEBHOOK?: string;
+
   // Cloudflare Rate Limiting API bindings
   RATE_LIMIT_READ: RateLimiter;
   RATE_LIMIT_WRITE: RateLimiter;
@@ -71,4 +78,6 @@ export type AppVariables = {
   looService: LooService;
   pendingChangeService: PendingChangeService;
   resultCount?: number;
+  /** Admin pages only: pending-change count for the nav badge. */
+  pendingCount?: number;
 };

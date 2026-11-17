@@ -1,4 +1,25 @@
+import { tryGetContext } from "hono/context-storage";
 import { html } from "hono/html";
+import type { AppVariables } from "../../types";
+
+/**
+ * Pending-change count for the nav badge, set per request by the admin router
+ * (see `admin/index.tsx`). Null outside a request or when the count failed.
+ */
+const currentPendingCount = (): number | null => {
+  const count = tryGetContext<{ Variables: AppVariables }>()?.var.pendingCount;
+  return typeof count === "number" ? count : null;
+};
+
+const PendingNavLink = () => {
+  const count = currentPendingCount();
+  if (!count) return html`<a href="/admin/pending">Pending</a>`;
+  const label = `${count} ${count === 1 ? "change" : "changes"} awaiting review`;
+  return html`<a href="/admin/pending">
+    Pending <span class="nav-badge" aria-hidden="true">${count > 99 ? "99+" : count}</span
+    ><span class="visually-hidden">(${label})</span>
+  </a>`;
+};
 
 export const Layout = (props: { title: string; children: unknown }) => {
   return html`
@@ -55,6 +76,19 @@ export const Layout = (props: { title: string; children: unknown }) => {
           .header__nav { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--space-m); font-weight: 600; flex-wrap: wrap; }
           .header__nav a { text-decoration: none; color: var(--color-primary-navy); }
           .header__nav a:hover { color: var(--color-accent-pink); }
+          .nav-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.5em;
+            padding: 0 0.4em;
+            margin-left: 0.25em;
+            border-radius: 999px;
+            background: var(--color-accent-pink);
+            color: var(--color-white, #fff);
+            font-size: var(--text--2);
+            line-height: 1.5;
+          }
 
           /* Layout Helpers */
           .center { box-sizing: content-box; margin-inline: auto; max-inline-size: var(--toilet-max-width); }
@@ -1122,7 +1156,7 @@ export const Layout = (props: { title: string; children: unknown }) => {
               <nav>
                 <ul class="header__nav">
                   <li><a href="/admin">Loos</a></li>
-                  <li><a href="/admin/pending">Pending</a></li>
+                  <li>${PendingNavLink()}</li>
                   <li><a href="/admin/users/admin">User admin</a></li>
                   <li><a href="/admin/users/statistics">User stats</a></li>
                   <li><a href="/admin/logout">Logout</a></li>

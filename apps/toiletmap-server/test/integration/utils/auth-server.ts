@@ -1150,6 +1150,9 @@ export const startAuthServer = async (options: StartAuthServerOptions): Promise<
   const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs1" }) as string;
 
   const issueToken: IssueTokenFn = (claims = {}) => {
+    // Default tokens carry `report:loo`, the permission direct writes require,
+    // so a plain `issueToken()` is a trusted contributor. Pass `permissions: []`
+    // for a signed-in user whose changes are queued for moderation.
     const defaults = {
       sub: "auth0|integration-test-user",
       nickname: "integration-test-user",
@@ -1157,6 +1160,7 @@ export const startAuthServer = async (options: StartAuthServerOptions): Promise<
       app_metadata: {
         nickname: "integration-tester",
       },
+      permissions: ["report:loo"],
     } satisfies Record<string, unknown>;
 
     const { aud, ...restClaims } = claims;

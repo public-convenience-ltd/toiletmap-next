@@ -484,6 +484,99 @@
           }
         }
       },
+      "ReportLooRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "permanently_closed",
+              "does_not_exist",
+              "not_public",
+              "duplicate",
+              "other"
+            ],
+            "description": "permanently_closed, does_not_exist (or in the wrong place), not_public, duplicate, or other."
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Free text, stored as `removalReason`. Required for `other`; otherwise a default sentence for the reason is stored."
+          },
+          "duplicateOf": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "pattern": "^[a-f0-9]{24}$",
+            "description": "Required for `duplicate` (and only allowed there): an active loo other than this one."
+          },
+          "baseUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The `updatedAt` the client loaded. A mismatch returns 409 `conflict`."
+          }
+        }
+      },
+      "RestoreLooRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Optional note for the moderator. Kept on queued restores only; a direct (trusted) restore does not store it and answers with `detailsIgnored: true`."
+          },
+          "baseUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The `updatedAt` the client loaded. A mismatch returns 409 `conflict`."
+          }
+        }
+      },
+      "StateConflictResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "error",
+          "current"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "already_removed",
+              "not_removed"
+            ]
+          },
+          "current": {
+            "$ref": "#/components/schemas/Loo"
+          }
+        }
+      },
+      "VerifyResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "verifiedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0123456789abcdef01234567"
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "QueuedChangeResponse": {
         "type": "object",
         "required": [
@@ -644,6 +737,29 @@
               "null"
             ]
           },
+          "removalCategory": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "permanently_closed",
+              "does_not_exist",
+              "not_public",
+              "duplicate",
+              "other",
+              null
+            ],
+            "description": "Why the loo was removed from the map. Null while it is active."
+          },
+          "duplicateOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 24,
+            "description": "For a removed duplicate, the id of the loo it duplicates."
+          },
           "radar": {
             "type": [
               "boolean",
@@ -698,6 +814,13 @@
                 "type": "number",
                 "description": "Distance from the requested point in meters.",
                 "example": 73.2
+              },
+              "active": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "False for removed loos, which are only returned with `includeInactive=true`."
               }
             }
           }
@@ -833,6 +956,29 @@
               "string",
               "null"
             ]
+          },
+          "removalCategory": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "permanently_closed",
+              "does_not_exist",
+              "not_public",
+              "duplicate",
+              "other",
+              null
+            ],
+            "description": "Why the loo was removed from the map. Null while it is active."
+          },
+          "duplicateOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 24,
+            "description": "For a removed duplicate, the id of the loo it duplicates."
           },
           "openingTimes": {
             "anyOf": [
@@ -1198,6 +1344,25 @@
           }
         ]
       },
+      "RestoredLooResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SavedLooResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "detailsIgnored": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ],
+                "description": "Present when the request carried `details`. Direct restores do not store the note; only queued restores keep it for the moderator."
+              }
+            }
+          }
+        ]
+      },
       "UpdatesResponse": {
         "type": "object",
         "required": [
@@ -1350,13 +1515,15 @@
           "Loos"
         ],
         "summary": "Create a loo",
+        "description": "Callers with `report:loo` or `access:admin` create the loo directly (201). Everyone else has the new loo queued for moderation (202).",
         "security": [
           {
             "bearerAuth": []
           },
           {
             "cookieAuth": []
-          }
+          },
+          {}
         ],
         "requestBody": {
           "required": true,
@@ -1376,6 +1543,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SavedLooResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Queued for moderation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedChangeResponse"
                 }
               }
             }
@@ -1551,7 +1728,7 @@
           "Loos"
         ],
         "summary": "Update (or create) a loo",
-        "description": "Authenticated callers write directly; an unknown id creates the loo. Anonymous callers can only suggest changes to existing loos: the changed fields are queued for moderation. Only fields that differ from the stored record are applied or queued.",
+        "description": "Callers with the `report:loo` or `access:admin` permission write directly; an unknown id creates the loo. Everyone else (anonymous, or signed in without those permissions) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
         "parameters": [
           {
             "name": "id",
@@ -1615,7 +1792,7 @@
             }
           },
           "202": {
-            "description": "Anonymous change queued for moderation.",
+            "description": "Change queued for moderation (anonymous, or no direct-write permission).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1660,6 +1837,302 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many writes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loos/{id}/report": {
+      "post": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Report a problem (remove a loo from the map)",
+        "description": "Callers with `report:loo` or `access:admin` remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation. Anonymous callers are rate limited.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "24 character loo identifier.",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportLooRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Removed. `compressed` is null: drop the loo from any cached map.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLooResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Queued for moderation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedChangeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: unknown reason, missing details for `other`, or a missing/invalid `duplicateOf` (unknown, removed, or this loo).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Loo not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`already_removed` (StateConflictResponse) or a stale `baseUpdatedAt` (`conflict`, ConflictResponse).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/StateConflictResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConflictResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many writes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loos/{id}/restore": {
+      "post": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Restore a removed loo",
+        "description": "Callers with `report:loo` or `access:admin` put the loo back on the map and clear its removal category, reason and duplicate link (kept in the audit history). Everyone else queues a `restore` change. The body is optional.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "24 character loo identifier.",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreLooRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Restored, with its `compressed` map tuple. `detailsIgnored: true` when `details` was sent: direct restores do not store it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoredLooResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Queued for moderation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedChangeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Loo not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_removed` (StateConflictResponse) or a stale `baseUpdatedAt` (`conflict`, ConflictResponse).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/StateConflictResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConflictResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many writes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loos/{id}/verify": {
+      "post": {
+        "tags": [
+          "Loos"
+        ],
+        "summary": "Confirm a loo is still there",
+        "description": "Anyone may verify; anonymous callers are rate limited. Sets `verifiedAt` to now and changes nothing else (`updatedAt` is unchanged). No request body.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "24 character loo identifier.",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Loo not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`removed`: the loo is not on the map.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1926,11 +2399,33 @@
               "maximum": 50000,
               "default": 1000
             }
+          },
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "required": false,
+            "description": "Also return removed (inactive) loos, flagged `active: false`. Default: active loos only.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "exclude",
+            "in": "query",
+            "required": false,
+            "description": "A loo id to leave out (e.g. the loo being edited).",
+            "schema": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "pattern": "^[a-f0-9]{24}$"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Loos ordered by distance from the supplied coordinates.",
+            "description": "Loos ordered by distance (nearest first). Cached for 60 seconds.",
             "content": {
               "application/json": {
                 "schema": {
