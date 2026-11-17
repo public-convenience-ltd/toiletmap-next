@@ -1,0 +1,67 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "schedule:weekly"],
+  "timezone": "Europe/London",
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "separateMajorMinor": true,
+  "postUpdateOptions": ["pnpmDedupe"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Keep GitHub Actions on version tags rather than pinned digests.",
+      "matchManagers": ["github-actions"],
+      "pinDigests": false
+    },
+    {
+      "description": "One PR per workspace for minor and patch updates; majors get their own PRs.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchFileNames": ["package.json"],
+      "groupName": "root tooling (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchFileNames": ["apps/toiletmap-client/**"],
+      "groupName": "toiletmap-client (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchFileNames": ["apps/toiletmap-server/**"],
+      "groupName": "toiletmap-server (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchFileNames": ["apps/toiletmap-design-system/**"],
+      "groupName": "toiletmap-design-system (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchFileNames": ["apps/toiletmap-app/**"],
+      "groupName": "toiletmap-app (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchFileNames": ["packages/auth/**"],
+      "groupName": "@toiletmap/auth (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchFileNames": ["packages/opening-hours/**"],
+      "groupName": "@toiletmap/opening-hours (non-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions (non-major)"
+    },
+    {
+      "description": "Patch updates to devDependencies merge themselves once CI passes. They get their own PR so a grouped runtime update never blocks them.",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "devDependencies (patch)",
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ]
+}
