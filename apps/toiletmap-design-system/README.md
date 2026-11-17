@@ -17,7 +17,7 @@ Shared Preact component library used by `toiletmap-client` and any future Toilet
 | `InputField` | Labelled text input |
 | `Logo` | Toilet Map wordmark/logo |
 | `MapOverlay` | Floating overlay container for map controls |
-| `OpeningHoursInput` | 7-day opening-hours editor with bulk helpers (all open, all closed, copy-down) |
+| `OpeningHoursInput` | Controlled opening-hours editor. `value: null` means "Don't know"; otherwise a 7-day array. Includes "copy Monday" helpers. Pair with `validateOpeningTimes()` and `isTwentyFourHours()` |
 | `RadioInput` | Accessible radio button group |
 | `Sheet` | Bottom sheet / modal |
 | `SiteLayout` | Full-page wrapper (header + main + footer) |
@@ -40,3 +40,9 @@ All exports (components and their TypeScript types) are available from the packa
 ## Development
 
 The design system is a pnpm workspace package. Run the consumer app (`toiletmap-client`) to see components in context — there is no standalone Storybook at this time.
+
+## Tests
+
+```sh
+pnpm --filter toiletmap-design-system test
+```

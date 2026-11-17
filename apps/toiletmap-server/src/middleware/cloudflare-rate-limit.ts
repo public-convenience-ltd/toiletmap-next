@@ -17,6 +17,8 @@ interface CloudflareRateLimitConfig {
   name?: string;
 }
 
+const missingBindingsLogged = new Set<CloudflareRateLimitConfig["binding"]>();
+
 /**
  * Cloudflare Rate Limiting middleware
  *
@@ -54,12 +56,16 @@ const cloudflareRateLimit = (
     const rateLimiter = c.env[binding];
 
     if (!rateLimiter) {
-      logger.error("Rate limiter binding not found", {
-        binding,
-        path: c.req.path,
-        method: c.req.method,
-      });
-      // Fail open if binding is missing
+      // Fail open if binding is missing (tests and some local setups). Log once
+      // per binding per isolate rather than on every request.
+      if (!missingBindingsLogged.has(binding)) {
+        missingBindingsLogged.add(binding);
+        logger.error("Rate limiter binding not found", {
+          binding,
+          path: c.req.path,
+          method: c.req.method,
+        });
+      }
       return next();
     }
 

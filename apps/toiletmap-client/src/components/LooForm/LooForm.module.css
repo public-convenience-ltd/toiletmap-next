@@ -14,31 +14,12 @@
   margin: 0 0 var(--space-l);
 }
 
-/* ── Two-column layout ──────────────────────────────────── */
+/* ── Layout ─────────────────────────────────────────────── */
 
 .layout {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-l);
-}
-
-@media (min-width: 768px) {
-  .layout {
-    grid-template-columns: 1fr 280px;
-    align-items: start;
-  }
-}
-
-.main {
   display: flex;
   flex-direction: column;
   gap: var(--space-l);
-}
-
-.aside {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-m);
 }
 
 /* ── Sections ───────────────────────────────────────────── */
@@ -54,16 +35,6 @@
   font-size: var(--text-0);
   font-weight: 700;
   margin: 0 0 var(--space-s);
-}
-
-/* Opening hours section: no inner padding so the OH grid sits flush */
-.sectionFlush {
-  padding: 0;
-  overflow: hidden;
-}
-
-.sectionFlush > .sectionTitle {
-  padding: var(--space-m) var(--space-m) var(--space-s);
 }
 
 /* ── Fields ─────────────────────────────────────────────── */
@@ -88,7 +59,7 @@
 .hint {
   font-size: var(--text--2);
   color: var(--color-neutral-grey);
-  margin: 0 0 var(--space-s);
+  margin: var(--space-2xs) 0 var(--space-s);
 }
 
 .required {
@@ -101,6 +72,71 @@
   font-size: var(--text--2);
   color: var(--color-accent-pink);
   margin-top: var(--space-2xs);
+}
+
+/* ── Location picker ─────────────────────────────────────── */
+
+.pickerWrap {
+  position: relative;
+}
+
+.pickerMap {
+  height: 360px;
+  width: 100%;
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border: 2px solid var(--color-primary-navy);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.placePin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s);
+  margin-top: var(--space-2xs);
+}
+
+.placePin > .hint {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
+.linkButton {
+  padding: 0;
+  font: inherit;
+  font-size: var(--text--1);
+  font-weight: 600;
+  color: var(--color-primary-navy);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linkButton:hover {
+  text-decoration: none;
+}
+
+.linkButton:focus-visible {
+  outline: 2px solid var(--color-primary-navy);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.coordRow {
+  margin-top: var(--space-s);
 }
 
 /* ── Search autocomplete ─────────────────────────────────── */
@@ -183,4 +219,8 @@
 .errorList {
   margin: var(--space-2xs) 0 0;
   padding-left: var(--space-m);
+}
+
+.bannerActions {
+  margin-top: var(--space-s);
 }

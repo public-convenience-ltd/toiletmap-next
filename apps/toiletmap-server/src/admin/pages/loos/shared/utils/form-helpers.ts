@@ -5,6 +5,8 @@ import type { ZodIssue } from "zod";
  */
 
 export type TriStateValue = "true" | "false" | "";
+/** A required yes/no answer (no "unknown"), e.g. the `active` flag. */
+export type BooleanValue = "true" | "false";
 export type FieldErrors = Record<string, string>;
 
 /**

@@ -13,6 +13,8 @@ type LooFormProps = {
   errors: FieldErrors;
   status: SubmissionStatus;
   serverError: string | null;
+  /** True when the save was rejected because someone else changed the loo (HTTP 409). */
+  conflict?: boolean;
   formId: string;
   mode: "create" | "edit";
   onSubmit: (event: Event) => void;
@@ -103,6 +105,7 @@ export const LooForm = ({
   errors,
   status,
   serverError,
+  conflict = false,
   formId,
   mode,
   onSubmit,
@@ -123,10 +126,28 @@ export const LooForm = ({
             <InlineAlert
               variant="error"
               title={
-                mode === "create" ? "We couldn't save that loo" : "We couldn't update that loo"
+                conflict
+                  ? "Someone else changed this loo"
+                  : mode === "create"
+                    ? "We couldn't save that loo"
+                    : "We couldn't update that loo"
               }
               message={serverError}
-            />
+            >
+              {conflict ? (
+                <p class="notification__message">
+                  Your changes have not been saved. Reload the page to see the latest version, then
+                  make your changes again.{" "}
+                  <button
+                    type="button"
+                    class="button button--secondary"
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload page
+                  </button>
+                </p>
+              ) : undefined}
+            </InlineAlert>
           </div>
         )}
 
@@ -319,8 +340,9 @@ export const LooForm = ({
                 name="active"
                 value={form.active}
                 onChange={onTriStateChange}
-                hint='Set to "No" if this loo is removed or inaccessible.'
+                hint='Set to "No" to remove this loo from the map (for example if it has closed permanently).'
                 compact
+                allowUnknown={false}
                 error={errors.active}
               />
               <TextAreaField
@@ -339,7 +361,7 @@ export const LooForm = ({
               <ul class="create-tips">
                 <li>Include precise coordinates to avoid duplicates.</li>
                 <li>Only mark features you are confident about.</li>
-                <li>Use notes for opening hours or seasonal info.</li>
+                <li>Leave opening hours as "Don't know" unless you're sure of them.</li>
               </ul>
             </section>
           </aside>

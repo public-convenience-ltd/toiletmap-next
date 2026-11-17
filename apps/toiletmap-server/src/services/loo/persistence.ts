@@ -114,6 +114,12 @@ type UpdateArgs = {
   mutation: LooMutationAttributes;
   contributor: string | null;
   now: Date;
+  /**
+   * Optimistic-concurrency guard. When provided, the row is only updated if its
+   * `updated_at` still equals this value (to millisecond precision); `null`
+   * matches a row whose `updated_at` is NULL.
+   */
+  expectedUpdatedAt?: Date | null;
 };
 
 /**
@@ -121,7 +127,15 @@ type UpdateArgs = {
  * Handles appending contributors and updating geography fields.
  * Returns the number of affected rows (0 or 1).
  */
-export const updateLoo = async ({ tx, id, data, mutation, contributor, now }: UpdateArgs) => {
+export const updateLoo = async ({
+  tx,
+  id,
+  data,
+  mutation,
+  contributor,
+  now,
+  expectedUpdatedAt,
+}: UpdateArgs) => {
   const assignments: Prisma.Sql[] = [Prisma.sql`updated_at = ${now}`];
 
   for (const [key, value] of Object.entries(data)) {
@@ -136,10 +150,21 @@ export const updateLoo = async ({ tx, id, data, mutation, contributor, now }: Up
   const contributorSql = buildContributorsUpdateClause(contributor);
   if (contributorSql) assignments.push(contributorSql);
 
+  // JS Dates carry millisecond precision while timestamptz stores microseconds,
+  // so match within one millisecond rather than exactly.
+  const versionGuard =
+    expectedUpdatedAt === undefined
+      ? Prisma.empty
+      : expectedUpdatedAt === null
+        ? Prisma.sql`AND updated_at IS NULL`
+        : Prisma.sql`AND updated_at > ${expectedUpdatedAt}::timestamptz - interval '1 millisecond'
+            AND updated_at < ${expectedUpdatedAt}::timestamptz + interval '1 millisecond'`;
+
   const updateSql = Prisma.sql`
     UPDATE toilets
     SET ${Prisma.join(assignments)}
     WHERE id = ${id}
+    ${versionGuard}
   `;
 
   // biome-ignore lint/suspicious/noExplicitAny: Prisma 7.8.0 / TS 6.0.3 type gap

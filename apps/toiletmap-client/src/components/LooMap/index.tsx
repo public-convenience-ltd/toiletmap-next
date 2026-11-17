@@ -23,7 +23,7 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  // True only for the initial /loo/{id} page load — cleared after first center
+  // True only for the initial /loos/{id} page load — cleared after first center
   const shouldCenterRef = useRef(!!initialToiletId);
   const { data } = useMapData(apiUrl);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -59,7 +59,7 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
     };
   }, []);
 
-  // Pre-select toilet when navigating directly to /loo/{id} and pan the map to it
+  // Pre-select toilet when navigating directly to /loos/{id} and pan the map to it
   useEffect(() => {
     if (!initialToiletId) return;
     import("../../api/loos").then(({ getLooById }) => {
@@ -84,13 +84,13 @@ export default function LooMap({ apiUrl, initialToiletId }: LooMapProps) {
   useEffect(() => {
     if (isInitialLoading.current) return;
     if (selectedToilet) {
-      history.pushState(null, "", `/loo/${selectedToilet.id}`);
+      history.pushState(null, "", `/loos/${selectedToilet.id}`);
     } else {
       history.replaceState(null, "", "/");
     }
   }, [selectedToilet]);
 
-  // On the initial /loo/{id} load only, offset the map so the marker sits
+  // On the initial /loos/{id} load only, offset the map so the marker sits
   // centred in the visible area above the details panel. Marker clicks skip
   // this — the user already sees the marker, just open the panel.
   useEffect(() => {

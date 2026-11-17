@@ -12,7 +12,11 @@
     "preact": ">=10"
   },
   "devDependencies": {
-    "preact": "^10.29.8"
+    "happy-dom": "^20.11.1",
+    "preact": "^10.29.8",
+    "vitest": "^4.1.10"
   },
-  "scripts": {}
+  "scripts": {
+    "test": "vitest run"
+  }
 }

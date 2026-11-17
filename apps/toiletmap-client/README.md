@@ -22,15 +22,50 @@ The application uses Astro's SSR mode with the Cloudflare adapter:
 
 ### API Integration
 
-The client communicates with the toiletmap-server backend API:
+The browser **never talks to toiletmap-server directly**. All browser API calls are
+same-origin requests to `/api/*` on this worker, handled by the proxy in
+[src/pages/api/[...path].ts](src/pages/api/[...path].ts) (logic in
+[src/utils/api.ts](src/utils/api.ts) `proxyApiRequest`):
 
-**Centralized Configuration** ([src/api/config.ts](src/api/config.ts))
-- Pure function `getApiUrl(baseUrl, path)` for constructing API URLs
-- No mutable state - apiUrl is passed explicitly where needed
+- Only allow-listed paths are forwarded: `/api/loos` and `/api/loos/*` (the only
+  endpoints browser code calls). Anything else (e.g. the server's `/api/docs`
+  Swagger UI) gets a 404 JSON response. Paths containing dot segments, encoded
+  slashes/backslashes (`%2f`, `%5c`), backslashes or `//` are rejected. When the
+  browser starts calling a new endpoint, add its prefix to `ALLOWED_API_PREFIXES`
+  in [src/utils/api.ts](src/utils/api.ts).
+- Upstream is the `API` service binding when configured (production), otherwise
+  `PUBLIC_API_URL` (local dev, per-branch previews — preview client hosts are mapped
+  to the matching `<branch>-toiletmap-server` host).
+- Forwards method, body, query string and `accept`/`content-type`/`if-none-match`/
+  `if-match` etc. The browser `Cookie` header is never forwarded.
+- State-changing methods (anything but GET/HEAD/OPTIONS) must send an `Origin`
+  equal to the site origin (CSRF protection, otherwise 403) and get
+  `Authorization: Bearer <access_token>` attached from the httpOnly cookie.
+  The access token is never rendered into HTML or exposed to page JS.
+- Client IP is forwarded as `cf-connecting-ip` / `x-forwarded-for` for rate limiting.
+- Upstream status, body and cache headers are returned; `set-cookie`,
+  `access-control-*` and upstream `content-security-policy` are stripped. Every
+  proxy response carries `content-security-policy: default-src 'none'; frame-ancestors 'none'`
+  and `x-content-type-options: nosniff` (responses are JSON, never documents).
 
-**Available Endpoints:**
+Pages therefore pass `apiUrl=""` to islands, and `getApiUrl("", path)` from
+[src/api/config.ts](src/api/config.ts) yields relative URLs. Server-side (SSR)
+fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
+[src/utils/api.ts](src/utils/api.ts), which goes straight upstream (binding or
+`PUBLIC_API_URL`), not through the proxy.
+
+**Available Endpoints (via `/api/*`):**
 - `GET /api/loos/dump` - Fetches compressed list of all loos (id, geohash, filterMask)
+- `GET /api/loos/updates?since=…` - Incremental changes since a timestamp
 - `GET /api/loos/:id` - Fetches detailed information for a specific loo
+- `POST /api/loos`, `PUT /api/loos/:id` - Create / update a loo
+
+### Routes
+
+- `/` - map
+- `/loos/:id` - map with a toilet selected
+- `/loos/:id/edit`, `/loos/add` - edit / add forms
+- `/loo/*` - legacy aliases, 301-redirected to `/loos/*` (query string preserved)
 
 ### Caching Strategy
 
@@ -64,10 +99,13 @@ The base URL for the toiletmap-server API.
 - **Production**: `https://toiletmap-server.gbtoiletmap.workers.dev`
 
 **How it works:**
-1. Environment variable is defined in `wrangler.jsonc`
-2. Astro accesses it via `Astro.locals.runtime.env.PUBLIC_API_URL` (server-side)
-3. Passed to Preact components as props
-4. Components pass `apiUrl` explicitly to API functions (immutable, no global state)
+1. Environment variable is defined in `wrangler.jsonc` (previews override it per branch)
+2. Read server-side only (`env` from `cloudflare:workers`) by the `/api/*` proxy and
+   SSR fetches; it is not sent to the browser
+3. In production the `API` service binding (`env.production.services` in
+   `wrangler.jsonc`) takes precedence over `PUBLIC_API_URL`. The binding only
+   exists in a build made with `CLOUDFLARE_ENV=production` (see
+   [Deploy](#deploy)).
 
 ## Development
 
@@ -120,15 +158,35 @@ pnpm run preview
 
 ### Deploy
 
-Deploy to Cloudflare Workers:
+The Astro Cloudflare adapter resolves the Wrangler environment **at build
+time**: `astro build` flattens `wrangler.jsonc` into `dist/server/wrangler.json`
+using the environment named by `CLOUDFLARE_ENV` (top-level config when unset),
+and writes `.wrangler/deploy/config.json` so that a later `wrangler deploy` /
+`wrangler versions upload` automatically uses that flattened file (no
+`--config` needed). A plain `pnpm build` therefore has **no** `API` service
+binding, and production would silently fall back to public `fetch` against
+`PUBLIC_API_URL`.
 
 ```bash
-# Deploy to preview environment
+# Production: builds with CLOUDFLARE_ENV=production (includes the API service
+# binding and env.production vars), then deploys.
 pnpm run deploy
 
-# Deploy to production
-pnpm run deploy --env production
+# Preview: builds with CLOUDFLARE_ENV=preview, then uploads a new version.
+pnpm run deploy:preview
 ```
+
+`pnpm build:production` / `pnpm build:preview` run just the build step. The
+`--env` passed to wrangler must match the build's environment: wrangler refuses
+to deploy `--env preview` from a production build (and vice versa). Validate
+without deploying via `pnpm build:production && pnpm exec wrangler deploy --env production --dry-run`
+and check the output lists `env.API (toiletmap-server)`.
+
+Per-branch previews (`.github/workflows/deploy-preview.yml`) use a plain
+`pnpm build` and `wrangler deploy --env preview --name <branch>-toiletmap-client`
+with `--var` overrides; that works because a plain build has no target
+environment and no service binding (previews reach their branch server over
+`PUBLIC_API_URL`).
 
 ## Project Structure
 
@@ -157,7 +215,8 @@ src/
 - Verify `PUBLIC_API_URL` is correctly configured
 
 **Check browser console:**
-- Look for CORS errors (should not occur with localhost)
+- API calls should be same-origin `/api/*` requests; CORS errors mean something is
+  bypassing the proxy
 - Check for JavaScript errors in the map initialization
 
 ### API requests fail in production

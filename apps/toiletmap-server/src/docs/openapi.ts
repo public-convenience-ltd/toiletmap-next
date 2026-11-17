@@ -166,7 +166,11 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
         pattern: "^[a-f0-9]{24}$",
       },
       accessible: nullableBoolean,
-      active: nullableBoolean,
+      active: {
+        type: "boolean",
+        description:
+          "Whether the loo is shown on the map. Must be true or false; null is rejected. Set false (with a removalReason) to remove a loo.",
+      },
       allGender: nullableBoolean,
       attended: nullableBoolean,
       automatic: nullableBoolean,
@@ -208,7 +212,48 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       },
     ],
   },
-  UpdateLooRequest: schemaRef("LooMutation"),
+  UpdateLooRequest: {
+    allOf: [
+      schemaRef("LooMutation"),
+      {
+        type: "object",
+        description:
+          "Omitted fields are left unchanged; null clears a field. Fields equal to the stored value are ignored.",
+        properties: {
+          baseUpdatedAt: {
+            type: "string",
+            format: "date-time",
+            description:
+              "The `updatedAt` of the record the client loaded. If the record has changed since, the request fails with 409 and the current record.",
+          },
+        },
+      },
+    ],
+  },
+  ConflictResponse: {
+    type: "object",
+    required: ["message", "error", "current"],
+    properties: {
+      message: {
+        type: "string",
+        example: "This toilet was changed by someone else while you were editing.",
+      },
+      error: { type: "string", enum: ["conflict"] },
+      current: schemaRef("Loo"),
+    },
+  },
+  QueuedChangeResponse: {
+    type: "object",
+    required: ["queued"],
+    properties: {
+      queued: { type: "boolean" },
+      id: { type: "string", format: "uuid", description: "Pending change id (when queued)." },
+      unchanged: {
+        type: "boolean",
+        description: "True when the submission matched the current record and nothing was queued.",
+      },
+    },
+  },
   Loo: {
     type: "object",
     required: ["id", "area", "reports", "contributorsCount"],
@@ -809,28 +854,51 @@ export const openApiDocument: OpenAPIObject = {
       },
       put: {
         tags: ["Loos"],
-        summary: "Create or replace a loo",
+        summary: "Update (or create) a loo",
+        description:
+          "Authenticated callers write directly; an unknown id creates the loo. Anonymous callers can only suggest changes to existing loos: the changed fields are queued for moderation. Only fields that differ from the stored record are applied or queued.",
         parameters: [idPathParameter],
-        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: {
           required: true,
-          description: "Attributes to upsert.",
+          description: "Attributes to change.",
           content: jsonContent("UpdateLooRequest"),
         },
         responses: {
           200: {
-            description: "Existing loo updated.",
-            content: jsonContent("Loo"),
+            description:
+              "Existing loo updated, or returned unchanged when nothing differed. Anonymous no-op submissions return `{ queued: false, unchanged: true }`.",
+            content: {
+              "application/json": {
+                schema: { anyOf: [schemaRef("Loo"), schemaRef("QueuedChangeResponse")] },
+              },
+            },
           },
           201: {
             description: "New loo created.",
             content: jsonContent("Loo"),
+          },
+          202: {
+            description: "Anonymous change queued for moderation.",
+            content: jsonContent("QueuedChangeResponse"),
           },
           400: {
             description: "Invalid identifier or payload.",
             content: jsonContent("ValidationErrorResponse"),
           },
           401: authErrorResponse,
+          404: {
+            description: "Anonymous change for a loo that does not exist.",
+            content: jsonContent("ErrorResponse"),
+          },
+          409: {
+            description: "The loo changed since `baseUpdatedAt`.",
+            content: jsonContent("ConflictResponse"),
+          },
+          429: {
+            description: "Too many writes.",
+            content: jsonContent("ErrorResponse"),
+          },
         },
       },
     },

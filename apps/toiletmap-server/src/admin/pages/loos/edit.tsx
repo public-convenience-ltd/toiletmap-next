@@ -23,7 +23,9 @@ export const looEdit = async (c: Context<{ Bindings: Env }>) => {
   }
   const prisma = createPrismaClient(connectionString);
   const looService = new LooService(prisma);
-  const loo = await looService.getById(id);
+  // Read fresh (bypassing the per-request cache): the `updatedAt` embedded
+  // below is the concurrency token the save is checked against.
+  const loo = await looService.getMutationBase(id);
 
   if (!loo) {
     return c.html(
@@ -68,6 +70,9 @@ export const looEdit = async (c: Context<{ Bindings: Env }>) => {
       update: `/api/loos/${id}`,
     },
     looId: id,
+    // Sent back as `baseUpdatedAt` so the API returns 409 if the loo has been
+    // changed by someone else since this page was rendered.
+    baseUpdatedAt: loo.updatedAt ?? null,
     defaults,
   };
 

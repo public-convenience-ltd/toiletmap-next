@@ -1,168 +1,242 @@
-import { useState } from "preact/hooks";
-import Icon from "../Icon/Icon";
+import { useId } from "preact/hooks";
 import "./OpeningHoursInput.css";
+import {
+  copyDayTo,
+  createDefaultOpeningTimes,
+  DAYS,
+  type DayHours,
+  DEFAULT_DAY_HOURS,
+  isTwentyFourHours,
+  normaliseOpeningTimes,
+  type OpeningTimes,
+  TWENTY_FOUR_HOURS,
+} from "./openingTimes";
 
-export type DayHours = [string, string] | [];
-export type OpeningTimes = DayHours[];
+export type { DayHours, OpeningTimes };
 
 export interface OpeningHoursInputProps {
+  /** `null` means the opening hours are not known. */
   value: OpeningTimes | null;
-  onChange: (value: OpeningTimes) => void;
+  onChange: (value: OpeningTimes | null) => void;
+  /** Accessible name for the "known / not known" choice. */
+  label?: string;
   error?: string;
 }
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WEEKDAY_INDEXES = [1, 2, 3, 4];
+const OTHER_DAY_INDEXES = [1, 2, 3, 4, 5, 6];
 
-const DEFAULT_HOURS: DayHours = ["09:00", "17:00"];
+/**
+ * Fully controlled opening hours editor. All rendering derives from `value`;
+ * the component never keeps its own copy of the hours.
+ */
+export default function OpeningHoursInput({
+  value,
+  onChange,
+  label = "Opening hours",
+  error,
+}: OpeningHoursInputProps) {
+  const baseId = useId();
+  const isKnown = value !== null;
+  const hours = isKnown ? normaliseOpeningTimes(value) : null;
 
-export default function OpeningHoursInput({ value, onChange, error }: OpeningHoursInputProps) {
-  const [hours, setHours] = useState<string[][]>(value ?? Array(7).fill([]));
-
-  const updateDay = (dayIndex: number, newTimes: string[]) => {
-    const next = [...hours];
-    next[dayIndex] = newTimes;
-    setHours(next);
-    onChange(next as OpeningTimes);
+  const setDay = (dayIndex: number, next: DayHours) => {
+    if (!hours) return;
+    onChange(hours.map((day, index) => (index === dayIndex ? next : day)));
   };
 
-  const handleOpenToggle = (dayIndex: number, isOpen: boolean) => {
-    updateDay(dayIndex, isOpen ? [...DEFAULT_HOURS] : []);
-  };
-
-  const handleTimeChange = (dayIndex: number, type: "open" | "close", time: string) => {
+  const setTime = (dayIndex: number, position: 0 | 1, time: string) => {
+    if (!hours) return;
     const day = hours[dayIndex];
     if (day.length !== 2) return;
-    const next = [...day];
-    next[type === "open" ? 0 : 1] = time;
-    updateDay(dayIndex, next);
+    const next: [string, string] = [day[0], day[1]];
+    next[position] = time;
+    setDay(dayIndex, next);
   };
 
-  const handle24hToggle = (dayIndex: number, is24h: boolean) => {
-    updateDay(dayIndex, is24h ? ["00:00", "00:00"] : [...DEFAULT_HOURS]);
-  };
-
-  const copyToNext = (dayIndex: number) => {
-    if (dayIndex >= 6) return;
-    updateDay(dayIndex + 1, [...hours[dayIndex]]);
-  };
-
-  const applyToAll = (dayIndex: number) => {
-    const times = hours[dayIndex];
-    const next = hours.map(() => [...times]);
-    setHours(next);
-    onChange(next as OpeningTimes);
-  };
+  const errorId = `${baseId}-error`;
 
   return (
     <div class="oh-input">
-      <div class="oh-grid">
-        {DAYS.map((day, index) => {
-          const times = hours[index] ?? [];
-          const isOpen = times.length > 0;
-          const is24h = isOpen && times[0] === "00:00" && times[1] === "00:00";
+      <div
+        class="oh-mode"
+        role="radiogroup"
+        aria-label={label}
+        aria-describedby={error ? errorId : undefined}
+      >
+        <label class="oh-toggle-option">
+          <input
+            type="radio"
+            class="oh-radio"
+            name={`${baseId}-mode`}
+            value="unknown"
+            checked={!isKnown}
+            onChange={() => {
+              if (isKnown) onChange(null);
+            }}
+          />
+          <span class={`oh-toggle-label${!isKnown ? " oh-toggle-label--active" : ""}`}>
+            Don't know
+          </span>
+        </label>
+        <label class="oh-toggle-option">
+          <input
+            type="radio"
+            class="oh-radio"
+            name={`${baseId}-mode`}
+            value="known"
+            checked={isKnown}
+            onChange={() => {
+              if (!isKnown) onChange(createDefaultOpeningTimes());
+            }}
+          />
+          <span class={`oh-toggle-label${isKnown ? " oh-toggle-label--active" : ""}`}>
+            Set opening hours
+          </span>
+        </label>
+      </div>
 
-          return (
-            <div class="oh-row" key={day}>
-              <span class="oh-day">{day}</span>
+      {!isKnown && (
+        <p class="oh-hint">
+          The hours will be shown as "not known". Choose "Set opening hours" if you know them.
+        </p>
+      )}
 
-              {/* Open / Closed toggle */}
-              <div class="oh-status">
-                <label class="oh-toggle-option">
-                  <input
-                    type="radio"
-                    name={`oh-status-${index}`}
-                    checked={isOpen}
-                    onChange={() => handleOpenToggle(index, true)}
-                    class="oh-radio"
-                  />
-                  <span class={`oh-toggle-label${isOpen ? " oh-toggle-label--active" : ""}`}>
-                    Open
-                  </span>
-                </label>
-                <label class="oh-toggle-option">
-                  <input
-                    type="radio"
-                    name={`oh-status-${index}`}
-                    checked={!isOpen}
-                    onChange={() => handleOpenToggle(index, false)}
-                    class="oh-radio"
-                  />
-                  <span class={`oh-toggle-label${!isOpen ? " oh-toggle-label--active" : ""}`}>
-                    Closed
-                  </span>
-                </label>
-              </div>
+      {hours && (
+        <>
+          <p class="oh-hint">
+            Every day starts at 09:00–17:00. Check each day and change any that are different.
+          </p>
 
-              {/* Time inputs */}
-              <div class="oh-times">
-                {isOpen && (
-                  <>
-                    <label class="oh-checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={is24h}
-                        onChange={(e) =>
-                          handle24hToggle(index, (e.target as HTMLInputElement).checked)
-                        }
-                        class="oh-checkbox"
-                      />
-                      <span>24 hrs</span>
-                    </label>
-                    {!is24h && (
-                      <div class="oh-time-inputs">
+          <div class="oh-bulk">
+            <button
+              type="button"
+              class="oh-action-btn"
+              onClick={() => onChange(copyDayTo(hours, 0, OTHER_DAY_INDEXES))}
+            >
+              Copy Monday's hours to all days
+            </button>
+            <button
+              type="button"
+              class="oh-action-btn"
+              onClick={() => onChange(copyDayTo(hours, 0, WEEKDAY_INDEXES))}
+            >
+              Copy Monday to weekdays (Mon–Fri)
+            </button>
+          </div>
+
+          <div class="oh-grid">
+            {DAYS.map((day, index) => {
+              const times = hours[index];
+              const isOpen = times.length === 2;
+              const is24h = isOpen && isTwentyFourHours(times);
+              const dayId = `${baseId}-day-${index}`;
+
+              return (
+                <fieldset class="oh-day-group" key={day} data-day={day}>
+                  <legend class="oh-legend" id={dayId}>
+                    {day}
+                  </legend>
+                  <div class={`oh-row${isOpen ? "" : " oh-row--closed"}`}>
+                    <span class="oh-day" aria-hidden="true">
+                      {day}
+                    </span>
+
+                    <div class="oh-status" role="radiogroup" aria-labelledby={dayId}>
+                      <label class="oh-toggle-option">
                         <input
-                          type="time"
-                          value={times[0]}
-                          onChange={(e) =>
-                            handleTimeChange(index, "open", (e.target as HTMLInputElement).value)
-                          }
-                          class="oh-time-field"
-                          aria-label={`${day} opening time`}
+                          type="radio"
+                          class="oh-radio"
+                          name={`${baseId}-status-${index}`}
+                          value="closed"
+                          checked={!isOpen}
+                          onChange={() => setDay(index, [])}
                         />
-                        <span class="oh-time-sep">–</span>
+                        <span class={`oh-toggle-label${!isOpen ? " oh-toggle-label--active" : ""}`}>
+                          Closed
+                        </span>
+                      </label>
+                      <label class="oh-toggle-option">
                         <input
-                          type="time"
-                          value={times[1]}
-                          onChange={(e) =>
-                            handleTimeChange(index, "close", (e.target as HTMLInputElement).value)
-                          }
-                          class="oh-time-field"
-                          aria-label={`${day} closing time`}
+                          type="radio"
+                          class="oh-radio"
+                          name={`${baseId}-status-${index}`}
+                          value="open"
+                          checked={isOpen}
+                          onChange={() => {
+                            if (!isOpen) setDay(index, [...DEFAULT_DAY_HOURS]);
+                          }}
                         />
+                        <span class={`oh-toggle-label${isOpen ? " oh-toggle-label--active" : ""}`}>
+                          Open
+                        </span>
+                      </label>
+                    </div>
+
+                    {isOpen && (
+                      <div class="oh-times">
+                        {is24h ? (
+                          <span class="oh-24h-text">Open 24 hours</span>
+                        ) : (
+                          <>
+                            <input
+                              type="time"
+                              class="oh-time-field"
+                              value={times[0]}
+                              onInput={(e) =>
+                                setTime(index, 0, (e.target as HTMLInputElement).value)
+                              }
+                              aria-label={`${day} opening time`}
+                            />
+                            <span class="oh-time-sep" aria-hidden="true">
+                              to
+                            </span>
+                            <input
+                              type="time"
+                              class="oh-time-field"
+                              value={times[1]}
+                              onInput={(e) =>
+                                setTime(index, 1, (e.target as HTMLInputElement).value)
+                              }
+                              aria-label={`${day} closing time`}
+                            />
+                          </>
+                        )}
                       </div>
                     )}
-                  </>
-                )}
-              </div>
 
-              {/* Bulk actions */}
-              <div class="oh-actions">
-                {index < 6 && (
-                  <button
-                    type="button"
-                    class="oh-action-btn"
-                    onClick={() => copyToNext(index)}
-                    aria-label={`Copy ${day} hours to next day`}
-                  >
-                    <Icon icon="chevron-down" size="small" aria-hidden="true" />
-                    <span class="oh-action-label">Copy to next</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  class="oh-action-btn"
-                  onClick={() => applyToAll(index)}
-                  aria-label={`Apply ${day} hours to all days`}
-                >
-                  <Icon icon="asterisk" size="small" aria-hidden="true" />
-                  <span class="oh-action-label">Apply to all</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {error && <p class="oh-error">{error}</p>}
+                    {isOpen && (
+                      <label class="oh-checkbox-label">
+                        <input
+                          type="checkbox"
+                          class="oh-checkbox"
+                          checked={is24h}
+                          aria-label={`${day}: open 24 hours`}
+                          onChange={(e) =>
+                            setDay(
+                              index,
+                              (e.target as HTMLInputElement).checked
+                                ? [...TWENTY_FOUR_HOURS]
+                                : [...DEFAULT_DAY_HOURS],
+                            )
+                          }
+                        />
+                        <span aria-hidden="true">24 hours</span>
+                      </label>
+                    )}
+                  </div>
+                </fieldset>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {error && (
+        <p class="oh-error" id={errorId} role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

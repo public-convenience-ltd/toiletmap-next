@@ -103,9 +103,15 @@ importers:
 
   apps/toiletmap-design-system:
     devDependencies:
+      happy-dom:
+        specifier: ^20.11.1
+        version: 20.11.1
       preact:
         specifier: ^10.29.8
         version: 10.29.8(preact-render-to-string@6.7.0)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.2)(happy-dom@20.11.1)(msw@2.12.2(@types/node@26.1.2)(typescript@7.0.2))(vite@8.2.1(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.10)(yaml@2.9.0))
 
   apps/toiletmap-server:
     dependencies:

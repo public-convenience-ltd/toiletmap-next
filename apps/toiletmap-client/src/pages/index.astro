@@ -1,13 +1,13 @@
 ---
-import { env } from "cloudflare:workers";
 import { Footer, Header } from "toiletmap-design-system";
 import logo from "../assets/logo.svg?url";
 import LooMap from "../components/LooMap";
 import Layout from "../layouts/Layout.astro";
 
-import { getApiUrl } from "../utils/api";
+import { BROWSER_API_URL } from "../utils/api";
 
-const apiUrl = getApiUrl(env, Astro.url);
+// Browser islands call the same-origin /api/* proxy.
+const apiUrl = BROWSER_API_URL;
 const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
 
 const navLinks = [
@@ -15,7 +15,7 @@ const navLinks = [
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
   { href: "/feedback", label: "Feedback" },
-  { href: "/loo/add", label: "Add a Toilet", button: true },
+  { href: "/loos/add", label: "Add a Toilet", button: true },
   isAuthenticated
     ? { href: "/auth/logout", label: "Sign out" }
     : { href: "/auth/login", label: "Sign in" },

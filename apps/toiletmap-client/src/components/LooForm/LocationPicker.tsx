@@ -1,5 +1,9 @@
 import L from "leaflet";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { Button } from "toiletmap-design-system";
+import { isValidLatLng, type LatLng } from "./geometry";
+import styles from "./LooForm.module.css";
+import { shouldOfferLocationReset, shouldShowCrosshair } from "./pinActions";
 
 // Leaflet bundler fix: deleting _getIconUrl is required because setting it to undefined
 // causes a TypeError when Leaflet calls it as a function.
@@ -12,74 +16,155 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+const DEFAULT_CENTER: L.LatLngExpression = [51.505, -0.09];
+const DEFAULT_ZOOM = 13;
+const PLACED_ZOOM = 17;
+
 interface LocationPickerProps {
-  lat: number;
-  lng: number;
+  /** Current pin position, or null when no pin has been placed yet. */
+  location: LatLng | null;
   onChange: (lat: number, lng: number) => void;
+  /**
+   * The saved location when editing an existing toilet. When set and the pin has moved away
+   * from it, a "Reset to original location" action is offered.
+   */
+  originalLocation?: LatLng | null;
+  /** Receives the picker's Leaflet map (and null on unmount) so callers can pan it. */
+  onMapReady?: (map: L.Map | null) => void;
 }
 
-export default function LocationPicker({ lat, lng, onChange }: LocationPickerProps) {
+const round6 = (n: number) => Number(n.toFixed(6));
+
+export default function LocationPicker({
+  location,
+  onChange,
+  originalLocation,
+  onMapReady,
+}: LocationPickerProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  // Keep the latest callbacks in refs so Leaflet handlers never see a stale closure.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const onMapReadyRef = useRef(onMapReady);
+  onMapReadyRef.current = onMapReady;
+  // Whether the centre crosshair is shown (no pin yet, or the pin is away from the map centre).
+  const [crosshairVisible, setCrosshairVisible] = useState(true);
+
+  // Uses only refs and a state setter, so it is safe to register once as a Leaflet handler.
+  const refreshCrosshair = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const marker = markerRef.current;
+    const size = map.getSize();
+    const markerPoint = marker ? map.latLngToContainerPoint(marker.getLatLng()) : null;
+    setCrosshairVisible(shouldShowCrosshair(markerPoint, { x: size.x / 2, y: size.y / 2 }));
+  };
 
   const updateMarker = (latitude: number, longitude: number) => {
-    if (!mapRef.current) return;
+    const map = mapRef.current;
+    if (!map || !isValidLatLng(latitude, longitude)) return;
     if (markerRef.current) {
       markerRef.current.setLatLng([latitude, longitude]);
     } else {
       markerRef.current = L.marker([latitude, longitude], { draggable: true })
-        .addTo(mapRef.current)
+        .addTo(map)
+        .on("drag", refreshCrosshair)
         .on("dragend", (e) => {
           const pos = (e.target as L.Marker).getLatLng();
-          onChange(Number(pos.lat.toFixed(6)), Number(pos.lng.toFixed(6)));
+          onChangeRef.current(round6(pos.lat), round6(pos.lng));
         });
     }
   };
 
+  const removeMarker = () => {
+    markerRef.current?.remove();
+    markerRef.current = null;
+  };
+
   useEffect(() => {
     if (!container.current || mapRef.current) return;
-    const center: L.LatLngExpression = [lat || 51.505, lng || -0.09];
-    mapRef.current = L.map(container.current).setView(center, 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const hasLocation = !!location && isValidLatLng(location.lat, location.lng);
+    const map = L.map(container.current).setView(
+      hasLocation ? [location.lat, location.lng] : DEFAULT_CENTER,
+      hasLocation ? PLACED_ZOOM : DEFAULT_ZOOM,
+    );
+    mapRef.current = map;
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(mapRef.current);
-    mapRef.current.on("click", (e) => {
-      onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)));
-    });
-    updateMarker(lat || 51.505, lng || -0.09);
+    }).addTo(map);
+    // No click handler: the pin only moves by dragging it or via the explicit buttons below.
+    if (hasLocation) updateMarker(location.lat, location.lng);
+    map.on("move zoom resize", refreshCrosshair);
+    refreshCrosshair();
+    onMapReadyRef.current?.(map);
     return () => {
-      mapRef.current?.remove();
+      onMapReadyRef.current?.(null);
+      map.remove();
       mapRef.current = null;
       markerRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    updateMarker(lat, lng);
-    const cur = mapRef.current.getCenter();
-    if (cur.distanceTo([lat, lng]) > 500) {
-      mapRef.current.setView([lat, lng], mapRef.current.getZoom());
+    const map = mapRef.current;
+    if (!map) return;
+    if (!location || !isValidLatLng(location.lat, location.lng)) {
+      removeMarker();
+      refreshCrosshair();
+      return;
     }
-  }, [lat, lng]);
+    updateMarker(location.lat, location.lng);
+    if (map.getCenter().distanceTo([location.lat, location.lng]) > 500) {
+      map.setView([location.lat, location.lng], map.getZoom());
+    }
+    refreshCrosshair();
+  }, [location?.lat, location?.lng]);
+
+  const placePinAtCentre = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const centre = map.getCenter();
+    onChangeRef.current(round6(centre.lat), round6(centre.lng));
+  };
+
+  const showReset = shouldOfferLocationReset(originalLocation, location);
+
+  const resetToOriginal = () => {
+    const map = mapRef.current;
+    if (!originalLocation || !isValidLatLng(originalLocation.lat, originalLocation.lng)) return;
+    // Unrounded, so the form sees no location change at all.
+    onChangeRef.current(originalLocation.lat, originalLocation.lng);
+    map?.setView(
+      [originalLocation.lat, originalLocation.lng],
+      Math.max(map.getZoom(), PLACED_ZOOM),
+    );
+  };
 
   return (
     <div>
-      <div
-        ref={container}
-        style={{ height: "360px", width: "100%", borderRadius: "8px", zIndex: 1 }}
-      />
-      <p
-        style={{
-          fontSize: "var(--text--2)",
-          color: "var(--color-neutral-grey)",
-          marginTop: "var(--space-2xs)",
-        }}
-      >
-        Click the map or drag the pin to set the exact location.
-      </p>
+      <div class={styles.pickerWrap}>
+        <div class={styles.pickerMap} ref={container} />
+        {(!location || crosshairVisible) && <span class={styles.crosshair} aria-hidden="true" />}
+      </div>
+      <div class={styles.placePin}>
+        <p class={styles.hint}>
+          {location
+            ? "Drag the pin to fine-tune. To move it further, search or move the map so the toilet is in the centre, then move the pin there."
+            : "Move the map so the toilet is in the centre, then place the pin. You can drag it afterwards to fine-tune."}
+        </p>
+        <Button htmlElement="button" type="button" variant="secondary" onClick={placePinAtCentre}>
+          {location ? "Move pin to centre of map" : "Place pin here"}
+        </Button>
+        {showReset && (
+          <button type="button" class={styles.linkButton} onClick={resetToOriginal}>
+            Reset to original location
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "concurrently --names \"ASTRO,AUTH\" -c \"cyan,green\" \"astro dev\" \"pnpm --filter toiletmap-server auth:server\"",
     "build": "astro build",
+    "build:production": "CLOUDFLARE_ENV=production astro build",
+    "build:preview": "CLOUDFLARE_ENV=preview astro build",
     "preview": "astro preview",
-    "deploy": "wrangler deploy --env production",
-    "deploy:preview": "wrangler versions upload --env preview",
+    "deploy": "pnpm build:production && wrangler deploy --env production",
+    "deploy:preview": "pnpm build:preview && wrangler versions upload --env preview",
     "cf-typegen": "wrangler types",
     "astro": "astro",
     "test": "vitest run"

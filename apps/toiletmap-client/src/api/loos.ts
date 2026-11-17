@@ -16,6 +16,13 @@ export interface LooDetail {
   paymentDetails: string | null;
   openingTimes: ([string, string] | [])[] | null;
   updatedAt: string | null;
+  notes?: string | null;
+  active?: boolean | null;
+  removalReason?: string | null;
+  urinalOnly?: boolean | null;
+  attended?: boolean | null;
+  createdAt?: string | null;
+  verifiedAt?: string | null;
   [key: string]: unknown;
 }
 

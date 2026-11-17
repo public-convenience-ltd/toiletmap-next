@@ -1,18 +1,21 @@
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { optionalAuth } from "../../auth/middleware";
 import { LOO_ID_LENGTH } from "../../common/constants";
 import { validate } from "../../common/validator";
 import { cacheResponse } from "../../middleware/cache";
+import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
 import { hasAdminRole } from "../../middleware/require-admin-role";
 import { generateLooId } from "../../services/loo";
+import { diffMutation, isEmptyMutation, isStaleBase } from "../../services/loo/diff";
+import type { LooMutationBase } from "../../services/loo/loo.service";
+import type { LooResponse } from "../../services/loo/types";
 import type { AppVariables, Env } from "../../types";
 import { extractContributor } from "../../utils/auth-utils";
 import { invalidateDumpCache } from "../../utils/cache";
 import { badRequest, handleRoute, notFound } from "../shared/route-helpers";
 import type { MetricsQuery, SearchQuery } from "./schemas";
 import {
-  baseMutationSchema,
   createMutationSchema,
   dumpQuerySchema,
   geohashParamSchema,
@@ -23,6 +26,7 @@ import {
   proximitySchema,
   reportsQuerySchema,
   searchQuerySchema,
+  updateMutationSchema,
   updatesQuerySchema,
 } from "./schemas";
 
@@ -45,6 +49,34 @@ const anonRateLimitExceeded = async (
   }
   return null;
 };
+
+type AppContext = Context<{ Variables: AppVariables; Bindings: Env }>;
+
+/**
+ * Applies the per-user write rate limiter to authenticated mutations.
+ * Anonymous mutations are limited separately (see anonRateLimitExceeded).
+ * Like every Cloudflare limiter here, a missing binding fails open.
+ */
+const authenticatedWriteRateLimit: MiddlewareHandler<{
+  Variables: AppVariables;
+  Bindings: Env;
+}> = async (c, next) => {
+  if (!c.get("user")) {
+    await next();
+    return;
+  }
+  return rateLimiters.write(c, next);
+};
+
+const CONFLICT_MESSAGE = "This toilet was changed by someone else while you were editing.";
+
+const stripMutationBase = ({ areaId: _areaId, ...loo }: LooMutationBase): LooResponse => loo;
+
+const conflictResponse = (c: AppContext, current: LooResponse) =>
+  c.json({ message: CONFLICT_MESSAGE, error: "conflict", current }, 409);
+
+/** Bounded retries when a concurrent write lands between our read and our update. */
+const MAX_UPDATE_ATTEMPTS = 3;
 
 /** GET /loos/updates — intentionally not cached so mutations are visible immediately */
 loosRouter.get("/updates", validate("query", updatesQuerySchema, "Invalid updates query"), (c) =>
@@ -210,6 +242,7 @@ loosRouter.get("/", validate("query", idsQuerySchema, "Invalid ids query paramet
 loosRouter.post(
   "/",
   optionalAuth,
+  authenticatedWriteRateLimit,
   validate("json", createMutationSchema, "Invalid create request body"),
   (c) =>
     handleRoute(c, "loos.create", async () => {
@@ -252,43 +285,104 @@ loosRouter.post(
     }),
 );
 
-/** PUT /loos/:id */
+/**
+ * PUT /loos/:id
+ *
+ * Semantics: omitted fields are left unchanged, `null` clears a field, and
+ * fields equal to the stored value are dropped. If nothing would change, the
+ * existing record is returned without writing. An optional `baseUpdatedAt`
+ * (the `updatedAt` the client loaded) turns on optimistic concurrency: a
+ * mismatch returns 409 with the current record.
+ */
 loosRouter.put(
   "/:id",
   optionalAuth,
+  authenticatedWriteRateLimit,
   validate("param", looIdParamSchema, "Invalid id path parameter"),
-  validate("json", baseMutationSchema, "Invalid upsert request body"),
+  validate("json", updateMutationSchema, "Invalid upsert request body"),
   (c) =>
     handleRoute(c, "loos.upsert", async () => {
       const user = c.get("user");
       const { id } = c.req.valid("param");
+      const { baseUpdatedAt, ...mutation } = c.req.valid("json");
+      const looService = c.get("looService");
 
       if (!user) {
-        // Anonymous submission: rate-limit then queue for approval
+        // Anonymous submission: rate-limit then queue the diff for approval
         const limited = await anonRateLimitExceeded(c);
         if (limited) return limited;
 
-        const validation = c.req.valid("json");
+        const existing = await looService.getMutationBase(id);
+        // Anonymous users can only suggest edits to toilets that exist.
+        if (!existing) return notFound(c, "Loo not found");
+        if (isStaleBase(baseUpdatedAt, existing.updatedAt)) {
+          return conflictResponse(c, stripMutationBase(existing));
+        }
+
+        const changes = diffMutation(mutation, existing);
+        if (isEmptyMutation(changes)) {
+          return c.json({ queued: false, unchanged: true }, 200);
+        }
+
         const pendingChangeService = c.get("pendingChangeService");
+        const baseVersion = baseUpdatedAt ?? existing.updatedAt;
         const { id: queued } = await pendingChangeService.queue(
           "update",
-          validation,
+          changes,
           id,
           c.req.header("cf-connecting-ip") ?? null,
+          baseVersion ? new Date(baseVersion) : null,
         );
         return c.json({ queued: true, id: queued }, 202);
       }
 
       // Authenticated: direct write
-      const validation = c.req.valid("json");
       const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
-      const looService = c.get("looService");
-      const existing = await looService.getById(id);
-      const saved = await looService.upsert(id, validation, contributor);
-      if (!saved) throw new Error(`Failed to reload loo ${id} after upsert`);
 
-      await invalidateDumpCache(c.req.url);
-      return c.json(saved, existing ? 200 : 201);
+      for (let attempt = 1; attempt <= MAX_UPDATE_ATTEMPTS; attempt++) {
+        const existing = await looService.getMutationBase(id);
+
+        if (!existing) {
+          // PUT keeps upsert semantics for authenticated callers: unknown ids are created.
+          const saved = await looService.upsert(id, mutation, contributor);
+          if (!saved) throw new Error(`Failed to reload loo ${id} after upsert`);
+          await invalidateDumpCache(c.req.url);
+          return c.json(saved, 201);
+        }
+
+        if (isStaleBase(baseUpdatedAt, existing.updatedAt)) {
+          return conflictResponse(c, stripMutationBase(existing));
+        }
+
+        const changes = diffMutation(mutation, existing);
+        if (isEmptyMutation(changes)) {
+          return c.json(stripMutationBase(existing), 200);
+        }
+
+        // Guard the write with the version we diffed against so a concurrent
+        // edit between read and write is never silently overwritten.
+        const result = await looService.updateExisting(id, changes, contributor, {
+          expectedUpdatedAt: existing.updatedAt,
+        });
+
+        if (result.status === "updated") {
+          if (!result.loo) throw new Error(`Failed to reload loo ${id} after update`);
+          await invalidateDumpCache(c.req.url);
+          return c.json(result.loo, 200);
+        }
+
+        // The record changed (or vanished) under us. A client that sent a base
+        // version gets an explicit conflict; otherwise re-read and re-diff.
+        if (baseUpdatedAt !== undefined) {
+          const current = await looService.getMutationBase(id);
+          if (current) return conflictResponse(c, stripMutationBase(current));
+        }
+      }
+
+      return c.json(
+        { message: CONFLICT_MESSAGE, error: "conflict", current: await looService.getById(id) },
+        409,
+      );
     }),
 );
 

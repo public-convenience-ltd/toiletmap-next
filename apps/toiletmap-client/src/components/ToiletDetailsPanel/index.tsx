@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import type { IconName } from "toiletmap-design-system";
-import { Button, Icon, Stack } from "toiletmap-design-system";
+import { Button, Icon, isTwentyFourHours, Stack } from "toiletmap-design-system";
 import type { LooDetail } from "../../api/loos";
 import styles from "./ToiletDetailsPanel.module.css";
 
@@ -39,8 +39,10 @@ function formatTime(t: string): string {
 }
 
 function formatDayHours(day: [string, string] | [] | undefined): string {
-  if (day === undefined) return "Unknown";
+  if (day === undefined) return "Not known";
   if (day.length === 0) return "Closed";
+  // Any pair where open === close (e.g. 00:00–00:00) means open 24 hours.
+  if (isTwentyFourHours(day)) return "Open 24 hours";
   return `${formatTime(day[0])} – ${formatTime(day[1])}`;
 }
 
@@ -160,13 +162,19 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
                 </Button>
                 <span className={styles.verifyNoSpan}>
                   No?{" "}
-                  <Button htmlElement="a" variant="secondary" href={`/loo/${toilet.id}/edit`}>
+                  <Button htmlElement="a" variant="secondary" href={`/loos/${toilet.id}/edit`}>
                     <Icon icon="pen-to-square" size="small" />
                     Edit
                   </Button>
                 </span>
               </div>
             </div>
+            {toilet.notes?.trim() && (
+              <div>
+                <h3 className={styles.colHeading}>Notes</h3>
+                <p className={styles.notes}>{toilet.notes.trim()}</p>
+              </div>
+            )}
             <p className={styles.updatedAt}>Last updated: {formatUpdatedAt(toilet.updatedAt)}</p>
           </Stack>
 
@@ -198,23 +206,27 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
               <Icon icon="clock" size="small" />
               Opening Hours
             </h3>
-            <ul className={styles.hoursList}>
-              {DAYS.map((day, i) => {
-                const dayEntry = toilet.openingTimes?.[i] as [string, string] | [] | undefined;
-                return (
-                  <li
-                    key={day}
-                    className={`${styles.hoursRow}${i === today ? ` ${styles.today}` : ""}`}
-                  >
-                    <span className={styles.dayName}>{day}</span>
-                    <span className={styles.dayHours}>{formatDayHours(dayEntry)}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            {toilet.openingTimes === null || toilet.openingTimes === undefined ? (
+              <p className={styles.hoursUnknown}>Opening hours not known</p>
+            ) : (
+              <ul className={styles.hoursList}>
+                {DAYS.map((day, i) => {
+                  const dayEntry = toilet.openingTimes?.[i];
+                  return (
+                    <li
+                      key={day}
+                      className={`${styles.hoursRow}${i === today ? ` ${styles.today}` : ""}`}
+                    >
+                      <span className={styles.dayName}>{day}</span>
+                      <span className={styles.dayHours}>{formatDayHours(dayEntry)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             <p className={styles.hoursNote}>
               Hours may vary with national holidays or seasonal changes.{" "}
-              <a href={`/loo/${toilet.id}/edit`}>Edit this toilet</a> if out of date.
+              <a href={`/loos/${toilet.id}/edit`}>Edit this toilet</a> if out of date.
             </p>
           </div>
         </div>

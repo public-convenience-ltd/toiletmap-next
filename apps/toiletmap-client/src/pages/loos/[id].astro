@@ -1,22 +1,23 @@
 ---
-import { env } from "cloudflare:workers";
 import { Footer, Header } from "toiletmap-design-system";
 import logo from "../../assets/logo.svg?url";
-import LooForm from "../../components/LooForm/LooForm";
+import LooMap from "../../components/LooMap";
 import Layout from "../../layouts/Layout.astro";
 
-import { getApiUrl } from "../../utils/api";
+const { id } = Astro.params;
 
-const apiUrl = getApiUrl(env, Astro.url);
+import { BROWSER_API_URL } from "../../utils/api";
+
+// Browser islands call the same-origin /api/* proxy.
+const apiUrl = BROWSER_API_URL;
 const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
-const accessToken = Astro.cookies.get("access_token")?.value ?? null;
 
 const navLinks = [
   { href: "/about", label: "About" },
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
   { href: "/feedback", label: "Feedback" },
-  { href: "/loo/add", label: "Add a Toilet", button: true },
+  { href: "/loos/add", label: "Add a Toilet", button: true },
   isAuthenticated
     ? { href: "/auth/logout", label: "Sign out" }
     : { href: "/auth/login", label: "Sign in" },
@@ -26,13 +27,7 @@ const navLinks = [
 <Layout>
   <Header client:load logoSrc={logo} navLinks={navLinks} />
   <main>
-    <LooForm
-      client:only="preact"
-      mode="add"
-      apiUrl={apiUrl}
-      isAuthenticated={isAuthenticated}
-      accessToken={accessToken}
-    />
+    <LooMap client:only="preact" apiUrl={apiUrl} initialToiletId={id} />
   </main>
   <Footer />
 </Layout>
@@ -41,6 +36,7 @@ const navLinks = [
   main {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
+    position: relative;
   }
 </style>

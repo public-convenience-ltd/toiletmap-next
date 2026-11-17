@@ -1,16 +1,26 @@
 /** @jsxImportSource hono/jsx/dom */
 
 import { useState } from "hono/jsx";
-import { DEFAULT_FORM_STATE } from "../utils/form";
+import { DEFAULT_FORM_STATE, toBooleanValue } from "../utils/form";
 import type { LooFormState, TriStateValue } from "../utils/types";
 
-const mergeDefaults = (defaults?: Partial<LooFormState>) => ({
-  ...DEFAULT_FORM_STATE,
-  ...(defaults || {}),
-});
+export const mergeDefaults = (defaults?: Partial<LooFormState>): LooFormState => {
+  const merged = {
+    ...DEFAULT_FORM_STATE,
+    ...(defaults || {}),
+  };
+  return {
+    ...merged,
+    // `active` is two-state only; a missing/unknown value defaults to active.
+    active: toBooleanValue(merged.active),
+    openingTimes: merged.openingTimes ?? null,
+  };
+};
 
 export const useLooForm = (defaults?: Partial<LooFormState>) => {
-  const [form, setForm] = useState<LooFormState>(() => mergeDefaults(defaults));
+  // The form as first loaded; edit mode diffs against this.
+  const [initialForm] = useState<LooFormState>(() => mergeDefaults(defaults));
+  const [form, setForm] = useState<LooFormState>(initialForm);
 
   const updateField = (field: keyof LooFormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -37,6 +47,7 @@ export const useLooForm = (defaults?: Partial<LooFormState>) => {
   };
 
   return {
+    initialForm,
     form,
     updateField,
     updateTriState,

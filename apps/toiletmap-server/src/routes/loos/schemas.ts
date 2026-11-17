@@ -48,7 +48,9 @@ export const baseMutationSchema = z
       .nullable()
       .optional(),
     accessible: booleanField,
-    active: booleanField,
+    // `active` is a soft-delete flag: it must be an explicit true/false. A null
+    // would silently hide the toilet from the map with no recorded reason.
+    active: z.boolean().optional(),
     allGender: booleanField,
     attended: booleanField,
     automatic: booleanField,
@@ -70,6 +72,17 @@ export const baseMutationSchema = z
 
 export const createMutationSchema = baseMutationSchema.extend({
   id: z.string().trim().length(LOO_ID_LENGTH).optional(),
+});
+
+/**
+ * PUT body. `baseUpdatedAt` is the `updatedAt` the client loaded before editing;
+ * when supplied and the record has changed since, the server responds 409.
+ * It is a concurrency token only and is stripped before reaching the service.
+ */
+export const updateMutationSchema = baseMutationSchema.extend({
+  baseUpdatedAt: z.iso
+    .datetime({ offset: true, message: "baseUpdatedAt must be an ISO-8601 datetime" })
+    .optional(),
 });
 
 export const searchQuerySchema = z.object({
