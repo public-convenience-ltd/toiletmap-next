@@ -434,6 +434,20 @@ INSERT INTO public.toilets (
   ('00280085727bd89ce7025537', '2014-11-26T15:41:17.933Z'::timestamptz, '2017-07-21T12:06:39.156Z'::timestamptz, ARRAY['Seed Data Import'], FALSE, TRUE, NULL, NULL, TRUE, NULL, NULL, NULL, NULL, NULL, 'Sittingbourne Station', 'Only Available with a train ticket', NULL, TRUE, TRUE, NULL, '6398cd2beeeaf8d0ce6484be', NULL, NULL, ST_SetSRID(ST_MakePoint(0.734697529, 51.341974656), 4326)::geography),
   ('00550fbf4dbca244564dc79a', '2016-09-13T23:30:36.213Z'::timestamptz, '2016-09-13T23:30:36.213Z'::timestamptz, ARRAY['Seed Data Import'], FALSE, TRUE, NULL, NULL, FALSE, TRUE, TRUE, NULL, NULL, NULL, 'WCP, Station Road,', NULL, NULL, TRUE, TRUE, NULL, '6398cd2beeeaf8d0ce64853d', NULL, '[["09:30","16:30"],["09:30","16:30"],["09:30","16:30"],["09:30","16:30"],["09:30","16:30"],["09:30","16:30"],["09:30","16:30"]]'::jsonb, ST_SetSRID(ST_MakePoint(-3.145554448, 53.343183322), 4326)::geography);
 
+-- Two rows inside the client's default map view (centre 51.505, -0.09, zoom 13)
+-- on every e2e viewport, including iPhone 13 (390x664). The Playwright map and
+-- freshness specs rely on a marker being visible there without creating data.
+-- They sit about 120px apart at zoom 13, so they never merge into a cluster.
+-- Treat them as read-only: no test should edit or remove them.
+INSERT INTO public.toilets (
+  id, created_at, updated_at, contributors, accessible, active, attended, automatic,
+  baby_change, men, women, all_gender, children, urinal_only, name, notes,
+  payment_details, no_payment, radar, removal_reason, area_id, verified_at,
+  opening_times, geography
+) OVERRIDING SYSTEM VALUE VALUES
+  ('e2e00000000000000000c001', '2024-06-01T09:00:00.000Z'::timestamptz, '2024-06-01T09:00:00.000Z'::timestamptz, ARRAY['Seed Data Import'], TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, NULL, FALSE, 'Borough Market', 'Seed row in the default map view (used by e2e tests).', NULL, TRUE, FALSE, NULL, NULL, NULL, NULL, ST_SetSRID(ST_MakePoint(-0.09, 51.505), 4326)::geography),
+  ('e2e00000000000000000c002', '2024-06-01T09:00:00.000Z'::timestamptz, '2024-06-01T09:00:00.000Z'::timestamptz, ARRAY['Seed Data Import'], NULL, TRUE, NULL, NULL, NULL, TRUE, TRUE, NULL, NULL, FALSE, 'Bermondsey Street', 'Seed row in the default map view (used by e2e tests).', NULL, TRUE, NULL, NULL, NULL, NULL, NULL, ST_SetSRID(ST_MakePoint(-0.07, 51.501), 4326)::geography);
+
 --
 -- Ensure seeded toilets have audit history for reporting tests
 --
