@@ -13,6 +13,7 @@ export const TRI_STATE_FIELDS = [
   "men",
   "women",
   "children",
+  "urinalOnly",
   "babyChange",
   "radar",
   "automatic",
@@ -55,8 +56,9 @@ export const FIELD_LABELS: Record<LooFormField, string> = {
   men: "Men",
   women: "Women",
   children: "Children",
+  urinalOnly: "Urinal only",
   babyChange: "Baby change",
-  radar: "Radar key",
+  radar: "RADAR key",
   automatic: "Automatic",
   noPayment: "Free",
 };

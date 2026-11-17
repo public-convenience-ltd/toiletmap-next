@@ -4,11 +4,15 @@ import { interpretSaveResponse, UNEXPECTED_RESPONSE_MESSAGE } from "./saveRespon
 const loo = { id: "abc123", name: "High Street", updatedAt: "2026-01-01T00:00:00.000Z" };
 
 describe("interpretSaveResponse", () => {
-  it("202 → queued", () => {
-    expect(interpretSaveResponse(202, { queued: true, id: "pending-1" }, "edit")).toEqual({
+  it("202 → queued, carrying the pending change id when the body has one", () => {
+    expect(interpretSaveResponse(202, { queued: true, id: "pending-1" }, "edit")).toStrictEqual({
+      kind: "queued",
+      pendingId: "pending-1",
+    });
+    expect(interpretSaveResponse(202, null, "add")).toStrictEqual({ kind: "queued" });
+    expect(interpretSaveResponse(202, { queued: true, id: "  " }, "add")).toStrictEqual({
       kind: "queued",
     });
-    expect(interpretSaveResponse(202, null, "add")).toEqual({ kind: "queued" });
   });
 
   it("200 with a record → saved with its id", () => {
@@ -58,6 +62,7 @@ describe("interpretSaveResponse", () => {
       kind: "error",
       message: "Invalid upsert request body",
       details: ["name: Too long"],
+      issues: body.issues,
     });
     expect(interpretSaveResponse(400, {}, "edit")).toEqual({
       kind: "error",

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { authenticateToken } from "@toiletmap/auth";
 import type { APIRoute } from "astro";
+import { RETURN_TO_COOKIE, safeReturnTo, sessionMaxAge } from "../../utils/returnTo";
 
 const constantTimeEquals = (a: string, b: string): boolean => {
   if (a.length !== b.length) return false;
@@ -16,7 +17,6 @@ const SESSION_COOKIE_OPTS = {
   secure: true,
   sameSite: "lax" as const,
   path: "/",
-  maxAge: 86400,
 };
 
 export const GET: APIRoute = async ({ cookies, redirect, url }) => {
@@ -24,9 +24,12 @@ export const GET: APIRoute = async ({ cookies, redirect, url }) => {
   const returnedState = url.searchParams.get("state");
   const storedState = cookies.get("auth_state")?.value;
   const storedNonce = cookies.get("auth_nonce")?.value;
+  // Re-validated here too: the cookie is httpOnly, but never trust a redirect target blindly.
+  const returnTo = safeReturnTo(cookies.get(RETURN_TO_COOKIE)?.value) ?? "/";
 
   cookies.delete("auth_state", { path: "/" });
   cookies.delete("auth_nonce", { path: "/" });
+  cookies.delete(RETURN_TO_COOKIE, { path: "/" });
 
   if (!returnedState || !storedState || !constantTimeEquals(returnedState, storedState)) {
     return new Response("Invalid authentication state", { status: 400 });
@@ -72,8 +75,14 @@ export const GET: APIRoute = async ({ cookies, redirect, url }) => {
       return new Response("Invalid authentication nonce", { status: 401 });
     }
 
-    cookies.set("id_token", tokenData.id_token, SESSION_COOKIE_OPTS);
-    cookies.set("access_token", tokenData.access_token, SESSION_COOKIE_OPTS);
+    // The session lasts as long as the access token: once it expires the API rejects it, so
+    // keeping the cookies longer would only make the site look signed in when it isn't.
+    const sessionCookieOpts = {
+      ...SESSION_COOKIE_OPTS,
+      maxAge: sessionMaxAge(tokenData.access_token),
+    };
+    cookies.set("id_token", tokenData.id_token, sessionCookieOpts);
+    cookies.set("access_token", tokenData.access_token, sessionCookieOpts);
 
     const userInfo = btoa(
       JSON.stringify({
@@ -84,11 +93,11 @@ export const GET: APIRoute = async ({ cookies, redirect, url }) => {
       }),
     );
     cookies.set("user_info", userInfo, {
-      ...SESSION_COOKIE_OPTS,
+      ...sessionCookieOpts,
       httpOnly: false,
     });
 
-    return redirect("/");
+    return redirect(returnTo);
   } catch {
     return new Response("Authentication error", { status: 500 });
   }

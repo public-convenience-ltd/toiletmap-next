@@ -10,7 +10,30 @@ import {
   resetMapCacheForTests,
   saveSnapshot,
 } from "../../api/mapCache";
-import LooForm from "./LooForm";
+import { draftKey } from "./draft";
+import LooForm, { LIVE_STRAIGHT_AWAY, MESSAGES, MODERATOR_WILL_CHECK } from "./LooForm";
+import { formStateFromLoo } from "./payload";
+
+const pendingKey = (looId: string) => `toiletmap-pending:${looId}`;
+
+/** Node's own (non-functional) localStorage shadows happy-dom's here, so use a memory one. */
+function memoryStorage(): Storage {
+  const map = new Map<string, string>();
+  return {
+    get length() {
+      return map.size;
+    },
+    clear: () => map.clear(),
+    getItem: (key) => map.get(key) ?? null,
+    key: (index) => Array.from(map.keys())[index] ?? null,
+    removeItem: (key) => {
+      map.delete(key);
+    },
+    setItem: (key, value) => {
+      map.set(key, String(value));
+    },
+  };
+}
 
 // The real cache module runs (against fake-indexeddb); this spy wraps it so tests can
 // assert the read-your-writes call and simulate a cache failure.
@@ -19,53 +42,108 @@ vi.mock("../../api/mapCache", async (importOriginal) => {
   return { ...actual, applyLocalMutation: vi.fn(actual.applyLocalMutation) };
 });
 
-// The picker's Leaflet map, as handed to LooForm through onMapReady. Address search must
-// only ever pan this map; it must never move the toilet's pin.
-const pickerMap = vi.hoisted(() => ({
-  setView: vi.fn(),
-  flyTo: vi.fn(),
-  panTo: vi.fn(),
-  fitBounds: vi.fn(),
+const OTHER_ID = "fffffffffffffffffffffff1";
+
+// Leaflet does not run in happy-dom, so the map picker is replaced with a stub that drives
+// the same callbacks the real picker does (its own behaviour is tested in LocationPicker.test).
+const pickerProps = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
+vi.mock("./LocationPicker", () => ({
+  default: function LocationPickerStub(props: {
+    location: { lat: number; lng: number } | null;
+    onChange: (lat: number, lng: number) => void;
+    onMovingChange?: (moving: boolean) => void;
+    onEditExisting?: (id: string) => void;
+    onRestoreExisting?: (id: string) => void;
+  }) {
+    pickerProps.last = props as unknown as Record<string, unknown>;
+    const { location, onChange, onMovingChange, onEditExisting, onRestoreExisting } = props;
+    return (
+      <div data-testid="location-picker">
+        <span data-testid="picker-location">
+          {location ? `${location.lat},${location.lng}` : "none"}
+        </span>
+        <button type="button" onClick={() => onChange(51.5074, -0.1278)}>
+          Stub: place pin
+        </button>
+        <button type="button" onClick={() => onChange(51.6, -0.2)}>
+          Stub: move pin far
+        </button>
+        <button type="button" onClick={() => onMovingChange?.(true)}>
+          Stub: start moving
+        </button>
+        <button type="button" onClick={() => onEditExisting?.("fffffffffffffffffffffff1")}>
+          Stub: edit existing
+        </button>
+        <button type="button" onClick={() => onRestoreExisting?.("fffffffffffffffffffffff1")}>
+          Stub: restore existing
+        </button>
+      </div>
+    );
+  },
 }));
 
-// Leaflet does not run in happy-dom, so the map picker is replaced with a stub
-// that can place/move the pin through the same onChange callback.
-vi.mock("./LocationPicker", async () => {
-  const { useEffect } = await import("preact/hooks");
+// The opening-hours widget has its own tests in the design system; here it is a stub that
+// drives the same controlled value/onChange contract and mirrors its structure: `id` is on the
+// first question's group (the mode radios), and the time inputs come after that group, the
+// first invalid one marked `data-first-invalid-for="<id>"`.
+vi.mock("toiletmap-design-system", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("toiletmap-design-system")>();
+  type Hours = ([string, string] | [])[] | null;
   return {
-    default: function LocationPickerStub({
-      location,
+    ...actual,
+    OpeningHoursInput: ({
+      value,
       onChange,
-      onMapReady,
+      error,
+      id,
     }: {
-      location: { lat: number; lng: number } | null;
-      onChange: (lat: number, lng: number) => void;
-      onMapReady?: (map: unknown) => void;
-    }) {
-      useEffect(() => {
-        onMapReady?.(pickerMap);
-        return () => onMapReady?.(null);
-      }, [onMapReady]);
-      return (
-        <div data-testid="location-picker">
-          <span data-testid="picker-location">
-            {location ? `${location.lat},${location.lng}` : "none"}
-          </span>
-          <button type="button" onClick={() => onChange(51.5074, -0.1278)}>
-            Stub: place pin
-          </button>
-          <button type="button" onClick={() => onChange(51.6, -0.2)}>
-            Stub: move pin far
-          </button>
-        </div>
-      );
-    },
+      value: Hours;
+      onChange: (v: Hours) => void;
+      error?: string;
+      id?: string;
+    }) => (
+      <div data-testid="opening-hours">
+        <fieldset id={id} tabIndex={id ? -1 : undefined}>
+          <legend>When is it open?</legend>
+          <label>
+            <input type="radio" checked={value === null} onChange={() => onChange(null)} />
+            Don't know
+          </label>
+        </fieldset>
+        <button
+          type="button"
+          onClick={() =>
+            onChange(
+              (value ?? Array.from({ length: 7 }, () => ["09:00", "17:00"])).map((day, i) =>
+                i === 0 ? ["", "17:00"] : day,
+              ) as Hours,
+            )
+          }
+        >
+          Stub: clear Monday opening
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(Array.from({ length: 7 }, () => ["00:00", "00:00"]) as Hours)}
+        >
+          Stub: open 24/7
+        </button>
+        {/* Stands in for the widget's time input, marked invalid alongside the error. */}
+        <input
+          aria-label="Monday opens"
+          aria-invalid={error ? "true" : undefined}
+          data-first-invalid-for={error && id ? id : undefined}
+        />
+        {error && <span>{error}</span>}
+      </div>
+    ),
   };
 });
 
 const LOO_ID = "0123456789abcdef01234567";
 const BASE_UPDATED_AT = "2026-11-01T10:00:00.000Z";
 const NEWER_UPDATED_AT = "2026-11-02T12:30:00.000Z";
+const START_HREF = "http://localhost:3000/loos/edit";
 
 const weekHours = (): ([string, string] | [])[] =>
   Array.from({ length: 7 }, () => ["09:00", "17:00"] as [string, string]);
@@ -89,6 +167,7 @@ const makeLoo = (overrides: Partial<LooDetail> = {}): LooDetail => ({
   notes: "Closed Sundays",
   active: true,
   removalReason: null,
+  urinalOnly: null,
   ...overrides,
 });
 
@@ -103,17 +182,19 @@ const jsonResponse = (status: number, body: unknown) =>
 
 let fetchMock: Mock<typeof fetch>;
 let originalLocation: Location;
-let locationStub: { href: string };
+let locationStub: { href: string; pathname: string; search: string };
 
 beforeEach(async () => {
-  for (const spy of Object.values(pickerMap)) spy.mockReset();
   vi.mocked(applyLocalMutation).mockClear();
+  pickerProps.last = null;
   await clearMapCache();
   resetMapCacheForTests();
+  sessionStorage.clear();
+  vi.stubGlobal("localStorage", memoryStorage());
   fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal("fetch", fetchMock);
   originalLocation = window.location;
-  locationStub = { href: "http://localhost:3000/loos/edit" };
+  locationStub = { href: START_HREF, pathname: `/loos/${LOO_ID}/edit`, search: "" };
   Object.defineProperty(window, "location", {
     configurable: true,
     value: locationStub,
@@ -124,13 +205,17 @@ afterEach(async () => {
   // A successful save keeps running after the test's last assertion: it patches the IndexedDB
   // cache (a macrotask in fake-indexeddb) and only then sets window.location.href. Without this
   // wait, that late redirect lands on the *next* test's location stub and fails it at random.
-  // "Saving…" stays on the button until the submit handler has fully finished.
+  // "Saving…" stays on the buttons until the submit handler has fully finished.
   await waitFor(() => expect(screen.queryByText("Saving…")).not.toBeInTheDocument());
   vi.unstubAllGlobals();
   Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
 });
 
-const renderEdit = (loo: LooDetail = makeLoo(), isAuthenticated = true) =>
+const renderEdit = (
+  loo: LooDetail = makeLoo(),
+  isAuthenticated = true,
+  extra: { skipReview?: boolean; canWriteDirectly?: boolean } = {},
+) =>
   render(
     <LooForm
       mode="edit"
@@ -138,11 +223,12 @@ const renderEdit = (loo: LooDetail = makeLoo(), isAuthenticated = true) =>
       looId={loo.id}
       apiUrl=""
       isAuthenticated={isAuthenticated}
+      {...extra}
     />,
   );
 
-const renderAdd = () =>
-  render(<LooForm mode="add" initialData={null} apiUrl="" isAuthenticated={true} />);
+const renderAdd = (isAuthenticated = true) =>
+  render(<LooForm mode="add" initialData={null} apiUrl="" isAuthenticated={isAuthenticated} />);
 
 /** The parsed JSON body and init of the n-th fetch call. */
 const request = (index = 0) => {
@@ -154,46 +240,35 @@ const request = (index = 0) => {
   };
 };
 
-const nameInput = () => screen.getByLabelText(/^Name/) as HTMLInputElement;
-const notesInput = () => screen.getByLabelText("Notes") as HTMLTextAreaElement;
-const saveButton = () => screen.getByRole("button", { name: /save|no changes|add toilet/i });
+const nameInput = () =>
+  screen.getByRole("textbox", { name: /^What's it called\?/ }) as HTMLInputElement;
+const notesInput = () =>
+  screen.getByRole("textbox", {
+    name: /^Anything else people should know\?/,
+  }) as HTMLTextAreaElement;
+const saveButton = () => screen.getByRole("button", { name: /^(save|no changes|add toilet)/i });
 const facility = (label: string) => within(screen.getByRole("group", { name: label }));
+const reviewSheet = () => screen.getByRole("dialog", { name: /^Check / });
+const confirmButton = () => screen.getByRole("button", { name: "Confirm and save" });
 
-const changeName = async (user: ReturnType<typeof userEvent.setup>, value: string) => {
+type User = ReturnType<typeof userEvent.setup>;
+
+const changeName = async (user: User, value: string) => {
   await user.clear(nameInput());
   await user.type(nameInput(), value);
 };
 
-const SUGGESTION = {
-  place_id: 7,
-  display_name: "Trafalgar Square, London",
-  lat: "51.508039",
-  lon: "-0.128069",
+/** Save through the review sheet. */
+const saveAndConfirm = async (user: User) => {
+  await user.click(saveButton());
+  await user.click(await screen.findByRole("button", { name: "Confirm and save" }));
 };
 
-/** Answers Nominatim address searches with SUGGESTION and everything else with `api`. */
-const routeFetch = (api: () => Response) =>
-  fetchMock.mockImplementation(async (input) =>
-    String(input).startsWith("https://nominatim.openstreetmap.org/")
-      ? jsonResponse(200, [SUGGESTION])
-      : api(),
-  );
-
-/** Calls made to the toilet API (i.e. not address searches). */
-const apiCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).startsWith("/api/"));
-
-const searchAndChooseSuggestion = async (user: ReturnType<typeof userEvent.setup>) => {
-  await user.type(
-    screen.getByLabelText("Search for an address to move the map there"),
-    "Trafalgar",
-  );
-  await user.click(await screen.findByRole("button", { name: SUGGESTION.display_name }));
-  expect(screen.queryByRole("button", { name: SUGGESTION.display_name })).toBeNull();
-};
-
-const expectPickerPannedToSuggestion = () => {
-  expect(pickerMap.setView).toHaveBeenCalledWith([51.508039, -0.128069], 17, { animate: false });
-};
+/** Text of each line of the review sheet. */
+const reviewLines = () =>
+  within(reviewSheet())
+    .getAllByRole("listitem")
+    .map((li) => li.textContent?.replace(/\s+/g, " ").trim());
 
 const expectNoForbiddenKeys = (body: Record<string, unknown>) => {
   expect(body).not.toHaveProperty("active");
@@ -201,7 +276,7 @@ const expectNoForbiddenKeys = (body: Record<string, unknown>) => {
 };
 
 describe("LooForm (edit)", () => {
-  it("disables Save until something changes, then sends only the changed field", async () => {
+  it("disables Save until something changes, reviews it, then sends only the changed field", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "Market Square toilets" })));
     renderEdit();
@@ -214,6 +289,11 @@ describe("LooForm (edit)", () => {
     expect(saveButton()).toBeEnabled();
 
     await user.click(saveButton());
+    expect(reviewSheet()).toBeInTheDocument();
+    expect(reviewLines()).toEqual(["Name: High Street toilets → changes to Market Square toilets"]);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await user.click(confirmButton());
 
     await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -232,7 +312,7 @@ describe("LooForm (edit)", () => {
     renderEdit();
 
     await changeName(user, "New");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
     expect(applyLocalMutation).toHaveBeenCalledWith(LOO_ID, compressed, BASE_UPDATED_AT);
@@ -252,33 +332,31 @@ describe("LooForm (edit)", () => {
     renderEdit();
 
     await changeName(user, "New");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
     expect(applyLocalMutation).toHaveBeenCalledWith(LOO_ID, null, BASE_UPDATED_AT);
     expect((await loadMapCache())?.data).toEqual([OTHER_ROW]);
   });
 
-  it("leaves the cached map alone when the response has no usable compressed row", async () => {
+  it.each([
+    ["no compressed field", makeLoo({ name: "New" })],
+    [
+      "a row for another toilet",
+      { ...makeLoo({ name: "New" }), compressed: ["someone-else", "x", 1] },
+    ],
+  ])("leaves the cached map alone when the response has %s", async (_label, responseBody) => {
     const user = userEvent.setup();
     const rows: CompressedLoo[] = [[LOO_ID, "gcpuvp", 1], OTHER_ROW];
     await saveSnapshot(rows, "2026-11-01T09:58:00.000Z");
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(200, makeLoo({ name: "New" })))
-      .mockResolvedValueOnce(
-        jsonResponse(200, { ...makeLoo({ name: "New" }), compressed: ["someone-else", "x", 1] }),
-      );
+    fetchMock.mockResolvedValue(jsonResponse(200, responseBody));
 
     renderEdit();
     await changeName(user, "New");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
     await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
 
-    locationStub.href = "http://localhost:3000/loos/edit";
-    await user.click(saveButton());
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(applyLocalMutation).not.toHaveBeenCalled();
     expect((await loadMapCache())?.data).toEqual(rows);
   });
@@ -293,7 +371,7 @@ describe("LooForm (edit)", () => {
     renderEdit();
 
     await changeName(user, "New");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
     expect(applyLocalMutation).toHaveBeenCalledTimes(1);
@@ -306,21 +384,38 @@ describe("LooForm (edit)", () => {
     fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ radar: true })));
     renderEdit();
 
-    await user.click(facility("Radar key").getByLabelText("Yes"));
+    await user.click(facility("Does it need a RADAR key?").getByLabelText("Yes"));
     expect(saveButton()).toHaveTextContent("Save 1 change");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(request().body).toEqual({ radar: true, baseUpdatedAt: BASE_UPDATED_AT });
   });
 
-  it("sends null for a toilet facility set back to Unknown", async () => {
+  it("sends urinalOnly from the Who can use it question", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ urinalOnly: true })));
+    renderEdit();
+
+    const who = within(screen.getByRole("region", { name: "Who can use it?" }));
+    await user.click(within(who.getByRole("group", { name: "Urinal only" })).getByLabelText("Yes"));
+    await user.click(saveButton());
+    expect(reviewLines()).toEqual(["Urinal only: Don't know → changes to Yes"]);
+    await user.click(confirmButton());
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(request().body).toEqual({ urinalOnly: true, baseUpdatedAt: BASE_UPDATED_AT });
+  });
+
+  it("sends null for a toilet facility set back to Don't know", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ accessible: null })));
     renderEdit();
 
-    await user.click(facility("Accessible").getByLabelText("Unknown"));
-    await user.click(saveButton());
+    await user.click(
+      facility("Is there a wheelchair-accessible toilet?").getByLabelText("Don't know"),
+    );
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(request().body).toEqual({ accessible: null, baseUpdatedAt: BASE_UPDATED_AT });
@@ -333,6 +428,8 @@ describe("LooForm (edit)", () => {
 
     await user.clear(notesInput());
     await user.click(saveButton());
+    expect(reviewLines()).toEqual(["Notes: Closed Sundays → changes to Nothing"]);
+    await user.click(confirmButton());
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(request().body).toEqual({ notes: null, baseUpdatedAt: BASE_UPDATED_AT });
@@ -345,9 +442,11 @@ describe("LooForm (edit)", () => {
     );
     renderEdit(makeLoo({ openingTimes: null }));
 
-    expect(screen.getByRole("radio", { name: "Don't know" })).toBeChecked();
+    expect(
+      within(screen.getByTestId("opening-hours")).getByRole("radio", { name: "Don't know" }),
+    ).toBeChecked();
     await changeName(user, "Renamed");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const { body } = request();
@@ -355,19 +454,77 @@ describe("LooForm (edit)", () => {
     expect(body).toEqual({ name: "Renamed", baseUpdatedAt: BASE_UPDATED_AT });
   });
 
-  it("sends a moved pin as the new location", async () => {
+  it("sends a moved pin as the new location, described as a distance and direction", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ location: { lat: 51.6, lng: -0.2 } })));
     renderEdit();
 
     await user.click(screen.getByRole("button", { name: "Stub: move pin far" }));
     await user.click(saveButton());
+    expect(reviewLines()).toEqual([expect.stringMatching(/^Location: Moved 11\.7 km north$/)]);
+    await user.click(confirmButton());
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(request().body).toEqual({
       location: { lat: 51.6, lng: -0.2 },
       baseUpdatedAt: BASE_UPDATED_AT,
     });
+  });
+
+  it("passes the picker its mode, the API origin and the toilet to exclude", () => {
+    renderEdit();
+    expect(pickerProps.last).toMatchObject({
+      mode: "edit",
+      apiUrl: "",
+      excludeId: LOO_ID,
+      originalLocation: { lat: 51.501234567, lng: -0.141234567 },
+    });
+    expect(screen.queryByRole("textbox", { name: /latitude|longitude/i })).toBeNull();
+  });
+
+  it("opens the other toilet's edit page or restore flow from the picker's prompts", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+
+    await user.click(screen.getByRole("button", { name: "Stub: edit existing" }));
+    expect(locationStub.href).toBe(`/loos/${OTHER_ID}/edit`);
+
+    await user.click(screen.getByRole("button", { name: "Stub: restore existing" }));
+    expect(locationStub.href).toBe(`/loos/${OTHER_ID}?restore=1`);
+  });
+
+  it("asks before the picker's prompts leave unsaved changes behind", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+    await changeName(user, "Renamed");
+
+    await user.click(screen.getByRole("button", { name: "Stub: edit existing" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Discard your changes?" });
+    expect(locationStub.href).toBe(START_HREF);
+    await user.click(within(dialog).getByRole("button", { name: "Keep editing" }));
+    expect(nameInput()).toHaveValue("Renamed");
+    expect(locationStub.href).toBe(START_HREF);
+
+    await user.click(screen.getByRole("button", { name: "Stub: restore existing" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(locationStub.href).toBe(`/loos/${OTHER_ID}?restore=1`);
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
+  });
+
+  it("won't save while the pin is being moved and not yet confirmed", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+
+    await changeName(user, "Renamed");
+    await user.click(screen.getByRole("button", { name: "Stub: start moving" }));
+    await user.click(saveButton());
+
+    expect(screen.getByRole("link", { name: MESSAGES.locationUnconfirmed })).toHaveAttribute(
+      "href",
+      "#field-location",
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("on 409 lists the conflicting fields and resubmits the user's change against the latest version", async () => {
@@ -386,18 +543,20 @@ describe("LooForm (edit)", () => {
 
     await user.clear(notesInput());
     await user.type(notesInput(), "Closed Sundays, key at café");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     const banner = await screen.findByText(
       "This toilet was changed by someone else while you were editing.",
     );
+    // The review sheet closes so the conflict can be dealt with.
+    expect(screen.queryByRole("dialog")).toBeNull();
     const alert = banner.closest('[role="alert"]') as HTMLElement;
     expect(alert).not.toBeNull();
     const listed = within(alert)
       .getAllByRole("listitem")
       .map((li) => li.textContent);
     expect(listed).toEqual(["Notes"]);
-    expect(locationStub.href).toBe("http://localhost:3000/loos/edit");
+    expect(locationStub.href).toBe(START_HREF);
 
     await user.click(screen.getByRole("button", { name: "Load latest and keep my changes" }));
 
@@ -409,7 +568,7 @@ describe("LooForm (edit)", () => {
     expect(notesInput()).toHaveValue("Closed Sundays, key at café");
     expect(saveButton()).toHaveTextContent("Save 1 change");
 
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(request(0).body).toEqual({
@@ -430,7 +589,7 @@ describe("LooForm (edit)", () => {
     renderEdit();
 
     await changeName(user, "Mine");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     expect(
       await screen.findByText(
@@ -439,25 +598,83 @@ describe("LooForm (edit)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a thank-you screen with a link back to the toilet when the edit is queued (202)", async () => {
+  it("on 202 shows the queued screen and remembers the suggestion in localStorage", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-17T09:00:00.000Z") });
+    fetchMock.mockResolvedValue(jsonResponse(202, { queued: true, id: "pending-42" }));
     renderEdit(makeLoo(), false);
 
-    expect(screen.getByText(/your change will be reviewed before going live/)).toBeInTheDocument();
+    expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
     await changeName(user, "Queued name");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
-    expect(await screen.findByText("Thank you!")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Thanks — a moderator will review your suggestion"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/awaiting review by a moderator/)).toBeInTheDocument();
+    // Focus moves to the confirmation so screen readers announce it.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByText("Thanks — a moderator will review your suggestion").closest("[tabindex]"),
+      ),
+    );
     expect(screen.getByRole("link", { name: "View this toilet" })).toHaveAttribute(
       "href",
       `/loos/${LOO_ID}`,
     );
     expect(screen.getByRole("link", { name: "Back to map" })).toHaveAttribute("href", "/");
-    expect(locationStub.href).toBe("http://localhost:3000/loos/edit");
+    // Signing in no longer promises that edits go live (that needs report:loo).
+    expect(
+      screen.getByRole("link", { name: "Sign in to keep track of your contributions" }),
+    ).toHaveAttribute("href", `/auth/login?returnTo=${encodeURIComponent(`/loos/${LOO_ID}`)}`);
+    expect(screen.queryByText(/go live/)).toBeNull();
+    expect(locationStub.href).toBe(START_HREF);
     // Nothing is live yet, so the map cache is not touched.
     expect(applyLocalMutation).not.toHaveBeenCalled();
+
+    expect(JSON.parse(localStorage.getItem(`toiletmap-pending:${LOO_ID}`) ?? "null")).toEqual({
+      kind: "edit",
+      pendingId: "pending-42",
+      at: "2026-11-17T09:00:00.000Z",
+    });
+    // The draft is done with.
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("does not offer sign-in on the queued screen to a signed-in user", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(202, { queued: true, id: "pending-43" }));
+    renderEdit(makeLoo(), true);
+
+    await changeName(user, "Queued name");
+    await saveAndConfirm(user);
+
+    expect(
+      await screen.findByText("Thanks — a moderator will review your suggestion"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Sign in/ })).toBeNull();
+  });
+
+  it("says the user already suggested changes when a recent marker exists", () => {
+    localStorage.setItem(
+      pendingKey(LOO_ID),
+      JSON.stringify({ kind: "edit", pendingId: "p1", at: new Date().toISOString() }),
+    );
+    renderEdit();
+    expect(
+      screen.getByText(/You suggested changes to this toilet .* awaiting review by a moderator/),
+    ).toBeInTheDocument();
+  });
+
+  it("ignores an expired suggestion marker", () => {
+    localStorage.setItem(
+      pendingKey(LOO_ID),
+      JSON.stringify({ kind: "edit", pendingId: "p1", at: "2020-01-01T00:00:00.000Z" }),
+    );
+    renderEdit();
+    expect(screen.queryByText(/You suggested changes/)).toBeNull();
+    expect(localStorage.getItem(pendingKey(LOO_ID))).toBeNull();
   });
 
   it("shows a message and does not redirect when the server reports nothing changed", async () => {
@@ -466,41 +683,80 @@ describe("LooForm (edit)", () => {
     renderEdit(makeLoo(), false);
 
     await changeName(user, "Same as stored");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     expect(
       await screen.findByText(/No changes were needed — this toilet already has these details/),
     ).toBeInTheDocument();
-    expect(locationStub.href).toBe("http://localhost:3000/loos/edit");
+    expect(locationStub.href).toBe(START_HREF);
     expect(locationStub.href).not.toContain("undefined");
   });
 
-  it("asks the user to sign in again on 401", async () => {
+  it("on 401 offers sign-in that returns to this page, and keeps the changes", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse(401, { message: "Unauthorized" }));
     renderEdit();
 
     await changeName(user, "Needs auth");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
-    const link = await screen.findByRole("link", { name: "sign in again" });
-    expect(link).toHaveAttribute("href", "/auth/login");
-    expect(screen.getByText(/Your sign-in has expired/)).toBeInTheDocument();
-    expect(locationStub.href).toBe("http://localhost:3000/loos/edit");
+    const link = await screen.findByRole("link", { name: "Sign in again" });
+    expect(link).toHaveAttribute(
+      "href",
+      `/auth/login?returnTo=${encodeURIComponent(`/loos/${LOO_ID}/edit`)}`,
+    );
+    expect(screen.getByText("Your sign-in has expired")).toBeInTheDocument();
+    expect(screen.getByText(/your changes are kept/)).toBeInTheDocument();
+    expect(locationStub.href).toBe(START_HREF);
+    expect(nameInput()).toHaveValue("Needs auth");
+    const draft = JSON.parse(sessionStorage.getItem(draftKey(LOO_ID)) ?? "null");
+    expect(draft?.form?.name).toBe("Needs auth");
   });
 
-  it("blocks submit and explains why when an opening time is empty", async () => {
+  it("blocks submit and links the error summary to the opening hours", async () => {
     const user = userEvent.setup();
     renderEdit();
 
-    fireEvent.input(screen.getByLabelText("Monday opening time"), { target: { value: "" } });
+    await user.click(screen.getByRole("button", { name: "Stub: clear Monday opening" }));
     expect(saveButton()).toHaveTextContent("Save 1 change");
     await user.click(saveButton());
 
-    expect(
-      (await screen.findAllByText("Enter both opening and closing times for Monday.")).length,
-    ).toBeGreaterThan(0);
+    const link = await screen.findByRole("link", {
+      name: "Enter both opening and closing times for Monday.",
+    });
+    expect(link).toHaveAttribute("href", "#field-openingTimes");
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+    // The summary takes focus so screen readers announce it.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByText("There's a problem").closest("[tabindex]"),
+      ),
+    );
+    // Its link goes to the invalid time, not the first control in the hours question.
+    fireEvent.click(link);
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Monday opens" }));
+  });
+
+  it("maps server validation issues onto fields, with links that focus them", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(
+      jsonResponse(400, {
+        message: "Invalid upsert request body",
+        issues: { _errors: [], name: { _errors: ["Too long"] } },
+      }),
+    );
+    renderEdit();
+
+    await changeName(user, "A very long name");
+    await saveAndConfirm(user);
+
+    const link = await screen.findByRole("link", { name: "Name: Too long" });
+    expect(link).toHaveAttribute("href", "#field-name");
+    expect(nameInput()).toHaveAttribute("aria-invalid", "true");
+    expect(nameInput().getAttribute("aria-describedby")).toContain("error-name");
+    await user.click(link);
+    expect(document.activeElement).toBe(nameInput());
   });
 
   it("never sends active or removalReason, even for a removed toilet", async () => {
@@ -511,10 +767,19 @@ describe("LooForm (edit)", () => {
     await changeName(user, "Back again");
     await user.clear(notesInput());
     await user.type(notesInput(), "Reopened");
-    await user.click(facility("Baby change").getByLabelText("No"));
-    await user.click(screen.getByRole("radio", { name: "Don't know" }));
+    await user.click(facility("Baby changing").getByLabelText("No"));
+    await user.click(
+      within(screen.getByTestId("opening-hours")).getByRole("radio", { name: "Don't know" }),
+    );
     expect(saveButton()).toHaveTextContent("Save 4 changes");
     await user.click(saveButton());
+    expect(reviewLines()).toEqual([
+      "Name: High Street toilets → changes to Back again",
+      "Baby changing: Yes → changes to No",
+      "Opening hours: Every day 9am–5pm → changes to Opening hours not known",
+      "Notes: Closed Sundays → changes to Reopened",
+    ]);
+    await user.click(confirmButton());
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const { body } = request();
@@ -534,7 +799,7 @@ describe("LooForm (edit)", () => {
     renderEdit();
 
     await changeName(user, "Proxy check");
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const { url, init } = request();
@@ -547,51 +812,556 @@ describe("LooForm (edit)", () => {
   });
 });
 
-describe("LooForm address search", () => {
-  it("pans the picker map to the chosen address without moving the toilet (edit)", async () => {
-    const user = userEvent.setup();
-    routeFetch(() => jsonResponse(200, makeLoo({ name: "Renamed" })));
+describe("LooForm layout", () => {
+  it("asks the seven questions in order, as labelled regions", () => {
     renderEdit();
-
-    await searchAndChooseSuggestion(user);
-
-    expectPickerPannedToSuggestion();
-    expect(screen.getByTestId("picker-location")).toHaveTextContent("51.501234567,-0.141234567");
-    expect(screen.getByLabelText("Latitude")).toHaveValue("51.501235");
-    expect(saveButton()).toHaveTextContent("No changes to save");
-    expect(saveButton()).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "Reset to original location" })).toBeNull();
-
-    // Saving another change afterwards still leaves the location out of the request.
-    await changeName(user, "Renamed");
-    expect(saveButton()).toHaveTextContent("Save 1 change");
-    await user.click(saveButton());
-
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
-    expect(apiCalls()).toHaveLength(1);
-    const body = JSON.parse(String((apiCalls()[0][1] as RequestInit).body));
-    expect(body).not.toHaveProperty("location");
-    expect(body).toEqual({ name: "Renamed", baseUpdatedAt: BASE_UPDATED_AT });
+    const titles = screen
+      .getAllByRole("region")
+      .map((region) => region.getAttribute("aria-labelledby"))
+      .map((id) => document.getElementById(id ?? "")?.textContent?.replace(/^\d+/, ""));
+    expect(titles).toEqual([
+      "What's it called?",
+      "Where is it?",
+      "Who can use it?",
+      "Accessibility",
+      "Does it cost money?",
+      "When is it open?",
+      "Anything else people should know?",
+    ]);
+    expect(
+      screen.getByTestId("opening-hours").contains(document.getElementById("field-openingTimes")),
+    ).toBe(true);
   });
 
-  it("does not place a pin from the chosen address (add)", async () => {
+  it("asks for payment details only when the toilet isn't free", async () => {
     const user = userEvent.setup();
-    routeFetch(() => jsonResponse(201, makeLoo()));
+    renderEdit();
+    const question = "How much does it cost, and how can people pay?";
+    expect(screen.queryByLabelText(question)).toBeNull();
+    await user.click(facility("Is it free to use?").getByLabelText("No"));
+    expect(screen.getByLabelText(question)).toHaveAttribute("id", "field-paymentDetails");
+  });
+});
+
+describe("LooForm deep links", () => {
+  it.each([
+    ["hours", "opening-hours"],
+    ["notes", null],
+  ])("focuses the #%s question on load", async (hash, testId) => {
+    Object.assign(locationStub, { hash: `#${hash}` });
+    renderEdit();
+    const section = document.getElementById(hash);
+    expect(section?.tagName).toBe("SECTION");
+    await waitFor(() => {
+      const active = document.activeElement as HTMLElement;
+      if (testId) expect(screen.getByTestId(testId).contains(active)).toBe(true);
+      else expect(active).toBe(notesInput());
+    });
+  });
+
+  it("focuses the location question for #location", async () => {
+    Object.assign(locationStub, { hash: "#location" });
+    renderEdit();
+    await waitFor(() =>
+      expect(document.getElementById("field-location")?.contains(document.activeElement)).toBe(
+        true,
+      ),
+    );
+  });
+
+  it("ignores unknown hashes", async () => {
+    Object.assign(locationStub, { hash: "#constructor" });
+    renderEdit();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(document.activeElement).toBe(document.body);
+  });
+});
+
+describe("LooForm review sheet", () => {
+  it("goes back to editing without saving, keeping the changes", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+
+    await changeName(user, "Renamed");
+    await user.click(saveButton());
+    expect(document.activeElement).toBe(
+      within(reviewSheet()).getByRole("heading", { name: "Check your changes" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Back to editing" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(nameInput()).toHaveValue("Renamed");
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Focus returns to where it was.
+    expect(document.activeElement).toBe(saveButton());
+  });
+
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+    await changeName(user, "Renamed");
+    await user.click(saveButton());
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("describes yes/no answers and opening hours in plain language", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+
+    await user.click(facility("Women").getByLabelText("Don't know"));
+    await user.click(facility("Is there a wheelchair-accessible toilet?").getByLabelText("No"));
+    await user.click(screen.getByRole("button", { name: "Stub: open 24/7" }));
+    await user.click(saveButton());
+
+    expect(reviewLines()).toEqual([
+      "Women: Yes → changes to Don't know",
+      "Wheelchair accessible: Yes → changes to No",
+      "Opening hours: Every day 9am–5pm → changes to Open 24 hours, every day",
+    ]);
+    expect(within(reviewSheet()).getByText("You're changing 3 things:")).toBeInTheDocument();
+  });
+
+  it("tells anonymous users a moderator will check, and is shown even if skipReview is set", async () => {
+    const user = userEvent.setup();
+    renderEdit(makeLoo(), false, { skipReview: true });
+    await changeName(user, "Renamed");
+    await user.click(saveButton());
+    expect(
+      within(reviewSheet()).getByText(
+        "A moderator will check your change before it appears on the map.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("tells a signed-in user without report:loo a moderator will check, too", async () => {
+    const user = userEvent.setup();
+    renderEdit(makeLoo(), true, { canWriteDirectly: false });
+    expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
+    await changeName(user, "Renamed");
+    expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
+    await user.click(saveButton());
+    expect(
+      within(reviewSheet()).getByText(
+        "A moderator will check your change before it appears on the map.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/go live/)).toBeNull();
+  });
+
+  it("tells a trusted user their change goes live straight away", async () => {
+    const user = userEvent.setup();
+    renderEdit(makeLoo(), true, { canWriteDirectly: true });
+    await changeName(user, "Renamed");
+    expect(screen.getByText(LIVE_STRAIGHT_AWAY)).toBeInTheDocument();
+    await user.click(saveButton());
+    expect(
+      within(reviewSheet()).getByText("Your change will go live straight away."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/moderator/)).toBeNull();
+  });
+
+  it("can be skipped for signed-in users", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "Renamed" })));
+    renderEdit(makeLoo(), true, { skipReview: true });
+    await changeName(user, "Renamed");
+    await user.click(saveButton());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
+  });
+
+  it("lists the answered questions for a new toilet", async () => {
+    const user = userEvent.setup();
     renderAdd();
-
-    await searchAndChooseSuggestion(user);
-
-    expectPickerPannedToSuggestion();
-    expect(screen.getByTestId("picker-location")).toHaveTextContent("none");
-    expect(screen.getByLabelText("Latitude")).toHaveValue("");
-
     await user.type(nameInput(), "Brand new toilet");
+    await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
+    await user.click(facility("Is there a wheelchair-accessible toilet?").getByLabelText("Yes"));
     await user.click(saveButton());
 
     expect(
-      (await screen.findAllByText("Please set the toilet's location on the map.")).length,
-    ).toBeGreaterThan(0);
-    expect(apiCalls()).toHaveLength(0);
+      within(reviewSheet()).getByRole("heading", { name: "Check the new toilet" }),
+    ).toBeVisible();
+    expect(reviewLines()).toEqual([
+      "Name: Brand new toilet",
+      "Location: Placed on the map",
+      "Wheelchair accessible: Yes",
+    ]);
+  });
+});
+
+describe("LooForm sticky action bar", () => {
+  it("counts changes and disables saving when there are none", async () => {
+    const user = userEvent.setup();
+    renderEdit(makeLoo(), true, { canWriteDirectly: true });
+    expect(saveButton()).toBeDisabled();
+    expect(screen.getByText("Change any answer to save.")).toBeInTheDocument();
+
+    await changeName(user, "Renamed");
+    await user.click(facility("Men").getByLabelText("No"));
+    expect(saveButton()).toHaveTextContent("Save 2 changes");
+    expect(saveButton()).toBeEnabled();
+
+    await changeName(user, "High Street toilets");
+    expect(saveButton()).toHaveTextContent("Save 1 change");
+  });
+
+  it("offers Add toilet once something has been entered", async () => {
+    const user = userEvent.setup();
+    renderAdd();
+    expect(saveButton()).toHaveTextContent("Add toilet");
+    expect(saveButton()).toBeDisabled();
+    await user.type(nameInput(), "X");
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it("tells anonymous users their change will be reviewed, with a sign-in link back here", () => {
+    locationStub.pathname = "/loos/add";
+    locationStub.search = "?lat=51.5&lng=-0.1&zoom=17";
+    renderAdd(false);
+    expect(screen.getByText(MODERATOR_WILL_CHECK)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      `/auth/login?returnTo=${encodeURIComponent("/loos/add?lat=51.5&lng=-0.1&zoom=17")}`,
+    );
+  });
+});
+
+describe("LooForm unsaved changes", () => {
+  it("Cancel is a plain link back to the toilet while nothing has changed", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+    const cancel = screen.getByRole("link", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("href", `/loos/${LOO_ID}`);
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    cancel.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(false);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await user.tab();
+  });
+
+  it("Cancel with changes asks before discarding them", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+    await changeName(user, "Renamed");
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).not.toBeNull();
+
+    await user.click(screen.getByRole("link", { name: "Cancel" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Discard your changes?" });
+    expect(within(dialog).getByText("You've made 1 change that haven't been saved.")).toBeVisible();
+    expect(document.activeElement).toBe(
+      within(dialog).getByRole("button", { name: "Keep editing" }),
+    );
+    expect(locationStub.href).toBe(START_HREF);
+
+    await user.click(within(dialog).getByRole("button", { name: "Keep editing" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(nameInput()).toHaveValue("Renamed");
+
+    await user.click(screen.getByRole("link", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(locationStub.href).toBe(`/loos/${LOO_ID}`);
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
+  });
+
+  it("warns on beforeunload only while there are unsaved changes", async () => {
+    const user = userEvent.setup();
+    const addSpy = vi.spyOn(window, "addEventListener");
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "Renamed" })));
+    renderEdit();
+
+    const fire = () => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    expect(addSpy.mock.calls.some(([type]) => String(type) === "beforeunload")).toBe(false);
+    expect(fire()).toBe(false);
+
+    await changeName(user, "Renamed");
+    expect(addSpy.mock.calls.some(([type]) => String(type) === "beforeunload")).toBe(true);
+    expect(fire()).toBe(true);
+
+    // A successful save navigates away without a prompt.
+    await saveAndConfirm(user);
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
+    expect(fire()).toBe(false);
+    addSpy.mockRestore();
+  });
+});
+
+describe("LooForm drafts", () => {
+  it("autosaves to sessionStorage and restores on the next load, with a Discard option", async () => {
+    const user = userEvent.setup();
+    const first = renderEdit();
+    await changeName(user, "Draft name");
+    await user.click(facility("Children").getByLabelText("Yes"));
+    first.unmount();
+
+    const stored = JSON.parse(sessionStorage.getItem(`loo-draft:${LOO_ID}`) ?? "null");
+    expect(stored.form).toMatchObject({ name: "Draft name", children: "true" });
+
+    renderEdit();
+    expect(screen.getByText(/Restored your unsaved changes/)).toBeInTheDocument();
+    expect(nameInput()).toHaveValue("Draft name");
+    expect(saveButton()).toHaveTextContent("Save 2 changes");
+
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(screen.queryByText(/Restored your unsaved changes/)).toBeNull();
+    expect(nameInput()).toHaveValue("High Street toilets");
+    expect(saveButton()).toBeDisabled();
+    expect(sessionStorage.getItem(`loo-draft:${LOO_ID}`)).toBeNull();
+  });
+
+  it("re-applies only the draft's changes on top of a newer version of the toilet", () => {
+    const old = makeLoo();
+    const initialForm = formStateFromLoo(old, "edit");
+    sessionStorage.setItem(
+      draftKey(LOO_ID),
+      JSON.stringify({
+        v: 1,
+        initialForm,
+        form: { ...initialForm, name: "Mine" },
+        baseUpdatedAt: BASE_UPDATED_AT,
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    renderEdit(makeLoo({ notes: "Updated elsewhere", updatedAt: NEWER_UPDATED_AT }));
+
+    expect(nameInput()).toHaveValue("Mine");
+    expect(notesInput()).toHaveValue("Updated elsewhere");
+    expect(saveButton()).toHaveTextContent("Save 1 change");
+  });
+
+  it("never overwrites a field someone else changed since the draft, and lets the user choose", async () => {
+    const user = userEvent.setup();
+    const initialForm = formStateFromLoo(makeLoo(), "edit");
+    sessionStorage.setItem(
+      draftKey(LOO_ID),
+      JSON.stringify({
+        v: 1,
+        initialForm,
+        form: { ...initialForm, name: "My name", women: "false" },
+        baseUpdatedAt: BASE_UPDATED_AT,
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "My name" })));
+    renderEdit(makeLoo({ name: "Their newer name", updatedAt: NEWER_UPDATED_AT }));
+
+    // The newer server value is kept; the non-overlapping change is restored.
+    expect(nameInput()).toHaveValue("Their newer name");
+    expect(facility("Women").getByLabelText("No")).toBeChecked();
+    expect(saveButton()).toHaveTextContent("Save 1 change");
+    const banner = screen
+      .getByText("This toilet was changed by someone else while you were editing.")
+      .closest('[role="alert"]') as HTMLElement;
+    expect(
+      within(banner)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Name"]);
+
+    await user.click(within(banner).getByRole("button", { name: "Use my changes instead" }));
+    expect(nameInput()).toHaveValue("My name");
+    expect(saveButton()).toHaveTextContent("Save 2 changes");
+    expect(
+      screen.queryByText("This toilet was changed by someone else while you were editing."),
+    ).toBeNull();
+
+    await saveAndConfirm(user);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    // Sent against the version the user has now seen.
+    expect(request().body).toEqual({
+      name: "My name",
+      women: false,
+      baseUpdatedAt: NEWER_UPDATED_AT,
+    });
+  });
+
+  it("can keep the other person's version of a conflicting field", async () => {
+    const user = userEvent.setup();
+    const initialForm = formStateFromLoo(makeLoo(), "edit");
+    sessionStorage.setItem(
+      draftKey(LOO_ID),
+      JSON.stringify({
+        v: 1,
+        initialForm,
+        form: { ...initialForm, name: "My name" },
+        baseUpdatedAt: BASE_UPDATED_AT,
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    renderEdit(makeLoo({ name: "Their newer name", updatedAt: NEWER_UPDATED_AT }));
+    await user.click(screen.getByRole("button", { name: "Keep their version" }));
+    expect(nameInput()).toHaveValue("Their newer name");
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it("keeps the user's own value for an unresolved conflict across a reload", async () => {
+    const user = userEvent.setup();
+    const initialForm = formStateFromLoo(makeLoo(), "edit");
+    sessionStorage.setItem(
+      draftKey(LOO_ID),
+      JSON.stringify({
+        v: 1,
+        initialForm,
+        form: { ...initialForm, name: "My name", women: "false" },
+        baseUpdatedAt: BASE_UPDATED_AT,
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    const newer = makeLoo({ name: "Their newer name", updatedAt: NEWER_UPDATED_AT });
+    const first = renderEdit(newer);
+    expect(nameInput()).toHaveValue("Their newer name");
+    first.unmount();
+
+    // Reloaded before choosing: the conflict is asked about again, with the user's value kept.
+    renderEdit(newer);
+    expect(nameInput()).toHaveValue("Their newer name");
+    expect(facility("Women").getByLabelText("No")).toBeChecked();
+    const banner = screen
+      .getByText("This toilet was changed by someone else while you were editing.")
+      .closest('[role="alert"]') as HTMLElement;
+    expect(
+      within(banner)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Name"]);
+    await user.click(within(banner).getByRole("button", { name: "Use my changes instead" }));
+    expect(nameInput()).toHaveValue("My name");
+    expect(saveButton()).toHaveTextContent("Save 2 changes");
+  });
+
+  it("keeps a draft whose only change is an unresolved conflict, until the user chooses", async () => {
+    const user = userEvent.setup();
+    const initialForm = formStateFromLoo(makeLoo(), "edit");
+    sessionStorage.setItem(
+      draftKey(LOO_ID),
+      JSON.stringify({
+        v: 1,
+        initialForm,
+        form: { ...initialForm, name: "My name" },
+        baseUpdatedAt: BASE_UPDATED_AT,
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    const newer = makeLoo({ name: "Their newer name", updatedAt: NEWER_UPDATED_AT });
+    renderEdit(newer).unmount();
+    expect(JSON.parse(sessionStorage.getItem(draftKey(LOO_ID)) ?? "null")?.form?.name).toBe(
+      "My name",
+    );
+
+    renderEdit(newer);
+    await user.click(screen.getByRole("button", { name: "Keep their version" }));
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
+  });
+
+  it("drops a draft older than a day", () => {
+    const initialForm = formStateFromLoo(makeLoo(), "edit");
+    sessionStorage.setItem(
+      draftKey(LOO_ID),
+      JSON.stringify({
+        v: 1,
+        initialForm,
+        form: { ...initialForm, name: "Stale" },
+        baseUpdatedAt: BASE_UPDATED_AT,
+        savedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+      }),
+    );
+    renderEdit();
+    expect(nameInput()).toHaveValue("High Street toilets");
+    expect(screen.queryByText(/Restored your unsaved changes/)).toBeNull();
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
+  });
+
+  it("opens a new toilet where ?lat&lng asked, not at an old draft's pin", () => {
+    const empty = formStateFromLoo(null, "add");
+    sessionStorage.setItem(
+      draftKey(null),
+      JSON.stringify({
+        v: 1,
+        initialForm: empty,
+        form: { ...empty, name: "Half-added", location: { lat: 51.6, lng: -0.2 } },
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    render(
+      <LooForm
+        mode="add"
+        apiUrl=""
+        isAuthenticated
+        initialView={{ lat: 51.5, lng: -0.12, zoom: 18 }}
+      />,
+    );
+    expect(screen.getByTestId("picker-location")).toHaveTextContent("none");
+    expect(nameInput()).toHaveValue("Half-added");
+    expect(screen.getByText(/The map is where you asked/)).toBeInTheDocument();
+  });
+
+  it("keeps a new toilet's draft pin when the page was opened at that same spot", () => {
+    const empty = formStateFromLoo(null, "add");
+    sessionStorage.setItem(
+      draftKey(null),
+      JSON.stringify({
+        v: 1,
+        initialForm: empty,
+        form: { ...empty, name: "Half-added", location: { lat: 51.5, lng: -0.12 } },
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    locationStub.search = "?lat=51.5&lng=-0.12&zoom=18";
+    renderAdd();
+    expect(screen.getByTestId("picker-location")).toHaveTextContent("51.5,-0.12");
+  });
+
+  it("keeps a new toilet's own pin when it comes back to the ?lat&lng the draft began at", async () => {
+    const user = userEvent.setup();
+    locationStub.pathname = "/loos/add";
+    locationStub.search = "?lat=51.5&lng=-0.12&zoom=18";
+    const first = renderAdd();
+    await user.type(nameInput(), "Half-added");
+    await user.click(screen.getByRole("button", { name: "Stub: move pin far" }));
+    first.unmount();
+
+    // Back from signing in (or reloaded): same page, so the pin the user placed stays.
+    const second = renderAdd();
+    expect(screen.getByTestId("picker-location")).toHaveTextContent("51.6,-0.2");
+    expect(screen.queryByText(/The map is where you asked/)).toBeNull();
+    second.unmount();
+
+    // Opened at a different spot, the map goes there instead.
+    locationStub.search = "?lat=51.4&lng=-0.3&zoom=18";
+    renderAdd();
+    expect(screen.getByTestId("picker-location")).toHaveTextContent("none");
+    expect(nameInput()).toHaveValue("Half-added");
+  });
+
+  it("ignores a corrupt draft", () => {
+    sessionStorage.setItem(draftKey(LOO_ID), "{not json");
+    renderEdit();
+    expect(screen.queryByText(/Restored your unsaved changes/)).toBeNull();
+    expect(nameInput()).toHaveValue("High Street toilets");
+  });
+
+  it("keeps a new toilet's draft under loo-draft:new and clears it after saving", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(
+      jsonResponse(201, { ...makeLoo(), id: "fedcba9876543210fedcba98" }),
+    );
+    const first = renderAdd();
+    await user.type(nameInput(), "New one");
+    await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
+    first.unmount();
+    expect(sessionStorage.getItem("loo-draft:new")).not.toBeNull();
+
+    renderAdd();
+    expect(nameInput()).toHaveValue("New one");
+    expect(screen.getByTestId("picker-location")).toHaveTextContent("51.5074,-0.1278");
+    await saveAndConfirm(user);
+    await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=1"));
+    expect(sessionStorage.getItem("loo-draft:new")).toBeNull();
   });
 });
 
@@ -603,10 +1373,33 @@ describe("LooForm (add)", () => {
     await user.type(nameInput(), "Brand new toilet");
     await user.click(saveButton());
 
-    expect(
-      (await screen.findAllByText("Please set the toilet's location on the map.")).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: MESSAGES.locationRequired })).toHaveAttribute(
+      "href",
+      "#field-location",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("tells the user to place the pin when it hasn't been confirmed yet", async () => {
+    const user = userEvent.setup();
+    renderAdd();
+    // A new toilet's picker starts moving, with nothing to cancel back to.
+    await user.click(screen.getByRole("button", { name: "Stub: start moving" }));
+    await user.type(nameInput(), "Brand new toilet");
+    await user.click(saveButton());
+
+    expect(screen.getByRole("link", { name: MESSAGES.locationNotPlaced })).toHaveAttribute(
+      "href",
+      "#field-location",
+    );
+    expect(screen.queryByText(/cancel the move/)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("gives a single location instruction, from the picker", () => {
+    renderAdd();
+    const question = screen.getByRole("region", { name: /Where is it\?/ });
+    expect(within(question).queryByText(/entrance/)).toBeNull();
   });
 
   it("requires a name before submitting", async () => {
@@ -616,7 +1409,11 @@ describe("LooForm (add)", () => {
     await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
     await user.click(saveButton());
 
-    expect((await screen.findAllByText("Name is required.")).length).toBeGreaterThan(0);
+    const link = screen.getByRole("link", { name: MESSAGES.nameRequired });
+    expect(link).toHaveAttribute("href", "#field-name");
+    expect(nameInput()).toHaveAttribute("aria-invalid", "true");
+    fireEvent.click(link);
+    expect(document.activeElement).toBe(nameInput());
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -627,13 +1424,13 @@ describe("LooForm (add)", () => {
     );
     renderAdd();
 
+    expect(pickerProps.last).toMatchObject({ mode: "add", apiUrl: "", originalLocation: null });
     expect(saveButton()).toHaveTextContent("Add toilet");
     await user.type(nameInput(), "Brand new toilet");
     await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
     expect(screen.getByTestId("picker-location")).toHaveTextContent("51.5074,-0.1278");
-    expect(screen.getByLabelText("Latitude")).toHaveValue("51.5074");
-    await user.click(facility("Accessible").getByLabelText("Yes"));
-    await user.click(saveButton());
+    await user.click(facility("Is there a wheelchair-accessible toilet?").getByLabelText("Yes"));
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=1"));
     const { url, init, body } = request();
@@ -647,9 +1444,22 @@ describe("LooForm (add)", () => {
       location: { lat: 51.5074, lng: -0.1278 },
       accessible: true,
       radar: null,
+      urinalOnly: null,
     });
     // Opening hours default to "Don't know", so none are sent.
     expect(body).not.toHaveProperty("openingTimes");
+  });
+
+  it("passes the initial map view to the picker", () => {
+    render(
+      <LooForm
+        mode="add"
+        apiUrl=""
+        isAuthenticated={true}
+        initialView={{ lat: 51.5, lng: -0.12, zoom: 18 }}
+      />,
+    );
+    expect(pickerProps.last).toMatchObject({ initialView: { lat: 51.5, lng: -0.12, zoom: 18 } });
   });
 
   it("adds the new toilet to the cached map so it shows on the next map load", async () => {
@@ -662,10 +1472,28 @@ describe("LooForm (add)", () => {
 
     await user.type(nameInput(), "Brand new toilet");
     await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
-    await user.click(saveButton());
+    await saveAndConfirm(user);
 
     await waitFor(() => expect(locationStub.href).toBe(`/loos/${newId}?saved=1`));
     expect(applyLocalMutation).toHaveBeenCalledWith(newId, compressed, BASE_UPDATED_AT);
     expect((await loadMapCache())?.data).toEqual([OTHER_ROW, compressed]);
+  });
+
+  it("remembers a queued new toilet under a create marker", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(202, { queued: true, id: "pending-new" }));
+    renderAdd(false);
+
+    await user.type(nameInput(), "Suggested toilet");
+    await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
+    await saveAndConfirm(user);
+
+    expect(
+      await screen.findByText("Thanks — a moderator will review your suggestion"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View this toilet" })).toBeNull();
+    expect(
+      JSON.parse(localStorage.getItem("toiletmap-pending:new:pending-new") ?? "null"),
+    ).toMatchObject({ kind: "create", pendingId: "pending-new" });
   });
 });
