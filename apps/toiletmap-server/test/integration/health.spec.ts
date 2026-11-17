@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { callApi } from "./utils/test-client";
+import type {
+  ErrorBody,
+  HealthCheck,
+  LivenessBody,
+  ReadinessBody,
+  ServiceInfoBody,
+} from "./utils/response-types";
+import { callApi, readJson } from "./utils/test-client";
+
+const findDatabaseCheck = (body: ReadinessBody): HealthCheck | undefined =>
+  body.checks.find((check) => check.name === "database");
 
 describe("Root routes", () => {
   it("returns service metadata on GET /", async () => {
     const response = await callApi("/");
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body = await readJson<ServiceInfoBody>(response);
     expect(body).toMatchObject({
       service: "toiletmap-server",
     });
@@ -16,7 +26,7 @@ describe("Root routes", () => {
 
   it("reflects degraded status when dependencies are unhealthy", async () => {
     const response = await callApi("/");
-    const body = await response.json();
+    const body = await readJson<ServiceInfoBody>(response);
 
     // Status should match the actual health of the system
     // In a healthy test environment, this should be 'ok'
@@ -26,7 +36,7 @@ describe("Root routes", () => {
     // If degraded, status should be consistent with health check
     if (body.status === "degraded") {
       const healthResponse = await callApi("/health/ready");
-      const healthBody = await healthResponse.json();
+      const healthBody = await readJson<ReadinessBody>(healthResponse);
       expect(healthBody.status).toBe("degraded");
     }
   });
@@ -34,7 +44,7 @@ describe("Root routes", () => {
   it("responds with 404 for unknown routes", async () => {
     const response = await callApi("/does-not-exist");
     expect(response.status).toBe(404);
-    const body = await response.json();
+    const body = await readJson<ErrorBody>(response);
     expect(body.message).toMatch(/not found/i);
   });
 });
@@ -45,7 +55,7 @@ describe("Health check endpoints", () => {
       const response = await callApi("/health/live");
       expect(response.status).toBe(200);
 
-      const body = await response.json();
+      const body = await readJson<LivenessBody>(response);
       expect(body).toMatchObject({
         status: "ok",
         service: "toiletmap-server",
@@ -59,7 +69,7 @@ describe("Health check endpoints", () => {
       const response = await callApi("/health/live");
       expect(response.status).toBe(200);
 
-      const body = await response.json();
+      const body = await readJson<LivenessBody>(response);
       expect(body.status).toBe("ok");
     });
   });
@@ -71,7 +81,7 @@ describe("Health check endpoints", () => {
       // Should return 200 when healthy
       expect(response.status).toBe(200);
 
-      const body = await response.json();
+      const body = await readJson<ReadinessBody>(response);
       expect(body).toMatchObject({
         status: "ok",
         service: "toiletmap-server",
@@ -83,17 +93,17 @@ describe("Health check endpoints", () => {
 
     it("includes database health check", async () => {
       const response = await callApi("/health/ready");
-      const body = await response.json();
+      const body = await readJson<ReadinessBody>(response);
 
-      const dbCheck = body.checks.find((check: any) => check.name === "database");
+      const dbCheck = findDatabaseCheck(body);
       expect(dbCheck).toBeDefined();
-      expect(dbCheck.status).toBe("ok");
-      expect(dbCheck.responseTime).toBeGreaterThanOrEqual(0);
+      expect(dbCheck?.status).toBe("ok");
+      expect(dbCheck?.responseTime).toBeGreaterThanOrEqual(0);
     });
 
     it("does not expose sensitive error information in development", async () => {
       const response = await callApi("/health/ready");
-      const body = await response.json();
+      const body = await readJson<ReadinessBody>(response);
 
       // Even in development mode, health checks should not expose:
       // - Database passwords
@@ -108,7 +118,7 @@ describe("Health check endpoints", () => {
       // In development, we may see "database check failed" or the actual error
       // but never raw connection errors with credentials
       if (body.status === "degraded") {
-        const dbCheck = body.checks.find((check: any) => check.name === "database");
+        const dbCheck = findDatabaseCheck(body);
         if (dbCheck?.message) {
           // Message should be sanitized or generic
           expect(dbCheck.message).toMatch(/database|connection|failed/i);
@@ -123,7 +133,7 @@ describe("Health check endpoints", () => {
 
       // For now, just verify the endpoint structure is correct
       const response = await callApi("/health/ready");
-      const body = await response.json();
+      const body = await readJson<ReadinessBody>(response);
 
       // Verify response structure supports degraded state
       expect(["ok", "degraded"]).toContain(body.status);
@@ -151,7 +161,7 @@ describe("Health check endpoints", () => {
       // In production, ENVIRONMENT would be set to "production" or "preview"
 
       const response = await callApi("/health/ready");
-      const body = await response.json();
+      const body = await readJson<ReadinessBody>(response);
       const bodyStr = JSON.stringify(body);
 
       // Verify no sensitive information is exposed:
@@ -174,11 +184,11 @@ describe("Health check endpoints", () => {
 
     it("provides generic error messages for failed checks", async () => {
       const response = await callApi("/health/ready");
-      const body = await response.json();
+      const body = await readJson<ReadinessBody>(response);
 
       // If there's a database error, the message should be generic
       if (body.status === "degraded") {
-        const dbCheck = body.checks.find((check: any) => check.name === "database");
+        const dbCheck = findDatabaseCheck(body);
         if (dbCheck?.status === "error") {
           // In production/preview: "database check failed"
           // In development: might be more detailed but still sanitized
@@ -194,13 +204,13 @@ describe("Health check endpoints", () => {
 
     it("maintains observability with response times", async () => {
       const response = await callApi("/health/ready");
-      const body = await response.json();
+      const body = await readJson<ReadinessBody>(response);
 
       // Even with sanitized errors, we should still get timing info
-      const dbCheck = body.checks.find((check: any) => check.name === "database");
+      const dbCheck = findDatabaseCheck(body);
       expect(dbCheck).toBeDefined();
-      expect(typeof dbCheck.responseTime).toBe("number");
-      expect(dbCheck.responseTime).toBeGreaterThanOrEqual(0);
+      expect(typeof dbCheck?.responseTime).toBe("number");
+      expect(dbCheck?.responseTime).toBeGreaterThanOrEqual(0);
     });
   });
 });

@@ -1,0 +1,24 @@
+// Wrangler config used ONLY by the Playwright e2e suite.
+//
+// playwright.config.ts starts `astro dev` with
+// CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH pointing here, so the client talks to
+// the local toiletmap-server (:8787) and the mock Auth0 server (:44555)
+// regardless of what is in a developer's (gitignored) .dev.vars. Because this
+// file lives in e2e/, wrangler looks for e2e/.dev.vars (which does not exist),
+// so the vars below are the complete, deterministic environment.
+//
+// Keep `compatibility_date` / `compatibility_flags` in sync with ../wrangler.jsonc.
+{
+  "name": "toiletmap-client",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat", "disable_nodejs_process_v2", "global_fetch_strictly_public"],
+  "vars": {
+    "ENVIRONMENT": "development",
+    "PUBLIC_API_URL": "http://localhost:8787",
+    "AUTH0_ISSUER_BASE_URL": "http://127.0.0.1:44555/",
+    "AUTH0_CLIENT_ID": "toiletmap-client-e2e",
+    "AUTH0_CLIENT_SECRET": "e2e-secret",
+    "AUTH0_SCOPE": "openid profile email",
+    "AUTH0_AUDIENCE": "https://toiletmap.org.uk"
+  }
+}
