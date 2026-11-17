@@ -121,14 +121,20 @@ export const securityHeaders = (
 
     // Set CORS headers for actual requests
     const origin = c.req.header("origin");
+    if (corsOrigins.length > 0) {
+      // The allowed origin is reflected per request, so any cache (browser or
+      // shared) must key cacheable responses by Origin.
+      c.header("Vary", "Origin", { append: true });
+    }
     if (origin && isOriginAllowed(origin, corsOrigins)) {
       c.header("Access-Control-Allow-Origin", origin);
       if (corsCredentials) {
         c.header("Access-Control-Allow-Credentials", "true");
       }
+      // ETag lets cross-origin consumers revalidate with If-None-Match.
       c.header(
         "Access-Control-Expose-Headers",
-        "X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset",
+        "ETag, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset",
       );
     }
 

@@ -130,8 +130,8 @@ investigated.
 | Project | Device | Specs |
 | --- | --- | --- |
 | `desktop-chromium` | Desktop Chrome 1280×720 | all |
-| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout` |
-| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout` |
+| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness` |
+| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness` |
 
 ## How the tests work
 
@@ -168,6 +168,16 @@ seed rows shown in the default view.
   ```
 
 **Map tiles.** OpenStreetMap tile requests are stubbed with a blank PNG.
+
+**Map data freshness.** `freshness.spec.ts` covers the Phase 2 caching: the
+`?saved=1` banner after a save, a second browser with a warm IndexedDB cache
+picking up an edit or a deactivation, the cached map when syncing fails, and
+Back/Forward with the details panel. Instead of waiting for the 60s poll it
+triggers a sync the way returning to the tab does (a `visibilitychange`
+event, `triggerMapSync` in `support/map.ts`), and reads the cache record
+(`loos-cache-v2`) straight from IndexedDB (`readMapCache`). After a signed-in
+save, use `waitForSaved` (`support/form.ts`): it waits for the redirect to
+`/loos/<id>?saved=1`, the banner, and the param being stripped.
 
 ## Known failures
 

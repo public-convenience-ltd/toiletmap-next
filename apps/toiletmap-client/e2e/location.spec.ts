@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { e2eName, getLoo } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
-import { jsonBody, nextSave, openEditForm } from "./support/form";
+import { jsonBody, nextSave, openEditForm, waitForSaved } from "./support/form";
 import { waitForMapToSettle } from "./support/map";
 
 /**
@@ -99,7 +99,7 @@ test.describe("location picker", () => {
     await form.save.click();
     const body = jsonBody(await put);
     expect(Object.keys(body).sort()).toEqual(["baseUpdatedAt", "location"]);
-    await page.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(page, loo.id);
 
     const after = await getLoo(loo.id);
     expect(after.location?.lat).toBeCloseTo(newLat, 5);
@@ -125,7 +125,7 @@ test.describe("location picker", () => {
     await form.save.click();
     const body = jsonBody(await put);
     expect(body).not.toHaveProperty("location");
-    await page.waitForURL(`/loos/${loo.id}`);
+    await waitForSaved(page, loo.id);
 
     const after = await getLoo(loo.id);
     expect(after.name).toBe(newName);

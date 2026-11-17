@@ -44,3 +44,21 @@ export function nextSave(page: Page, method: "PUT" | "POST"): Promise<Request> {
 
 export const jsonBody = (req: Request): Record<string, unknown> =>
   JSON.parse(req.postData() ?? "{}") as Record<string, unknown>;
+
+/** Banner LooMap shows on `/loos/:id?saved=1` (ToiletDetailsPanel SAVED_MESSAGE). */
+export const SAVED_BANNER_TEXT = "Thanks — your changes are live.";
+
+/**
+ * Waits for the redirect a successful signed-in save makes, `/loos/<id>?saved=1`,
+ * and for the map to consume the param: the "changes are live" banner shows and
+ * `?saved=1` is stripped from the address bar. Returns the toilet id (useful
+ * after adding a toilet, when the id is not known in advance).
+ */
+export async function waitForSaved(page: Page, id?: string): Promise<string> {
+  const idPattern = id ? id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "[0-9a-f]{24}";
+  // Either form: by the time this runs the param may already have been stripped.
+  await page.waitForURL(new RegExp(`/loos/(${idPattern})(\\?saved=1)?$`));
+  await expect(page.getByText(SAVED_BANNER_TEXT)).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/loos/${idPattern}$`));
+  return new URL(page.url()).pathname.split("/").pop() ?? "";
+}

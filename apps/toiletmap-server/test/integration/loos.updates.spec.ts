@@ -7,12 +7,14 @@ import { callApi, jsonRequest, readJson } from "./utils/test-client";
 const fixtures = createFixtureFactory();
 
 test("GET /loos/updates returns incremental updates", async () => {
-  // 1. Create a loo
+  // 1. Create a loo. Its own updated_at (database clock) is the boundary, so
+  //    the test does not depend on the test runner's clock matching the DB's.
+  //    +1ms because the API truncates the stored microseconds.
   const loo1 = await fixtures.loos.create();
-  const since = new Date().toISOString();
+  const since = new Date(Date.parse(loo1.updatedAt ?? "") + 1).toISOString();
 
   // 2. Wait a bit to ensure timestamp difference
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, 20));
 
   // 3. Create another loo
   const loo2 = await fixtures.loos.create();
@@ -53,9 +55,9 @@ test("GET /loos/geohash returns summary data", async () => {
 test("GET /loos/updates lists a deactivated loo under deleted", async () => {
   const loo = await fixtures.loos.create({ active: true });
 
-  // Make sure the deactivation lands strictly after `since`.
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  const since = new Date().toISOString();
+  // The fixture's own updated_at (database clock) is the boundary; the
+  // deactivation lands strictly after it.
+  const since = new Date(Date.parse(loo.updatedAt ?? "") + 1).toISOString();
   await new Promise((resolve) => setTimeout(resolve, 20));
 
   const { issueToken } = getTestContext();

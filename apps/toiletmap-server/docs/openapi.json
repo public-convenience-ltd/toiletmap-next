@@ -1120,11 +1120,90 @@
           }
         }
       },
+      "DumpResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count",
+          "cursor"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompressedLoo"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 2
+          },
+          "cursor": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server sync cursor: the database clock minus 120 seconds, read before the data was queried. Pass it back unchanged as `since` to `/api/loos/updates`; never substitute the client clock. The overlap means a row can be delivered twice, so apply updates idempotently.",
+            "example": "2026-11-17T09:58:00.000Z"
+          }
+        }
+      },
+      "RichDumpResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "count",
+          "cursor"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Loo"
+            }
+          },
+          "count": {
+            "type": "number",
+            "example": 2
+          },
+          "cursor": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server sync cursor: the database clock minus 120 seconds, read before the data was queried. Pass it back unchanged as `since` to `/api/loos/updates`; never substitute the client clock. The overlap means a row can be delivered twice, so apply updates idempotently.",
+            "example": "2026-11-17T09:58:00.000Z"
+          }
+        }
+      },
+      "SavedLooResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Loo"
+          },
+          {
+            "type": "object",
+            "required": [
+              "compressed"
+            ],
+            "properties": {
+              "compressed": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CompressedLoo"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The loo's map tuple, exactly as `/api/loos/dump` will serve it, so clients can patch a cached map immediately. `null` when the loo is not on the map (inactive or without a location)."
+              }
+            }
+          }
+        ]
+      },
       "UpdatesResponse": {
         "type": "object",
         "required": [
           "upserted",
-          "deleted"
+          "deleted",
+          "cursor"
         ],
         "properties": {
           "upserted": {
@@ -1132,18 +1211,24 @@
             "items": {
               "$ref": "#/components/schemas/CompressedLoo"
             },
-            "description": "Loos that have been created or updated since the requested timestamp."
+            "description": "Loos on the map that were created or updated after `since`."
           },
           "deleted": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "IDs of loos that have been deleted or deactivated since the requested timestamp.",
+            "description": "IDs of loos that left the map (deactivated or without a location) after `since`.",
             "example": [
               "9234",
               "1234"
             ]
+          },
+          "cursor": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server sync cursor: the database clock minus 120 seconds, read before the data was queried. Pass it back unchanged as `since` to `/api/loos/updates`; never substitute the client clock. The overlap means a row can be delivered twice, so apply updates idempotently.",
+            "example": "2026-11-17T09:58:00.000Z"
           }
         }
       }
@@ -1231,6 +1316,15 @@
         "responses": {
           "200": {
             "description": "Matching loos.",
+            "headers": {
+              "Cache-Control": {
+                "description": "`private, max-age=60`",
+                "schema": {
+                  "type": "string",
+                  "example": "private, max-age=60"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1277,11 +1371,11 @@
         },
         "responses": {
           "201": {
-            "description": "Loo created.",
+            "description": "Loo created. Includes its `compressed` map tuple.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Loo"
+                  "$ref": "#/components/schemas/SavedLooResponse"
                 }
               }
             }
@@ -1325,13 +1419,13 @@
           "Loos"
         ],
         "summary": "Fetch incremental updates",
-        "description": "Returns a list of loos that have been created, updated, or deleted since the provided timestamp.",
+        "description": "Map changes since a sync cursor: loos created or updated (`upserted`) and loos that left the map (`deleted`). Pass the `cursor` from `/api/loos/dump` or the previous `/updates` response as `since`, and store the new `cursor` for next time. Never cached.",
         "parameters": [
           {
             "name": "since",
             "in": "query",
             "required": true,
-            "description": "ISO 8601 timestamp (e.g. 2025-01-21T12:00:00.000Z).",
+            "description": "A `cursor` returned by `/api/loos/dump` or `/api/loos/updates` (ISO 8601). Do not send the client clock.",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -1340,7 +1434,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Incremental updates.",
+            "description": "Incremental updates and the next cursor.",
+            "headers": {
+              "Cache-Control": {
+                "description": "`no-store`",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1368,6 +1471,7 @@
           "Loos"
         ],
         "summary": "Fetch a single loo",
+        "description": "Revalidated on every use: send the previous `ETag` as `If-None-Match` to get a 304 while the loo is unchanged.",
         "parameters": [
           {
             "name": "id",
@@ -1380,11 +1484,35 @@
               "maxLength": 24,
               "pattern": "^[a-f0-9]{24}$"
             }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "An ETag from an earlier response. A match returns 304 with no body.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Loo detail.",
+            "headers": {
+              "ETag": {
+                "description": "Weak per-record version: `W/\"loo-<id>-<updatedAt epoch ms>-<body hash>\"`. Also changes when joined data such as the area name does.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "`private, max-age=0, must-revalidate`",
+                "schema": {
+                  "type": "string",
+                  "example": "private, max-age=0, must-revalidate"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1392,6 +1520,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: the `If-None-Match` ETag is current."
           },
           "400": {
             "description": "Invalid loo identifier.",
@@ -1457,13 +1588,13 @@
         },
         "responses": {
           "200": {
-            "description": "Existing loo updated, or returned unchanged when nothing differed. Anonymous no-op submissions return `{ queued: false, unchanged: true }`.",
+            "description": "Existing loo updated, or returned unchanged when nothing differed; both include the `compressed` map tuple. Anonymous no-op submissions return `{ queued: false, unchanged: true }`.",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "$ref": "#/components/schemas/Loo"
+                      "$ref": "#/components/schemas/SavedLooResponse"
                     },
                     {
                       "$ref": "#/components/schemas/QueuedChangeResponse"
@@ -1474,11 +1605,11 @@
             }
           },
           "201": {
-            "description": "New loo created.",
+            "description": "New loo created. Includes its `compressed` map tuple.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Loo"
+                  "$ref": "#/components/schemas/SavedLooResponse"
                 }
               }
             }
@@ -1617,36 +1748,63 @@
           "Loos"
         ],
         "summary": "Dump all active loos",
-        "description": "Returns a compressed list of all active loos. Optimized for initial map loading. Cached for 1 hour.",
+        "description": "Every active loo with a location, as compressed `[id, geohash, filterMask]` tuples (or full records with `rich=true`), plus a sync `cursor` for `/api/loos/updates`. Browsers may cache it for 60s and revalidate in the background for 300s more; edits made meanwhile arrive through `/updates`. The ETag is a dataset version, so `If-None-Match` revalidation is cheap.",
         "parameters": [
           {
             "name": "rich",
             "in": "query",
             "required": false,
-            "description": "Return full loo details instead of compressed summary. WARNING: Large response size.",
+            "description": "Return full loo details instead of compressed tuples. WARNING: Large response size. Has its own ETag (`W/\"dump-rich-...\"`).",
             "schema": {
               "type": "boolean",
               "default": false
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "An ETag from an earlier response. A match returns 304 with no body.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "List of all active loos (compressed or full).",
+            "description": "All active loos (compressed or full) and a sync cursor.",
+            "headers": {
+              "ETag": {
+                "description": "Weak dataset version: `W/\"dump-<max updated_at epoch ms>-<row count>-<sum of updated_at epoch µs>\"`. Changes on every write, including out-of-order commits.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "`public, max-age=60, stale-while-revalidate=300`",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=60, stale-while-revalidate=300"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "oneOf": [
                     {
-                      "$ref": "#/components/schemas/CompressedLooListResponse"
+                      "$ref": "#/components/schemas/DumpResponse"
                     },
                     {
-                      "$ref": "#/components/schemas/LooListResponse"
+                      "$ref": "#/components/schemas/RichDumpResponse"
                     }
                   ]
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified: the dataset has not changed since the `If-None-Match` ETag. Keep the cached body and its cursor."
           }
         }
       }

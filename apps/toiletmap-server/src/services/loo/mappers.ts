@@ -2,6 +2,7 @@ import { openingTimesSchema } from "../../common/schemas";
 import type { areas, record_version, toilets } from "../../generated/prisma/client";
 import type {
   AdminGeo,
+  CompressedLoo,
   Coordinates,
   LooCommon,
   LooResponse,
@@ -180,6 +181,70 @@ export const genLooFilterBitmask = (loo: {
     radarValue
   );
 };
+
+/** The `toilets` columns needed to build a {@link CompressedLoo}. */
+export const compressedLooSelect = {
+  id: true,
+  active: true,
+  geohash: true,
+  no_payment: true,
+  all_gender: true,
+  automatic: true,
+  accessible: true,
+  baby_change: true,
+  radar: true,
+} as const;
+
+type CompressibleRow = Pick<
+  toilets,
+  | "id"
+  | "geohash"
+  | "no_payment"
+  | "all_gender"
+  | "automatic"
+  | "accessible"
+  | "baby_change"
+  | "radar"
+>;
+
+/** Builds the `[id, geohash, filterMask]` map tuple from a database row. */
+export const compressLooRow = (row: CompressibleRow): CompressedLoo => [
+  row.id,
+  row.geohash ?? "",
+  genLooFilterBitmask({
+    noPayment: row.no_payment,
+    allGender: row.all_gender,
+    automatic: row.automatic,
+    accessible: row.accessible,
+    babyChange: row.baby_change,
+    radar: row.radar,
+  }),
+];
+
+/** Whether a row belongs on the map, matching the `/api/loos/dump` filter. */
+export const isMapVisible = (loo: { active: boolean | null; geohash: string | null }): boolean =>
+  loo.active === true && !!loo.geohash;
+
+/**
+ * The map tuple for a loo as returned by a mutation, in the same shape as the
+ * dump, or `null` when the loo is not on the map (inactive or unlocated), in
+ * which case clients should drop it from their map cache.
+ */
+export const toCompressedLoo = (
+  loo: Pick<
+    LooResponse,
+    | "id"
+    | "active"
+    | "geohash"
+    | "noPayment"
+    | "allGender"
+    | "automatic"
+    | "accessible"
+    | "babyChange"
+    | "radar"
+  >,
+): CompressedLoo | null =>
+  isMapVisible(loo) ? [loo.id, loo.geohash ?? "", genLooFilterBitmask(loo)] : null;
 
 type AuditRecord = Pick<record_version, "id" | "record" | "old_record">;
 

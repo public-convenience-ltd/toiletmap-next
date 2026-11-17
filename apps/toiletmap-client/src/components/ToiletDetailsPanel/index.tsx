@@ -1,6 +1,7 @@
+import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import type { IconName } from "toiletmap-design-system";
-import { Button, Icon, isTwentyFourHours, Stack } from "toiletmap-design-system";
+import { Banner, Button, Icon, isTwentyFourHours, Stack } from "toiletmap-design-system";
 import type { LooDetail } from "../../api/loos";
 import styles from "./ToiletDetailsPanel.module.css";
 
@@ -81,18 +82,71 @@ function FeatureStatus({ value }: { value: boolean | null | undefined }) {
   );
 }
 
+export const REMOVED_MESSAGE = "This toilet has been removed from the map";
+export const SAVED_MESSAGE = "Thanks — your changes are live.";
+
 interface ToiletDetailsPanelProps {
   toilet: LooDetail;
   onClose: () => void;
+  /** Optional message shown at the top of the panel (e.g. the "changes are live" banner). */
+  notice?: ComponentChildren;
+  /**
+   * The toilet is no longer on the map (deleted, or marked inactive since it was opened).
+   * Shows a removed notice and hides the directions and edit actions.
+   */
+  removed?: boolean;
+  /** Show the dismissible "your changes are live" banner (after a save, `?saved=1`). */
+  saved?: boolean;
+  onDismissSaved?: () => void;
 }
 
-export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPanelProps) {
+export default function ToiletDetailsPanel({
+  toilet,
+  onClose,
+  notice,
+  removed = false,
+  saved = false,
+  onDismissSaved,
+}: ToiletDetailsPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const today = todayIndex();
 
-  const directionsUrl = toilet.location
-    ? `https://maps.apple.com/?dirflg=w&daddr=${toilet.location.lat},${toilet.location.lng}`
-    : null;
+  const directionsUrl =
+    toilet.location && !removed
+      ? `https://maps.apple.com/?dirflg=w&daddr=${toilet.location.lat},${toilet.location.lng}`
+      : null;
+
+  const showSaved = saved && !removed;
+  const notices =
+    notice || removed || showSaved ? (
+      <div className={styles.notices}>
+        {removed && (
+          <div role="status">
+            <Banner variant="info">{REMOVED_MESSAGE}.</Banner>
+          </div>
+        )}
+        {showSaved && (
+          <div role="status">
+            <Banner variant="success">
+              <div className={styles.noticeRow}>
+                <span>{SAVED_MESSAGE}</span>
+                {onDismissSaved && (
+                  <button
+                    type="button"
+                    className={styles.noticeDismiss}
+                    aria-label="Dismiss message"
+                    onClick={onDismissSaved}
+                  >
+                    <Icon icon="xmark" size="small" />
+                  </button>
+                )}
+              </div>
+            </Banner>
+          </div>
+        )}
+        {notice}
+      </div>
+    ) : null;
 
   if (!isExpanded) {
     return (
@@ -104,6 +158,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
             Close
           </Button>
         </div>
+        {notices}
         <div className={styles.collapsedActions}>
           {directionsUrl && (
             <Button
@@ -136,6 +191,7 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
       </div>
 
       <div className={styles.expandedContent}>
+        {notices}
         <div className={styles.grid}>
           {/* Column 1: Details */}
           <Stack space="m">
@@ -154,21 +210,23 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
                 </Button>
               </div>
             )}
-            <div>
-              <p className={styles.verifyPrompt}>Is this information correct?</p>
-              <div className={styles.verifyActions}>
-                <Button htmlElement="button" variant="primary">
-                  Yes
-                </Button>
-                <span className={styles.verifyNoSpan}>
-                  No?{" "}
-                  <Button htmlElement="a" variant="secondary" href={`/loos/${toilet.id}/edit`}>
-                    <Icon icon="pen-to-square" size="small" />
-                    Edit
+            {!removed && (
+              <div>
+                <p className={styles.verifyPrompt}>Is this information correct?</p>
+                <div className={styles.verifyActions}>
+                  <Button htmlElement="button" variant="primary">
+                    Yes
                   </Button>
-                </span>
+                  <span className={styles.verifyNoSpan}>
+                    No?{" "}
+                    <Button htmlElement="a" variant="secondary" href={`/loos/${toilet.id}/edit`}>
+                      <Icon icon="pen-to-square" size="small" />
+                      Edit
+                    </Button>
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
             {toilet.notes?.trim() && (
               <div>
                 <h3 className={styles.colHeading}>Notes</h3>
@@ -224,10 +282,12 @@ export default function ToiletDetailsPanel({ toilet, onClose }: ToiletDetailsPan
                 })}
               </ul>
             )}
-            <p className={styles.hoursNote}>
-              Hours may vary with national holidays or seasonal changes.{" "}
-              <a href={`/loos/${toilet.id}/edit`}>Edit this toilet</a> if out of date.
-            </p>
+            {!removed && (
+              <p className={styles.hoursNote}>
+                Hours may vary with national holidays or seasonal changes.{" "}
+                <a href={`/loos/${toilet.id}/edit`}>Edit this toilet</a> if out of date.
+              </p>
+            )}
           </div>
         </div>
       </div>

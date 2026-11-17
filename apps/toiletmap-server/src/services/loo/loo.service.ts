@@ -4,7 +4,9 @@ import type { LooDiffBase } from "./diff";
 import {
   areaSelection,
   buildAreaFromJoin,
-  genLooFilterBitmask,
+  compressedLooSelect,
+  compressLooRow,
+  isMapVisible,
   mapAuditRecordToReport,
   mapLoo,
   mapNearbyLoo,
@@ -36,6 +38,23 @@ import {
 } from "./types";
 
 type DbClient = PrismaClientInstance | Prisma.TransactionClient;
+
+/** How far the sync cursor trails the database clock. See {@link LooService.getSyncCursor}. */
+const SYNC_CURSOR_OVERLAP_SECONDS = 120;
+const SYNC_CURSOR_OVERLAP = Prisma.raw(`interval '${SYNC_CURSOR_OVERLAP_SECONDS} seconds'`);
+
+/**
+ * Fingerprint of the toilets table (see {@link LooService.getDatasetVersion})
+ * plus the sync cursor read with it.
+ */
+export type DatasetVersion = {
+  /** Newest `updated_at`, epoch ms (0 for an empty table). */
+  maxUpdatedAt: number;
+  count: number;
+  /** Sum of every `updated_at` in epoch microseconds, as a decimal string. */
+  updatedAtSum: string;
+  cursor: string;
+};
 
 /** A loo as read for mutation purposes: the public response plus its raw `areaId`. */
 export type LooMutationBase = LooDiffBase & { areaId: string | null };
@@ -315,32 +334,10 @@ export class LooService {
 
     const rows = await this.prisma.toilets.findMany({
       where,
-      select: {
-        id: true,
-        geohash: true,
-        no_payment: true,
-        all_gender: true,
-        automatic: true,
-        accessible: true,
-        baby_change: true,
-        radar: true,
-      },
+      select: compressedLooSelect,
     });
 
-    return rows.map((row: (typeof rows)[number]) => {
-      return [
-        row.id,
-        row.geohash ?? "",
-        genLooFilterBitmask({
-          noPayment: row.no_payment,
-          allGender: row.all_gender,
-          automatic: row.automatic,
-          accessible: row.accessible,
-          babyChange: row.baby_change,
-          radar: row.radar,
-        }),
-      ];
-    });
+    return rows.map(compressLooRow);
   }
 
   /**
@@ -374,32 +371,10 @@ export class LooService {
         active: true,
         geohash: { not: null },
       },
-      select: {
-        id: true,
-        geohash: true,
-        no_payment: true,
-        all_gender: true,
-        automatic: true,
-        accessible: true,
-        baby_change: true,
-        radar: true,
-      },
+      select: compressedLooSelect,
     });
 
-    return rows.map((row: (typeof rows)[number]) => {
-      return [
-        row.id,
-        row.geohash ?? "",
-        genLooFilterBitmask({
-          noPayment: row.no_payment,
-          allGender: row.all_gender,
-          automatic: row.automatic,
-          accessible: row.accessible,
-          babyChange: row.baby_change,
-          radar: row.radar,
-        }),
-      ];
-    });
+    return rows.map(compressLooRow);
   }
 
   /**
@@ -419,43 +394,86 @@ export class LooService {
   }
 
   /**
-   * Retrieves updates (upserts and deletes) since a given date.
+   * Reads the sync cursor from the database clock: `now() - 120 seconds`.
+   *
+   * Callers must read it *before* the query whose results it describes. Any
+   * write not visible to that query commits after the cursor was read, and its
+   * `updated_at` (also the database clock, see `persistence.ts`) can trail its
+   * commit by at most the length of its transaction, far less than the 120s
+   * overlap. So `/updates?since=<cursor>` always re-delivers it. The overlap
+   * also re-delivers some rows the client already has; clients apply deltas
+   * idempotently.
+   */
+  async getSyncCursor(): Promise<string> {
+    const [row] = await this.prisma.$queryRaw<Array<{ cursor: Date }>>(
+      Prisma.sql`SELECT now() - ${SYNC_CURSOR_OVERLAP} AS cursor`,
+    );
+    if (!row) throw new Error("Failed to read sync cursor");
+    return new Date(row.cursor).toISOString();
+  }
+
+  /**
+   * A cheap fingerprint of the whole toilets table, plus a sync cursor read in
+   * the same statement (so before any dump query that follows).
+   *
+   * Every write bumps `updated_at` (deactivations included; rows are never
+   * hard-deleted in normal operation). `max(updated_at)` and the row count
+   * alone miss a write that leaves the maximum where it was: one to a row that
+   * is not the newest, or a transaction that commits after a later-started one
+   * (its `updated_at` is its start time, below the other's). So the version
+   * also carries the sum of every `updated_at` in microseconds, which moves
+   * whenever any single row's `updated_at` does.
+   *
+   * The sum is taken over intervals and converted once at the end, which costs
+   * well under a millisecond extra on ~16k rows (per-row `extract` was ~2ms,
+   * an md5 over ids and timestamps ~10ms). Used for the dump's ETag and
+   * edge-cache key.
+   */
+  async getDatasetVersion(): Promise<DatasetVersion> {
+    const [row] = await this.prisma.$queryRaw<
+      Array<{
+        cursor: Date;
+        max_updated_at: Date | null;
+        count: bigint | number;
+        updated_at_sum: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        now() - ${SYNC_CURSOR_OVERLAP} AS cursor,
+        max(updated_at) AS max_updated_at,
+        count(*)::bigint AS count,
+        (extract(epoch FROM sum(updated_at - timestamptz 'epoch')) * 1000000)::numeric(40, 0)::text
+          AS updated_at_sum
+      FROM toilets
+    `);
+    if (!row) throw new Error("Failed to read dataset version");
+    return {
+      maxUpdatedAt: row.max_updated_at ? new Date(row.max_updated_at).getTime() : 0,
+      count: Number(row.count),
+      updatedAtSum: row.updated_at_sum ?? "0",
+      cursor: new Date(row.cursor).toISOString(),
+    };
+  }
+
+  /**
+   * Retrieves map changes since a server-issued cursor: loos now on the map
+   * (`upserted`) and loos that left it, by deactivation or losing their
+   * location (`deleted`).
    */
   async getUpdates(since: Date): Promise<{ upserted: CompressedLoo[]; deleted: string[] }> {
     const rows = await this.prisma.toilets.findMany({
       where: {
         updated_at: { gt: since },
       },
-      select: {
-        id: true,
-        active: true,
-        geohash: true,
-        no_payment: true,
-        all_gender: true,
-        automatic: true,
-        accessible: true,
-        baby_change: true,
-        radar: true,
-      },
+      select: compressedLooSelect,
     });
 
     const upserted: CompressedLoo[] = [];
     const deleted: string[] = [];
 
     for (const row of rows) {
-      if (row.active) {
-        upserted.push([
-          row.id,
-          row.geohash ?? "",
-          genLooFilterBitmask({
-            noPayment: row.no_payment,
-            allGender: row.all_gender,
-            automatic: row.automatic,
-            accessible: row.accessible,
-            babyChange: row.baby_change,
-            radar: row.radar,
-          }),
-        ]);
+      if (isMapVisible(row)) {
+        upserted.push(compressLooRow(row));
       } else {
         deleted.push(row.id);
       }
@@ -548,7 +566,6 @@ export class LooService {
     mutation: LooMutationAttributes,
     contributor: string | null,
   ): Promise<LooResponse | null> {
-    const now = new Date();
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
     });
@@ -560,7 +577,6 @@ export class LooService {
         data: dataForCreate,
         mutation,
         contributor,
-        now,
       });
     });
 
@@ -583,7 +599,6 @@ export class LooService {
       data: mapMutationToPrismaData(mutation, { forCreate: true }),
       mutation,
       contributor,
-      now: new Date(),
     });
     this.looCache.delete(id);
   }
@@ -619,7 +634,6 @@ export class LooService {
         data: mapMutationToPrismaData(mutation, { forCreate: false }),
         mutation,
         contributor,
-        now: new Date(),
         expectedUpdatedAt: expected,
       });
       this.looCache.delete(id);
@@ -660,7 +674,6 @@ export class LooService {
     mutation: LooMutationAttributes,
     contributor: string | null,
   ): Promise<LooResponse | null> {
-    const now = new Date();
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
     });
@@ -677,7 +690,6 @@ export class LooService {
         data: dataForUpdate,
         mutation,
         contributor,
-        now,
       });
 
       // Invalidate cache
@@ -692,7 +704,6 @@ export class LooService {
           data: dataForCreate,
           mutation,
           contributor,
-          now,
         });
       }
     });

@@ -1,10 +1,23 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import userEvent from "@testing-library/user-event";
-import { get, set } from "idb-keyval";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { CACHE_KEYS } from "../../api/constants";
 import type { LooDetail } from "../../api/loos";
+import {
+  applyLocalMutation,
+  type CompressedLoo,
+  clearMapCache,
+  loadMapCache,
+  resetMapCacheForTests,
+  saveSnapshot,
+} from "../../api/mapCache";
 import LooForm from "./LooForm";
+
+// The real cache module runs (against fake-indexeddb); this spy wraps it so tests can
+// assert the read-your-writes call and simulate a cache failure.
+vi.mock("../../api/mapCache", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../api/mapCache")>();
+  return { ...actual, applyLocalMutation: vi.fn(actual.applyLocalMutation) };
+});
 
 // The picker's Leaflet map, as handed to LooForm through onMapReady. Address search must
 // only ever pan this map; it must never move the toilet's pin.
@@ -79,6 +92,9 @@ const makeLoo = (overrides: Partial<LooDetail> = {}): LooDetail => ({
   ...overrides,
 });
 
+/** A row for some other toilet, which a save must never touch. */
+const OTHER_ROW: CompressedLoo = ["fffffffffffffffffffffff0", "gcpvj0", 3];
+
 const jsonResponse = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status,
@@ -89,8 +105,11 @@ let fetchMock: Mock<typeof fetch>;
 let originalLocation: Location;
 let locationStub: { href: string };
 
-beforeEach(() => {
+beforeEach(async () => {
   for (const spy of Object.values(pickerMap)) spy.mockReset();
+  vi.mocked(applyLocalMutation).mockClear();
+  await clearMapCache();
+  resetMapCacheForTests();
   fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal("fetch", fetchMock);
   originalLocation = window.location;
@@ -102,7 +121,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // A successful save keeps running after the test's last assertion: it clears the IndexedDB
+  // A successful save keeps running after the test's last assertion: it patches the IndexedDB
   // cache (a macrotask in fake-indexeddb) and only then sets window.location.href. Without this
   // wait, that late redirect lands on the *next* test's location stub and fails it at random.
   // "Saving…" stays on the button until the submit handler has fully finished.
@@ -196,7 +215,7 @@ describe("LooForm (edit)", () => {
 
     await user.click(saveButton());
 
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}`));
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const { url, init, body } = request();
     expect(url).toBe(`/api/loos/${LOO_ID}`);
@@ -204,19 +223,82 @@ describe("LooForm (edit)", () => {
     expect(body).toEqual({ name: "Market Square toilets", baseUpdatedAt: BASE_UPDATED_AT });
   });
 
-  it("clears the cached map data after a successful save", async () => {
+  it("patches the cached map row, marked with the save's updatedAt, after a save", async () => {
     const user = userEvent.setup();
-    await set(CACHE_KEYS.LOOS_LIST, ["cached"]);
-    await set(CACHE_KEYS.LAST_UPDATED, "2026-01-01");
-    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "New" })));
+    const cursor = "2026-11-01T09:58:00.000Z";
+    await saveSnapshot([[LOO_ID, "gcpuvp", 1], OTHER_ROW], cursor);
+    const compressed: CompressedLoo = [LOO_ID, "gcpvhf", 5];
+    fetchMock.mockResolvedValue(jsonResponse(200, { ...makeLoo({ name: "New" }), compressed }));
     renderEdit();
 
     await changeName(user, "New");
     await user.click(saveButton());
 
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}`));
-    expect(await get(CACHE_KEYS.LOOS_LIST)).toBeUndefined();
-    expect(await get(CACHE_KEYS.LAST_UPDATED)).toBeUndefined();
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
+    expect(applyLocalMutation).toHaveBeenCalledWith(LOO_ID, compressed, BASE_UPDATED_AT);
+    const cached = await loadMapCache();
+    expect(cached?.data).toEqual([compressed, OTHER_ROW]);
+    // A local patch never moves the server cursor, and protects the row from older deltas.
+    expect(cached?.cursor).toBe(cursor);
+    expect(cached?.patched).toEqual({ [LOO_ID]: BASE_UPDATED_AT });
+  });
+
+  it("removes the toilet from the cached map when the save made it inactive", async () => {
+    const user = userEvent.setup();
+    await saveSnapshot([[LOO_ID, "gcpuvp", 1], OTHER_ROW], "2026-11-01T09:58:00.000Z");
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, { ...makeLoo({ name: "New", active: false }), compressed: null }),
+    );
+    renderEdit();
+
+    await changeName(user, "New");
+    await user.click(saveButton());
+
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
+    expect(applyLocalMutation).toHaveBeenCalledWith(LOO_ID, null, BASE_UPDATED_AT);
+    expect((await loadMapCache())?.data).toEqual([OTHER_ROW]);
+  });
+
+  it("leaves the cached map alone when the response has no usable compressed row", async () => {
+    const user = userEvent.setup();
+    const rows: CompressedLoo[] = [[LOO_ID, "gcpuvp", 1], OTHER_ROW];
+    await saveSnapshot(rows, "2026-11-01T09:58:00.000Z");
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, makeLoo({ name: "New" })))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { ...makeLoo({ name: "New" }), compressed: ["someone-else", "x", 1] }),
+      );
+
+    renderEdit();
+    await changeName(user, "New");
+    await user.click(saveButton());
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
+
+    locationStub.href = "http://localhost:3000/loos/edit";
+    await user.click(saveButton());
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(applyLocalMutation).not.toHaveBeenCalled();
+    expect((await loadMapCache())?.data).toEqual(rows);
+  });
+
+  it("still opens the toilet's page when the cache can't be updated", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(applyLocalMutation).mockRejectedValueOnce(new Error("QuotaExceededError"));
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, { ...makeLoo({ name: "New" }), compressed: [LOO_ID, "gcpvhf", 5] }),
+    );
+    renderEdit();
+
+    await changeName(user, "New");
+    await user.click(saveButton());
+
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
+    expect(applyLocalMutation).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    consoleError.mockRestore();
   });
 
   it("sends only the toggled facility", async () => {
@@ -338,7 +420,7 @@ describe("LooForm (edit)", () => {
       notes: "Closed Sundays, key at café",
       baseUpdatedAt: NEWER_UPDATED_AT,
     });
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}`));
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
   });
 
   it("on 409 with no overlapping fields says the user's changes are unaffected", async () => {
@@ -374,6 +456,8 @@ describe("LooForm (edit)", () => {
     );
     expect(screen.getByRole("link", { name: "Back to map" })).toHaveAttribute("href", "/");
     expect(locationStub.href).toBe("http://localhost:3000/loos/edit");
+    // Nothing is live yet, so the map cache is not touched.
+    expect(applyLocalMutation).not.toHaveBeenCalled();
   });
 
   it("shows a message and does not redirect when the server reports nothing changed", async () => {
@@ -483,7 +567,7 @@ describe("LooForm address search", () => {
     expect(saveButton()).toHaveTextContent("Save 1 change");
     await user.click(saveButton());
 
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}`));
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${LOO_ID}?saved=1`));
     expect(apiCalls()).toHaveLength(1);
     const body = JSON.parse(String((apiCalls()[0][1] as RequestInit).body));
     expect(body).not.toHaveProperty("location");
@@ -551,7 +635,7 @@ describe("LooForm (add)", () => {
     await user.click(facility("Accessible").getByLabelText("Yes"));
     await user.click(saveButton());
 
-    await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98"));
+    await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=1"));
     const { url, init, body } = request();
     expect(url).toBe("/api/loos");
     expect(init.method).toBe("POST");
@@ -566,5 +650,22 @@ describe("LooForm (add)", () => {
     });
     // Opening hours default to "Don't know", so none are sent.
     expect(body).not.toHaveProperty("openingTimes");
+  });
+
+  it("adds the new toilet to the cached map so it shows on the next map load", async () => {
+    const user = userEvent.setup();
+    const newId = "fedcba9876543210fedcba98";
+    const compressed: CompressedLoo = [newId, "gcpvj0", 1];
+    await saveSnapshot([OTHER_ROW], "2026-11-01T09:58:00.000Z");
+    fetchMock.mockResolvedValue(jsonResponse(201, { ...makeLoo(), id: newId, compressed }));
+    renderAdd();
+
+    await user.type(nameInput(), "Brand new toilet");
+    await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
+    await user.click(saveButton());
+
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${newId}?saved=1`));
+    expect(applyLocalMutation).toHaveBeenCalledWith(newId, compressed, BASE_UPDATED_AT);
+    expect((await loadMapCache())?.data).toEqual([OTHER_ROW, compressed]);
   });
 });

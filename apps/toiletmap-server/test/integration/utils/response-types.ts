@@ -50,7 +50,15 @@ export type AreasBody = ListBody<AdminGeo>;
 export type UpdatesBody = {
   upserted: CompressedLoo[];
   deleted: string[];
+  /** Server sync cursor to send back as `since` next time. */
+  cursor: string;
 };
+
+/** GET /api/loos/dump (compressed) */
+export type DumpBody = ListBody<CompressedLoo> & { cursor: string };
+
+/** 200/201 from an authenticated create or update. */
+export type SavedLooBody = LooResponse & { compressed: CompressedLoo | null };
 
 /** 202 from an anonymous create or update that was queued for moderation. */
 export type QueuedBody = { queued: true; id: string };

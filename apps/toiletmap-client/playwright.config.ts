@@ -41,7 +41,7 @@ const SERVER_COMMAND = `sh -c ${JSON.stringify(
 )}`;
 
 /** Specs that also run on the phone-sized projects. */
-const MOBILE_SPECS = ["map.spec.ts", "edit.spec.ts", "layout.spec.ts"];
+const MOBILE_SPECS = ["map.spec.ts", "edit.spec.ts", "layout.spec.ts", "freshness.spec.ts"];
 
 export default defineConfig({
   testDir: "./e2e",

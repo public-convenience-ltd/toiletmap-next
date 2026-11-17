@@ -1,5 +1,4 @@
 import "leaflet/dist/leaflet.css";
-import { del } from "idb-keyval";
 import type L from "leaflet";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
@@ -13,8 +12,8 @@ import {
   type TriStateValue,
   validateOpeningTimes,
 } from "toiletmap-design-system";
-import { CACHE_KEYS } from "../../api/constants";
 import type { LooDetail } from "../../api/loos";
+import { applyLocalMutation } from "../../api/mapCache";
 import { useNominatimSearch } from "../../hooks/useNominatimSearch";
 import { isValidLatLng } from "./geometry";
 import LocationPicker from "./LocationPicker";
@@ -51,6 +50,50 @@ type SubmitError =
   | { kind: "conflict"; current: LooDetail; fields: LooFormField[] };
 
 const CONFLICT_MESSAGE = "This toilet was changed by someone else while you were editing.";
+
+/** The map row [id, geohash, filterMask] a 200/201 save returns as `compressed`. */
+type CompressedRow = [string, string, number];
+
+/**
+ * Read `compressed` from a save response: a row, null (the toilet is inactive, so it leaves
+ * the map), or undefined when absent/malformed (then the cache is left for the next delta,
+ * rather than deleting a toilet that is still on the map).
+ */
+const compressedFromSaveBody = (body: unknown, id: string): CompressedRow | null | undefined => {
+  if (!body || typeof body !== "object" || !("compressed" in body)) return undefined;
+  const value = (body as { compressed: unknown }).compressed;
+  if (value === null) return null;
+  if (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value[0] === id &&
+    typeof value[1] === "string" &&
+    typeof value[2] === "number"
+  ) {
+    return value as CompressedRow;
+  }
+  return undefined;
+};
+
+/**
+ * Read-your-writes after a successful save: patch the map cache (IndexedDB, so it survives
+ * the full navigation to the toilet's page) and mark the row with the save's `updatedAt`
+ * so an in-flight delta read before the save can't undo it. Best effort: the save itself
+ * has succeeded, and the next delta re-delivers the change anyway (its cursor overlaps).
+ *
+ * The detail itself is not cached here: the redirect is a full page load, which resets the
+ * in-memory detail cache, and the toilet page's own fetch returns the saved version.
+ */
+const applySavedLocally = async (body: LooDetail) => {
+  const compressed = compressedFromSaveBody(body, body.id);
+  if (compressed === undefined) return;
+  const updatedAt = typeof body.updatedAt === "string" ? body.updatedAt : null;
+  try {
+    await applyLocalMutation(body.id, compressed, updatedAt);
+  } catch (error) {
+    console.error("Couldn't update the cached map data:", error);
+  }
+};
 
 const formatCoord = (n: number | undefined) =>
   n === undefined ? "" : String(Number(n.toFixed(6)));
@@ -237,9 +280,9 @@ export default function LooForm({
           setSubmitError({ kind: "message", message: action.message, details: action.details });
           return;
         case "saved":
-          // Clear stale compressed list so the map re-fetches fresh data on next load
-          await Promise.all([del(CACHE_KEYS.LOOS_LIST), del(CACHE_KEYS.LAST_UPDATED)]);
-          window.location.href = `/loos/${encodeURIComponent(action.id)}`;
+          // interpretSaveResponse only returns "saved" for a body with a valid id.
+          await applySavedLocally(body as LooDetail);
+          window.location.href = `/loos/${encodeURIComponent(action.id)}?saved=1`;
           return;
       }
     } catch {

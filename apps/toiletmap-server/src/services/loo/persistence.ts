@@ -51,6 +51,21 @@ const geographyExpression = (location: LooMutationAttributes["location"]) => {
   `;
 };
 
+/**
+ * Timestamps written by mutations come from the database clock, the same clock
+ * the sync cursor of `/api/loos/dump` and `/api/loos/updates` is read from
+ * (`now() - 120s`, see `LooService.getSyncCursor`). Using one clock removes
+ * Worker/database skew from the freshness guarantee.
+ *
+ * `now()` is the transaction's start time, so a row becomes visible to other
+ * readers slightly after the instant its `updated_at` names. The 120 second
+ * overlap on the cursor covers that gap (a mutation transaction is a handful of
+ * statements and Hyperdrive/Postgres time out well before two minutes), so a
+ * change committed while a dump is being read is always re-delivered by the
+ * next `/updates` call rather than lost.
+ */
+const dbNow = Prisma.sql`now()`;
+
 const toColumnValueSql = (column: string, value: unknown) => {
   if (column === "opening_times" && value !== null) {
     return Prisma.sql`${JSON.stringify(value)}::jsonb`;
@@ -64,7 +79,6 @@ type InsertArgs = {
   data: Prisma.toiletsUncheckedCreateInput;
   mutation: LooMutationAttributes;
   contributor: string | null;
-  now: Date;
 };
 
 /**
@@ -72,7 +86,7 @@ type InsertArgs = {
  * Raw SQL is used to handle PostGIS geography types and array operations
  * that are cumbersome or impossible with standard Prisma create.
  */
-export const insertLoo = async ({ tx, id, data, mutation, contributor, now }: InsertArgs) => {
+export const insertLoo = async ({ tx, id, data, mutation, contributor }: InsertArgs) => {
   const keys = Object.keys(data);
   const columns = [
     Prisma.raw("id"),
@@ -84,8 +98,8 @@ export const insertLoo = async ({ tx, id, data, mutation, contributor, now }: In
 
   const values = [
     Prisma.sql`${id}`,
-    Prisma.sql`${now}`,
-    Prisma.sql`${now}`,
+    dbNow,
+    dbNow,
     buildContributorsInsertValue(contributor),
     ...keys.map((k) => toColumnValueSql(k, data[k as keyof typeof data])),
   ];
@@ -113,7 +127,6 @@ type UpdateArgs = {
   data: Prisma.toiletsUncheckedUpdateInput;
   mutation: LooMutationAttributes;
   contributor: string | null;
-  now: Date;
   /**
    * Optimistic-concurrency guard. When provided, the row is only updated if its
    * `updated_at` still equals this value (to millisecond precision); `null`
@@ -133,10 +146,9 @@ export const updateLoo = async ({
   data,
   mutation,
   contributor,
-  now,
   expectedUpdatedAt,
 }: UpdateArgs) => {
-  const assignments: Prisma.Sql[] = [Prisma.sql`updated_at = ${now}`];
+  const assignments: Prisma.Sql[] = [Prisma.sql`updated_at = ${dbNow}`];
 
   for (const [key, value] of Object.entries(data)) {
     assignments.push(Prisma.sql`${Prisma.raw(key)} = ${toColumnValueSql(key, value)}`);

@@ -42,17 +42,19 @@ describe("Loo dump endpoint", () => {
       const inactiveItem = body.data.find((row) => row[0] === inactiveLoo.id);
       expect(inactiveItem).toBeUndefined();
 
-      // Check cache header
-      expect(response.headers.get("Cache-Control")).toContain("public, max-age=3600");
+      // Short browser caching; freshness comes from the cursor + /updates.
+      // See loos.caching.spec.ts for the full caching contract.
+      expect(response.headers.get("Cache-Control")).toBe(
+        "public, max-age=60, stale-while-revalidate=300",
+      );
 
-      // Verify cache hit on second request
+      // A second request for the same dataset version (here authenticated)
+      // is served from the (mocked) edge cache with an identical body.
       const cachedResponse = await callApi("/api/loos/dump", {
         headers: authHeaders(),
       });
       expect(cachedResponse.status).toBe(200);
-      // In a real worker environment, we might check for a CF-Cache-Status header,
-      // but here we are just verifying our mock works and the middleware uses it.
-      // We can verify the response body is identical.
+      expect(cachedResponse.headers.get("ETag")).toBe(response.headers.get("ETag"));
       const cachedBody = await readJson<ListBody<CompressedLoo>>(cachedResponse);
       expect(cachedBody).toEqual(body);
     });
