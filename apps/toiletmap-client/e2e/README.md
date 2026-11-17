@@ -48,7 +48,7 @@ and explains:
 
   ```bash
   CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH=e2e/wrangler.e2e.jsonc ASTRO_DEV_BACKGROUND=1 \
-    pnpm exec astro dev --port 4321
+    ASTRO_DEV_TOOLBAR=off pnpm exec astro dev --port 4321
   ```
 
 The server must start before the client. Both use the workerd inspector on
@@ -56,7 +56,9 @@ port 9229: wrangler fails if that port is taken, while the client's Vite plugin
 falls back to another port. Playwright starts them in that order.
 
 `ASTRO_DEV_BACKGROUND=1` stops Astro 7 from detaching `astro dev` into the
-background, which it does when it detects an AI coding agent.
+background, which it does when it detects an AI coding agent. `ASTRO_DEV_TOOLBAR=off`
+(read by `astro.config.mjs`) hides Astro's dev toolbar, which would otherwise sit over
+the map's details sheet at the bottom of phone-sized screens and take its taps.
 
 Environment overrides: `E2E_DATABASE_URL` (default
 `postgresql://postgres:postgres@127.0.0.1:54322/postgres`), `E2E_CLIENT_URL`,
@@ -130,8 +132,9 @@ investigated.
 | Project | Device | Specs |
 | --- | --- | --- |
 | `desktop-chromium` | Desktop Chrome 1280×720 | all |
-| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness`, `picker`, `report` |
-| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness`, `picker`, `report` |
+| `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness`, `picker`, `report`, `panel` |
+| `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness`, `picker`, `report`, `panel` |
+| `mobile-landscape` | Pixel 7 landscape (863×360) | `panel`, `layout` |
 
 ## How the tests work
 
@@ -190,6 +193,26 @@ event, `triggerMapSync` in `support/map.ts`), and reads the cache record
 (`loos-cache-v2`) straight from IndexedDB (`readMapCache`). After a signed-in
 save, use `waitForSaved` (`support/form.ts`): it waits for the redirect to
 `/loos/<id>?saved=1`, the banner, and the param being stripped.
+
+**Details panel and phone layout.** `panel.spec.ts` covers the Phase 4 panel on
+every project: a marker tap or deep link opens the summary (at most 30% of a
+phone screen, with the map still draggable around it), Details expands it (at
+most 60% of the map on phones, scrolling inside; a card of at most 400px on the
+left on desktop), Escape and Close collapse then close, focus moves to the
+heading and back to the marker, and the selected marker's box never touches the
+panel or a floating control (`[data-map-control]`). Deep links open the
+summary, so tests that use the verify / edit / report actions call
+`expandDetails` (`support/map.ts`) first. On a phone in landscape
+(`mobile-landscape`: wide enough for the card, but short) a toilet with notices
+keeps Directions reachable by scrolling the card, its marker clear of the card,
+and the page free of horizontal overflow. `layout.spec.ts` checks that the
+floating controls don't overlap at 360px and 430px, that map pages hide the
+footer below 768px (its links are in the menu drawer), that Escape in that
+menu closes the menu but not an open toilet, and the viewport meta. Its "page
+shell" tests check the computed body / main overflow and height (map pages fill
+the viewport and never scroll; form pages scroll the document), and its
+safe-area tests stub `--safe-top` / `--safe-bottom` to check the map's floating
+controls don't add an inset the header or footer already pads.
 
 ## Known failures
 

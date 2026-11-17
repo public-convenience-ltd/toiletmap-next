@@ -1,7 +1,7 @@
 import { e2eName, getLoo, type OpeningTimes, stable } from "./support/api";
 import { expect, authedTest as test } from "./support/fixtures";
 import { jsonBody, looForm, nextSave, openEditForm, QUESTIONS, waitForSaved } from "./support/form";
-import { detailsPanelHeading } from "./support/map";
+import { detailsPanelHeading, expandDetails } from "./support/map";
 
 /**
  * Signed-in editing (legacy cypress/e2e/{desktop,mobile}/edit.cy.ts), with the
@@ -136,6 +136,7 @@ test.describe("edit (signed in)", () => {
     await page.goto(`/loos/${loo.id}`);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
 
+    await expandDetails(page);
     await page.locator(".toilet-panel").getByRole("link", { name: "Suggest an edit" }).click();
     const form = looForm(page);
     await expect(form.heading).toHaveText("Edit toilet");

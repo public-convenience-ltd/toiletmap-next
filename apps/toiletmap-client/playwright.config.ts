@@ -48,7 +48,11 @@ const MOBILE_SPECS = [
   "freshness.spec.ts",
   "picker.spec.ts",
   "report.spec.ts",
+  "panel.spec.ts",
 ];
+
+/** Specs that also run on a phone in landscape. */
+const LANDSCAPE_SPECS = ["panel.spec.ts", "layout.spec.ts"];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -86,6 +90,13 @@ export default defineConfig({
       name: "mobile-webkit",
       use: { ...devices["iPhone 13"] },
       testMatch: MOBILE_SPECS,
+    },
+    {
+      // A phone on its side: ≥768px wide but only 360px tall, so the panel is the card
+      // (scrolling as a whole) and the map is a short strip.
+      name: "mobile-landscape",
+      use: { ...devices["Pixel 7 landscape"] },
+      testMatch: LANDSCAPE_SPECS,
     },
   ],
   // Started in order: the server before the client, so wrangler gets the
@@ -134,6 +145,8 @@ export default defineConfig({
         // this marks the process as the dev server itself so it stays in the
         // foreground where Playwright can wait on and stop it.
         ASTRO_DEV_BACKGROUND: "1",
+        // Astro's dev toolbar would cover the bottom of the screen (the details sheet).
+        ASTRO_DEV_TOOLBAR: "off",
       },
     },
   ],
