@@ -45,15 +45,15 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.51.1",
-    "@types/node": "26.1.2",
+    "@cloudflare/vite-plugin": "^1.67.0",
+    "@types/node": "26.6.6",
     "@types/pg": "^8.20.4",
     "concurrently": "^10.0.4",
     "dotenv": "^17.4.2",
-    "knip": "^6.32.0",
+    "knip": "^6.44.1",
     "supabase": "^2.112.0",
-    "tsx": "4.23.10",
-    "vite": "^8.2.1",
+    "tsx": "4.23.15",
+    "vite": "^8.3.5",
     "vitest": "^4.1.10"
   }
 }

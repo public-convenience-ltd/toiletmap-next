@@ -115,6 +115,13 @@
   text-align: center;
 }
 
+/* Narrower toggles in the day rows' status column. Kept before the :hover,
+   active and focus rules below so selector specificity only ever ascends. */
+.oh-status .oh-toggle-label {
+  min-width: 4rem;
+  padding-inline: var(--space-2xs);
+}
+
 .oh-toggle-label:hover {
   background: var(--color-light-grey);
 }
@@ -169,11 +176,6 @@
 
 .oh-status {
   grid-column: 2;
-}
-
-.oh-status .oh-toggle-label {
-  min-width: 4rem;
-  padding-inline: var(--space-2xs);
 }
 
 .oh-times {

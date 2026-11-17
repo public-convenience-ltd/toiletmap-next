@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "vcs": {
     "clientKind": "git",
     "enabled": true,
@@ -180,7 +180,7 @@
         "useValidAriaValues": "warn"
       },
       "nursery": {
-        "useSortedClasses": "off"
+        "useTailwindSortedClasses": "off"
       },
       "security": {
         "noBlankTarget": "warn"

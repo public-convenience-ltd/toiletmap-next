@@ -466,7 +466,7 @@ Form-based loo creation with:
 {
   "name": "toiletmap-server",
   "main": "./src/index.ts",
-  "compatibility_date": "2025-11-18",
+  "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "AUTH0_ISSUER_BASE_URL": "https://gbptm.eu.auth0.com/",

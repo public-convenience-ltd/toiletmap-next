@@ -8,10 +8,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        'loos-list': path.resolve(__dirname, 'src/admin/pages/loos/client/index.client.tsx'),
-        'loos-create': path.resolve(__dirname, 'src/admin/pages/loos/create/client/index.client.tsx'),
-        'loos-edit': path.resolve(__dirname, 'src/admin/pages/loos/edit/client/index.client.tsx'),
-        'styles': path.resolve(__dirname, 'src/admin/styles.ts')
+        'loos-list': path.resolve(import.meta.dirname, 'src/admin/pages/loos/client/index.client.tsx'),
+        'loos-create': path.resolve(import.meta.dirname, 'src/admin/pages/loos/create/client/index.client.tsx'),
+        'loos-edit': path.resolve(import.meta.dirname, 'src/admin/pages/loos/edit/client/index.client.tsx'),
+        'styles': path.resolve(import.meta.dirname, 'src/admin/styles.ts')
       },
       output: {
         // Use fixed names for easier development, can add hashing later for production
@@ -32,7 +32,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@client': path.resolve(__dirname, 'src/admin/pages/loos/client')
+      '@client': path.resolve(import.meta.dirname, 'src/admin/pages/loos/client')
     }
   },
   // Optimize dependencies

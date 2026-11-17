@@ -91,7 +91,7 @@ function overlappingMapControls(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const root = document.querySelector(".loo-map-container");
     if (!root) throw new Error("no map container");
-    const describe = (el: Element) => {
+    const describeElement = (el: Element) => {
       const label =
         el.getAttribute("aria-label") ?? (el.textContent ?? "").trim().replace(/\s+/g, " ");
       return `<${el.tagName.toLowerCase()}> "${label.slice(0, 30)}"`;
@@ -112,7 +112,8 @@ function overlappingMapControls(page: Page): Promise<string[]> {
         if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
         const x = Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left);
         const y = Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top);
-        if (x > 0.5 && y > 0.5) overlaps.push(`${describe(a.el)} × ${describe(b.el)}`);
+        if (x > 0.5 && y > 0.5)
+          overlaps.push(`${describeElement(a.el)} × ${describeElement(b.el)}`);
       }
     }
     return overlaps;
