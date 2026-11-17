@@ -157,11 +157,19 @@ make build-app         # mobile app (flutter build apk)
 ### Testing & Verification
 
 ```bash
-make test-server-e2e                         # run end-to-end tests
-make check                                   # style check + typecheck + wrangler dry-run
+pnpm --filter toiletmap-client test               # client unit/component/SSR render tests (Vitest)
+pnpm --filter toiletmap-client typecheck          # tsc + astro check
+pnpm --filter toiletmap-client test:e2e           # Playwright browser tests
+pnpm --filter toiletmap-design-system test        # design-system tests
+pnpm --filter toiletmap-design-system typecheck
+pnpm --filter toiletmap-server typecheck          # server source
+pnpm --filter toiletmap-server typecheck:test     # server tests + scripts
+pnpm --filter toiletmap-server test:e2e           # server unit/admin/integration tests (or: make test-server-e2e)
+make check                                        # style check + typecheck + wrangler dry-run
 ```
 
-- Frontend tests will land once the client worker grows beyond static HTML.
+- Server `test:e2e` and Playwright need Docker and the local Supabase stack running (`make db-start`). After pulling new migrations into a reused stack, run `npx -y supabase@2.122.1 migration up --local` in `apps/toiletmap-server`.
+- Playwright setup and options: [apps/toiletmap-client/e2e/README.md](apps/toiletmap-client/e2e/README.md). Test and CI details (including required CI jobs): the "Testing & CI" section of [AGENTS.md](AGENTS.md).
 
 ### Development Helpers
 

@@ -2,7 +2,7 @@
 
 > **Purpose**: This document provides AI coding assistants with essential context about the Toilet Map API project to enable effective contributions.
 
-**Workspace layout**: This repository is a pnpm monorepo. The API/Admin worker now lives in `apps/toiletmap-server` (all paths below are relative to that directory unless noted). A placeholder frontend worker is available in `apps/toiletmap-client`, and the mobile app is in `apps/toiletmap-app`.
+**Workspace layout**: This repository is a pnpm monorepo. The API/Admin worker lives in `apps/toiletmap-server` (all paths below are relative to that directory unless noted). The public-facing frontend (Astro + Preact SSR worker with the map and add/edit forms) is `apps/toiletmap-client`, shared Preact components are in `apps/toiletmap-design-system`, shared Auth0 JWT helpers are in `packages/auth`, and the Flutter mobile app is in `apps/toiletmap-app`.
 
 ## Project Overview
 
@@ -262,10 +262,10 @@ pnpm supabase:start            # Start Supabase (Postgres + PostGIS)
 pnpm supabase:stop             # Stop Supabase
 pnpm supabase:reset            # Reset DB with migrations + seed data
 
-# Testing
-pnpm test:e2e                  # Run all E2E tests
-KEEP_SUPABASE=1 pnpm test:e2e  # Keep DB running between test runs
-pnpm vitest run test/integration/loos.read.spec.ts  # Run single test file
+# Testing (Supabase must already be running; see "Testing & CI")
+pnpm test:e2e                  # Run unit, admin and integration tests
+pnpm test:e2e test/integration/loos.read.spec.ts  # Run single test file
+pnpm typecheck:test            # Type-check src, test/ and scripts/
 
 # Documentation
 pnpm docs:generate             # Generate OpenAPI spec
@@ -273,9 +273,9 @@ pnpm docs:generate             # Generate OpenAPI spec
 
 ### Testing Strategy
 
-- **E2E Suite**: 7 test files in `test/integration/` covering all endpoints
+- **Suites**: `test/unit/`, `test/admin/` and `test/integration/` (endpoint coverage), all run by `pnpm test:e2e`
 - **Test Client**: Direct Worker invocation via `app.fetch()` (no HTTP server)
-- **Database**: Supabase auto-starts if not running (set `KEEP_SUPABASE=1` to persist between runs)
+- **Database**: Requires the local Supabase stack (`pnpm supabase:start`); setup fails fast if it is unreachable or missing migrations
 - **Auth**: Mock JWKS server at `http://127.0.0.1:44555/` issues deterministic test tokens
 - **Fixtures**: Reusable test data factories in `test/integration/utils/fixtures.ts`
 - **Cleanup**: Automated database cleanup between tests
@@ -360,6 +360,30 @@ Migrations are automatically applied by Supabase when deploying. Coordinate timi
 4. Add E2E tests in `test/integration/<domain>/`
 5. Update `src/app.ts` to register new routes
 6. Update OpenAPI documentation if needed
+
+## Testing & CI
+
+Run from the repository root (Docker must be running for anything that touches the database).
+
+```bash
+# Client (apps/toiletmap-client)
+pnpm --filter toiletmap-client test        # Vitest: unit, component, SSR render (render test needs a prior `build`)
+pnpm --filter toiletmap-client typecheck   # tsc + astro check
+pnpm --filter toiletmap-client test:e2e    # Playwright (see apps/toiletmap-client/e2e/README.md)
+
+# Design system (apps/toiletmap-design-system)
+pnpm --filter toiletmap-design-system test
+pnpm --filter toiletmap-design-system typecheck
+
+# Server (apps/toiletmap-server)
+pnpm --filter toiletmap-server typecheck
+pnpm --filter toiletmap-server typecheck:test   # src + test/ + scripts/
+pnpm --filter toiletmap-server test:e2e         # needs local Supabase on :54322
+```
+
+- **TypeScript versions**: the root uses TypeScript 7 (native compiler). The client pins `typescript` 6.0.3 because `@astrojs/check` needs the TypeScript JS language-service API, which TS 7 does not ship.
+- **Playwright prerequisites**: local Supabase running (`pnpm --filter toiletmap-server supabase:start`), `pnpm --filter toiletmap-server prisma:generate`, and browsers (`pnpm exec playwright install chromium webkit` in `apps/toiletmap-client`). Playwright starts the server and client itself. A reused local stack may be missing newer migrations: run `npx -y supabase@2.122.1 migration up --local` in `apps/toiletmap-server`.
+- **CI jobs** (`.github/workflows/ci.yml`): `Biome (Lint & Format)`, `Type Check` (server typecheck + typecheck:test) and `Integration Tests` (server `test:e2e`) are **required** by the branch ruleset. `Client Checks` (design-system tests + typecheck, client typecheck, build, client tests), `E2E (Playwright)`, `Mobile App (Flutter)` and `Cloudflare Build Check` also run on every PR but are not required.
 
 ## Admin Interface Architecture
 
@@ -611,7 +635,7 @@ const contributor = contributorPath.split('.').reduce(
 3. **Geohash Queries**: Prefix matching is case-sensitive and uses `LIKE 'prefix%'` pattern
 4. **Auth Profile Key**: If using nested Auth0 profile fields, set `AUTH0_PROFILE_KEY` to the namespaced claim URL or path (e.g., `app_metadata.contributor_name`)
 5. **Prisma Client Location**: Always import from `src/generated/prisma/client` in app code, `test/integration/generated/client` in tests
-6. **Test Database**: E2E suite auto-starts Supabase; use `KEEP_SUPABASE=1` to avoid teardown delays
+6. **Test Database**: The test suite never starts Supabase; run `pnpm supabase:start` first. A reused stack may need `pnpm exec supabase migration up --local` (non-destructive) after new migrations land
 7. **Soft Deletes**: Filter by `active = true` in most queries (see `src/services/loo/sql.ts` examples)
 8. **Cloudflare Cold Starts**: First request after deploy may be slower due to Prisma initialization
 9. **JWKS Caching**: Auth0 signing keys are cached (5 entries, 10 min TTL) - rate-limited to 10 requests/min
@@ -636,7 +660,7 @@ const contributor = contributorPath.split('.').reduce(
 
 ---
 
-**Last Updated**: 2026-05-10
+**Last Updated**: 2026-11-17
 **Maintainer**: Public Convenience Ltd.
-**Repository**: `public-convenience-ltd/toiletmap-server`
+**Repository**: `public-convenience-ltd/toiletmap-next`
 **Deployment**: Cloudflare Workers

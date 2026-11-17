@@ -138,6 +138,16 @@ pnpm run dev
 
 The client expects the server at `http://localhost:8787` in development mode.
 
+## Testing
+
+```bash
+pnpm test           # Vitest: unit, component and SSR render tests (run `pnpm build` first for the render test)
+pnpm typecheck      # tsc + astro check (uses the pinned TypeScript 6; see AGENTS.md)
+pnpm test:e2e       # Playwright against the local stack (Docker Supabase must be running)
+```
+
+See [e2e/README.md](e2e/README.md) for Playwright prerequisites, reuse of running servers and overrides.
+
 ## Building and Deployment
 
 ### Build
