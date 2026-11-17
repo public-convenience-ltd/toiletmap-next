@@ -1,7 +1,11 @@
 import "dotenv/config";
+import { readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll } from "vitest";
 import { createPrismaClient, type PrismaClientInstance } from "../../src/prisma";
 import { type AuthServer, type IssueTokenFn, startAuthServer } from "./utils/auth-server";
+import { cleanupManager } from "./utils/cleanup";
+import { getTestDatabaseUrl, testProcessEnv } from "./utils/env";
 
 const state: {
   issueToken: IssueTokenFn | null;
@@ -13,59 +17,97 @@ const state: {
   prisma: null,
 };
 
+const MIGRATIONS_DIR = fileURLToPath(new URL("../../supabase/migrations", import.meta.url));
+
 /**
- * Gets database URL for tests.
- * Uses CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE (matches TEST_HYPERDRIVE binding)
- * Falls back to default local Supabase connection.
+ * Fails fast when the local database is missing migrations from
+ * `supabase/migrations`, which otherwise surfaces as confusing Prisma
+ * "column does not exist" errors deep inside unrelated tests.
+ *
+ * Skipped when the database has no Supabase migration history table
+ * (e.g. a plain Postgres pointed at via the connection-string override).
  */
-const getDatabaseUrl = () => {
-  return (
-    process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ||
-    "postgresql://postgres:postgres@localhost:54322/postgres"
-  );
+const assertMigrationsApplied = async (prisma: PrismaClientInstance) => {
+  const [{ tracked }] = await prisma.$queryRaw<{ tracked: boolean }[]>`
+    SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL AS tracked
+  `;
+  if (!tracked) return;
+
+  const applied = await prisma.$queryRaw<{ version: string }[]>`
+    SELECT version FROM supabase_migrations.schema_migrations
+  `;
+  const appliedVersions = new Set(applied.map((row) => row.version));
+  const missing = readdirSync(MIGRATIONS_DIR)
+    .filter((file) => file.endsWith(".sql"))
+    .filter((file) => !appliedVersions.has(file.split("_")[0] ?? ""));
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Local database is missing migrations: ${missing.join(", ")}. ` +
+        "Run `pnpm exec supabase migration up --local` in apps/toiletmap-server " +
+        "(non-destructive), or `pnpm supabase:reset` to rebuild the database.",
+    );
+  }
 };
 
 beforeAll(async () => {
-  const databaseUrl = getDatabaseUrl();
+  const databaseUrl = getTestDatabaseUrl();
 
-  const audience = process.env.AUTH0_AUDIENCE ?? "https://integration.toiletmap/api";
-  process.env.AUTH0_AUDIENCE = audience;
+  const audience = testProcessEnv.AUTH0_AUDIENCE ?? "https://integration.toiletmap/api";
+  testProcessEnv.AUTH0_AUDIENCE = audience;
 
   const authServer: AuthServer = await startAuthServer({ audience });
-  process.env.AUTH0_ISSUER_BASE_URL = authServer.issuer;
-  process.env.AUTH0_PROFILE_KEY = "app_metadata";
-  process.env.AUTH0_CLIENT_ID = "integration-test-client-id";
+  testProcessEnv.AUTH0_ISSUER_BASE_URL = authServer.issuer;
+  testProcessEnv.AUTH0_PROFILE_KEY = "app_metadata";
+  testProcessEnv.AUTH0_CLIENT_ID = "integration-test-client-id";
 
-  // Mock Cloudflare Cache API
+  // In-memory stand-in for the Cloudflare `caches.default` Cache API.
   const cacheStore = new Map<string, Response>();
-  // @ts-expect-error
-  global.caches = {
-    default: {
-      match: (request: Request | string) => {
-        const url = typeof request === "string" ? request : request.url;
-        const cached = cacheStore.get(url);
-        return cached ? cached.clone() : undefined;
-      },
-      put: (request: Request | string, response: Response) => {
-        const url = typeof request === "string" ? request : request.url;
-        cacheStore.set(url, response.clone());
-      },
-      delete: (request: Request | string) => {
-        const url = typeof request === "string" ? request : request.url;
-        return cacheStore.delete(url);
-      },
+  const cacheKey = (request: RequestInfo | URL) =>
+    typeof request === "string" ? request : request instanceof URL ? request.href : request.url;
+  const defaultCache: Pick<Cache, "match" | "put" | "delete"> = {
+    match: (request) => Promise.resolve(cacheStore.get(cacheKey(request))?.clone()),
+    put: (request, response) => {
+      cacheStore.set(cacheKey(request), response.clone());
+      return Promise.resolve();
     },
+    delete: (request) => Promise.resolve(cacheStore.delete(cacheKey(request))),
   };
+  Object.defineProperty(globalThis, "caches", {
+    value: { default: defaultCache },
+    configurable: true,
+    writable: true,
+  });
 
   const prisma = createPrismaClient(databaseUrl);
-  await prisma.$connect();
+  let ready = false;
+  try {
+    try {
+      // With the pg driver adapter `$connect()` is lazy, so a round-trip is
+      // needed to tell an unreachable database apart from other failures.
+      await prisma.$connect();
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (error) {
+      throw new Error(
+        `Could not reach the test database at ${new URL(databaseUrl).host}. ` +
+          "Start local Supabase with `pnpm supabase:start` in apps/toiletmap-server.",
+        { cause: error },
+      );
+    }
+    // Migration-check failures (missing migrations, query errors) propagate as-is.
+    await assertMigrationsApplied(prisma);
+    ready = true;
+  } finally {
+    if (!ready) {
+      await prisma.$disconnect();
+      await authServer.stop();
+    }
+  }
   state.prisma = prisma;
 
   state.issueToken = authServer.issueToken;
   state.stopAuthServer = authServer.stop;
 });
-
-import { cleanupManager } from "./utils/cleanup";
 
 afterAll(async () => {
   if (state.stopAuthServer) {
@@ -73,8 +115,7 @@ afterAll(async () => {
   }
   if (state.prisma) {
     // Create a privileged client for cleanup
-    const databaseUrl = getDatabaseUrl();
-    const adminUrl = new URL(databaseUrl);
+    const adminUrl = new URL(getTestDatabaseUrl());
     adminUrl.username = "postgres";
     adminUrl.password = "postgres";
 

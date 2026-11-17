@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getTestContext } from "./setup";
-import { callApi } from "./utils/test-client";
+import type { AreasBody } from "./utils/response-types";
+import { callApi, readJson } from "./utils/test-client";
 
 const authHeaders = () => {
   const { issueToken } = getTestContext();
@@ -14,7 +15,7 @@ describe("GET /api/areas", () => {
     const response = await callApi("/api/areas", { headers: authHeaders() });
     expect(response.status).toBe(200);
 
-    const body = await response.json();
+    const body = await readJson<AreasBody>(response);
     expect(body).toMatchObject({
       count: expect.any(Number),
       data: expect.any(Array),

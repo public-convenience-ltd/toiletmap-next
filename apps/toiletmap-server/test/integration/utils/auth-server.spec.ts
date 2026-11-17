@@ -76,7 +76,7 @@ describe("local auth server customization", () => {
         headers: { authorization: `Bearer ${tokens.access_token}` },
       });
       expect(userInfoResponse.status).toBe(200);
-      const userInfo = await userInfoResponse.json();
+      const userInfo = (await userInfoResponse.json()) as Record<string, unknown>;
       expect(userInfo.email).toBe("dev@example.com");
       expect(userInfo.permissions).toEqual(
         expect.arrayContaining(["access:admin", "report:loo", "beta:feature", "ops:read"]),

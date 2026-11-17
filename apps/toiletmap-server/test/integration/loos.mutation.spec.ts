@@ -3,7 +3,13 @@ import { generateLooId, LOO_ID_LENGTH } from "../../src/services/loo";
 import { getTestContext } from "./setup";
 import { cleanupManager } from "./utils/cleanup";
 import { createFixtureFactory } from "./utils/fixtures";
-import { callApi, jsonRequest } from "./utils/test-client";
+import type {
+  ErrorBody,
+  FormattedFieldError,
+  LooResponse,
+  QueuedBody,
+} from "./utils/response-types";
+import { callApi, jsonRequest, readJson } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
 
@@ -28,7 +34,7 @@ describe("Loo mutation endpoints", () => {
 
       const response = await callApi("/api/loos", authedJson("POST", payload));
       expect(response.status).toBe(201);
-      const body = await response.json();
+      const body = await readJson<LooResponse>(response);
       expect(body.id).toHaveLength(LOO_ID_LENGTH);
       expect(body.name).toBe(payload.name);
       cleanupManager.trackLoo(body.id);
@@ -54,10 +60,9 @@ describe("Loo mutation endpoints", () => {
       };
       const response = await callApi("/api/loos", authedJson("POST", payload));
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = await readJson<ErrorBody<{ id?: FormattedFieldError }>>(response);
       expect(body.message).toBe("Invalid create request body");
-      const issueMessage = body.issues?.id?._errors?.[0] ?? body.issues?.id?._errors ?? "";
-      expect(String(issueMessage)).toMatch(/24/);
+      expect(body.issues?.id?._errors.join(" ")).toMatch(/24/);
     });
 
     it("queues anonymous submissions for review (202)", async () => {
@@ -69,7 +74,7 @@ describe("Loo mutation endpoints", () => {
         }),
       );
       expect(response.status).toBe(202);
-      const body = await response.json();
+      const body = await readJson<QueuedBody>(response);
       expect(body.queued).toBe(true);
       expect(typeof body.id).toBe("string");
       cleanupManager.trackPendingChange(body.id);
@@ -99,7 +104,7 @@ describe("Loo mutation endpoints", () => {
 
       const response = await callApi(`/api/loos/${id}`, authedJson("PUT", payload));
       expect(response.status).toBe(201);
-      const body = await response.json();
+      const body = await readJson<LooResponse>(response);
       expect(body.id).toBe(id);
       expect(body.notes).toBe(payload.notes);
       cleanupManager.trackLoo(id);
@@ -128,7 +133,7 @@ describe("Loo mutation endpoints", () => {
 
       const response = await callApi(`/api/loos/${existing.id}`, authedJson("PUT", payload));
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<LooResponse>(response);
       expect(body.notes).toBe("After update");
       expect(body.radar).toBe(true);
 
@@ -147,7 +152,7 @@ describe("Loo mutation endpoints", () => {
         jsonRequest("PUT", { notes: "Anonymous update" }),
       );
       expect(response.status).toBe(202);
-      const body = await response.json();
+      const body = await readJson<QueuedBody>(response);
       expect(body.queued).toBe(true);
       cleanupManager.trackPendingChange(body.id);
     });

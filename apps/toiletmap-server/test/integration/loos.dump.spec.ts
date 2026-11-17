@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { getTestContext } from "./setup";
 import { createFixtureFactory } from "./utils/fixtures";
-import { callApi } from "./utils/test-client";
+import type { CompressedLoo, ListBody } from "./utils/response-types";
+import { callApi, readJson } from "./utils/test-client";
 
 const authHeaders = () => {
   const { issueToken } = getTestContext();
@@ -26,21 +27,19 @@ describe("Loo dump endpoint", () => {
 
       const response = await callApi("/api/loos/dump");
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<CompressedLoo>>(response);
 
       expect(body.count).toBeGreaterThanOrEqual(1);
 
       // Should contain active loo
-      const activeItem = body.data.find((row: [string, string, number]) => row[0] === activeLoo.id);
+      const activeItem = body.data.find((row) => row[0] === activeLoo.id);
       expect(activeItem).toBeDefined();
-      expect(activeItem[1]).toBe(activeLoo.geohash);
+      expect(activeItem?.[1]).toBe(activeLoo.geohash);
       // NO_PAYMENT (1) | ALL_GENDER (2) | ACCESSIBLE (8) = 11
-      expect(activeItem[2]).toBe(11);
+      expect(activeItem?.[2]).toBe(11);
 
       // Should NOT contain inactive loo
-      const inactiveItem = body.data.find(
-        (row: [string, string, number]) => row[0] === inactiveLoo.id,
-      );
+      const inactiveItem = body.data.find((row) => row[0] === inactiveLoo.id);
       expect(inactiveItem).toBeUndefined();
 
       // Check cache header
@@ -54,7 +53,7 @@ describe("Loo dump endpoint", () => {
       // In a real worker environment, we might check for a CF-Cache-Status header,
       // but here we are just verifying our mock works and the middleware uses it.
       // We can verify the response body is identical.
-      const cachedBody = await cachedResponse.json();
+      const cachedBody = await readJson<ListBody<CompressedLoo>>(cachedResponse);
       expect(cachedBody).toEqual(body);
     });
   });

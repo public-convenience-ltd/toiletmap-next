@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createFixtureFactory } from "./utils/fixtures";
-import { callApi } from "./utils/test-client";
+import type { CompressedLoo, ListBody, LooResponse } from "./utils/response-types";
+import { callApi, readJson } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
 
@@ -14,15 +15,15 @@ describe("Loo dump endpoint (rich)", () => {
 
       const response = await callApi("/api/loos/dump?rich=true");
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<LooResponse>>(response);
 
       expect(body.count).toBeGreaterThanOrEqual(1);
 
       // Should contain active loo with full details
-      const activeItem = body.data.find((loo: any) => loo.id === activeLoo.id);
+      const activeItem = body.data.find((loo) => loo.id === activeLoo.id);
       expect(activeItem).toBeDefined();
-      expect(activeItem.name).toBe("Rich Dump Test Loo");
-      expect(activeItem.geohash).toBe(activeLoo.geohash);
+      expect(activeItem?.name).toBe("Rich Dump Test Loo");
+      expect(activeItem?.geohash).toBe(activeLoo.geohash);
     });
   });
 
@@ -35,15 +36,15 @@ describe("Loo dump endpoint (rich)", () => {
 
       const response = await callApi("/api/loos/dump");
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<CompressedLoo>>(response);
 
       expect(body.count).toBeGreaterThanOrEqual(1);
 
       // Compressed loo is an array
-      const activeItem = body.data.find((row: any) => row[0] === activeLoo.id);
+      const activeItem = body.data.find((row) => row[0] === activeLoo.id);
       expect(activeItem).toBeDefined();
       expect(Array.isArray(activeItem)).toBe(true);
-      expect(activeItem.length).toBe(3);
+      expect(activeItem).toHaveLength(3);
     });
   });
 });

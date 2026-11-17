@@ -9,18 +9,11 @@ import { LooService } from "../../src/services/loo";
 import type { LooResponse, OpeningTimes, ReportResponse } from "../../src/services/loo/types";
 import type { Env } from "../../src/types";
 import { getTestContext } from "../integration/setup";
+import { createTestHyperdrive } from "../integration/utils/env";
 
 const buildEnv = (): Env => ({
-  TEST_HYPERDRIVE: {
-    connectionString:
-      process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ??
-      "postgresql://postgres:postgres@localhost:54322/postgres",
-  },
-  HYPERDRIVE: {
-    connectionString:
-      process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_TEST_HYPERDRIVE ??
-      "postgresql://postgres:postgres@localhost:54322/postgres",
-  },
+  TEST_HYPERDRIVE: createTestHyperdrive(),
+  HYPERDRIVE: createTestHyperdrive(),
   AUTH0_ISSUER_BASE_URL: process.env.AUTH0_ISSUER_BASE_URL ?? "https://example.auth0.com/",
   AUTH0_AUDIENCE: process.env.AUTH0_AUDIENCE ?? "https://api.toiletmap.org.uk",
   AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID ?? "test-client-id",
@@ -35,7 +28,14 @@ const buildEnv = (): Env => ({
   RATE_LIMIT_WRITE: { limit: vi.fn().mockResolvedValue({ success: true }) },
   RATE_LIMIT_ADMIN: { limit: vi.fn().mockResolvedValue({ success: true }) },
   RATE_LIMIT_AUTH: { limit: vi.fn().mockResolvedValue({ success: true }) },
+  RATE_LIMIT_ANON_WRITE: { limit: vi.fn().mockResolvedValue({ success: true }) },
 });
+
+/**
+ * Stands in for the Prisma client in tests that mock every service call.
+ * It has no models, so an unmocked query fails loudly instead of hitting the database.
+ */
+const stubPrismaClient = {} as prismaModule.PrismaClientInstance;
 
 let env: Env;
 let app: ReturnType<typeof createApp>;
@@ -317,7 +317,7 @@ describe("Admin Routes", () => {
       },
     ];
 
-    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
+    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue(stubPrismaClient);
     const getById = vi.spyOn(LooService.prototype, "getById").mockResolvedValue(mockLoo);
     const getReports = vi.spyOn(LooService.prototype, "getReports").mockResolvedValue(mockReports);
 
@@ -374,7 +374,7 @@ describe("Admin Routes", () => {
       location: { lat: 51.501, lng: -0.141 },
     };
 
-    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
+    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue(stubPrismaClient);
     // The edit page must read the record fresh (uncached), not via getById.
     const getMutationBase = vi
       .spyOn(LooService.prototype, "getMutationBase")
@@ -411,7 +411,7 @@ describe("Admin Routes", () => {
   });
 
   it("should render a helpful state when trying to edit a missing loo", async () => {
-    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
+    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue(stubPrismaClient);
     const getMutationBase = vi
       .spyOn(LooService.prototype, "getMutationBase")
       .mockResolvedValue(null);
@@ -493,7 +493,7 @@ describe("Admin Routes", () => {
       ],
     };
 
-    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue({} as any);
+    vi.spyOn(prismaModule, "createPrismaClient").mockReturnValue(stubPrismaClient);
     vi.spyOn(UserInsightsService.prototype, "getPopularContributors").mockResolvedValue([
       { handle: "Testy", contributions: 3 },
     ]);

@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { getTestContext } from "./setup";
 import { createFixtureFactory } from "./utils/fixtures";
-import { callApi } from "./utils/test-client";
+import type {
+  CompressedLoo,
+  ErrorBody,
+  ListBody,
+  LooMetricsResponse,
+  LooResponse,
+  NearbyLooResponse,
+  ReportResponse,
+  ReportSummaryResponse,
+  SearchBody,
+} from "./utils/response-types";
+import { callApi, readJson } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
 const adminHeaders = () => {
@@ -35,7 +46,7 @@ describe("Loo read endpoints", () => {
         console.log("DEBUG ERROR BODY:", await response.text());
       }
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<LooResponse>(response);
       expect(body.id).toBe(loo.id);
       if (existingArea) {
         expect(Array.isArray(body.area)).toBe(true);
@@ -54,7 +65,7 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(response.status).toBe(404);
-      const body = await response.json();
+      const body = await readJson<ErrorBody>(response);
       expect(body.message).toMatch(/not found/i);
     });
 
@@ -62,7 +73,7 @@ describe("Loo read endpoints", () => {
       const loo = await fixtures.loos.create();
       const response = await callApi(`/api/loos/${loo.id}`);
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<LooResponse>(response);
       expect(body.id).toBe(loo.id);
     });
   });
@@ -76,7 +87,7 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<LooResponse>>(response);
       expect(body.count).toBe(2);
       expect(body.data.map((item: { id: string }) => item.id)).toEqual([first.id, second.id]);
     });
@@ -84,7 +95,7 @@ describe("Loo read endpoints", () => {
     it("rejects requests without ids", async () => {
       const response = await callApi("/api/loos", { headers: authHeaders() });
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = await readJson<ErrorBody>(response);
       expect(body.message).toBe("Invalid ids query parameter");
       expect(body.issues).toBeDefined();
     });
@@ -99,7 +110,7 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(summaryResponse.status).toBe(200);
-      const summary = await summaryResponse.json();
+      const summary = await readJson<ListBody<ReportSummaryResponse>>(summaryResponse);
       expect(summary.count).toBeGreaterThan(0);
       expect(summary.data[0]).toMatchObject({
         id: expect.any(String),
@@ -111,7 +122,7 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(hydratedResponse.status).toBe(200);
-      const hydrated = await hydratedResponse.json();
+      const hydrated = await readJson<ListBody<ReportResponse>>(hydratedResponse);
       expect(hydrated.data[0]).toHaveProperty("notes");
       expect(hydrated.data[0].contributor).toBeNull();
     });
@@ -124,7 +135,7 @@ describe("Loo read endpoints", () => {
         headers: adminHeaders(),
       });
       expect(summaryResponse.status).toBe(200);
-      const summary = await summaryResponse.json();
+      const summary = await readJson<ListBody<ReportSummaryResponse>>(summaryResponse);
       const latestSummary = summary.data[summary.data.length - 1];
       expect(latestSummary.contributor).toBe("reports-test");
 
@@ -132,7 +143,7 @@ describe("Loo read endpoints", () => {
         headers: adminHeaders(),
       });
       expect(hydratedResponse.status).toBe(200);
-      const hydrated = await hydratedResponse.json();
+      const hydrated = await readJson<ListBody<ReportResponse>>(hydratedResponse);
       const latestHydrated = hydrated.data[hydrated.data.length - 1];
       expect(latestHydrated.contributor).toBe("reports-test");
     });
@@ -158,14 +169,14 @@ describe("Loo read endpoints", () => {
 
       // Fetch the loo to get its created_at and updated_at
       const looResponse = await callApi(`/api/loos/${loo.id}`, { headers: authHeaders() });
-      const looData = await looResponse.json();
+      const looData = await readJson<LooResponse>(looResponse);
 
       // Fetch reports
       const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<ReportResponse>>(response);
 
       // Should have 3 reports (initial creation + 2 updates)
       expect(body.count).toBe(3);
@@ -229,7 +240,7 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<ReportResponse>>(response);
 
       const notesTimeline = body.data.map((report: { notes: string | null }) => report.notes);
       expect(notesTimeline).toEqual(["Baseline version", "Second version", "Third version"]);
@@ -243,11 +254,11 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<ReportResponse>>(response);
       const latest = body.data[body.data.length - 1];
 
       expect(latest.diff).toBeTruthy();
-      expect(latest.diff.name).toEqual({
+      expect(latest.diff?.name).toEqual({
         previous: "Original Name",
         current: "Updated Name",
       });
@@ -259,7 +270,7 @@ describe("Loo read endpoints", () => {
 
       const response = await callApi(`/api/loos/${loo.id}/reports`, { headers: authHeaders() });
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<ReportSummaryResponse>>(response);
 
       expect(body.count).toBeGreaterThan(0);
       for (const report of body.data) {
@@ -288,14 +299,14 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(activeResponse.status).toBe(200);
-      const activeBody = await activeResponse.json();
+      const activeBody = await readJson<ListBody<LooResponse>>(activeResponse);
       expect(activeBody.data.map((row: { id: string }) => row.id)).toContain(activeLoo.id);
 
       const inactiveResponse = await callApi(`/api/loos/geohash/${prefix}?active=false`, {
         headers: authHeaders(),
       });
       expect(inactiveResponse.status).toBe(200);
-      const inactiveBody = await inactiveResponse.json();
+      const inactiveBody = await readJson<ListBody<LooResponse>>(inactiveResponse);
       expect(inactiveBody.data.map((row: { id: string }) => row.id)).toContain(inactiveLoo.id);
     });
 
@@ -318,9 +329,9 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
-      const body = await response.json();
-      const item = body.data.find((row: [string, string, number]) => row[0] === loo.id);
-      expect(item).toBeDefined();
+      const body = await readJson<ListBody<CompressedLoo>>(response);
+      const item = body.data.find((row) => row[0] === loo.id);
+      if (!item) throw new Error(`Loo ${loo.id} missing from compressed geohash response`);
       expect(Array.isArray(item)).toBe(true);
       expect(item).toHaveLength(3);
 
@@ -341,7 +352,7 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(cachedResponse.status).toBe(200);
-      const cachedBody = await cachedResponse.json();
+      const cachedBody = await readJson<ListBody<CompressedLoo>>(cachedResponse);
       expect(cachedBody).toEqual(body);
     });
 
@@ -390,7 +401,7 @@ describe("Loo read endpoints", () => {
         headers: authHeaders(),
       });
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<ListBody<NearbyLooResponse>>(response);
       expect(body.data.some((entry: { id: string }) => entry.id === near.id)).toBe(true);
       expect(body.data.every((entry: { distance: number }) => entry.distance >= 0)).toBe(true);
     });
@@ -430,11 +441,11 @@ describe("Loo read endpoints", () => {
         { headers: authHeaders() },
       );
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<SearchBody>(response);
       expect(body.page).toBe(1);
       expect(body.pageSize).toBe(2);
       expect(body.hasMore).toBe(true);
-      expect(body.data.map((row: { name: string }) => row.name)).toEqual([
+      expect(body.data.map((row) => row.name)).toEqual([
         makeName("Alpha Searchable"),
         makeName("Bravo Searchable"),
       ]);
@@ -443,7 +454,7 @@ describe("Loo read endpoints", () => {
         `/api/loos/search?search=${suffix}&hasLocation=false&limit=10&page=1`,
         { headers: authHeaders() },
       );
-      const noLocationBody = await noLocationResponse.json();
+      const noLocationBody = await readJson<SearchBody>(noLocationResponse);
       expect(noLocationBody.data.map((row: { id: string }) => row.id)).toContain(noLocation.id);
     });
 
@@ -480,7 +491,7 @@ describe("Loo read endpoints", () => {
         { headers: authHeaders() },
       );
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<LooMetricsResponse>(response);
       expect(body.totals.filtered).toBe(1);
       expect(body.totals.accessible).toBe(1);
       expect(body.totals.babyChange).toBe(1);
@@ -497,7 +508,7 @@ describe("Loo read endpoints", () => {
         console.error("DEBUG METRICS ERROR:", await response.text());
       }
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = await readJson<LooMetricsResponse>(response);
       expect(body.recentWindowDays).toBe(5);
     });
   });
