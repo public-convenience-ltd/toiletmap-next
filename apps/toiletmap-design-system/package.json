@@ -14,9 +14,11 @@
   "devDependencies": {
     "happy-dom": "^20.11.1",
     "preact": "^10.29.8",
+    "typescript": "7.0.2",
     "vitest": "^4.1.10"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
   }
 }
