@@ -1,0 +1,35 @@
+---
+/**
+ * The blog, at /posts (the legacy site's address): published posts, newest first, 20 to a
+ * page; later pages are /posts/page/<n>. Prerendered; the header reads the sign-in state in
+ * the browser.
+ */
+import { getCollection } from "astro:content";
+import PostList from "../../components/PostList/PostList.astro";
+import ContentLayout from "../../layouts/ContentLayout.astro";
+import { paginatePosts, publishedPosts } from "../../utils/content";
+import { RSS_PATH, RSS_TITLE } from "../../utils/rss";
+import { pageTitle } from "../../utils/seo";
+import { BLOG_PATH } from "../../utils/siteNav";
+
+export const prerender = true;
+
+const page = paginatePosts(publishedPosts(await getCollection("posts")), 1);
+---
+
+<ContentLayout
+  title={pageTitle("Blog")}
+  description="News and stories from the Toilet Map: toilets in the news, our data, and the people keeping the map up to date."
+  heading="Toilet Map Blog"
+  canonical={BLOG_PATH}
+  signInReturnTo={BLOG_PATH}
+>
+  <PostList page={page} />
+  <p slot="after" class="blog-feed"><a href={RSS_PATH} type="application/rss+xml">{RSS_TITLE} RSS feed</a></p>
+</ContentLayout>
+
+<style>
+  .blog-feed {
+    margin-block-start: var(--space-l);
+  }
+</style>

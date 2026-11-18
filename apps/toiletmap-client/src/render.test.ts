@@ -171,7 +171,12 @@ describe("Client Worker SSR HTML Render", () => {
         expect(html).toContain("18/11/2026, 00:17");
         expect(html).toContain("15,432");
         expect(html).toContain('href="/dataset/archive/2026-11-17/toilets.csv"');
-        expect(html).toContain("<title>Toilet Map: Our Data</title>");
+        expect(html).toContain("<title>Our Data – Toilet Map</title>");
+        expect(html).toContain(
+          '<link rel="canonical" href="https://www.toiletmap.org.uk/dataset">',
+        );
+        // The site's own header and footer (SiteChrome).
+        expect(html).toMatch(/<footer[\s>]/);
         // Each archive link names its day for screen readers.
         expect(html).toMatch(
           /href="\/dataset\/archive\/2026-11-17\/toilets\.json"[^>]*>\s*JSON<span class="visually-hidden"[^>]*> for 2026-11-17<\/span>/,
@@ -232,6 +237,15 @@ describe("Client Worker SSR HTML Render", () => {
         ctx,
       );
       expect(file.status).toBe(503);
+
+      // The legacy dataset explorer now lands on this real page.
+      const explorer = await worker.fetch(
+        new Request("http://localhost:4321/explorer/search?q=x"),
+        baseBindings,
+        ctx,
+      );
+      expect(explorer.status).toBe(301);
+      expect(explorer.headers.get("location")).toBe("/dataset");
     });
 
     it.skipIf(!distExists)("serves a file from the bucket with its headers", async () => {
@@ -255,6 +269,13 @@ describe("Client Worker SSR HTML Render", () => {
         expect(res.headers.get("content-disposition")).toBe(
           'attachment; filename="toilets-2026-11-18.csv"',
         );
+        // The route's own headers survive the security-header middleware, which adds the rest.
+        expect(res.headers.get("access-control-allow-origin")).toBe("*");
+        expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+        expect(res.headers.get("content-security-policy-report-only")).toContain(
+          "default-src 'self'",
+        );
+        expect(res.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
         const etag = res.headers.get("etag") ?? "";
         const notModified = await worker.fetch(
           new Request("https://www.toiletmap.org.uk/dataset/latest/toilets.csv", {
@@ -275,4 +296,52 @@ describe("Client Worker SSR HTML Render", () => {
       }
     });
   });
+
+  /** GET a path from the built worker with the given ENVIRONMENT var. */
+  const fetchBuilt = async (path: string, environment: string) => {
+    const bindings = {
+      ASSET: { fetch: async () => new Response("Not found", { status: 404 }) },
+      ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+      PUBLIC_API_URL: "https://toiletmap-server.gbtoiletmap.workers.dev",
+      ENVIRONMENT: environment,
+    };
+    Object.assign(workerEnv, bindings);
+    const entry = (await import(/* @vite-ignore */ pathToFileURL(entryPath).href)) as {
+      default: { fetch: (req: Request, env: unknown, ctx: unknown) => Promise<Response> };
+    };
+    return entry.default.fetch(new Request(`http://localhost:4321${path}`), bindings, {
+      waitUntil: () => {
+        /* noop */
+      },
+    });
+  };
+
+  it.skipIf(!distExists)(
+    "the /dev/components kitchen sink is a 404 in production and renders in preview (needs dist/)",
+    async () => {
+      const production = await fetchBuilt("/dev/components", "production");
+      expect(production.status).toBe(404);
+      expect(await production.text()).not.toContain("Every component in");
+
+      const preview = await fetchBuilt("/dev/components", "preview");
+      expect(preview.status).toBe(200);
+      const html = await preview.text();
+      expect(html).toContain("Every component in");
+      expect(html).toContain('<meta name="robots" content="noindex, nofollow">');
+    },
+  );
+
+  it.skipIf(!distExists)(
+    "an unknown path gets the site's own 404 page, with its header (needs dist/)",
+    async () => {
+      const response = await fetchBuilt("/no-such-page", "production");
+      expect(response.status).toBe(404);
+      const html = await response.text();
+      expect(html).toContain("We can't find that page");
+      expect(html).toContain("<title>Page not found – Toilet Map</title>");
+      expect(html).toContain('href="/"');
+      // Not Astro's development 404.
+      expect(html).not.toContain("astro-logo");
+    },
+  );
 });

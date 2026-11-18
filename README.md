@@ -180,21 +180,25 @@ make token-issue                             # issue a test token
 
 ### Deployment
 
+Production deploys automatically when a pull request is merged to `main`
+([.github/workflows/deploy-production.yml](.github/workflows/deploy-production.yml)): production
+migrations first, then the server, then the client, then a smoke check. Workers whose code didn't
+change are skipped. See [docs/deployment.md](docs/deployment.md) for the order, where secrets live,
+rolling back and switching to manual deploys. By hand:
+
 ```bash
 make deploy-server                           # deploys server
 make deploy-client                           # deploys client
 ```
-
-The combined deploy script stops if either worker fails, keeping environments in sync.
 
 #### Database Migrations
 
 Database migrations are automatically deployed via GitHub Actions:
 
 - **Staging**: Push to `postgres-staging` branch → triggers deployment to staging Supabase
-- **Production**: Push to `main` branch → triggers deployment to production Supabase
+- **Production**: Push to `main` branch → the `migrate` job of the production deploy, before either worker deploys
 
-Both workflows can also be manually triggered through GitHub Actions. See [ONBOARDING.md](ONBOARDING.md#migrations) for detailed migration creation and deployment instructions.
+Both can also be triggered by hand from GitHub Actions. See [ONBOARDING.md](ONBOARDING.md#migrations) for detailed migration creation and deployment instructions.
 
 ## Repository Structure (Top Level)
 

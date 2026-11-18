@@ -1,7 +1,7 @@
 import type { JSX } from "preact";
 import { forwardRef } from "preact/compat";
 
-const RadioInput = forwardRef<HTMLInputElement, JSX.HTMLAttributes<HTMLInputElement>>(
+const RadioInput = forwardRef<HTMLInputElement, JSX.InputHTMLAttributes<HTMLInputElement>>(
   function RadioInput(props, ref) {
     return (
       <label>

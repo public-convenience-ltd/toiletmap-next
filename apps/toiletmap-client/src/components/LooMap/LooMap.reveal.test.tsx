@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "preact/hooks";
+import { toast } from "toiletmap-design-system";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LooDetail } from "../../api/loos";
 import LooMap from "./index";
@@ -162,8 +163,14 @@ function mockLayoutRects() {
     }
     if (this.tagName === "SEARCH") return rectOf(12, 12, 388, 56);
     // The freshness notice, visually hidden while a panel is open: a 1px box, bottom left.
-    if (this.classList.contains("map-freshness-notice--in-panel")) return rectOf(12, 767, 1, 1);
+    if (
+      this.classList.contains("map-freshness-notice") &&
+      !this.classList.contains("map-freshness-notice--shown")
+    )
+      return rectOf(12, 767, 1, 1);
     if (this.dataset.testid === "panel") return rectOf(0, 800 - sheetHeight, 412, sheetHeight);
+    // A toast, below the search bar: y 84…128.
+    if (this.classList.contains("toast")) return rectOf(12, 84, 388, 44);
     return ZERO;
   });
 }
@@ -213,6 +220,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  act(() => toast.clear());
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   Reflect.deleteProperty(navigator, "geolocation");
@@ -355,6 +363,19 @@ describe("LooMap keeps the selected marker in view", () => {
     expect(fakeMap.panBy).toHaveBeenCalledWith([0, 224], { animate: false });
   });
 
+  it("keeps a deep-linked toilet clear of the 'changes are live' toast it opens with", async () => {
+    panel.firstLayout = EXPANDED_SHEET;
+    window.history.replaceState(null, "", "/loos/aaa?saved=1");
+    render(<LooMap apiUrl="" initialToiletId="aaa" />);
+    await screen.findByRole("heading", { name: "Toilet aaa" });
+    await screen.findByText("Thanks — your changes are live.");
+    await waitFor(() => expect(fakeMap.panBy).toHaveBeenCalled());
+    await nextFrame();
+    // As above, but the free area starts below the toast: y 188…224 (centre 206).
+    expect(fakeMap.panBy).toHaveBeenCalledTimes(1);
+    expect(fakeMap.panBy).toHaveBeenCalledWith([0, 194], { animate: false });
+  });
+
   it("ignores the freshness notice while it is hidden in the panel (no phantom left inset)", async () => {
     mapState.current = { ...mapState.current, status: "offline" };
     const user = userEvent.setup();
@@ -362,8 +383,9 @@ describe("LooMap keeps the selected marker in view", () => {
     await user.click(screen.getByRole("button", { name: "Marker aaa" }));
     await screen.findByRole("heading", { name: "Toilet aaa" });
     await waitFor(() => expect(fakeMap.panInside).toHaveBeenCalled());
-    const notice = screen.getByRole("status");
-    expect(notice).toHaveClass("map-freshness-notice--in-panel");
+    const notice = document.querySelector(".map-freshness-notice");
+    expect(notice).toHaveAttribute("role", "status");
+    expect(notice).not.toHaveClass("map-freshness-notice--shown");
     expect(notice).not.toHaveAttribute("data-map-control");
     expect(fakeMap.panInside).toHaveBeenLastCalledWith([51.5, -0.1], {
       paddingTopLeft: [SIDE, TOP],

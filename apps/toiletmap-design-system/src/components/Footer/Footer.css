@@ -3,7 +3,8 @@
   padding-inline: var(--safe-left) var(--safe-right);
 }
 
-@media (max-width: 767.98px) {
+/* Where the map takes the whole screen: phones, and short (landscape phone) screens. */
+@media (max-width: 767.98px), (max-height: 500px) {
   .footer--hide-on-mobile {
     display: none;
   }

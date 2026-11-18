@@ -1,0 +1,34 @@
+---
+/**
+ * Map pages (/ and /loos/:id): exactly one screen tall, never scrolling (the map pans
+ * instead). Below 768px the footer is hidden and its links are in the header's menu.
+ * The page's content (the visually hidden h1 and the LooMap island) goes in <main>.
+ */
+import SiteChrome from "../components/SiteChrome/SiteChrome.astro";
+import BaseLayout, { type Props as BaseProps } from "./BaseLayout.astro";
+
+interface Props extends Omit<BaseProps, "bodyClass"> {
+  /** See SiteChrome. By default "Sign in" returns to the toilet or map view on screen. */
+  signInReturnTo?: string | null;
+}
+
+const { signInReturnTo, ...meta } = Astro.props;
+---
+
+<BaseLayout {...meta} bodyClass="map-page">
+	<slot name="head" slot="head" />
+	<SiteChrome map signInReturnTo={signInReturnTo}>
+		<main>
+			<slot />
+		</main>
+	</SiteChrome>
+</BaseLayout>
+
+<style>
+	main {
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+		position: relative;
+	}
+</style>

@@ -19,7 +19,7 @@ export const deepLinkSpot = () => ({
 /** The toilet name heading in the details panel. */
 export const detailsPanelHeading = (page: Page) => page.locator(".toilet-panel h2");
 
-/** The details panel: a bottom sheet below 768px, a floating card from 768px. */
+/** The details panel: a bottom sheet below 768px, a floating card from 768px and on a landscape phone. */
 export const detailsPanel = (page: Page) => page.locator(".toilet-panel");
 
 /** The summary's "Details" toggle (the sheet's drag handle is a separate button). */
@@ -209,6 +209,18 @@ export async function clickMarkerAt(
   page: Page,
   box: { x: number; y: number; width: number; height: number },
 ): Promise<void> {
+  await (await markerAt(page, box)).dispatchEvent("click");
+}
+
+/**
+ * The plain marker drawn where `box` (a marker's bounding box) was, once it is
+ * there: after the panel closes, the marker is redrawn (and the map may still
+ * be settling), so this waits for it rather than measuring too early.
+ */
+export async function markerAt(
+  page: Page,
+  box: { x: number; y: number; width: number; height: number },
+): Promise<Locator> {
   const markers = page.locator("#map .loo-marker");
   const findIndex = () =>
     markers.evaluateAll(
@@ -232,7 +244,7 @@ export async function clickMarkerAt(
       { message: "a marker should be drawn at the toilet's position" },
     )
     .toBeGreaterThanOrEqual(0);
-  await markers.nth(index).dispatchEvent("click");
+  return markers.nth(index);
 }
 
 /**

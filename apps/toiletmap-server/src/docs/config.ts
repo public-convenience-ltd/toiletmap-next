@@ -12,6 +12,8 @@ export const openApiTags = [
     name: "Legacy GraphQL",
     description: "Deprecated read-only compatibility endpoint for the old GraphQL API.",
   },
+  { name: "Feedback", description: "Messages to the Toilet Map team." },
+  { name: "Geocoding", description: "Place and postcode search in Great Britain." },
 ];
 
 export const openApiServers = [

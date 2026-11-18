@@ -2,7 +2,7 @@
 
 .page {
   box-sizing: border-box;
-  max-width: 720px;
+  max-width: var(--toilet-form-max-width, 720px);
   margin: 0 auto;
   padding: var(--space-l) var(--space-m) 0;
   font-family: var(--font-family);
@@ -18,7 +18,7 @@
 .intro {
   margin: 0 0 var(--space-m);
   font-size: var(--text-0);
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
 }
 
 /* What a save will do (goes live / a moderator checks), said once, above the questions. */
@@ -44,7 +44,7 @@
 .outcome:focus-visible {
   outline: 3px solid var(--color-primary-navy);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .alerts:not(:empty),
@@ -61,10 +61,12 @@
   gap: var(--space-m);
 }
 
+/* A visible edge (the light grey alone was 1.1:1 on white) and the DS card elevation. */
 .card {
   background: var(--color-base-white);
-  border: 1px solid var(--color-light-grey);
-  border-radius: 12px;
+  border: 1px solid #d3d6e4;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
   padding: var(--space-m);
   min-width: 0;
 }
@@ -98,7 +100,7 @@
 
 .hint {
   font-size: var(--text--1);
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
   margin: 0 0 var(--space-s);
 }
 
@@ -126,7 +128,7 @@
   display: block;
   font-size: var(--text--1);
   font-weight: 600;
-  color: var(--color-accent-pink);
+  color: var(--color-text-error);
   margin-top: var(--space-2xs);
 }
 
@@ -137,7 +139,7 @@
 .locationField:focus-visible {
   outline: 3px solid var(--color-primary-navy);
   outline-offset: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .triGrid {
@@ -157,29 +159,13 @@
   margin-top: 0;
 }
 
+/* A grid of yes/no questions following others in the same card. */
+.triGridAfter {
+  margin-top: var(--space-s);
+}
+
 .triField {
   min-width: 0;
-}
-
-.linkButton {
-  padding: 0;
-  font: inherit;
-  font-weight: 600;
-  color: var(--color-primary-navy);
-  background: none;
-  border: none;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.linkButton:hover {
-  text-decoration: none;
-}
-
-.linkButton:focus-visible {
-  outline: 2px solid var(--color-primary-navy);
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 
 /* ── Sticky action bar ───────────────────────────────────── */
@@ -198,6 +184,17 @@
   background: var(--color-base-white);
   border-top: 1px solid var(--color-light-grey);
   box-shadow: 0 -4px 16px rgba(10, 22, 94, 0.08);
+}
+
+/*
+ * A phone in landscape is too short to give a sticky bar its 60px: it left about 130px of
+ * form to scroll. There the bar sits at the end of the form instead.
+ */
+@media (max-height: 480px) and (orientation: landscape) {
+  .actionBar {
+    position: static;
+    box-shadow: none;
+  }
 }
 
 /*
@@ -277,6 +274,10 @@
 
 /* ── Outcome (queued / unchanged) ────────────────────────── */
 
+.outcome .heading {
+  margin-bottom: var(--space-s);
+}
+
 .outcomeActions {
   display: flex;
   flex-wrap: wrap;
@@ -285,7 +286,12 @@
 }
 
 .signInPrompt {
-  margin: var(--space-m) 0 0;
+  margin: var(--space-s) 0 0;
+  font-size: var(--text--1);
+  color: var(--color-text-muted);
+}
+
+.signInPrompt a {
   font-weight: 600;
 }
 
@@ -301,45 +307,30 @@
   font-weight: 600;
 }
 
-.bannerActions {
-  margin-top: var(--space-s);
-}
-
-/* ── Discard dialog ──────────────────────────────────────── */
-
-.dialogTitle {
-  font-size: var(--text-1);
-  font-weight: 700;
-  margin: 0 0 var(--space-xs);
-}
-
-.dialogText {
-  margin: 0 0 var(--space-m);
-}
-
-.dialogActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-s);
-}
-
 /* ── Touch targets ───────────────────────────────────────── */
 
 @media (pointer: coarse) {
   .actionBar :global(.button),
-  .outcomeActions :global(.button),
-  .dialogActions :global(.button),
-  .bannerActions :global(.button) {
+  .outcomeActions :global(.button) {
     min-height: 44px;
   }
 
-  .linkButton,
-  .errorList a,
   .signInPrompt a {
     display: inline-block;
     min-height: 44px;
     line-height: 44px;
+  }
+
+  /* An error summary link can run to two lines: kept inline (an inline-block would sit its
+     list bullet on its last line), with a 44px-tall hit area from padding on each line. */
+  .errorList li {
+    padding-block: 10px;
+  }
+
+  .errorList a {
+    display: inline;
+    line-height: 1.5;
+    padding-block: 10px;
   }
 
   /* A 44px-tall hit area around the inline link, without making the notice any taller. */

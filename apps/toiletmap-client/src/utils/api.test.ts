@@ -573,3 +573,191 @@ describe("proxyLegacyGraphqlRequest", () => {
     expect(binding.fetch).not.toHaveBeenCalled();
   });
 });
+
+describe("public feedback endpoint (/api/feedback)", () => {
+  const FEEDBACK_URL = `${ORIGIN}/api/feedback`;
+  const formBody = "text=Great+map&email=&route=Toilet+Map+2.0+Android";
+
+  it("is allow-listed as an exact path only", () => {
+    expect(isAllowedApiPath("/api/feedback")).toBe(true);
+    for (const path of [
+      "/api/feedback/",
+      "/api/feedback/1",
+      "/api/feedbacks",
+      "/api/feedback/../docs",
+      "/api/feedback%2f..",
+    ]) {
+      expect(isAllowedApiPath(path), path).toBe(false);
+    }
+  });
+
+  it("forwards a same-origin browser POST without the access token", async () => {
+    const { binding, calls } = makeBinding(() => new Response('{"ok":true}', { status: 200 }));
+    const body = JSON.stringify({ text: "Great map", route: "/feedback" });
+    const res = await proxyApiRequest({
+      request: new Request(FEEDBACK_URL, {
+        method: "POST",
+        headers: {
+          origin: ORIGIN,
+          "content-type": "application/json",
+          "sec-fetch-site": "same-origin",
+        },
+        body,
+      }),
+      env: envWith(binding),
+      accessToken: "secret",
+      clientIp: "1.2.3.4",
+    });
+
+    expect(res.status).toBe(200);
+    const upstream = calls[0];
+    expect(upstream?.url).toBe("https://toiletmap-server.example.dev/api/feedback");
+    expect(upstream?.method).toBe("POST");
+    expect(upstream?.headers.get("authorization")).toBeNull();
+    expect(upstream?.headers.get("cf-connecting-ip")).toBe("1.2.3.4");
+    expect(await upstream?.text()).toBe(body);
+  });
+
+  it("forwards the Flutter app's form POST, which has no Origin header", async () => {
+    const { binding, calls } = makeBinding(() => new Response('{"ok":true}', { status: 200 }));
+    const res = await proxyApiRequest({
+      request: new Request(FEEDBACK_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded; charset=utf-8",
+          "user-agent": "Dart/3.5 (dart:io)",
+        },
+        body: formBody,
+      }),
+      env: envWith(binding),
+      accessToken: "secret",
+      clientIp: "5.6.7.8",
+    });
+
+    expect(res.status).toBe(200);
+    const upstream = calls[0];
+    expect(upstream?.headers.get("content-type")).toBe(
+      "application/x-www-form-urlencoded; charset=utf-8",
+    );
+    expect(upstream?.headers.get("authorization")).toBeNull();
+    expect(upstream?.headers.get("cf-connecting-ip")).toBe("5.6.7.8");
+    expect(await upstream?.text()).toBe(formBody);
+  });
+
+  it("still rejects cross-origin browser POSTs", async () => {
+    const { binding } = makeBinding();
+    const cases: Record<string, string>[] = [
+      { origin: "https://evil.example" },
+      { origin: "null" },
+      { origin: "http://www.toiletmap.org.uk" },
+      // No Origin, but the browser says it is cross-site or same-site.
+      { "sec-fetch-site": "cross-site" },
+      { "sec-fetch-site": "same-site" },
+    ];
+    for (const extra of cases) {
+      const res = await proxyApiRequest({
+        request: new Request(FEEDBACK_URL, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded", ...extra },
+          body: formBody,
+        }),
+        env: envWith(binding),
+      });
+      expect(res.status, JSON.stringify(extra)).toBe(403);
+    }
+    expect(binding.fetch).not.toHaveBeenCalled();
+  });
+
+  it("allows a missing Origin only for POST to the public path", async () => {
+    const { binding } = makeBinding();
+    const noOrigin = (url: string, method: string) =>
+      proxyApiRequest({
+        request: new Request(url, {
+          method,
+          headers: { "content-type": "application/json" },
+          body: "{}",
+        }),
+        env: envWith(binding),
+        accessToken: "secret",
+      });
+
+    expect((await noOrigin(FEEDBACK_URL, "PUT")).status).toBe(403);
+    expect((await noOrigin(FEEDBACK_URL, "DELETE")).status).toBe(403);
+    expect((await noOrigin(`${ORIGIN}/api/loos`, "POST")).status).toBe(403);
+    expect((await noOrigin(`${ORIGIN}/api/loos/abc/report`, "POST")).status).toBe(403);
+    expect(binding.fetch).not.toHaveBeenCalled();
+  });
+
+  it("allows a missing Origin when the browser reports a same-origin or user-initiated request", async () => {
+    const { binding, calls } = makeBinding();
+    for (const site of ["same-origin", "none"]) {
+      await proxyApiRequest({
+        request: new Request(FEEDBACK_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json", "sec-fetch-site": site },
+          body: "{}",
+        }),
+        env: envWith(binding),
+      });
+    }
+    expect(calls).toHaveLength(2);
+  });
+});
+
+describe("public place search (/api/geocode)", () => {
+  const GEOCODE_URL = `${ORIGIN}/api/geocode?q=Leeds`;
+
+  it("is allow-listed as an exact path only", () => {
+    expect(isAllowedApiPath("/api/geocode")).toBe(true);
+    for (const path of [
+      "/api/geocode/",
+      "/api/geocode/x",
+      "/api/geocoder",
+      "/api/geocode/../docs",
+    ]) {
+      expect(isAllowedApiPath(path), path).toBe(false);
+    }
+  });
+
+  it("forwards a GET with its query string, client IP and cache headers, never the token", async () => {
+    const { binding, calls } = makeBinding(
+      () =>
+        new Response('{"results":[],"attribution":null}', {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "public, max-age=86400",
+          },
+        }),
+    );
+    const res = await proxyApiRequest({
+      request: new Request(GEOCODE_URL, { headers: { accept: "application/json" } }),
+      env: envWith(binding),
+      accessToken: "secret",
+      clientIp: "1.2.3.4",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
+    const upstream = calls[0];
+    expect(upstream?.url).toBe("https://toiletmap-server.example.dev/api/geocode?q=Leeds");
+    expect(upstream?.method).toBe("GET");
+    expect(upstream?.headers.get("authorization")).toBeNull();
+    expect(upstream?.headers.get("cf-connecting-ip")).toBe("1.2.3.4");
+  });
+
+  it.each(["POST", "PUT", "PATCH", "DELETE"])(
+    "refuses %s with 405 without contacting upstream",
+    async (method) => {
+      const { binding, calls } = makeBinding();
+      const res = await proxyApiRequest({
+        request: new Request(GEOCODE_URL, { method, headers: { origin: ORIGIN }, body: "{}" }),
+        env: envWith(binding),
+        accessToken: "secret",
+      });
+      expect(res.status).toBe(405);
+      expect(res.headers.get("allow")).toBe("GET, HEAD");
+      expect(calls).toHaveLength(0);
+    },
+  );
+});

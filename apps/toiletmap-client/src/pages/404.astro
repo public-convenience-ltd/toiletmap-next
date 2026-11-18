@@ -1,0 +1,35 @@
+---
+import { Button } from "toiletmap-design-system";
+import ContentLayout from "../layouts/ContentLayout.astro";
+import { pageTitle } from "../utils/seo";
+
+// The site's own "page not found", in the site layout (not Astro's default page). Unknown
+// paths, unknown toilets (/loos/:id and its edit and report pages), the gated /dev/* pages in
+// production, and anything else Astro can't route land here, with a 404 status.
+Astro.response.status = 404;
+---
+
+<ContentLayout
+  title={pageTitle("Page not found")}
+  description="We can't find that page. Find public toilets near you on the Toilet Map."
+  heading="We can't find that page"
+  noindex
+  signInReturnTo="/"
+>
+  <p>
+    The link may be out of date, or the page or toilet may have been removed. You can find
+    toilets near you on the map.
+  </p>
+  <div class="error-page__actions">
+    <Button htmlElement="a" variant="primary" href="/">Back to the map</Button>
+    <Button htmlElement="a" variant="secondary" href="/loos/add">Add a toilet</Button>
+  </div>
+</ContentLayout>
+
+<style>
+  .error-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+  }
+</style>

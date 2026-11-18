@@ -1,8 +1,9 @@
+/* The same column as the add/edit form (--toilet-form-max-width, the form's side padding). */
 .container {
   box-sizing: border-box;
-  max-width: 680px;
+  max-width: var(--toilet-form-max-width, 720px);
   margin: 0 auto;
-  padding: var(--space-m) var(--space-s) var(--space-xl);
+  padding: var(--space-l) var(--space-m) var(--space-xl);
   color: var(--color-primary-navy);
 }
 
@@ -56,7 +57,7 @@
   box-sizing: border-box;
   padding: var(--space-2xs) var(--space-s);
   border: 1.5px solid rgba(10, 22, 94, 0.3);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--color-base-white);
   font-size: var(--text-0);
   cursor: pointer;
@@ -93,7 +94,7 @@
 }
 
 .cardMeta {
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
   font-size: var(--text--1);
 }
 
@@ -133,7 +134,7 @@
 .explain {
   margin: 0 0 var(--space-m);
   padding: var(--space-s);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--color-light-grey);
   font-size: var(--text-0);
 }
@@ -166,17 +167,32 @@
 .hint {
   margin: 0 0 var(--space-2xs);
   font-size: var(--text--1);
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
 }
 
 .hint p {
   margin: 0 0 var(--space-2xs);
 }
 
+/* The error summary above the form (as on the add and edit forms). */
+.errorSummary {
+  margin-bottom: var(--space-m);
+}
+
+.errorList {
+  margin: var(--space-2xs) 0 0;
+  padding-left: var(--space-m);
+}
+
+.errorList a {
+  color: inherit;
+  font-weight: 600;
+}
+
 .error {
   margin: 0 0 var(--space-2xs);
   font-weight: 700;
-  color: var(--color-accent-pink);
+  color: var(--color-text-error);
 }
 
 /* Never below 16px, so iOS doesn't zoom on focus. */
@@ -219,20 +235,22 @@
   overflow-wrap: anywhere;
 }
 
-.consequence {
-  display: flex;
-  gap: var(--space-2xs);
-  align-items: flex-start;
-  margin: 0 0 var(--space-m);
-  padding: var(--space-s);
-  border-radius: 8px;
-  background: var(--color-frost-ice);
-  font-weight: 600;
-}
-
+.consequence,
+.outcomeNotice,
 .submitError,
 .undoResult {
   margin: 0 0 var(--space-m);
+}
+
+/* Under the outcome's buttons: a quieter line (muted, but 6.46:1), clear of them. */
+.signInPrompt {
+  margin: var(--space-s) 0 0;
+  font-size: var(--text--1);
+  color: var(--color-text-muted);
+}
+
+.signInPrompt a {
+  font-weight: 600;
 }
 
 .submitError:focus,

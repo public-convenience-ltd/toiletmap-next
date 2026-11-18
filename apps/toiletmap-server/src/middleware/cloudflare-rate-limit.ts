@@ -18,6 +18,13 @@ interface CloudflareRateLimitConfig {
   name?: string;
   /** Paths whose "Rate limit exceeded" log must not include the (IP-based) key. */
   omitKeyFromLogs?: (path: string) => boolean;
+  /**
+   * Include the rate-limit key (which usually contains the client IP) in the
+   * "Rate limit exceeded" log line. Default true; false (or a function
+   * returning false for the request) for endpoints that promise never to log
+   * the IP (feedback).
+   */
+  logKey?: boolean | ((c: Context<{ Bindings: Env; Variables: AppVariables }>) => boolean);
 }
 
 const missingBindingsLogged = new Set<CloudflareRateLimitConfig["binding"]>();
@@ -54,6 +61,7 @@ const cloudflareRateLimit = (
     message = "Too many requests, please try again later",
     name = binding,
     omitKeyFromLogs = () => false,
+    logKey = true,
   } = config;
 
   return async (c, next) => {
@@ -81,7 +89,9 @@ const cloudflareRateLimit = (
       if (!success) {
         logger.warn("Rate limit exceeded", {
           rateLimiter: name,
-          ...(omitKeyFromLogs(c.req.path) ? {} : { key }),
+          ...(!omitKeyFromLogs(c.req.path) && (typeof logKey === "function" ? logKey(c) : logKey)
+            ? { key }
+            : {}),
           path: c.req.path,
           method: c.req.method,
         });
@@ -117,6 +127,13 @@ const cloudflareRateLimit = (
 };
 
 /**
+ * `POST /api/feedback` promises never to log the client IP, so the global
+ * read limiter (which also runs for it) leaves its key out there too.
+ */
+const isFeedbackPath = (path: string): boolean =>
+  path === "/api/feedback" || path.startsWith("/api/feedback/");
+
+/**
  * Get client IP from Cloudflare headers
  */
 const getClientIp = (c: Context): string => {
@@ -150,6 +167,7 @@ export const rateLimiters = {
     name: "read",
     // The legacy GraphQL endpoint logs no client IP.
     omitKeyFromLogs: isLegacyGraphqlPath,
+    logKey: (c) => !isFeedbackPath(c.req.path),
   }),
 
   /** Write operations (20 req/min, user or IP-based) */
@@ -169,6 +187,32 @@ export const rateLimiters = {
     keyGenerator: (c) => `write-ip:${getClientIp(c)}`,
     message: "Too many requests, please slow down",
     name: "write-ip",
+  }),
+
+  /**
+   * Public feedback (`POST /api/feedback`): the write binding (20 req/min)
+   * under its own per-IP key, so feedback does not eat into a caller's edit
+   * budget. The key is never logged.
+   */
+  feedback: cloudflareRateLimit({
+    binding: "RATE_LIMIT_WRITE",
+    keyGenerator: (c) => `feedback:${getClientIp(c)}`,
+    message: "Too many messages, please try again in a minute",
+    name: "feedback",
+    logKey: false,
+  }),
+
+  /**
+   * Explicit place searches (`GET /api/geocode` without `mode=suggest`, the
+   * ones that may reach Nominatim): the write binding (20 req/min) under its
+   * own per-IP key, on top of the read limiter. The key is never logged.
+   */
+  geocode: cloudflareRateLimit({
+    binding: "RATE_LIMIT_WRITE",
+    keyGenerator: (c) => `geocode:${getClientIp(c)}`,
+    message: "Too many place searches, please try again in a minute",
+    name: "geocode",
+    logKey: false,
   }),
 
   /** Admin operations (60 req/min, user or IP-based) */

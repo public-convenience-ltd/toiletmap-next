@@ -3,7 +3,8 @@ import { forwardRef } from "preact/compat";
 
 // Shared visual props — separate from element-specific attrs
 interface ButtonBaseProps {
-  variant: "primary" | "secondary";
+  /** "destructive" is a primary action that deletes or discards something (white on red). */
+  variant: "primary" | "secondary" | "destructive";
   children: ComponentChildren;
 }
 
@@ -29,7 +30,7 @@ export type ButtonProps = ButtonElementProps | AnchorElementProps;
 const buttonClass = (variant: string, ...extra: unknown[]) =>
   [
     "button",
-    variant === "secondary" ? "button--secondary" : "",
+    variant === "secondary" || variant === "destructive" ? `button--${variant}` : "",
     ...extra.filter((c): c is string => typeof c === "string"),
   ]
     .filter(Boolean)

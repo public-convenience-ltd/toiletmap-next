@@ -75,8 +75,20 @@ describe("/api/* routing", () => {
     );
     expect(crossSite.status).toBe(403);
 
-    const feedback = await call(new Request(`${ORIGIN}/api/feedback`, { method: "GET" }));
-    expect(feedback.status).toBe(404);
+    const docs = await call(new Request(`${ORIGIN}/api/docs`, { method: "GET" }));
+    expect(docs.status).toBe(404);
     expect(upstream).toHaveLength(1);
+
+    // The public feedback route goes to /api/feedback, not GraphQL, and never gets the token.
+    await call(
+      new Request(`${ORIGIN}/api/feedback`, {
+        method: "POST",
+        headers: { origin: ORIGIN, "content-type": "application/json" },
+        body: '{"text":"Great map"}',
+      }),
+    );
+    expect(upstream).toHaveLength(2);
+    expect(upstream[1]?.url).toBe("https://toiletmap-server.example.dev/api/feedback");
+    expect(upstream[1]?.headers.get("authorization")).toBeNull();
   });
 });

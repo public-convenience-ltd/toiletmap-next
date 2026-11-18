@@ -1,7 +1,7 @@
 import { londonClock } from "@toiletmap/opening-hours";
-import type { ComponentChildren, JSX } from "preact";
-import { useEffect, useId, useRef, useState } from "preact/hooks";
-import { BottomSheet, Button, Icon } from "toiletmap-design-system";
+import type { JSX } from "preact";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { BottomSheet, Button, ConfirmDialog, Notice } from "toiletmap-design-system";
 import { type LooDetail, peekLooDetail } from "../../api/loos";
 import {
   type ChangeOutcome,
@@ -11,6 +11,7 @@ import {
   restoreLoo,
   verifyLoo,
 } from "../../api/reports";
+import { loginHref } from "../../utils/returnTo";
 import {
   directionsUrl,
   distanceText,
@@ -37,7 +38,6 @@ export { freshnessLine, REMOVED_MESSAGE, removalSummary } from "./format";
 export type { Occludes, PanelLayout, PanelMode, PanelState } from "./layout";
 export { VERIFIED_MESSAGE, VERIFY_LABEL } from "./ToiletDetails";
 
-export const SAVED_MESSAGE = "Thanks — your changes are live.";
 export const PENDING_MESSAGE = "You suggested a change to this toilet — it's awaiting review.";
 export const RESTORED_MESSAGE = "Thanks — it's back on the map.";
 export const RESTORE_QUEUED_MESSAGE = "Thanks — a moderator will review your request.";
@@ -79,47 +79,22 @@ function focusReturnTarget(returnFocusTo: HTMLElement | null | undefined) {
 
 type RestoreState = { status: "idle" | "sending" } | { status: "done"; outcome: ChangeOutcome };
 
-type NoticeTone = "success" | "info" | "warning" | "error";
-
-/** One slim notice line in the summary. */
-function NoticeLine({
-  tone,
-  children,
-  action,
-}: {
-  tone: NoticeTone;
-  children: ComponentChildren;
-  action?: ComponentChildren;
-}) {
-  return (
-    <div className={styles.notice} data-tone={tone}>
-      <Icon
-        icon={tone === "success" ? "check" : tone === "info" ? "info" : "warning"}
-        size="small"
-        class={styles.noticeIcon}
-      />
-      <div className={styles.noticeText}>{children}</div>
-      {action}
-    </div>
-  );
-}
-
 export interface ToiletDetailsPanelProps {
   toilet: LooDetail;
   onClose: () => void;
   /** Base URL for API calls; "" (the same-origin /api proxy) by default. */
   apiUrl?: string;
-  /** Optional slim message in the summary (e.g. an offline / stale-data notice). */
-  notice?: ComponentChildren;
+  /**
+   * The map's offline / stale-data message, repeated here while the panel covers the map's
+   * own. Shown, not announced: the map's copy is the live region.
+   */
+  notice?: string;
   /**
    * The toilet is no longer on the map (deleted, or marked inactive since it was opened).
    * Shows a removed notice and hides the directions and edit actions. A toilet whose
    * `active` is false is shown as removed without this.
    */
   removed?: boolean;
-  /** Show the dismissible "your changes are live" notice (after a save, `?saved=1`). */
-  saved?: boolean;
-  onDismissSaved?: () => void;
   /**
    * The viewer's changes go live straight away (signed in with an unexpired session): the
    * restore prompt then says it will be put back at once, and otherwise that a moderator will
@@ -149,14 +124,15 @@ export interface ToiletDetailsPanelProps {
  *   the map (less on a short map, so the selected marker always fits above it) and pins only
  *   a compact header (name, distance / open now, Details and Close); the key features,
  *   payment, notices and Directions scroll, first, with the details.
- * - From 768px: a floating card on the left, under the search bar, scrolling inside.
+ * - From 768px, and on a phone in landscape (600px wide or more, at most 500px tall): a
+ *   floating card on the left, under the search bar, scrolling inside.
  *
  * Close (the X) always closes. Escape inside the panel collapses the details first, then
  * closes; dragging the sheet's handle down does the same. Focus moves to the heading on open
  * and back to `returnFocusTo` (or the search box) on close.
  *
- * On short screens (a phone in landscape, ≥768px wide but ≤560px tall) the card scrolls as a
- * whole, so its summary, notices and actions can't be squeezed out of reach.
+ * On short screens (a phone in landscape, at most 560px tall) the card scrolls as a whole, so
+ * its summary, notices and actions can't be squeezed out of reach.
  *
  * Positions itself absolutely: render it directly inside the (positioned) map container.
  */
@@ -166,8 +142,6 @@ export default function ToiletDetailsPanel({
   apiUrl = "",
   notice,
   removed = false,
-  saved = false,
-  onDismissSaved,
   canWriteDirectly = false,
   userLocation = null,
   returnFocusTo,
@@ -203,7 +177,6 @@ export default function ToiletDetailsPanel({
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreDetails, setRestoreDetails] = useState("");
   const [pending, setPending] = useState<PendingChange | null>(() => readPendingChange(toilet.id));
-  const restoreHeadingRef = useRef<HTMLHeadingElement>(null);
   const restoreResultRef = useRef<HTMLDivElement>(null);
   const restoreActionRef = useRef<HTMLDivElement>(null);
 
@@ -234,7 +207,9 @@ export default function ToiletDetailsPanel({
 
   // In the sheet the Details toggle moves between the pinned header (expanded) and the
   // summary's actions (collapsed): when it had focus, focus follows it to its new place.
-  useEffect(() => {
+  // A layout effect, so it happens with the re-render, not after the next paint: by then the
+  // user may have moved focus on (into the search box), and it mustn't be pulled back.
+  useLayoutEffect(() => {
     if (!focusToggleRef.current) return;
     focusToggleRef.current = false;
     detailsToggleRef.current?.focus({ preventScroll: true });
@@ -259,10 +234,6 @@ export default function ToiletDetailsPanel({
     stripRestoreParam();
     if (canRestore) setRestoreOpen(true);
   }, []);
-
-  useEffect(() => {
-    if (restoreOpen) restoreHeadingRef.current?.focus();
-  }, [restoreOpen]);
 
   useEffect(() => {
     if (restore.status === "done") restoreResultRef.current?.focus();
@@ -324,8 +295,8 @@ export default function ToiletDetailsPanel({
     }
   };
 
-  const onRestore = async (event: Event) => {
-    event.preventDefault();
+  /** The restore dialog's confirm: busy until the request settles, then closed. */
+  const onRestore = async () => {
     if (restore.status === "sending") return;
     setRestore({ status: "sending" });
     const result = await restoreLoo(apiUrl, toilet.id, {
@@ -334,19 +305,19 @@ export default function ToiletDetailsPanel({
     });
     if (result.kind === "applied") {
       setLocal({ base: toilet, value: { ...current, ...result.loo } });
-      setRestoreOpen(false);
     } else if (result.kind === "queued") {
       rememberPendingChange(toilet.id, "restore", result.pendingId);
       setPending(readPendingChange(toilet.id));
+    }
+    // Done (or nothing to do): close the dialog and say so in the panel. A failure keeps it
+    // open with the error, so it can be tried again.
+    if (result.kind === "applied" || result.kind === "queued" || result.kind === "notRemoved") {
       setRestoreOpen(false);
     }
     setRestore({ status: "done", outcome: result });
   };
 
-  const openRestore = () => {
-    setExpanded(true);
-    setRestoreOpen(true);
-  };
+  const openRestore = () => setRestoreOpen(true);
 
   const cancelRestore = () => {
     setRestoreOpen(false);
@@ -359,23 +330,28 @@ export default function ToiletDetailsPanel({
     restore.status === "done" &&
     (restore.outcome.kind === "applied" || restore.outcome.kind === "queued");
 
-  const showSaved = saved && !isRemoved;
   const showPending =
     !!pending && !(restore.status === "done" && restore.outcome.kind === "queued");
 
   const restoreResult = (() => {
     if (restore.status !== "done") return null;
     const r = restore.outcome;
+    const line = (tone: "success" | "info" | "warning" | "error", body: JSX.Element | string) => (
+      <Notice tone={tone} size="compact" announce="off">
+        {body}
+      </Notice>
+    );
     switch (r.kind) {
       case "applied":
-        return <NoticeLine tone="success">{RESTORED_MESSAGE}</NoticeLine>;
+        return line("success", RESTORED_MESSAGE);
       case "queued":
-        return <NoticeLine tone="success">{RESTORE_QUEUED_MESSAGE}</NoticeLine>;
+        return line("success", RESTORE_QUEUED_MESSAGE);
       case "notRemoved":
-        return <NoticeLine tone="info">It's already back on the map.</NoticeLine>;
+        return line("info", "It's already back on the map.");
       case "conflict":
-        return (
-          <NoticeLine tone="warning">
+        return line(
+          "warning",
+          <>
             Someone else changed this toilet since you opened it.{" "}
             <button
               type="button"
@@ -385,86 +361,67 @@ export default function ToiletDetailsPanel({
               Reload
             </button>{" "}
             to see the latest version.
-          </NoticeLine>
+          </>,
         );
       case "notFound":
-        return (
-          <NoticeLine tone="error">
-            We couldn't find this toilet — it may have been deleted.
-          </NoticeLine>
-        );
+        return line("error", "We couldn't find this toilet — it may have been deleted.");
       case "auth":
-        return (
-          <NoticeLine tone="error">
-            Your sign-in has expired.{" "}
-            <a href={`/auth/login?returnTo=${encodeURIComponent(`${looHref}?restore=1`)}`}>
-              Sign in again
-            </a>{" "}
+        return line(
+          "error",
+          <>
+            Your sign-in has expired. <a href={loginHref(`${looHref}?restore=1`)}>Sign in again</a>{" "}
             to restore it.
-          </NoticeLine>
+          </>,
         );
       case "rateLimited":
-        return (
-          <NoticeLine tone="error">
-            You've sent a lot of requests in a short time. Please try again later.
-          </NoticeLine>
+        return line(
+          "error",
+          "You've sent a lot of requests in a short time. Please try again later.",
         );
       case "error":
-        return <NoticeLine tone="error">{r.message}</NoticeLine>;
+        return line("error", r.message);
       default:
         return null;
     }
   })();
 
+  /** The result in the panel once the dialog has closed; while it is open, in the dialog. */
+  const panelRestoreResult = restoreOpen ? null : restoreResult;
+
   const notices =
-    notice || isRemoved || showSaved || showPending || restoreResult ? (
+    notice || isRemoved || showPending || panelRestoreResult ? (
       <div className={styles.notices}>
         {isRemoved && (
-          <div role="status">
-            <NoticeLine tone="warning">
-              <p className={styles.noticeParagraph}>{summary ?? `${REMOVED_MESSAGE}.`}</p>
-              {duplicateOf && (
-                <p className={styles.noticeParagraph}>
-                  <a href={`/loos/${encodeURIComponent(duplicateOf)}`}>
-                    See the toilet it duplicates
-                  </a>
-                </p>
-              )}
-            </NoticeLine>
-          </div>
+          <Notice tone="warning" size="compact">
+            <p>{summary ?? `${REMOVED_MESSAGE}.`}</p>
+            {duplicateOf && (
+              <p>
+                <a href={`/loos/${encodeURIComponent(duplicateOf)}`}>
+                  See the toilet it duplicates
+                </a>
+              </p>
+            )}
+          </Notice>
         )}
-        {restoreResult && (
+        {panelRestoreResult && (
+          // The focus target after a restore, and the live region that announces its result.
           <div ref={restoreResultRef} tabIndex={-1} role="status" className={styles.focusTarget}>
-            {restoreResult}
-          </div>
-        )}
-        {showSaved && (
-          <div role="status">
-            <NoticeLine
-              tone="success"
-              action={
-                onDismissSaved && (
-                  <button
-                    type="button"
-                    className={styles.noticeDismiss}
-                    aria-label="Dismiss message"
-                    onClick={onDismissSaved}
-                  >
-                    <Icon icon="xmark" size="small" />
-                  </button>
-                )
-              }
-            >
-              {SAVED_MESSAGE}
-            </NoticeLine>
+            {panelRestoreResult}
           </div>
         )}
         {showPending && (
-          <div role="status">
-            <NoticeLine tone="info">{PENDING_MESSAGE}</NoticeLine>
+          <Notice tone="info" size="compact">
+            {PENDING_MESSAGE}
+          </Notice>
+        )}
+        {notice && (
+          // The map's own copy is the live region; this one is only shown.
+          <div aria-hidden="true">
+            <Notice tone="warning" size="compact" announce="off">
+              {notice}
+            </Notice>
           </div>
         )}
-        {notice && <div className={styles.noticeSlot}>{notice}</div>}
       </div>
     ) : null;
 
@@ -477,66 +434,53 @@ export default function ToiletDetailsPanel({
       </div>
     ) : null;
 
-  const restorePrompt =
-    canRestore && restoreOpen ? (
-      <form
-        className={styles.restorePrompt}
-        onSubmit={onRestore}
-        aria-labelledby={`${uid}-restore-heading`}
-      >
-        <h3
-          id={`${uid}-restore-heading`}
-          className={styles.sectionHeading}
-          tabIndex={-1}
-          ref={restoreHeadingRef}
-        >
-          Is it still here?
-        </h3>
-        <p className={styles.restoreText}>
-          {canWriteDirectly
-            ? `If ${current.name?.trim() || "this toilet"} is still here and open to the public, it will go back on the map straight away.`
-            : `If ${current.name?.trim() || "this toilet"} is still here and open to the public, tell us and a moderator will check before it goes back on the map.`}
-        </p>
-        {/* A signed-in user's restore is applied straight away and the server ignores
-            its details. Known trade-off: a blocked user (or a session that expired
-            after render) looks signed in here, so their restore is queued with
-            no note; the server's 202 still shows the queued message. */}
-        {!canWriteDirectly && (
-          <>
-            <label htmlFor={`${uid}-restore-details`} className={styles.restoreLabel}>
-              Anything we should know? (optional)
-            </label>
-            <textarea
-              id={`${uid}-restore-details`}
-              className={`text-area ${styles.restoreTextarea}`}
-              rows={3}
-              maxLength={2000}
-              value={restoreDetails}
-              onInput={(e) => setRestoreDetails((e.currentTarget as HTMLTextAreaElement).value)}
-            />
-          </>
-        )}
-        <div className={styles.detailActions}>
-          <Button
-            htmlElement="button"
-            type="submit"
-            variant="primary"
-            disabled={restore.status === "sending"}
-          >
-            {restore.status === "sending" ? "Sending…" : "Restore it"}
-          </Button>
-          <Button
-            htmlElement="button"
-            type="button"
-            variant="secondary"
-            onClick={cancelRestore}
-            disabled={restore.status === "sending"}
-          >
-            Cancel
-          </Button>
-        </div>
-      </form>
-    ) : null;
+  const restoreName = current.name?.trim() || "this toilet";
+  const restoreDialog = canRestore ? (
+    <ConfirmDialog
+      open={restoreOpen}
+      class={styles.panel}
+      title="Is it still here?"
+      initialFocus="title"
+      confirmLabel="Restore it"
+      busyLabel="Sending…"
+      onConfirm={onRestore}
+      onCancel={cancelRestore}
+      extra={
+        <>
+          {restoreResult && (
+            <div role="alert" className={styles.restoreField}>
+              {restoreResult}
+            </div>
+          )}
+          {/* A signed-in user's restore is applied straight away and the server ignores its
+              details. Known trade-off: a blocked user (or a session that expired after render)
+              looks signed in here, so their restore is queued with no note; the server's 202
+              still shows the queued message. */}
+          {!canWriteDirectly && (
+            <div className={styles.restoreField}>
+              <label htmlFor={`${uid}-restore-details`} className={styles.restoreLabel}>
+                Anything we should know? (optional)
+              </label>
+              <textarea
+                id={`${uid}-restore-details`}
+                className={`text-area ${styles.restoreTextarea}`}
+                rows={3}
+                maxLength={2000}
+                value={restoreDetails}
+                onInput={(e) => setRestoreDetails((e.currentTarget as HTMLTextAreaElement).value)}
+              />
+            </div>
+          )}
+        </>
+      }
+    >
+      <p className={styles.restoreText}>
+        {canWriteDirectly
+          ? `If ${restoreName} is still here and open to the public, it will go back on the map straight away.`
+          : `If ${restoreName} is still here and open to the public, tell us and a moderator will check before it goes back on the map.`}
+      </p>
+    </ConfirmDialog>
+  ) : null;
 
   const summaryView = (
     <ToiletSummary
@@ -569,7 +513,6 @@ export default function ToiletDetailsPanel({
       verify={verify}
       onVerify={onVerify}
       verifiedAt={verify.status === "done" ? verify.verifiedAt : current.verifiedAt}
-      restorePrompt={restorePrompt}
     />
   ) : null;
 
@@ -587,6 +530,7 @@ export default function ToiletDetailsPanel({
       >
         {summaryView}
         {detailsView}
+        {restoreDialog}
       </BottomSheet>
     );
   }
@@ -602,6 +546,7 @@ export default function ToiletDetailsPanel({
     >
       {summaryView}
       {detailsView && <div className={styles.cardBody}>{detailsView}</div>}
+      {restoreDialog}
     </section>
   );
 }

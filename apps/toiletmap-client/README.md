@@ -4,12 +4,12 @@ The public-facing frontend for the Toilet Map, built with Astro and Preact.
 
 ## Stack
 
-- **Framework**: [Astro](https://astro.build) 5.x (SSR mode)
+- **Framework**: [Astro](https://astro.build) 7.x (SSR mode)
 - **UI Library**: [Preact](https://preactjs.com) (client-side hydration)
 - **Deployment**: Cloudflare Workers
 - **Styling**: CSS Modules
 - **Map**: [Leaflet](https://leafletjs.com/) with [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) for marker clustering
-- **Caching**: [idb-keyval](https://github.com/jakearchibald/idb-keyval) for IndexedDB storage
+- **Caching**: [idb-keyval](https://github.com/jakearchibald/idb-keyval) keeps the map dataset in IndexedDB
 
 ## Architecture
 
@@ -27,8 +27,9 @@ same-origin requests to `/api/*` on this worker, handled by the proxy in
 [src/pages/api/[...path].ts](src/pages/api/[...path].ts) (logic in
 [src/utils/api.ts](src/utils/api.ts) `proxyApiRequest`):
 
-- Only allow-listed paths are forwarded: `/api/loos` and `/api/loos/*` (the only
-  endpoints browser code calls). Anything else (e.g. the server's `/api/docs`
+- Only allow-listed paths are forwarded: `/api/loos` and `/api/loos/*`, `POST
+  /api/feedback` and `GET /api/geocode` (the endpoints browser code calls; other
+  methods on `/api/geocode` get a 405). Anything else (e.g. the server's `/api/docs`
   Swagger UI) gets a 404 JSON response. Paths containing dot segments, encoded
   slashes/backslashes (`%2f`, `%5c`), backslashes or `//` are rejected. When the
   browser starts calling a new endpoint, add its prefix to `ALLOWED_API_PREFIXES`
@@ -56,8 +57,8 @@ same-origin requests to `/api/*` on this worker, handled by the proxy in
   limiting. Bodies are capped at 64 KiB while they are read (chunked bodies
   included), and the proxy's own `405`/`413` errors carry
   `access-control-allow-origin: *`. `/api/feedback` and every other path keep the
-  rules above, so the Flutter app's `POST /api/feedback` is a `404`: a known
-  cutover blocker (see the server README, "Legacy GraphQL compatibility endpoint").
+  rules above (the Flutter app's `POST /api/feedback` goes through the public
+  feedback route, not GraphQL).
 
 Pages therefore pass `apiUrl=""` to islands, and `getApiUrl("", path)` from
 [src/api/config.ts](src/api/config.ts) yields relative URLs. Server-side (SSR)
@@ -70,6 +71,12 @@ fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
 - `GET /api/loos/updates?since=…` - Incremental changes since a timestamp
 - `GET /api/loos/:id` - Fetches detailed information for a specific loo
 - `POST /api/loos`, `PUT /api/loos/:id` - Create / update a loo
+- `GET /api/geocode?q=…` - Place and postcode search for the map and location picker
+  search boxes. The server asks postcodes.io, then OpenStreetMap's Nominatim (GB only,
+  throttled and cached), so the browser never calls a geocoder itself; results from
+  Nominatim are shown with OpenStreetMap's credit. Typing only looks postcodes up
+  (`&mode=suggest`, never Nominatim, whose policy forbids autocomplete); place names are
+  searched on Enter
 
 ### Routes
 
@@ -79,22 +86,65 @@ fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
 - `/loo/*` - legacy aliases, 301-redirected to `/loos/*` (query string preserved)
 - `/dataset` - the open dataset page: downloads, fields, CC BY 4.0 licence
 - `/dataset/latest/*`, `/dataset/archive/YYYY-MM-DD/*` - the export files (`toilets.json`, `toilets.csv`, `manifest.json`), streamed from the `EXPORTS` R2 bucket with ETag/304 and caching headers. The bucket is bound in `env.production` only: in dev and preview the page says downloads are live-site only and the files answer 503. See [the server's dataset export doc](../toiletmap-server/docs/operations/dataset-export.md).
+- `/map/:lng/:lat`, `/explorer/*`, `/login`, `/api/auth/*`, `/api/admin`,
+  `/api/decap-oauth/*` - the legacy site's URLs, 301-redirected (`?lat&lng` map view,
+  `/dataset`, `/auth/*`, `/cms/`); the table is in [docs/security.md](docs/security.md)
+- `/auth/login?returnTo=<path>`, `/auth/callback`, `/auth/logout`, `/auth/error` - sign-in,
+  back to a same-origin path, with friendly error pages
+- `/feedback` - message to the team (`POST /api/feedback` through the proxy; the email is
+  optional). `?loo=<id>` makes it about one toilet ("Report a problem → Something else"
+  links there) and stores `/loos/<id>` as the message's `route`. Works without JavaScript:
+  the form posts to the page itself, which redirects to `?sent=1` on success
+- `/about`, `/contact`, `/privacy`, `/app`, `/app/privacy` - text pages from
+  `src/content/pages/*.md` (prerendered; `/app/privacy` is the app's store-listed policy)
+- `/posts`, `/posts/<slug>` (the legacy slugs), `/posts/page/<n>` past 20 posts - the blog,
+  from `src/content/posts/*.md` (prerendered). Uploads live at `/images/uploads/*`
+- `/cms/` - Sveltia CMS for the pages and posts (noindex), signing in with GitHub through
+  `/api/cms-oauth/*`; see [docs/cms.md](docs/cms.md)
+- `/sitemap.xml` (and `/sitemap-<n>.xml` chunks past 45,000 URLs), `/robots.txt`,
+  `/posts/rss.xml` - SEO endpoints; see [Layouts, meta and SEO](#layouts-meta-and-seo)
+- any unknown path or toilet - the site's 404 page (`src/pages/404.astro`, real 404 status);
+  unhandled errors - the prerendered 500 page (`src/pages/500.astro`)
+
+### Layouts, meta and SEO
+
+- `layouts/BaseLayout.astro` - the document and `<head>`: `title`, `description`,
+  `canonical` (defaults to the page's path on `site`), `image`, `ogType`, `noindex`,
+  `nofollow`, `jsonLd` (escaped by `serializeJsonLd`), plus a `head` slot. Preview and
+  development deployments (`ENVIRONMENT`) are always `noindex, nofollow`.
+- `layouts/MapLayout.astro` - map pages: one screen tall, no scrolling.
+- `layouts/ContentLayout.astro` - text pages in the design system's `.prose` column
+  (`Prose` in toiletmap-design-system), with `heading` and `before`/`after` slots.
+- `components/SiteChrome/` - the header and footer for every page; the nav is defined once
+  in `utils/siteNav.ts`. On prerendered pages the header reads the sign-in cookie in the
+  browser.
+- `/loos/:id` fetches the toilet on the server (`utils/looPage.ts`): unknown or invalid ids
+  are a 404; removed toilets are a 200 with `noindex` (the panel explains and offers restore,
+  so old links keep working); active ones get a title, description, canonical and schema.org
+  `PublicToilet` JSON-LD (`utils/looSeo.ts`).
+- `site` in `astro.config.ts` is `SITE_URL` or `https://www.toiletmap.org.uk`. robots.txt
+  disallows `/cms`, `/auth`, `/api`, `/dev` and the contribution forms in production and
+  everything on previews. The sitemap lists the fixed pages, the `pages` and `posts`
+  collections (`src/content.config.ts`) and every active toilet from `/api/loos/dump`
+  (503 with `Retry-After` when the API is down).
+
+### Security headers
+
+Every response carries HSTS (production), `nosniff`, `Referrer-Policy`, `Permissions-Policy`
+(geolocation for this origin only), `X-Frame-Options: DENY`, COOP and a Content Security
+Policy (report-only for now; violations are logged via `/api/csp-report`): from
+`src/middleware.ts` for worker responses and from the generated `_headers` for static
+assets. See [docs/security.md](docs/security.md).
 
 ### Caching Strategy
 
-The application implements a two-tier caching approach using IndexedDB:
+1. **Map dataset** (IndexedDB, persistent): the compressed list from `/api/loos/dump` in one
+   versioned record (`loos-cache-v2`), kept current with `/api/loos/updates?since=<cursor>`
+   and shared between tabs. See [src/api/mapCache.ts](src/api/mapCache.ts).
+2. **Loo details** (in memory only, up to 200): revalidated with `If-None-Match`, so a reload
+   starts empty. See [src/api/loos.ts](src/api/loos.ts).
 
-1. **Loos List Cache** (1-hour TTL)
-   - Caches the compressed list of all loos
-   - Reduces network requests and improves initial load time
-   - Keys: `loos-cache`, `loos-cache-time`
-
-2. **Individual Loo Details Cache** (persistent)
-   - Caches detailed loo information by ID
-   - Cache-first strategy: checks cache before fetching from API
-   - Key: `loos-detail-cache`
-
-All cache keys are centralized in [src/api/constants.ts](src/api/constants.ts).
+Cache keys are in [src/api/constants.ts](src/api/constants.ts).
 
 ## Environment Variables
 
@@ -119,6 +169,22 @@ The base URL for the toiletmap-server API.
    `wrangler.jsonc`) takes precedence over `PUBLIC_API_URL`. The binding only
    exists in a build made with `CLOUDFLARE_ENV=production` (see
    [Deploy](#deploy)).
+
+### `PLAUSIBLE_DOMAIN` (optional, off by default)
+
+The site domain to count pageviews under in [Plausible](https://plausible.io). A plain var
+(not a secret), unset everywhere today. When set (in `env.production.vars` in
+`wrangler.jsonc`), pages load the script from our own origin (`/js/p.js`) and send events to
+our `/api/event`, which forwards them to plausible.io; when unset, nothing is rendered and
+both routes 404. See [docs/analytics.md](docs/analytics.md) for what is and isn't tracked
+(GPC / Do Not Track are honoured) and the privacy policy wording it needs.
+
+### `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (optional, unset today)
+
+The GitHub OAuth app the CMS signs in with (worker secrets). Until both are set,
+`/api/cms-oauth/auth` and `/api/cms-oauth/callback` answer 503 "CMS sign-in isn't configured
+yet" and `/cms/` says so. [docs/cms.md](docs/cms.md) explains how to create the app (callback
+URL `https://www.toiletmap.org.uk/api/cms-oauth/callback`) and set them.
 
 ## Development
 
@@ -213,11 +279,14 @@ and check the output lists `env.API (toiletmap-server)` and `env.EXPORTS (toilet
 > deploy. Dry-runs and preview deploys do not need it. See
 > [the dataset export runbook](../toiletmap-server/docs/operations/dataset-export.md#owner-setup-once).
 
-Per-branch previews (`.github/workflows/deploy-preview.yml`) use a plain
-`pnpm build` and `wrangler deploy --env preview --name <branch>-toiletmap-client`
-with `--var` overrides; that works because a plain build has no target
-environment and no service binding (previews reach their branch server over
-`PUBLIC_API_URL`).
+Per-branch previews (`.github/workflows/deploy-preview.yml`) use
+`pnpm build:preview` and `wrangler deploy --env preview --name <branch>-toiletmap-client`
+with `--var` overrides (the preview env has no service binding either; previews
+reach their branch server over `PUBLIC_API_URL`). It has to be the preview build,
+not a plain `pnpm build`: prerendered pages (about, privacy, posts, ...) take
+`ENVIRONMENT` at build time, and only `env.preview` sets it to `preview`, which
+makes them `noindex`. The `--var` flags reach server-rendered pages only. The
+workflow checks the built `about.html` carries the noindex tag before deploying.
 
 ## Project Structure
 
@@ -229,8 +298,9 @@ src/
 │   └── loos.ts       # Loo-related API functions
 ├── assets/           # Static assets (images, SVGs)
 ├── components/       # Preact components
-│   └── LooMap.tsx    # Main map component with clustering
-├── layouts/          # Astro layout components
+│   └── LooMap/       # Main map component with clustering
+├── content/          # Markdown content collections (posts, pages; schema in content.config.ts)
+├── layouts/          # BaseLayout, MapLayout, ContentLayout
 ├── pages/            # Astro pages (routes)
 │   └── index.astro   # Homepage with map
 └── env.d.ts          # TypeScript environment definitions

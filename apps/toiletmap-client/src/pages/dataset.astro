@@ -1,30 +1,18 @@
 ---
 import { env } from "cloudflare:workers";
-import { Footer, Header } from "toiletmap-design-system";
-import logo from "../assets/logo.svg?url";
-import Layout from "../layouts/Layout.astro";
+import ContentLayout from "../layouts/ContentLayout.astro";
 import { formatMegabytes, formatUkDateTime, readDatasetManifest } from "../utils/dataset";
-import { loginHref } from "../utils/returnTo";
+import { DATASET_PATH } from "../utils/legacyRedirects";
+import { pageTitle } from "../utils/seo";
 
 /**
  * The open dataset: downloads (from the EXPORTS bucket's manifest), the
  * fields, and the licence. Copy and licence wording ported from the legacy
  * /dataset page. Downloads exist on the production worker only; elsewhere
- * the page says so.
+ * the page says so. A text page (ContentLayout): the site header and footer,
+ * one scrolling prose column.
  */
 export const prerender = false;
-
-const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
-const navLinks = [
-  { href: "/about", label: "About" },
-  { href: "/blog", label: "Blog" },
-  { href: "/contact", label: "Contact" },
-  { href: "/feedback", label: "Feedback" },
-  { href: "/loos/add", label: "Add a Toilet", button: true },
-  isAuthenticated
-    ? { href: "/auth/logout", label: "Sign out" }
-    : { href: loginHref(Astro.url.pathname), label: "Sign in" },
-];
 
 const result = await readDatasetManifest(env.EXPORTS);
 const manifest = result.status === "ok" ? result.manifest : null;
@@ -89,181 +77,182 @@ const fields: Array<{ name: string; type: string; meaning: string }> = [
 ];
 ---
 
-<Layout title="Toilet Map: Our Data">
-  <Header client:load logoSrc={logo} navLinks={navLinks} />
-  <main class="dataset">
-    <article class="dataset__article">
-      <h1>Toilet Data</h1>
-
-      <section aria-labelledby="download-a-copy">
-        <h2 id="download-a-copy">Download a copy</h2>
-        {
-          manifest && json && csv ? (
-            <>
-              <p class="dataset__buttons">
-                <a class="button" href={`/dataset/${json.key}`} data-dataset-download="json">
-                  JSON ({formatMegabytes(json.size)})
-                </a>
-                <a class="button" href={`/dataset/${csv.key}`} data-dataset-download="csv">
-                  CSV ({formatMegabytes(csv.size)})
-                </a>
-              </p>
-              <p data-dataset-updated>
-                Last updated on <strong>{formatUkDateTime(manifest.generatedAt)}</strong>.{" "}
-                {manifest.rowCount.toLocaleString("en-GB")} toilets.
-              </p>
-              <p>
-                A new copy is published every day shortly after midnight (UTC). Each download
-                link always points at the latest copy. The{" "}
-                <a href="/dataset/latest/manifest.json">manifest</a> lists each file's size and
-                SHA-256 checksum, and the credit line to use. Only active toilets are included;
-                removed ones are left out.
-              </p>
-            </>
-          ) : result.status === "missing" ? (
-            <p class="dataset__notice" data-dataset-unavailable>
-              The data hasn't been published yet. Please check back tomorrow.
-            </p>
-          ) : result.status === "error" || result.status === "ok" ? (
-            <p class="dataset__notice" data-dataset-unavailable>
-              Downloads are temporarily unavailable. Please try again later.
-            </p>
-          ) : (
-            <p class="dataset__notice" data-dataset-unavailable>
-              Data downloads are only available on the live site, at{" "}
-              <a href="https://www.toiletmap.org.uk/dataset">www.toiletmap.org.uk/dataset</a>.
-            </p>
-          )
-        }
-      </section>
-
-      {
-        archives.length > 0 && (
-          <section aria-labelledby="archive">
-            <h2 id="archive">Daily archive</h2>
-            <p>
-              One copy is kept for each day, at{" "}
-              <code>/dataset/archive/YYYY-MM-DD/toilets.json</code> (or <code>.csv</code>).
-              {manifest && manifest.archives.length > ARCHIVES_SHOWN
-                ? ` The ${ARCHIVES_SHOWN} most recent days are listed here.`
-                : ""}
-            </p>
-            <ul class="dataset__archives">
-              {archives.map((date) => (
-                <li>
-                  <span>{date}</span>{" "}
-                  <a href={`/dataset/archive/${date}/toilets.json`}>
-                    JSON<span class="visually-hidden"> for {date}</span>
-                  </a>{" "}
-                  <a href={`/dataset/archive/${date}/toilets.csv`}>
-                    CSV<span class="visually-hidden"> for {date}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )
-      }
-
-      <section aria-labelledby="fields">
-        <h2 id="fields">Fields</h2>
-        <p>
-          Both files hold the same records. Unknown values are <code>null</code> in the JSON and
-          empty cells in the CSV. Dates are ISO 8601 in UTC. In the CSV the header row is plain and
-          every other cell is quoted. A text cell starting with <code>=</code>, <code>+</code>,
-          <code>-</code> or <code>@</code> gets a leading <code>'</code>, so spreadsheets do not run
-          it as a formula. The JSON columns (<code>opening_times</code>, <code>location</code>, <code>areas</code>)
-          hold JSON text.
+<ContentLayout
+  title={pageTitle("Our Data")}
+  description="Download the Toilet Map's open data: every active public toilet in the UK as JSON or CSV, updated daily, under the CC BY 4.0 licence."
+  heading="Toilet Data"
+  canonical={DATASET_PATH}
+>
+  <section class="dataset-section" aria-labelledby="download-a-copy">
+    <h2 id="download-a-copy">Download a copy</h2>
+    {
+      manifest && json && csv ? (
+        <>
+          <p class="dataset__buttons">
+            <a class="button" href={`/dataset/${json.key}`} data-dataset-download="json">
+              JSON ({formatMegabytes(json.size)})
+            </a>
+            <a class="button" href={`/dataset/${csv.key}`} data-dataset-download="csv">
+              CSV ({formatMegabytes(csv.size)})
+            </a>
+          </p>
+          <p data-dataset-updated>
+            Last updated on <strong>{formatUkDateTime(manifest.generatedAt)}</strong>.{" "}
+            {manifest.rowCount.toLocaleString("en-GB")} toilets.
+          </p>
+          <p>
+            A new copy is published every day shortly after midnight (UTC). Each download
+            link always points at the latest copy. The{" "}
+            <a href="/dataset/latest/manifest.json">manifest</a> lists each file's size and
+            SHA-256 checksum, and the credit line to use. Only active toilets are included;
+            removed ones are left out.
+          </p>
+        </>
+      ) : result.status === "missing" ? (
+        <p class="dataset__notice" data-dataset-unavailable>
+          The data hasn't been published yet. Please check back tomorrow.
         </p>
-        <div class="dataset__table-wrapper">
-          <table>
-            <caption class="visually-hidden">Fields in the Toilet Map dataset</caption>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Type</th>
-                <th scope="col">Meaning</th>
-              </tr>
-            </thead>
-            <tbody>
-              {
-                fields.map((field) => (
-                  <tr>
-                    <th scope="row">
-                      <code>{field.name}</code>
-                    </th>
-                    <td>{field.type}</td>
-                    <td>{field.meaning}</td>
-                  </tr>
-                ))
-              }
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="licence" aria-labelledby="licence-info">
-        <h2 id="licence-info">Licence Information</h2>
-        <p>
-          The <strong>Toilet Map</strong> dataset is open data released under the{" "}
-          <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener noreferrer" target="_blank">
-            Creative Commons Attribution 4.0 International&nbsp;(CC&nbsp;BY&nbsp;4.0)
-          </a>{" "}
-          licence.
+      ) : result.status === "error" || result.status === "ok" ? (
+        <p class="dataset__notice" data-dataset-unavailable>
+          Downloads are temporarily unavailable. Please try again later.
         </p>
+      ) : (
+        <p class="dataset__notice" data-dataset-unavailable>
+          Data downloads are only available on the live site, at{" "}
+          <a href="https://www.toiletmap.org.uk/dataset">www.toiletmap.org.uk/dataset</a>.
+        </p>
+      )
+    }
+  </section>
 
-        <h3 id="licence-summary-heading">In short</h3>
-        <div class="dataset__table-wrapper">
-          <table id="licence-summary">
-            <caption class="visually-hidden">Summary of your rights and responsibilities</caption>
-            <thead>
-              <tr>
-                <th scope="col">You may</th>
-                <th scope="col">You must</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Copy, share and redistribute the data in any medium or format.</td>
-                <td>
-                  Give clear credit: “Contains data from the Toilet Map © 2025 –
-                  <abbr title="Creative Commons Attribution 4.0 International">CC BY 4.0</abbr>” —
-                  preferably linking to this page or the licence.
-                </td>
-              </tr>
-              <tr>
-                <td>Adapt it, mash it up, sell it, or even print it on a T-shirt.</td>
-                <td>State if you’ve changed the data.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+  {
+    archives.length > 0 && (
+      <section class="dataset-section" aria-labelledby="archive">
+        <h2 id="archive">Daily archive</h2>
+        <p>
+          One copy is kept for each day, at{" "}
+          <code>/dataset/archive/YYYY-MM-DD/toilets.json</code> (or <code>.csv</code>).
+          {manifest && manifest.archives.length > ARCHIVES_SHOWN
+            ? ` The ${ARCHIVES_SHOWN} most recent days are listed here.`
+            : ""}
+        </p>
+        <ul class="dataset__archives">
+          {archives.map((date) => (
+            <li>
+              <span>{date}</span>{" "}
+              <a href={`/dataset/archive/${date}/toilets.json`}>
+                JSON<span class="visually-hidden"> for {date}</span>
+              </a>{" "}
+              <a href={`/dataset/archive/${date}/toilets.csv`}>
+                CSV<span class="visually-hidden"> for {date}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
       </section>
-    </article>
-  </main>
-  <Footer />
-</Layout>
+    )
+  }
+
+  <section class="dataset-section" aria-labelledby="fields">
+    <h2 id="fields">Fields</h2>
+    <p>
+      Both files hold the same records. Unknown values are <code>null</code> in the JSON and
+      empty cells in the CSV. Dates are ISO 8601 in UTC. In the CSV the header row is plain and
+      every other cell is quoted. A text cell starting with <code>=</code>, <code>+</code>,
+      <code>-</code> or <code>@</code> gets a leading <code>'</code>, so spreadsheets do not run
+      it as a formula. The JSON columns (<code>opening_times</code>, <code>location</code>, <code>areas</code>)
+      hold JSON text.
+    </p>
+    <div class="dataset__table-wrapper">
+      <table>
+        <caption class="visually-hidden">Fields in the Toilet Map dataset</caption>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Type</th>
+            <th scope="col">Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            fields.map((field) => (
+              <tr>
+                <th scope="row">
+                  <code>{field.name}</code>
+                </th>
+                <td>{field.type}</td>
+                <td>{field.meaning}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="licence" class="dataset-section" aria-labelledby="licence-info">
+    <h2 id="licence-info">Licence Information</h2>
+    <p>
+      The <strong>Toilet Map</strong> dataset is open data released under the{" "}
+      <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener noreferrer" target="_blank">
+        Creative Commons Attribution 4.0 International&nbsp;(CC&nbsp;BY&nbsp;4.0)
+      </a>{" "}
+      licence.
+    </p>
+
+    <h3 id="licence-summary-heading">In short</h3>
+    <div class="dataset__table-wrapper">
+      <table id="licence-summary">
+        <caption class="visually-hidden">Summary of your rights and responsibilities</caption>
+        <thead>
+          <tr>
+            <th scope="col">You may</th>
+            <th scope="col">You must</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Copy, share and redistribute the data in any medium or format.</td>
+            <td>
+              Give clear credit: “Contains data from the Toilet Map © 2025 –
+              <abbr title="Creative Commons Attribution 4.0 International">CC BY 4.0</abbr>” —
+              preferably linking to this page or the licence.
+            </td>
+          </tr>
+          <tr>
+            <td>Adapt it, mash it up, sell it, or even print it on a T-shirt.</td>
+            <td>State if you’ve changed the data.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</ContentLayout>
 
 <style>
-  .dataset {
-    padding-block: var(--space-l);
-    /* Clear of the notch in landscape (Layout sets viewport-fit=cover). */
-    padding-inline: max(var(--space-s), var(--safe-left)) max(var(--space-s), var(--safe-right));
+  /*
+   * The prose column (ContentLayout) spaces its direct children; inside each section the
+   * same rhythm is repeated here, with more room above a section than within one.
+   */
+  .dataset-section {
+    margin-block-start: var(--space-l);
   }
 
-  .dataset__article {
-    max-width: 50rem;
-    margin-inline: auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-l);
+  .dataset-section > :global(*) {
+    margin-block: 0;
   }
 
-  .dataset__article h1,
-  .dataset__article h2,
-  .dataset__article h3,
-  .dataset__article p {
-    margin-block: 0 var(--space-s);
+  .dataset-section > :global(* + *) {
+    margin-block-start: var(--prose-flow);
+  }
+
+  .dataset-section > :global(* + h3) {
+    margin-block-start: var(--space-m);
+  }
+
+  .dataset-section > :global(h2 + *),
+  .dataset-section > :global(h3 + *) {
+    margin-block-start: var(--space-2xs);
   }
 
   .dataset__buttons {
@@ -277,7 +266,6 @@ const fields: Array<{ name: string; type: string; meaning: string }> = [
   }
 
   .dataset__archives {
-    margin: 0;
     padding-inline-start: var(--space-m);
     columns: 14rem;
   }
@@ -286,24 +274,18 @@ const fields: Array<{ name: string; type: string; meaning: string }> = [
     margin-inline-start: var(--space-2xs);
   }
 
+  /* A wide table scrolls sideways in its own box, never widening the page. */
   .dataset__table-wrapper {
     overflow-x: auto;
   }
 
-  .dataset table {
-    border-collapse: collapse;
+  /* A real table filling the column (prose tables are display: block, sized to content). */
+  .dataset__table-wrapper table {
+    display: table;
     width: 100%;
   }
 
-  .dataset th,
-  .dataset td {
-    border-bottom: 1px solid var(--color-light-grey);
-    padding: var(--space-2xs) var(--space-xs);
-    text-align: left;
-    vertical-align: top;
-  }
-
-  .dataset code {
+  .dataset-section code {
     overflow-wrap: anywhere;
   }
 </style>
