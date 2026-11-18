@@ -14,10 +14,16 @@ const edgeCache = (): ScriptCache | null => {
   return storage?.default ?? null;
 };
 
+/**
+ * The Cloudflare adapter puts the worker's ExecutionContext on `locals.cfContext`, but the
+ * adapter version in use doesn't declare it on `App.Locals`, so read it through a narrow type.
+ */
+type WithExecutionContext = { cfContext?: { waitUntil(promise: Promise<unknown>): void } };
+
 export const ALL: APIRoute = ({ request, locals }) =>
   proxyPlausibleScript({
     env,
     request,
     cache: edgeCache(),
-    waitUntil: (promise) => locals.cfContext?.waitUntil(promise),
+    waitUntil: (promise) => (locals as WithExecutionContext).cfContext?.waitUntil(promise),
   });
