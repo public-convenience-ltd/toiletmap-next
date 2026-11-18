@@ -68,6 +68,20 @@ describe("saveDraft / loadDraft / clearDraft", () => {
     expect(loadDraft("k")?.requestedView).toBeNull();
   });
 
+  it("remembers a location that was never confirmed, so saving it still asks", () => {
+    const initialForm = formStateFromLoo(loo, "edit");
+    const form = { ...initialForm, location: { lat: 51.6, lng: -0.1 } };
+    saveDraft("k", initialForm, form, loo.updatedAt, { locationUnconfirmed: true });
+    expect(loadDraft("k")?.locationUnconfirmed).toBe(true);
+    saveDraft("k", initialForm, form, loo.updatedAt);
+    expect(loadDraft("k")?.locationUnconfirmed).toBe(false);
+    // Drafts written before the flag existed read as confirmed.
+    const raw = JSON.parse(sessionStorage.getItem("k") ?? "{}");
+    raw.locationUnconfirmed = undefined; // dropped by JSON.stringify
+    sessionStorage.setItem("k", JSON.stringify(raw));
+    expect(loadDraft("k")?.locationUnconfirmed).toBe(false);
+  });
+
   it.each([
     ["not JSON", "{oops"],
     ["wrong version", JSON.stringify({ v: 99 })],

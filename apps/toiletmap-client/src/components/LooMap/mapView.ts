@@ -58,6 +58,20 @@ export function writeMapView(view: MapView, storage: Storage | null = safeLocalS
   }
 }
 
+/** The zoom a pin can be placed at in the add/edit location picker. */
+export const PIN_PLACE_ZOOM = 17;
+/** A main-map view at least this close opens the add form at PIN_PLACE_ZOOM. */
+export const CLOSE_VIEW_ZOOM = 15;
+
+/**
+ * Where the add form's picker opens for a main-map view: a view at zoom 15 or closer is close
+ * enough to be the spot the user meant, so it opens at 17, where the pin can be placed straight
+ * away (and the streets around it are still in view). Further out, the view is used as it is.
+ */
+export function addFormView(view: MapView): MapView {
+  return view.zoom >= CLOSE_VIEW_ZOOM ? { ...view, zoom: PIN_PLACE_ZOOM } : view;
+}
+
 /** `?lat=…&lng=…&zoom=…` from a URL search string (e.g. the "Add a toilet here" link). */
 export function mapViewFromSearch(search: string): MapView | null {
   try {

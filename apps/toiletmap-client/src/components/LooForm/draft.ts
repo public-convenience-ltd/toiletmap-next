@@ -38,10 +38,16 @@ export interface LooDraft {
    * coming back to that same page (after signing in, or a reload) keeps the user's own pin.
    */
   requestedView?: LatLng | null;
+  /**
+   * The draft's location was never confirmed with "Use this location": it was kept when the
+   * user carried on with the form, or was still pending. Saving it still asks first.
+   */
+  locationUnconfirmed?: boolean;
 }
 
 export interface SaveDraftOptions {
   requestedView?: LatLng | null;
+  locationUnconfirmed?: boolean;
 }
 
 const storage = (): Storage | null => {
@@ -57,7 +63,7 @@ export function saveDraft(
   initialForm: LooFormState,
   form: LooFormState,
   baseUpdatedAt?: string | null,
-  { requestedView }: SaveDraftOptions = {},
+  { requestedView, locationUnconfirmed = false }: SaveDraftOptions = {},
 ): void {
   try {
     storage()?.setItem(
@@ -68,6 +74,7 @@ export function saveDraft(
         form,
         baseUpdatedAt: baseUpdatedAt ?? null,
         requestedView: requestedView ? { lat: requestedView.lat, lng: requestedView.lng } : null,
+        locationUnconfirmed,
         savedAt: new Date().toISOString(),
       }),
     );
@@ -163,6 +170,7 @@ export function loadDraft(key: string, now: number = Date.now()): LooDraft | nul
       savedAt,
       baseUpdatedAt: typeof parsed.baseUpdatedAt === "string" ? parsed.baseUpdatedAt : null,
       requestedView: readLocation(parsed.requestedView) ?? null,
+      locationUnconfirmed: parsed.locationUnconfirmed === true,
     };
   } catch {
     return null;

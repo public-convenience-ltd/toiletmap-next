@@ -335,11 +335,22 @@
   }
 
   .linkButton,
-  .errorList a,
   .signInPrompt a {
     display: inline-block;
     min-height: 44px;
     line-height: 44px;
+  }
+
+  /* An error summary link can run to two lines: kept inline (an inline-block would sit its
+     list bullet on its last line), with a 44px-tall hit area from padding on each line. */
+  .errorList li {
+    padding-block: 10px;
+  }
+
+  .errorList a {
+    display: inline;
+    line-height: 1.5;
+    padding-block: 10px;
   }
 
   /* A 44px-tall hit area around the inline link, without making the notice any taller. */
