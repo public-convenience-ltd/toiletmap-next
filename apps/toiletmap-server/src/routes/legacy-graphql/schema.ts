@@ -1,0 +1,232 @@
+/**
+ * The legacy GraphQL schema (www.toiletmap.org.uk/api), frozen.
+ *
+ * Copied from the legacy repo's `src/api/schema.graphql` with these changes
+ * only, so the contract stays exactly what existing clients see:
+ * - the three mutations and their types (`Mutation`, `MutationResponse`,
+ *   `ReportMutationResponse`, `ReportInput`, `RemovalReportInput`,
+ *   `PointInput`) are removed: this endpoint is read-only;
+ * - the `@auth` directive and `Permission` enum (used only by the mutations)
+ *   are not declared;
+ * - the scalar descriptions the legacy runtime attached (graphql-iso-date for
+ *   `DateTime`, the custom `OpeningTimes` scalar) are written into the SDL;
+ * - the schema itself carries a deprecation description. Fields are NOT
+ *   marked `@deprecated`, because `fields` without `includeDeprecated: true`
+ *   would then hide every query from some introspection-driven clients.
+ *
+ * Do not add fields. New capabilities belong in the REST API.
+ */
+export const LEGACY_GRAPHQL_SDL = /* GraphQL */ `
+"""
+DEPRECATED: the legacy Toilet Map GraphQL API, kept read-only and frozen for
+existing clients until its sunset date (see the Sunset response header once
+one is announced). Use the REST API instead: /api/docs.
+"""
+schema {
+  query: Query
+}
+
+"""
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the \`date-time\` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
+"""
+scalar DateTime
+
+"""
+An array of 7 elements in which each represent a day's opening times. Each element can be either an empty array (closed) or an array of opening and closing times ["09:00", "17:00"]
+"""
+scalar OpeningTimes
+
+enum CacheControlScope {
+  PUBLIC
+  PRIVATE
+}
+
+directive @cacheControl(
+  maxAge: Int
+  scope: CacheControlScope
+  inheritMaxAge: Boolean
+) on FIELD_DEFINITION | OBJECT | INTERFACE | UNION
+
+"""
+A Geographical Point
+Expressed in WGS84 coordinates (SRID 4326).
+"""
+type Point {
+  "Latitude"
+  lat: Float!
+  "Longitude"
+  lng: Float!
+}
+"""
+A unit of Administrative Geography
+e.g. a district council
+"""
+type AdminGeo {
+  name: String
+  type: String
+}
+
+"""
+A Toilet
+The data representing a toilet is computed from its **Report**s
+"""
+type Loo {
+  id: ID
+  createdAt: DateTime
+  updatedAt: DateTime
+  verifiedAt: DateTime
+  reports: [Report]
+  active: Boolean
+  location: Point
+  area: [AdminGeo]
+  name: String
+  openingTimes: OpeningTimes
+  accessible: Boolean
+  allGender: Boolean
+  men: Boolean
+  women: Boolean
+  urinalOnly: Boolean
+  children: Boolean
+  babyChange: Boolean
+  radar: Boolean
+  attended: Boolean
+  automatic: Boolean
+  noPayment: Boolean
+  paymentDetails: String
+  notes: String
+  removalReason: String
+  geohash: String
+}
+
+"""
+Reported information about a real-world toilet
+Reports are submitted by contributors or created as part of data imports
+A report can refer to another report (via the **previous** field) to indicate that it is intended to augment or adjust an existing Loo
+"""
+type Report {
+  id: ID!
+  "An identifier for the user or process which contributed the report"
+  contributor: String!
+  "When the report was added to the system"
+  createdAt: DateTime!
+  verifiedAt: DateTime
+  """
+  We insert location updates separately using a DB trigger because Prisma doesn't support PostGIS yet.
+  This field is used to indicate to the client that the system created the report so that it can be coalesced with the user's report.
+  """
+  isSystemReport: Boolean
+  """
+  A link to the previous report in the chain
+  This is nullable since this might be the first report about a particular toilet
+  """
+  previous: Report
+  active: Boolean
+  location: Point
+  area: [AdminGeo]
+  name: String
+  openingTimes: OpeningTimes
+  accessible: Boolean
+  allGender: Boolean
+  men: Boolean
+  women: Boolean
+  urinalOnly: Boolean
+  children: Boolean
+  babyChange: Boolean
+  radar: Boolean
+  attended: Boolean
+  automatic: Boolean
+  noPayment: Boolean
+  geohash: String
+  paymentDetails: String
+  notes: String
+  removalReason: String
+  "The Loo which uses the data submitted in this report"
+  loo: Loo
+}
+
+"""
+The name of a contributor. This requires a certain level of permissions to access.
+"""
+type AuthedContributor {
+  name: String!
+}
+
+type AreaToiletCount {
+  name: String
+  active: Int
+  removed: Int
+}
+
+type Statistics {
+  total: Int
+  active: Int
+  removed: Int
+  areaToiletCount: [AreaToiletCount]
+}
+
+"Include or Exclude Loos from search results based on whether they satisfy a filter condition"
+input LooFilter {
+  active: Boolean = true
+  noPayment: Boolean
+  text: String
+  fromDate: DateTime
+  toDate: DateTime
+  contributors: [String]
+  areaName: String
+}
+
+input PaginationInput {
+  limit: Int = 10
+  page: Int = 1
+}
+
+type LooSearchResponse {
+  loos: [Loo!]!
+  total: Int
+  page: Int
+  limit: Int
+  pages: Int
+}
+
+enum SortOrder {
+  NEWEST_FIRST
+  OLDEST_FIRST
+}
+
+type Query {
+  "Retrieve a Loo by ID"
+  loo(id: ID): Loo
+  "Search for loos matching a filter"
+  loos(
+    filters: LooFilter!
+    pagination: PaginationInput = { limit: 10, page: 1 }
+    sort: SortOrder = NEWEST_FIRST
+  ): LooSearchResponse!
+  "Get statistics about our data"
+  statistics: Statistics
+  "Retrieve Loos by proximity to a Point"
+  loosByProximity(
+    "A Point from which to begin the search"
+    from: ProximityInput!
+  ): [Loo!]!
+  looNamesByIds(idList: [ID]): [Loo!]!
+  "Retrieve a list of areas in existence, name and type only"
+  areas: [AdminGeo!]!
+  "Retrieve loos that sit within a given geohash"
+  loosByGeohash(geohash: String!, active: Boolean = true): [String!]!
+    @cacheControl(maxAge: 21600, scope: PUBLIC)
+  "Retrieve detailed, compressed loos that sit within a given geohash"
+  fullLoosByGeohash(geohash: String!, active: Boolean = true): [String!]!
+    @cacheControl(maxAge: 21600, scope: PUBLIC)
+  reportsForLoo(id: ID!): [Report!]!
+}
+
+input ProximityInput {
+  "Latitude"
+  lat: Float!
+  "Longitude"
+  lng: Float!
+  "Maximum Distance in meters"
+  maxDistance: Int = 1000
+}
+`;

@@ -20,6 +20,20 @@ const jsonContent = (schemaName: string): Record<string, MediaTypeObject> => ({
   },
 });
 
+const legacyGraphqlDescription =
+  "Compatibility endpoint for clients of the old www.toiletmap.org.uk/api GraphQL API (the Flutter app, the GraphQL explorer, third parties); the site proxies `/api` and `/api/` here. The schema is frozen and read-only: any mutation is rejected with `This API is read-only; use the REST API.` Responses carry `Deprecation: true`, a `Link` to these docs and, once a date is set, `Sunset`. Use the REST endpoints for anything new. Limits: depth 8, 250 fields, 15 aliases, a cost budget per request, `loos` pages of at most 100, `looNamesByIds` of at most 100 ids, `maxDistance` up to 50,000 m, 32 KiB request bodies.";
+
+const legacyGraphqlResponses = {
+  200: {
+    description:
+      "A GraphQL response (`data` and/or `errors`). Validation and resolver errors also use 200, as the legacy API did.",
+    content: { "application/json": { schema: { type: "object" as const } } },
+  },
+  400: { description: "Malformed request, or variables that do not match their types." },
+  413: { description: "Query or request body too large." },
+  429: { description: "Rate limited (shared with the other public reads)." },
+};
+
 const syncCursorSchema: SchemaObject = {
   type: "string",
   format: "date-time",
@@ -1076,6 +1090,60 @@ export const openApiDocument: OpenAPIObject = {
             content: jsonContent("AreaListResponse"),
           },
         },
+      },
+    },
+    "/api/graphql": {
+      get: {
+        tags: ["Legacy GraphQL"],
+        deprecated: true,
+        summary: "Legacy GraphQL API (read-only, frozen)",
+        description: legacyGraphqlDescription,
+        parameters: [
+          {
+            name: "query",
+            in: "query" as const,
+            required: true,
+            description: "GraphQL query document (at most 10,000 characters).",
+            schema: { type: "string" },
+          },
+          {
+            name: "variables",
+            in: "query" as const,
+            required: false,
+            description: "JSON-encoded variables object.",
+            schema: { type: "string" },
+          },
+          {
+            name: "operationName",
+            in: "query" as const,
+            required: false,
+            schema: { type: "string" },
+          },
+        ],
+        responses: legacyGraphqlResponses,
+      },
+      post: {
+        tags: ["Legacy GraphQL"],
+        deprecated: true,
+        summary: "Legacy GraphQL API (read-only, frozen)",
+        description: legacyGraphqlDescription,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string" },
+                  variables: { type: "object", additionalProperties: true },
+                  operationName: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: legacyGraphqlResponses,
       },
     },
     "/api/loos": {

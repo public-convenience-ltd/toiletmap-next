@@ -10,9 +10,13 @@ import { createLogger } from "../utils/logger";
  * - Response status and timing
  * - User information (if authenticated)
  * - Error details (if any)
+ *
+ * The client IP and user agent are left out for paths matching
+ * `omitClientDetails` (the legacy GraphQL endpoint promises not to log them).
  */
 export const requestLogger = (
   env?: "production" | "preview" | "development",
+  { omitClientDetails = () => false }: { omitClientDetails?: (path: string) => boolean } = {},
 ): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
   const logger = createLogger(env);
 
@@ -23,13 +27,14 @@ export const requestLogger = (
     const path = c.req.path;
 
     // Log incoming request. Feedback promises never to log the submitter's
-    // IP, so its line carries neither IP nor user agent.
+    // IP, so its line carries neither IP nor user agent (nor does any path
+    // matching `omitClientDetails`).
     const isFeedback = path === "/api/feedback" || path.startsWith("/api/feedback/");
     logger.info("Incoming request", {
       requestId,
       method,
       path,
-      ...(isFeedback
+      ...(isFeedback || omitClientDetails(path)
         ? {}
         : {
             userAgent: c.req.header("user-agent"),

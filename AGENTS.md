@@ -217,6 +217,8 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 Public routes still accept optional authentication so admin tokens can unlock extra data (e.g., contributor names in reports).
 
+- **GET/POST /api/graphql** - Legacy GraphQL compatibility endpoint (deprecated, read-only, frozen; `src/routes/legacy-graphql/`). The client worker proxies exactly `/api` and `/api/` here with no cookies or token. Do not add fields: new features go to REST. Its output is pinned byte for byte to the golden fixtures in `test/fixtures/legacy-graphql/` (contract tests: `test/integration/legacy-graphql.*.spec.ts`); see the server README.
+
 ### Protected API Endpoints (JWT or Session Required)
 
 - **POST /api/loos** - Create new loo (requires contributor info in JWT)

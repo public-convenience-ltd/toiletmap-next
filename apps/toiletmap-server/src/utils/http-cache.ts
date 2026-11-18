@@ -33,6 +33,16 @@ export const LOO_DETAIL_CACHE_CONTROL = "private, max-age=0, must-revalidate";
 /** `/api/loos?ids=`: short private caching for API consumers. */
 export const LOO_IDS_CACHE_CONTROL = "private, max-age=60";
 
+/**
+ * Legacy GraphQL `GET ?query=` responses that executed without errors: the
+ * same short public TTL as the REST proximity read (`cacheResponse(60)`).
+ * POSTs and error responses are `no-store`.
+ */
+export const LEGACY_GRAPHQL_GET_CACHE_CONTROL = "public, max-age=60";
+
+/** How long a successful legacy GraphQL GET stays in the colo-local edge cache. */
+export const LEGACY_GRAPHQL_EDGE_TTL_SECONDS = 60;
+
 /** Strips the weak-validator prefix so tags compare by opaque value. */
 const opaqueTag = (tag: string): string => tag.trim().replace(/^W\//, "");
 
