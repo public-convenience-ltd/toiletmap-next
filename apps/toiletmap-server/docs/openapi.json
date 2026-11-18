@@ -31,6 +31,10 @@
     {
       "name": "Feedback",
       "description": "Messages to the Toilet Map team."
+    },
+    {
+      "name": "Geocoding",
+      "description": "Place and postcode search in Great Britain."
     }
   ],
   "components": {
@@ -1559,6 +1563,151 @@
           },
           "503": {
             "description": "Turnstile is enabled but could not be reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/geocode": {
+      "get": {
+        "tags": [
+          "Geocoding"
+        ],
+        "summary": "Search for a place or postcode in Great Britain",
+        "description": "Public and unauthenticated; rate limited with the other reads, and explicit searches also per IP (20 a minute). Anything shaped like a UK postcode or outcode is looked up on postcodes.io first; everything else (and unknown postcodes) is searched on OpenStreetMap's Nominatim, limited to Great Britain. `mode=suggest` is for search-as-you-type: it only looks postcodes and outcodes up and never asks Nominatim, whose usage policy forbids autocomplete. Results are cached for 24 hours, keyed on the mode and the normalised query. Nominatim results carry OpenStreetMap's attribution, which must be shown with them.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "The place, address or postcode. Whitespace is collapsed and case ignored.",
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200,
+              "example": "SW1A 1AA"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "description": "`search` (the default: an explicit search, which may use Nominatim) or `suggest` (typing: postcodes and outcodes only, an empty list for anything else).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "search",
+                "suggest"
+              ],
+              "default": "search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Up to five results, best first. An empty list means nothing matched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "results",
+                    "attribution"
+                  ],
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "label",
+                          "lat",
+                          "lng",
+                          "kind"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "example": "SW1A 1AA, Westminster"
+                          },
+                          "lat": {
+                            "type": "number",
+                            "example": 51.501009
+                          },
+                          "lng": {
+                            "type": "number",
+                            "example": -0.141588
+                          },
+                          "bbox": {
+                            "type": "array",
+                            "description": "The result's extent as [west, south, east, north].",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 4,
+                            "maxItems": 4
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "postcode",
+                              "place"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "attribution": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Attribution to show with the results, or null when none is needed.",
+                      "example": "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing, too short or too long `q`, or an unknown `mode`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests (the read limit, or the per-IP limit on explicit searches).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The upstream geocoder failed or timed out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Place search is busy (Nominatim's one request a second is used up); retry after `Retry-After` seconds.",
             "content": {
               "application/json": {
                 "schema": {
