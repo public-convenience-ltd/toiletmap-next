@@ -48,6 +48,8 @@ export {
   validateDay,
   validateOpeningTimes,
 } from "./components/OpeningHoursInput/openingTimes";
+export type { ProseProps } from "./components/Prose/Prose";
+export { default as Prose } from "./components/Prose/Prose";
 export { default as RadioInput } from "./components/RadioInput/RadioInput";
 export type { SheetProps } from "./components/Sheet/Sheet";
 export { default as Sheet } from "./components/Sheet/Sheet";
