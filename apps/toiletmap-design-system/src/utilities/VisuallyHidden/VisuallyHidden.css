@@ -1,4 +1,9 @@
-.visually-hidden {
+/*
+ * .sr-only is the same thing under the name Markdown renderers use (Astro's GFM footnotes
+ * label their "Footnotes" heading with it).
+ */
+.visually-hidden,
+.sr-only {
   position: absolute;
   clip: rect(1px, 1px, 1px, 1px);
   padding: 0;

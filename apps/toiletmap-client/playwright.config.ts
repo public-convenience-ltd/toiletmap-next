@@ -49,6 +49,8 @@ const MOBILE_SPECS = [
   "picker.spec.ts",
   "report.spec.ts",
   "panel.spec.ts",
+  // Content pages, the blog and the CMS: text pages must scroll on phones.
+  "content.spec.ts",
   // Key-state screenshots (test-results/screenshots), on phones too.
   "screenshots.spec.ts",
 ];

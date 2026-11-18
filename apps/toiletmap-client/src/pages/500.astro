@@ -1,0 +1,44 @@
+---
+import { Button } from "toiletmap-design-system";
+import ContentLayout from "../layouts/ContentLayout.astro";
+import { pageTitle } from "../utils/seo";
+
+/**
+ * The site's error page. Astro renders it, with a 500 status, for any unhandled error while
+ * rendering a page or endpoint, and for a body-less 500 a page returns (the edit and report
+ * pages do this when the API is down).
+ *
+ * Prerendered, so it does not depend on whatever just failed: the Cloudflare adapter serves
+ * the built 500.html from static assets (`prerenderedErrorPageFetch`). The header reads the
+ * sign-in state in the browser. The error itself is never shown (it is in the worker logs).
+ */
+export const prerender = true;
+---
+
+<ContentLayout
+  title={pageTitle("Something went wrong")}
+  description="Something went wrong on our side. Please try again in a moment."
+  heading="Something went wrong"
+  noindex
+  canonical={false}
+  signInReturnTo={null}
+>
+  <p>
+    Sorry, something went wrong on our side and we couldn't show this page. Please try again in
+    a moment. If it keeps happening, let us know through the feedback page. If that doesn't work
+    either, our <a href="/contact">contact page</a> has our email address.
+  </p>
+  <div class="error-page__actions">
+    <Button htmlElement="a" variant="primary" href="/">Back to the map</Button>
+    <Button htmlElement="a" variant="secondary" href="/feedback">Send feedback</Button>
+    <Button htmlElement="a" variant="secondary" href="/contact">Contact us</Button>
+  </div>
+</ContentLayout>
+
+<style>
+  .error-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+  }
+</style>

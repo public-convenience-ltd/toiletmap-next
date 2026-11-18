@@ -20,6 +20,7 @@ Shared Preact component library used by `toiletmap-client` and any future Toilet
 | `Notice` | Inline message, tones `info` / `success` / `warning` / `error`, optional title, action(s) and dismiss; `role="status"` (errors `role="alert"`) unless `announce="off"` or `autoFocus` |
 | `MapOverlay` | Floating overlay container for map controls |
 | `OpeningHoursInput` | Controlled opening-hours editor. `value: null` means "Don't know"; otherwise a 7-day array. Includes "copy Monday" helpers. Pair with `validateOpeningTimes()` and `isTwentyFourHours()` |
+| `Prose` | Long-form text (content pages, posts): headings, lists, links, quotes, tables, images and code in a ~70ch column, styling bare elements so Markdown needs no classes. Astro pages can use `<div class="prose">` directly |
 | `RadioInput` | Accessible radio button group |
 | `Sheet` | Bottom sheet / modal |
 | `SiteLayout` | Full-page wrapper (header + main + footer) |

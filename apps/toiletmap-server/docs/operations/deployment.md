@@ -84,14 +84,15 @@ See [Hyperdrive architecture docs](../architecture/hyperdrive.md) for details on
 
 2. **Monitor deployment**:
    - Visit GitHub Actions tab
-   - Watch "Deploy to Production" workflow
-   - Verify all steps complete successfully
+   - Watch the "Deploy Production" workflow ([`.github/workflows/deploy-production.yml`](../../../../.github/workflows/deploy-production.yml)):
+     migrate, then deploy-server (skipped when no server code changed), then deploy-client, then a smoke check
+   - Verify all jobs complete successfully
 
 3. **Manual trigger** (if needed):
-   - Go to Actions > Deploy to Production
-   - Click "Run workflow"
-   - Select "production" environment
-   - Click "Run workflow"
+   - Go to Actions > Deploy Production
+   - Click "Run workflow" with `main` selected (deploys both workers)
+
+See [docs/deployment.md](../../../../docs/deployment.md) for the job order, secrets, rollback and switching to manual deploys.
 
 ### Option 2: Manual Deployment
 
@@ -137,10 +138,11 @@ Migrations are automatically deployed to the staging database when code is pushe
 
 ### Production Environment
 
-Migrations are automatically deployed to the production database when code is merged to `main`:
+Migrations are automatically deployed to the production database when code is merged to `main`,
+as the first job of the production deploy (the workers deploy only after it succeeds):
 
-1. **Workflow**: [`.github/workflows/supabase-migrations-prod.yml`](../../.github/workflows/supabase-migrations-prod.yml)
-2. **Trigger**: Push to `main` branch or manual workflow dispatch
+1. **Workflow**: [`.github/workflows/deploy-production.yml`](../../../../.github/workflows/deploy-production.yml), job `migrate`
+2. **Trigger**: Push to `main` branch or manual workflow dispatch (runs the whole deploy)
 3. **Target**: Production Supabase project
 4. **Process**:
    - Checks out repository
@@ -163,7 +165,7 @@ If you need to manually trigger a migration deployment:
 1. Go to GitHub Actions tab in your repository
 2. Select the appropriate workflow:
    - "Deploy Staging Supabase Migrations" for staging
-   - "Deploy Production Supabase Migrations" for production
+   - "Deploy Production" for production (migrates, then deploys both workers)
 3. Click "Run workflow"
 4. Select the branch containing your migrations
 5. Click "Run workflow" button
@@ -173,7 +175,7 @@ If you need to manually trigger a migration deployment:
 After pushing to `postgres-staging` or `main`:
 
 1. Navigate to the GitHub Actions tab
-2. Find the running workflow (e.g., "Deploy Production Supabase Migrations")
+2. Find the running workflow (e.g., "Deploy Production", job "Migrate production database")
 3. Click on the workflow run to see detailed logs
 4. Verify that `supabase db push` completed successfully
 

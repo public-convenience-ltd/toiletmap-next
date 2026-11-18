@@ -1,71 +1,33 @@
 ---
-import { Button, defaultFooterLinks, Footer, Header } from "toiletmap-design-system";
-import logo from "../assets/logo.svg?url";
-import Layout from "../layouts/Layout.astro";
-import { loginHref } from "../utils/returnTo";
+import { Button } from "toiletmap-design-system";
+import ContentLayout from "../layouts/ContentLayout.astro";
+import { pageTitle } from "../utils/seo";
 
 // The site's own "page not found", in the site layout (not Astro's default page). Unknown
-// paths, the gated /dev/* pages in production, and anything else Astro can't route land here.
-const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
-
-const navLinks = [
-  { href: "/about", label: "About" },
-  { href: "/blog", label: "Blog" },
-  { href: "/contact", label: "Contact" },
-  { href: "/feedback", label: "Feedback" },
-  { href: "/loos/add", label: "Add a toilet", button: true },
-  isAuthenticated
-    ? { href: "/auth/logout", label: "Sign out" }
-    : { href: loginHref("/"), label: "Sign in" },
-];
-
+// paths, unknown toilets (/loos/:id and its edit and report pages), the gated /dev/* pages in
+// production, and anything else Astro can't route land here, with a 404 status.
 Astro.response.status = 404;
 ---
 
-<Layout title="Page not found – Toilet Map">
-  <meta slot="head" name="robots" content="noindex" />
-  <Header client:load logoSrc={logo} navLinks={navLinks} drawerLinks={defaultFooterLinks} />
-  <main>
-    <div class="not-found">
-      <h1>We can't find that page</h1>
-      <p>
-        The link may be out of date, or the page may have moved. You can find toilets near you on
-        the map.
-      </p>
-      <div class="not-found__actions">
-        <Button htmlElement="a" variant="primary" href="/">Back to the map</Button>
-        <Button htmlElement="a" variant="secondary" href="/loos/add">Add a toilet</Button>
-      </div>
-    </div>
-  </main>
-  <Footer />
-</Layout>
+<ContentLayout
+  title={pageTitle("Page not found")}
+  description="We can't find that page. Find public toilets near you on the Toilet Map."
+  heading="We can't find that page"
+  noindex
+  signInReturnTo="/"
+>
+  <p>
+    The link may be out of date, or the page or toilet may have been removed. You can find
+    toilets near you on the map.
+  </p>
+  <div class="error-page__actions">
+    <Button htmlElement="a" variant="primary" href="/">Back to the map</Button>
+    <Button htmlElement="a" variant="secondary" href="/loos/add">Add a toilet</Button>
+  </div>
+</ContentLayout>
 
 <style>
-  main {
-    flex: 1;
-  }
-
-  .not-found {
-    box-sizing: border-box;
-    max-width: var(--toilet-form-max-width, 720px);
-    margin: 0 auto;
-    padding: var(--space-xl) var(--space-m);
-    color: var(--color-text);
-  }
-
-  h1 {
-    margin: 0 0 var(--space-s);
-    font-size: var(--text-3);
-    line-height: 1.2;
-  }
-
-  p {
-    margin: 0 0 var(--space-m);
-    font-size: var(--text-0);
-  }
-
-  .not-found__actions {
+  .error-page__actions {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-s);

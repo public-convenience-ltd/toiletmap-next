@@ -1,27 +1,21 @@
 ---
 import { env } from "cloudflare:workers";
-import { defaultFooterLinks, Footer, Header } from "toiletmap-design-system";
 import logo from "../../assets/logo.svg?url";
 import KitchenSink from "../../components/dev/KitchenSink";
-import Layout from "../../layouts/Layout.astro";
+import SiteChrome from "../../components/SiteChrome/SiteChrome.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
 import { developerPageResponse } from "../../utils/developerControls";
 
 // Dev and preview builds only, the same rule as the Settings gear and DevTools: anywhere
 // else this is a 404 (see developerControls.test.ts).
 const blocked = developerPageResponse(env.ENVIRONMENT, import.meta.env.DEV);
 if (blocked) return blocked;
-
-const navLinks = [
-  { href: "/", label: "Map" },
-  { href: "/loos/add", label: "Add a toilet", button: true },
-];
 ---
 
-<Layout title="Design system · Toilet Map">
-  <meta slot="head" name="robots" content="noindex, nofollow" />
-  <Header client:load logoSrc={logo} navLinks={navLinks} drawerLinks={defaultFooterLinks} />
-  <main>
-    <KitchenSink client:load logoSrc={logo} />
-  </main>
-  <Footer />
-</Layout>
+<BaseLayout title="Design system · Toilet Map" noindex nofollow>
+  <SiteChrome>
+    <main>
+      <KitchenSink client:load logoSrc={logo} />
+    </main>
+  </SiteChrome>
+</BaseLayout>
