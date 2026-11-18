@@ -1,0 +1,128 @@
+# Sveltia CMS configuration for /cms (apps/toiletmap-client/docs/cms.md).
+#
+# Edits are commits to public-convenience-ltd/toiletmap-next through the GitHub API. With
+# the editorial workflow each change is a pull request (with a preview deployment) that is
+# published by merging it into main, which deploys the site.
+#
+# Paths are from the repository root. The front matter fields below must match the schemas
+# in apps/toiletmap-client/src/utils/contentSchemas.ts (src/cms.test.ts checks them).
+backend:
+  name: github
+  repo: public-convenience-ltd/toiletmap-next
+  branch: main
+  # GitHub sign-in runs on this site's own worker: /api/cms-oauth/auth, then
+  # /api/cms-oauth/callback. cms-loader.js sets base_url to the page's own origin, so the
+  # same file works on whichever origin the GitHub OAuth app's callback URL names.
+  base_url: https://www.toiletmap.org.uk
+  auth_endpoint: api/cms-oauth/auth
+  # The repository is public: public_repo is enough to commit and open pull requests.
+  auth_scope: public_repo
+  squash_merges: true
+  commit_messages:
+    create: Create {{collection}} “{{slug}}”
+    update: Update {{collection}} “{{slug}}”
+    delete: Delete {{collection}} “{{slug}}”
+    uploadMedia: Upload “{{path}}”
+    deleteMedia: Delete “{{path}}”
+    openAuthoring: "{{message}}"
+
+publish_mode: editorial_workflow
+
+app_title: Toilet Map CMS
+site_url: https://www.toiletmap.org.uk
+display_url: https://www.toiletmap.org.uk
+logo:
+  src: /logo.svg
+
+# Uploaded images and files, served from /images/uploads/ (the legacy site's URLs).
+media_folder: apps/toiletmap-client/public/images/uploads
+public_folder: /images/uploads
+
+collections:
+  - name: posts
+    label: Blog posts
+    label_singular: Blog post
+    description: Posts on the blog at /posts. The file name becomes the post's address.
+    folder: apps/toiletmap-client/src/content/posts
+    extension: md
+    format: frontmatter
+    create: true
+    slug: "{{slug}}"
+    identifier_field: title
+    summary: "{{title}}"
+    sortable_fields: [date, title]
+    preview_path: posts/{{slug}}
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Publish date, name: date, widget: datetime }
+      - label: Summary
+        name: description
+        widget: text
+        required: false
+        hint: Shown in search results and the RSS feed. Leave empty to use the start of the post.
+      - label: Authors
+        name: authors
+        widget: list
+        required: false
+        fields:
+          - { label: Name, name: name, widget: string }
+          - label: Social URL
+            name: social_url
+            widget: string
+            required: false
+            hint: A link to the author's profile, e.g. on Bluesky.
+          - label: Profile image URL
+            name: profile_image_url
+            widget: string
+            required: false
+            hint: An image URL, or a path such as /images/uploads/photo.jpg.
+      - label: Social card image
+        name: image
+        widget: image
+        required: false
+        hint: Shown when the post is shared. Leave empty to use the post's first image.
+      - label: Draft
+        name: draft
+        widget: boolean
+        required: false
+        default: false
+        hint: Drafts are not published, even once merged.
+      - { label: Body, name: body, widget: markdown }
+
+  - name: pages
+    label: Pages
+    label_singular: Page
+    description: The site's text pages. Their addresses are fixed.
+    files:
+      - name: about
+        label: About (/about)
+        file: apps/toiletmap-client/src/content/pages/about.md
+        fields: &pageFields
+          - { label: Title, name: title, widget: string, hint: Used in the browser tab. }
+          - label: Heading
+            name: heading
+            widget: string
+            required: false
+            hint: The heading at the top of the page. Leave empty to use the title.
+          - label: Description
+            name: description
+            widget: text
+            required: false
+            hint: Shown in search results.
+          - { label: Body, name: body, widget: markdown }
+      - name: contact
+        label: Contact (/contact)
+        file: apps/toiletmap-client/src/content/pages/contact.md
+        fields: *pageFields
+      - name: privacy
+        label: Privacy policy (/privacy)
+        file: apps/toiletmap-client/src/content/pages/privacy.md
+        fields: *pageFields
+      - name: app
+        label: App (/app)
+        file: apps/toiletmap-client/src/content/pages/app.md
+        fields: *pageFields
+      - name: app-privacy
+        label: App privacy policy (/app/privacy, linked from the app store)
+        file: apps/toiletmap-client/src/content/pages/app/privacy.md
+        fields: *pageFields

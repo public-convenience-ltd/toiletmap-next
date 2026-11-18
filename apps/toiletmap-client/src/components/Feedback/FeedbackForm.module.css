@@ -1,0 +1,122 @@
+/* The feedback form (src/pages/feedback.astro), in ContentLayout's column. */
+
+.form {
+  margin-top: var(--space-m);
+  color: var(--color-text);
+  font-size: var(--text-0);
+}
+
+.noticeText {
+  margin: 0;
+}
+
+.context,
+.errorSummary,
+.submitError {
+  margin: 0 0 var(--space-m);
+}
+
+/* Focus lands on these after a send; the ring shows only for keyboard users. */
+.focusTarget:focus {
+  outline: none;
+}
+
+.focusTarget:focus-visible {
+  outline: 3px solid var(--color-primary-navy);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.errorList {
+  margin: var(--space-2xs) 0 0;
+  padding-left: var(--space-m);
+}
+
+.errorList a {
+  color: inherit;
+  font-weight: 600;
+}
+
+.field {
+  margin: 0 0 var(--space-m);
+}
+
+.label {
+  display: block;
+  font-weight: 700;
+  font-size: var(--text-0);
+  margin-bottom: var(--space-3xs);
+}
+
+.hint {
+  margin: 0 0 var(--space-2xs);
+  font-size: var(--text--1);
+  color: var(--color-text-muted);
+}
+
+.hint p {
+  margin: 0 0 var(--space-3xs);
+}
+
+.hint a {
+  color: var(--color-primary-navy);
+}
+
+.error {
+  margin: 0 0 var(--space-2xs);
+  font-weight: 700;
+  color: var(--color-text-error);
+}
+
+/* Never below 16px, so iOS doesn't zoom on focus; 44px tall, a comfortable tap target. */
+.textarea,
+.input {
+  font-size: max(16px, var(--text-0));
+  min-height: 44px;
+}
+
+.textarea {
+  min-height: 9rem;
+}
+
+.input {
+  margin-top: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+  margin-top: var(--space-m);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Touch screens: 44px targets. */
+@media (pointer: coarse) {
+  .actions :global(.button) {
+    min-height: 44px;
+    border-radius: 22px;
+  }
+
+  .errorList li {
+    padding-block: 10px;
+  }
+
+  .errorList a {
+    display: inline;
+    line-height: 1.5;
+    padding-block: 10px;
+  }
+}

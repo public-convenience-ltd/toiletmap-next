@@ -3,6 +3,7 @@ import type { PrismaClientInstance } from "../../../src/prisma";
 class CleanupManager {
   private looIds: Set<string> = new Set();
   private pendingChangeIds: Set<string> = new Set();
+  private feedbackIds: Set<number> = new Set();
 
   trackLoo(id: string) {
     this.looIds.add(id);
@@ -12,7 +13,15 @@ class CleanupManager {
     this.pendingChangeIds.add(id);
   }
 
+  trackFeedback(id: number) {
+    this.feedbackIds.add(id);
+  }
+
   async cleanup(prisma: PrismaClientInstance) {
+    if (this.feedbackIds.size > 0) {
+      await prisma.feedback.deleteMany({ where: { id: { in: Array.from(this.feedbackIds) } } });
+      this.feedbackIds.clear();
+    }
     if (this.pendingChangeIds.size > 0) {
       await prisma.pending_change.deleteMany({
         where: { id: { in: Array.from(this.pendingChangeIds) } },

@@ -18,7 +18,7 @@ afterEach(() => {
 
 const navLinks = [
   { href: "/about", label: "About" },
-  { href: "/loos/add", label: "Add a Toilet", button: true },
+  { href: "/loos/add", label: "Add a toilet", button: true },
 ];
 
 const renderHeader = (props: Partial<Parameters<typeof Header>[0]> = {}) => {
@@ -48,13 +48,13 @@ describe("Header", () => {
 
     expect(linkTexts(drawer())).toEqual([
       "About",
-      "Add a Toilet",
+      "Add a toilet",
       "Privacy Policy",
       "Dataset",
       "App",
       "Support Us",
     ]);
-    expect(linkTexts(desktopMenu())).toEqual(["About", "Add a Toilet"]);
+    expect(linkTexts(desktopMenu())).toEqual(["About", "Add a toilet"]);
   });
 
   it("opens drawer links that leave the site in a new tab", () => {

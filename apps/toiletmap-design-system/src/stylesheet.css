@@ -5,8 +5,11 @@
 @import "./components/IconButton/IconButton.css";
 @import "./components/Sheet/Sheet.css";
 @import "./components/Tag/Tag.css";
-@import "./components/Banner/Banner.css";
 @import "./components/Button/Button.css";
+/* After Button.css: these restyle buttons inside them. */
+@import "./components/Notice/Notice.css";
+@import "./components/Toast/Toast.css";
+@import "./components/ConfirmDialog/ConfirmDialog.css";
 @import "./components/Drawer/Drawer.css";
 @import "./components/Footer/Footer.css";
 @import "./components/Header/Header.css";
@@ -20,6 +23,8 @@
 @import "./components/TextArea/TextArea.css";
 @import "./components/TriStateToggle/TriStateToggle.css";
 @import "./components/OpeningHoursInput/OpeningHoursInput.css";
+/* Long-form text (content pages and posts). */
+@import "./components/Prose/Prose.css";
 
 /* Layout */
 @import "./layout/Center/Center.css";
@@ -44,6 +49,19 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/*
+ * Links: the brand colour, never the browser's default blue (#0000ee) or visited purple.
+ * :where() keeps this at zero specificity, so any component's own link colour wins.
+ */
+:where(a:not(.button)) {
+  color: var(--color-link);
+  text-underline-offset: 0.15em;
+}
+
+:where(a:not(.button)):visited {
+  color: var(--color-link);
 }
 
 /* iOS Safari zooms into any field whose text is under 16px when it is focused. */

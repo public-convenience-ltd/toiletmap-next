@@ -2,9 +2,10 @@ import "leaflet/dist/leaflet.css";
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
-  Banner,
   Button,
+  ConfirmDialog,
   InputField,
+  Notice,
   OpeningHoursInput,
   TextArea,
   TriStateToggle,
@@ -17,7 +18,6 @@ import { readPendingChange, rememberPendingChange } from "../../api/reports";
 import { useSoftKeyboardOpen } from "../../hooks/useSoftKeyboardOpen";
 import { currentPath, loginHref } from "../../utils/returnTo";
 import { type MapView, mapViewFromSearch } from "../LooMap/mapView";
-import Dialog from "../ReviewChanges/Dialog";
 import { describeChanges } from "../ReviewChanges/describeChanges";
 import ReviewChanges from "../ReviewChanges/ReviewChanges";
 import {
@@ -29,9 +29,17 @@ import {
   saveDraft,
   type UnresolvedDraftConflicts,
 } from "./draft";
-import { distanceMeters, isValidLatLng } from "./geometry";
+import { distanceMeters, isValidLatLng, type LatLng } from "./geometry";
 import { fieldErrorsFromIssues } from "./issues";
-import LocationPicker from "./LocationPicker";
+import LocationPicker, {
+  type JumpKind,
+  type LocationChangeSource,
+  type LocationPickerHandle,
+  type PendingLocation,
+  type PickerIssue,
+  type PickerResolution,
+} from "./LocationPicker";
+import { describeMove, formatDistance } from "./LocationPicker/move";
 import styles from "./LooForm.module.css";
 import {
   buildLooPatch,
@@ -42,6 +50,7 @@ import {
   type LooFormField,
   type LooFormMode,
   type LooFormState,
+  locationMoved,
   rebaseOnCurrent,
   type TriStateField,
 } from "./payload";
@@ -85,15 +94,44 @@ export const MESSAGES = {
   nameRequired: "Enter a name for the toilet.",
   locationRequired: "Show where the toilet is on the map.",
   locationInvalid: "The location isn't valid. Move the pin again.",
-  locationUnconfirmed:
-    "Confirm the toilet's location with “Use this location”, or cancel the move.",
-  /** A new toilet whose pin hasn't been placed yet: there is no move to cancel. */
-  locationNotPlaced:
-    "Move the map until the pin is on the toilet, then choose “Use this location”.",
+  /** A move of more than 50 m is never kept without "Use this location". */
+  locationBigMove: "Confirm the big move with “Use this location”, or cancel it.",
+  /** Editing: a search moved the pin. */
+  locationJump: "Check the pin after your search, then choose “Use this location”.",
+  /** Editing: "Use my location" or typed coordinates moved the pin. */
+  locationJumpCheck: "Check the pin is on the toilet, then choose “Use this location”.",
+  locationZoom: "Zoom in on the map so the pin can be placed accurately.",
+  /** The picker's "Is it the same toilet?" question is still open. */
+  locationDuplicate: (name: string) => `Tell us if this is the same toilet as ${name}.`,
 } as const;
+
+/** The error summary's message for what stops the picker keeping the pin. */
+const locationIssueMessage = (resolution: {
+  issue: PickerIssue;
+  name?: string;
+  jump?: JumpKind;
+}): string => {
+  switch (resolution.issue) {
+    case "zoom":
+      return MESSAGES.locationZoom;
+    case "bigMove":
+      return MESSAGES.locationBigMove;
+    case "jump":
+      return resolution.jump && resolution.jump !== "search"
+        ? MESSAGES.locationJumpCheck
+        : MESSAGES.locationJump;
+    case "duplicate":
+      return MESSAGES.locationDuplicate(resolution.name ?? "the toilet nearby");
+  }
+};
 
 export const LIVE_STRAIGHT_AWAY = "Your change will go live straight away.";
 export const MODERATOR_WILL_CHECK = "A moderator will check your change before it appears.";
+/** The add form's version of LIVE_STRAIGHT_AWAY: there is no "change", it's a new toilet. */
+export const ADDED_STRAIGHT_AWAY = "The toilet will go on the map straight away.";
+/** The add form's version of MODERATOR_WILL_CHECK. */
+export const ADD_MODERATOR_WILL_CHECK =
+  "A moderator will check the new toilet before it appears on the map.";
 /** Read out with the disabled "No changes to save" button on the edit form. */
 export const NO_CHANGES_HINT = "Change any answer to save.";
 
@@ -111,15 +149,15 @@ const FIELD_ORDER: LooFormField[] = [
   "men",
   "allGender",
   "children",
-  "urinalOnly",
-  "babyChange",
   "accessible",
   "radar",
+  "babyChange",
+  "urinalOnly",
+  "automatic",
   "noPayment",
   "paymentDetails",
   "openingTimes",
   "notes",
-  "automatic",
 ];
 
 /**
@@ -298,6 +336,12 @@ export default function LooForm({
       draftBase:
         restored && draft ? { form: draft.initialForm, updatedAt: draft.baseUpdatedAt } : null,
       pinSkipped: restored?.skipped.includes("location") ?? false,
+      // A restored location the user never confirmed (kept by carrying on, or still pending)
+      // is asked about again on Save, as it would have been before the reload.
+      locationUnconfirmed:
+        !!restored &&
+        !!draft?.locationUnconfirmed &&
+        locationMoved(initialForm.location, restored.form.location),
       // Kept in the draft: the page's own `?lat&lng`, else the one the restored draft began at.
       requestedView: requested
         ? { lat: requested.lat, lng: requested.lng }
@@ -332,8 +376,22 @@ export default function LooForm({
   const [reviewOpen, setReviewOpen] = useState(false);
   /** The discard dialog is open, and where "Discard changes" goes. */
   const [discardTarget, setDiscardTarget] = useState<string | null>(null);
-  /** The picker is in "move pin" mode with a location that hasn't been confirmed yet. */
-  const [pinMoving, setPinMoving] = useState(false);
+  /** Where the picker's pin is while it hasn't been kept yet: it counts as a change. */
+  const [pendingLocation, setPendingLocation] = useState<PendingLocation | null>(null);
+  /** What stops the picker keeping the pin, when the last save attempt was blocked by it. */
+  const [locationIssue, setLocationIssue] = useState<PickerIssue | null>(null);
+  /**
+   * "Is the pin on the toilet?": a new toilet's pin isn't placed (`accuracy`: it is at a rough
+   * "Use my location" fix, in metres; otherwise the map was never moved).
+   */
+  const [pinCheck, setPinCheck] = useState<{ accuracy?: number } | null>(null);
+  const pinCheckOpen = pinCheck !== null;
+  /** "Save the new location?": the form to save, and how far the pin moved. */
+  const [locationCheck, setLocationCheck] = useState<{ form: LooFormState; moved: string } | null>(
+    null,
+  );
+  /** Save is waiting for the picker to settle (a duplicate check can take a moment). */
+  const [resolving, setResolving] = useState(false);
   // Remounts the controlled opening-hours widget when the baseline is replaced.
   const [baseVersion, setBaseVersion] = useState(0);
   const [pendingSuggestion] = useState(() =>
@@ -341,19 +399,49 @@ export default function LooForm({
   );
 
   const formRef = useRef<HTMLFormElement>(null);
+  const pickerRef = useRef<LocationPickerHandle | null>(null);
+  /** The form as it is now, including a location the picker kept since the last render. */
+  const latestFormRef = useRef(form);
+  latestFormRef.current = form;
+  /** The location was last kept automatically (moving on), not with "Use this location". */
+  const autoKeptRef = useRef(start.locationUnconfirmed);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const alertsRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
   /** Navigation we started on purpose (save, discard, sign in): don't warn about it. */
   const allowUnloadRef = useRef(false);
 
-  const { payload, changedKeys } = useMemo(
+  const { payload } = useMemo(
     () => buildLooPatch({ initial: base.initial, initialForm: base.initialForm, form, mode }),
     [base, form, mode],
   );
+  // A move the picker hasn't kept yet still counts: "Save 1 change", and leaving warns.
+  const countedForm = useMemo(
+    () => (pendingLocation ? { ...form, location: pendingLocation.location } : form),
+    [form, pendingLocation],
+  );
+  const { changedKeys } = useMemo(
+    () =>
+      buildLooPatch({
+        initial: base.initial,
+        initialForm: base.initialForm,
+        form: countedForm,
+        mode,
+      }),
+    [base, countedForm, mode],
+  );
   const changedFields = useMemo(
-    () => changedFormFields(base.initialForm, form),
-    [base.initialForm, form],
+    () => changedFormFields(base.initialForm, countedForm),
+    [base.initialForm, countedForm],
+  );
+  // The draft keeps a pending move only if moving on would keep it anyway (never a big move,
+  // a search jump or a pin with an open duplicate question), and only once its duplicate check
+  // is done: a restored location isn't checked again.
+  const draftPending = !!pendingLocation?.keepable && pendingLocation.checked;
+  const draftForm = draftPending ? countedForm : form;
+  const draftDirty = useMemo(
+    () => changedFormFields(base.initialForm, draftForm).length > 0,
+    [base.initialForm, draftForm],
   );
   const dirty = changedFields.length > 0;
   const changeCount = changedKeys.length;
@@ -372,21 +460,23 @@ export default function LooForm({
   const persistDraft = () => {
     const stored = draftWithUnresolvedConflicts(
       base.initialForm,
-      form,
+      draftForm,
       base.initial?.updatedAt,
       draftConflicts,
     );
     saveDraft(storageKey, stored.initialForm, stored.form, stored.baseUpdatedAt, {
       requestedView: start.requestedView,
+      // Not confirmed with "Use this location": "Save the new location?" still has to ask.
+      locationUnconfirmed: draftPending || autoKeptRef.current,
     });
   };
 
   // Draft autosave: every change is kept in sessionStorage until it is saved or discarded.
   useEffect(() => {
     if (outcome || leaving) return;
-    if (dirty || draftConflicts) persistDraft();
+    if (draftDirty || draftConflicts) persistDraft();
     else clearDraft(storageKey);
-  }, [storageKey, base, form, dirty, draftConflicts, outcome, leaving]);
+  }, [storageKey, base, draftForm, draftDirty, draftConflicts, outcome, leaving]);
 
   // Warn before leaving the page with unsaved changes.
   useEffect(() => {
@@ -437,9 +527,12 @@ export default function LooForm({
   const clearError = (key: LooFormField) =>
     setFormErrors((fe) => (fe[key] ? { ...fe, [key]: undefined } : fe));
 
-  const setLocation = (lat: number, lng: number) => {
+  const setLocation = (lat: number, lng: number, source?: LocationChangeSource) => {
     if (!isValidLatLng(lat, lng)) return;
+    autoKeptRef.current = source === "auto";
+    latestFormRef.current = { ...latestFormRef.current, location: { lat, lng } };
     setForm((f) => ({ ...f, location: { lat, lng } }));
+    setLocationIssue(null);
     clearError("location");
   };
 
@@ -451,20 +544,26 @@ export default function LooForm({
   const focusLater = (ref: { current: HTMLElement | null }) =>
     setTimeout(() => ref.current?.focus(), 0);
 
-  const validate = (): boolean => {
+  /**
+   * Check `f` before saving. `picker` is what the location picker said when asked to settle:
+   * a blocked pin is listed with what fixes it, and a never-moved new pin isn't an error (the
+   * "Is the pin on the toilet?" question follows).
+   */
+  const validate = (f: LooFormState, picker: PickerResolution): boolean => {
     const errors: FormErrors = {};
-    if (!form.name.trim()) errors.name = MESSAGES.nameRequired;
-    if (pinMoving) {
-      errors.location = form.location ? MESSAGES.locationUnconfirmed : MESSAGES.locationNotPlaced;
-    } else if (form.location) {
-      if (!isValidLatLng(form.location.lat, form.location.lng)) {
+    if (!f.name.trim()) errors.name = MESSAGES.nameRequired;
+    if (picker.kind === "blocked") {
+      errors.location = locationIssueMessage(picker);
+    } else if (f.location) {
+      if (!isValidLatLng(f.location.lat, f.location.lng)) {
         errors.location = MESSAGES.locationInvalid;
       }
-    } else if (requiresLocation) {
+    } else if (requiresLocation && picker.kind !== "unplaced") {
       errors.location = MESSAGES.locationRequired;
     }
-    const hoursError = validateOpeningTimes(form.openingTimes);
+    const hoursError = validateOpeningTimes(f.openingTimes);
     if (hoursError) errors.openingTimes = hoursError;
+    setLocationIssue(picker.kind === "blocked" ? picker.issue : null);
     setFormErrors(errors);
 
     if (Object.values(errors).some(Boolean)) {
@@ -474,8 +573,17 @@ export default function LooForm({
     return true;
   };
 
-  const save = async () => {
+  const save = async (toSave: LooFormState = form) => {
     if (submitting || leaving) return;
+    const requestBody =
+      toSave === form
+        ? payload
+        : buildLooPatch({
+            initial: base.initial,
+            initialForm: base.initialForm,
+            form: toSave,
+            mode,
+          }).payload;
     setSubmitting(true);
     setSubmitError(null);
     setOutcome(null);
@@ -488,7 +596,7 @@ export default function LooForm({
         method,
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestBody),
       });
 
       const body: unknown = await res.json().catch(() => null);
@@ -517,7 +625,10 @@ export default function LooForm({
           clearDraft(storageKey);
           setLeaving(true);
           await applySavedLocally(body as LooDetail);
-          navigate(`/loos/${encodeURIComponent(action.id)}?saved=1`);
+          // The map confirms it in a toast: "added" says a new toilet is on the map.
+          navigate(
+            `/loos/${encodeURIComponent(action.id)}?saved=${mode === "add" ? "added" : "1"}`,
+          );
           return;
         case "conflict":
           setReviewOpen(false);
@@ -526,7 +637,7 @@ export default function LooForm({
             current: action.current,
             fields: conflictingFields({
               initialForm: base.initialForm,
-              form,
+              form: toSave,
               current: action.current,
             }),
           });
@@ -573,12 +684,102 @@ export default function LooForm({
     }
   };
 
-  const handleSubmit = (e: Event) => {
-    e.preventDefault();
-    if (submitting || leaving || !canSave) return;
-    if (!validate()) return;
+  /** The review sheet (or, when it is skipped, the save itself) for `next`. */
+  const proceed = (next: LooFormState) => {
     if (reviewRequired) setReviewOpen(true);
-    else save();
+    else save(next);
+  };
+
+  /** Everything after the location is settled: nothing left to save, the location check, save. */
+  const continueSave = (next: LooFormState) => {
+    const keys = buildLooPatch({
+      initial: base.initial,
+      initialForm: base.initialForm,
+      form: next,
+      mode,
+    }).changedKeys;
+    // The pin went back where it was and nothing else changed: there is nothing to send.
+    if (mode === "edit" && keys.length === 0) return;
+    const saved = base.initialForm.location;
+    if (
+      trusted &&
+      mode === "edit" &&
+      autoKeptRef.current &&
+      saved &&
+      next.location &&
+      locationMoved(saved, next.location)
+    ) {
+      const move = describeMove(saved, next.location);
+      setLocationCheck({ form: next, moved: move.label.replace(/^Moved /, "") });
+      return;
+    }
+    proceed(next);
+  };
+
+  const handleSubmit = async (e: Event) => {
+    e.preventDefault();
+    if (submitting || leaving || resolving || !canSave) return;
+    // Save waits for the picker: it keeps a safe pending move, or says what has to be answered.
+    let picker: PickerResolution = { kind: "ok", location: form.location, source: null };
+    const handle = pickerRef.current;
+    if (handle) {
+      setResolving(true);
+      try {
+        // For Save: a jump to typed coordinates or the device's position is kept, and then
+        // checked like a dragged move ("Save the new location?"; the review sheet when signed
+        // out), rather than refused with an error after the bar said "Save 1 change".
+        picker = await handle.resolve({ save: true });
+      } finally {
+        setResolving(false);
+      }
+    }
+    let next = latestFormRef.current;
+    if (picker.kind === "ok" && picker.location) {
+      next = { ...next, location: picker.location };
+      latestFormRef.current = next;
+      setPendingLocation(null);
+    }
+    if (!validate(next, picker)) return;
+    if (picker.kind === "unplaced") {
+      setPinCheck(picker.accuracy !== undefined ? { accuracy: picker.accuracy } : {});
+      return;
+    }
+    continueSave(next);
+  };
+
+  /** "Yes, it's on the toilet": keep the never-moved pin where the map opened, then carry on. */
+  const confirmPinWhereItIs = () => {
+    setPinCheck(null);
+    const at: LatLng | null = pickerRef.current?.placeHere() ?? null;
+    if (!at) return;
+    const next = { ...latestFormRef.current, location: at };
+    latestFormRef.current = next;
+    setPendingLocation(null);
+    if (!validate(next, { kind: "ok", location: at, source: "confirmed" })) return;
+    continueSave(next);
+  };
+
+  /** "No, keep the old location": undo only the move, and save anything else. */
+  const keepOldLocation = () => {
+    const check = locationCheck;
+    setLocationCheck(null);
+    if (!check) return;
+    const reverted = { ...check.form, location: base.initialForm.location };
+    autoKeptRef.current = false;
+    latestFormRef.current = reverted;
+    setForm(reverted);
+    const keys = buildLooPatch({
+      initial: base.initial,
+      initialForm: base.initialForm,
+      form: reverted,
+      mode,
+    }).changedKeys;
+    if (keys.length > 0) {
+      proceed(reverted);
+    } else {
+      // The move was the only change: back to the form, with nothing left to save.
+      setTimeout(() => document.getElementById(fieldId("location"))?.focus(), 0);
+    }
   };
 
   const loadLatestKeepingChanges = () => {
@@ -591,6 +792,7 @@ export default function LooForm({
     });
     setBase({ initial: rebased.initial, initialForm: rebased.initialForm });
     setForm(rebased.form);
+    setLocationIssue(null);
     setBaseVersion((v) => v + 1);
     setSubmitError(null);
     setFormErrors({});
@@ -619,28 +821,35 @@ export default function LooForm({
 
   if (outcome) {
     const toiletHref = mode === "edit" && looId ? `/loos/${encodeURIComponent(looId)}` : null;
+    // One outcome pattern (shared with the report flow): a heading, a Notice saying what
+    // happens next, then the next step as the primary button.
     return (
       <div class={styles.page}>
         <div ref={outcomeRef} tabIndex={-1} class={styles.outcome}>
+          <h1 class={styles.heading}>
+            {outcome === "queued"
+              ? "Thanks — a moderator will review your suggestion"
+              : "No changes needed"}
+          </h1>
           {outcome === "queued" ? (
-            <Banner variant="success" title="Thanks — a moderator will review your suggestion">
+            <Notice tone="success" announce="off">
               {mode === "edit"
                 ? "Your changes are awaiting review by a moderator, and will appear on the map once they've been checked."
                 : "The new toilet is awaiting review by a moderator, and will appear on the map once it's been checked."}
-            </Banner>
+            </Notice>
           ) : (
-            <Banner variant="info">
+            <Notice tone="info" announce="off">
               No changes were needed — this toilet already has these details.
-            </Banner>
+            </Notice>
           )}
         </div>
         <div class={styles.outcomeActions}>
           {toiletHref && (
-            <Button htmlElement="a" variant="secondary" href={toiletHref}>
+            <Button htmlElement="a" variant="primary" href={toiletHref}>
               View this toilet
             </Button>
           )}
-          <Button htmlElement="a" variant="secondary" href="/">
+          <Button htmlElement="a" variant={toiletHref ? "secondary" : "primary"} href="/">
             Back to map
           </Button>
         </div>
@@ -691,7 +900,14 @@ export default function LooForm({
 
   // Says what a save will do: signed-in users' changes go live straight away (the server may
   // still queue one, e.g. from a user blocked in Auth0, and the queued screen then says so).
-  const saveNotice = trusted ? LIVE_STRAIGHT_AWAY : MODERATOR_WILL_CHECK;
+  const saveNotice =
+    mode === "add"
+      ? trusted
+        ? ADDED_STRAIGHT_AWAY
+        : ADD_MODERATOR_WILL_CHECK
+      : trusted
+        ? LIVE_STRAIGHT_AWAY
+        : MODERATOR_WILL_CHECK;
   // Why Save is disabled, for screen readers (the label already says "No changes to save").
   const saveHint =
     mode === "edit" && changeCount === 0 && !submitting && !leaving ? NO_CHANGES_HINT : null;
@@ -704,7 +920,7 @@ export default function LooForm({
       </p>
 
       <div class={styles.saveNotice}>
-        <Banner variant="info">
+        <Notice tone="info" size="compact" announce="off">
           <p>
             {saveNotice}
             {!isAuthenticated && (
@@ -722,31 +938,59 @@ export default function LooForm({
               </>
             )}
           </p>
-        </Banner>
+        </Notice>
       </div>
 
       {pendingSuggestion && (
-        <Banner variant="info">
-          You suggested changes to this toilet {formatSuggestedOn(pendingSuggestion.at)} — they're
-          awaiting review by a moderator.
-        </Banner>
+        <div class={styles.restored}>
+          <Notice tone="info" announce="off">
+            You suggested changes to this toilet {formatSuggestedOn(pendingSuggestion.at)} — they're
+            awaiting review by a moderator.
+          </Notice>
+        </div>
       )}
 
       {draftRestored && (
         <div class={styles.restored}>
-          <Banner variant="info">
+          <Notice
+            tone="info"
+            announce="off"
+            action={{ label: "Discard", onClick: discardRestoredDraft }}
+          >
             Restored your unsaved changes.
-            {start.pinSkipped && " The map is where you asked, not where your earlier pin was."}{" "}
-            <button type="button" class={styles.linkButton} onClick={discardRestoredDraft}>
-              Discard
-            </button>
-          </Banner>
+            {start.pinSkipped && " The map is where you asked, not where your earlier pin was."}
+          </Notice>
         </div>
       )}
 
       {draftConflicts && (
         <div class={styles.restored}>
-          <Banner variant="warning" title={CONFLICT_MESSAGE}>
+          <Notice
+            tone="warning"
+            title={CONFLICT_MESSAGE}
+            headingLevel={2}
+            announce="assertive"
+            actions={
+              <>
+                <Button
+                  htmlElement="button"
+                  type="button"
+                  variant="primary"
+                  onClick={() => setDraftConflicts(null)}
+                >
+                  Keep their version
+                </Button>
+                <Button
+                  htmlElement="button"
+                  type="button"
+                  variant="secondary"
+                  onClick={restoreMyDraftValues}
+                >
+                  Use my changes instead
+                </Button>
+              </>
+            }
+          >
             <p>You'd also changed these, so we're showing their newer version instead of yours:</p>
             <ul class={styles.errorList}>
               {draftConflicts.fields.map((field) => (
@@ -754,31 +998,13 @@ export default function LooForm({
               ))}
             </ul>
             <p>Check them before you save, or put your own back.</p>
-            <div class={styles.bannerActions}>
-              <Button
-                htmlElement="button"
-                type="button"
-                variant="secondary"
-                onClick={restoreMyDraftValues}
-              >
-                Use my changes instead
-              </Button>
-              <Button
-                htmlElement="button"
-                type="button"
-                variant="primary"
-                onClick={() => setDraftConflicts(null)}
-              >
-                Keep their version
-              </Button>
-            </div>
-          </Banner>
+          </Notice>
         </div>
       )}
 
       {errorEntries.length > 0 && (
         <div ref={errorSummaryRef} tabIndex={-1} class={styles.errorSummary}>
-          <Banner variant="error" title="There's a problem">
+          <Notice tone="error" title="There's a problem" headingLevel={2}>
             <ul class={styles.errorList}>
               {errorEntries.map(([field, message]) => (
                 <li key={field}>
@@ -786,6 +1012,14 @@ export default function LooForm({
                     href={`#${fieldId(field)}`}
                     onClick={(e) => {
                       e.preventDefault();
+                      const picker = pickerRef.current;
+                      if (field === "location" && locationIssue && picker) {
+                        document
+                          .getElementById(fieldId("location"))
+                          ?.scrollIntoView?.({ block: "center" });
+                        picker.fixIssue(locationIssue);
+                        return;
+                      }
                       focusField(fieldId(field));
                     }}
                   >
@@ -794,13 +1028,13 @@ export default function LooForm({
                 </li>
               ))}
             </ul>
-          </Banner>
+          </Notice>
         </div>
       )}
 
       <div ref={alertsRef} tabIndex={-1} class={styles.alerts}>
         {submitError?.kind === "message" && (
-          <Banner variant="error">
+          <Notice tone="error">
             {submitError.message}
             {submitError.details && submitError.details.length > 0 && (
               <ul class={styles.errorList}>
@@ -809,11 +1043,11 @@ export default function LooForm({
                 ))}
               </ul>
             )}
-          </Banner>
+          </Notice>
         )}
 
         {submitError?.kind === "auth" && (
-          <Banner variant="error" title="Your sign-in has expired">
+          <Notice tone="error" title="Your sign-in has expired" headingLevel={2}>
             <a
               href={loginHref(currentPath(fallbackPath))}
               onClick={() => {
@@ -825,17 +1059,37 @@ export default function LooForm({
               Sign in again
             </a>{" "}
             — your changes are kept.
-          </Banner>
+          </Notice>
         )}
 
         {submitError?.kind === "notFound" && (
-          <Banner variant="error" title="This toilet no longer exists">
-            It may have been removed while you were editing. <a href="/">Back to map</a>
-          </Banner>
+          <Notice
+            tone="error"
+            title="This toilet no longer exists"
+            headingLevel={2}
+            action={{ label: "Back to map", href: "/" }}
+          >
+            It may have been removed while you were editing.
+          </Notice>
         )}
 
         {submitError?.kind === "conflict" && (
-          <Banner variant="warning" title={CONFLICT_MESSAGE}>
+          <Notice
+            tone="warning"
+            title={CONFLICT_MESSAGE}
+            headingLevel={2}
+            announce="assertive"
+            actions={
+              <Button
+                htmlElement="button"
+                type="button"
+                variant="primary"
+                onClick={loadLatestKeepingChanges}
+              >
+                Load latest and keep my changes
+              </Button>
+            }
+          >
             {submitError.fields.length > 0 ? (
               <>
                 <p>These fields you changed have also been changed by someone else:</p>
@@ -849,17 +1103,7 @@ export default function LooForm({
             ) : (
               <p>None of the fields you changed were affected. Your changes will be kept.</p>
             )}
-            <div class={styles.bannerActions}>
-              <Button
-                htmlElement="button"
-                type="button"
-                variant="primary"
-                onClick={loadLatestKeepingChanges}
-              >
-                Load latest and keep my changes
-              </Button>
-            </div>
-          </Banner>
+          </Notice>
         )}
       </div>
 
@@ -892,8 +1136,9 @@ export default function LooForm({
           id="q-location"
           anchor="location"
           title="Where is it?"
-          // A new toilet's instruction is the picker's own ("…on the toilet's entrance").
-          hint={mode === "edit" ? "Only move the pin if it's in the wrong place." : undefined}
+          // No hint: the picker gives the one instruction for its state (adding: "…on the
+          // toilet's entrance"; editing: the strip under the locked map and Move pin), so a
+          // hint here would only repeat it.
         >
           <div
             id={fieldId("location")}
@@ -905,13 +1150,23 @@ export default function LooForm({
               location={form.location}
               originalLocation={mode === "edit" ? base.initialForm.location : null}
               onChange={setLocation}
+              onPendingChange={setPendingLocation}
+              onIssueChange={(issue) => {
+                // Answered (zoomed in, said it's a different toilet…): the error is out of date.
+                if (locationIssue && issue !== locationIssue) {
+                  setLocationIssue(null);
+                  clearError("location");
+                }
+              }}
+              controllerRef={pickerRef}
               mode={mode}
               apiUrl={apiUrl}
               excludeId={mode === "edit" ? looId : undefined}
               initialView={mode === "add" ? initialView : undefined}
               onMovingChange={(moving) => {
-                setPinMoving(moving);
-                if (!moving) clearError("location");
+                if (moving) return;
+                setLocationIssue(null);
+                clearError("location");
               }}
               onEditExisting={(id) => leaveTo(`/loos/${encodeURIComponent(id)}/edit`)}
               onRestoreExisting={(id) => leaveTo(`/loos/${encodeURIComponent(id)}?restore=1`)}
@@ -931,15 +1186,20 @@ export default function LooForm({
             {tri("men", "Men")}
             {tri("allGender", "All gender", "One toilet anyone can use")}
             {tri("children", "Children")}
-            {tri("urinalOnly", "Urinal only", "There are urinals but no cubicles")}
-            {tri("babyChange", "Baby changing")}
           </div>
         </Question>
 
-        <Question number={4} id="q-access" title="Accessibility">
+        <Question number={4} id="q-access" title="Accessibility and facilities">
           <div class={styles.triStack}>
             {tri("accessible", "Is there a wheelchair-accessible toilet?")}
             {tri("radar", "Does it need a RADAR key?", "RADAR keys open locked accessible toilets")}
+          </div>
+          <div class={`${styles.triGrid} ${styles.triGridAfter}`}>
+            {tri("babyChange", "Baby changing")}
+            {tri("urinalOnly", "Urinal only", "There are urinals but no cubicles")}
+          </div>
+          <div class={styles.triStack}>
+            {tri("automatic", "Is it an automatic (self-cleaning) toilet?")}
           </div>
         </Question>
 
@@ -1006,9 +1266,6 @@ export default function LooForm({
             }}
           />
           {fieldError("notes")}
-          <div class={styles.triStack}>
-            {tri("automatic", "Is it an automatic (self-cleaning) toilet?")}
-          </div>
         </Question>
       </div>
 
@@ -1058,50 +1315,78 @@ export default function LooForm({
         saved={leaving}
         canWriteDirectly={trusted}
         onBack={() => setReviewOpen(false)}
-        onConfirm={save}
+        onConfirm={() => save()}
       />
 
-      <Dialog
+      <ConfirmDialog
         open={discardTarget !== null}
-        role="alertdialog"
-        labelledBy="discard-title"
-        describedBy="discard-description"
-        onDismiss={() => setDiscardTarget(null)}
-        initialFocus="[data-autofocus]"
+        tone="destructive"
+        title="Discard your changes?"
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        onConfirm={() => {
+          const target = discardTarget ?? cancelHref;
+          clearDraft(storageKey);
+          setDiscardTarget(null);
+          navigate(target);
+        }}
+        onCancel={() => setDiscardTarget(null)}
       >
-        <h2 id="discard-title" class={styles.dialogTitle}>
-          Discard your changes?
-        </h2>
-        <p id="discard-description" class={styles.dialogText}>
+        <p>
           {mode === "edit"
             ? `You've made ${changeCount} change${changeCount === 1 ? "" : "s"} that haven't been saved.`
             : "The details you've entered for this toilet haven't been saved."}
         </p>
-        <div class={styles.dialogActions}>
-          <Button
-            htmlElement="button"
-            type="button"
-            variant="secondary"
-            data-autofocus
-            onClick={() => setDiscardTarget(null)}
-          >
-            Keep editing
-          </Button>
-          <Button
-            htmlElement="button"
-            type="button"
-            variant="primary"
-            onClick={() => {
-              const target = discardTarget ?? cancelHref;
-              clearDraft(storageKey);
-              setDiscardTarget(null);
-              navigate(target);
-            }}
-          >
-            Discard changes
-          </Button>
-        </div>
-      </Dialog>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={pinCheckOpen}
+        title="Is the pin on the toilet?"
+        confirmLabel="Yes, it's on the toilet"
+        cancelLabel="Move the map"
+        // Moving the map is the safer answer: a pin left where the map opened is often wrong.
+        initialFocus="cancel"
+        onConfirm={confirmPinWhereItIs}
+        onCancel={() => {
+          setPinCheck(null);
+          pickerRef.current?.focusMap();
+        }}
+        onDismiss={() => setPinCheck(null)}
+      >
+        <p>
+          {pinCheck?.accuracy !== undefined
+            ? `The pin is at your approximate location, which is only accurate to about ${formatDistance(pinCheck.accuracy)}.`
+            : "You haven't moved the map, so the pin is where the map opened."}
+        </p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={locationCheck !== null}
+        title="Save the new location?"
+        confirmLabel="Yes, save the new location"
+        cancelLabel="No, keep the old location"
+        onConfirm={() => {
+          const check = locationCheck;
+          setLocationCheck(null);
+          autoKeptRef.current = false;
+          if (!check) return;
+          // The move was the only change and this was its check: the review sheet would only
+          // ask the same question again. Other changes still go through the sheet.
+          const keys = buildLooPatch({
+            initial: base.initial,
+            initialForm: base.initialForm,
+            form: check.form,
+            mode,
+          }).changedKeys;
+          if (keys.length === 1 && keys[0] === "location") save(check.form);
+          else proceed(check.form);
+        }}
+        onCancel={keepOldLocation}
+        // Escape, the backdrop and × only close it: neither answer is assumed.
+        onDismiss={() => setLocationCheck(null)}
+      >
+        <p>You moved the pin {locationCheck?.moved}.</p>
+      </ConfirmDialog>
     </form>
   );
 }

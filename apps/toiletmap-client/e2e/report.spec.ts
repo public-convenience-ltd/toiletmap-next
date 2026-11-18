@@ -22,7 +22,7 @@ const report = (page: Page) => ({
   reason: (label: string) => page.getByText(label, { exact: true }),
   details: page.getByRole("textbox", { name: /^(What's wrong\?|Anything else we should know\?)/ }),
   continue: page.getByRole("button", { name: "Continue" }),
-  reportIt: page.getByRole("button", { name: "Report it" }),
+  reportIt: page.getByRole("button", { name: /^(Report it|Remove it from the map)$/ }),
   undo: page.getByRole("button", { name: "Undo" }),
 });
 
@@ -179,22 +179,21 @@ test.describe("report a problem (anonymous)", () => {
     ).toBeVisible();
   });
 
-  test("'Something else' needs details before it can continue", async ({ page, loos }) => {
+  test("'Something else' points to the feedback page about this toilet, not a report", async ({
+    page,
+    loos,
+  }) => {
     const loo = await loos.create({}, "report other");
     const r = await openReport(page, loo.id);
     await r.reason("Something else").click();
-    await expect(page.getByRole("textbox", { name: /^What's wrong\?/ })).toBeVisible();
-    await r.continue.click();
-
-    await expect(page.getByText("Tell us what's wrong.")).toBeVisible();
-    await expect(r.details).toHaveAttribute("aria-invalid", "true");
-    await expect(r.details).toBeFocused();
-    await expect(page.getByRole("heading", { name: "Check your report" })).toHaveCount(0);
-
-    await r.details.fill("The door is welded shut and the sign says private");
-    await r.continue.click();
-    await expect(page.getByRole("heading", { name: "Check your report" })).toBeVisible();
-    await expect(page.getByText("The door is welded shut and the sign says private")).toBeVisible();
+    // Not a report: no details box and no Continue. (Sending it: e2e/feedback.spec.ts.)
+    await expect(r.continue).toHaveCount(0);
+    await expect(r.details).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Send us a message" })).toHaveAttribute(
+      "href",
+      `/feedback?loo=${loo.id}`,
+    );
+    expect(await getPendingChangesForLoo(loo.id)).toEqual([]);
   });
 });
 

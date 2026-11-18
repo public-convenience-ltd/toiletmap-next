@@ -1,56 +1,24 @@
 ---
 import { env } from "cloudflare:workers";
-import { defaultFooterLinks, Footer, Header } from "toiletmap-design-system";
-import logo from "../assets/logo.svg?url";
 import LooMap from "../components/LooMap";
-import Layout from "../layouts/Layout.astro";
+import MapLayout from "../layouts/MapLayout.astro";
 
 import { BROWSER_API_URL } from "../utils/api";
 import { sessionCanWriteDirectly } from "../utils/permissions";
+import { siteJsonLd } from "../utils/seo";
 
 // Browser islands call the same-origin /api/* proxy.
 const apiUrl = BROWSER_API_URL;
-const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
 // Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
 const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
-
-const navLinks = [
-  { href: "/about", label: "About" },
-  { href: "/blog", label: "Blog" },
-  { href: "/contact", label: "Contact" },
-  { href: "/feedback", label: "Feedback" },
-  { href: "/loos/add", label: "Add a Toilet", button: true },
-  isAuthenticated
-    ? { href: "/auth/logout", label: "Sign out" }
-    : { href: "/auth/login", label: "Sign in" },
-];
 ---
 
-<Layout bodyClass="map-page">
-  <Header
-    client:load
-    logoSrc={logo}
-    navLinks={navLinks}
-    drawerLinks={defaultFooterLinks}
+<MapLayout canonical="/" jsonLd={siteJsonLd(Astro.site)}>
+  <h1 class="visually-hidden">Toilet Map</h1>
+  <LooMap
+    client:only="preact"
+    apiUrl={apiUrl}
+    canWriteDirectly={canWriteDirectly}
+    environment={env.ENVIRONMENT}
   />
-  <main>
-    <h1 class="visually-hidden">Toilet Map</h1>
-    <LooMap
-      client:only="preact"
-      apiUrl={apiUrl}
-      canWriteDirectly={canWriteDirectly}
-      environment={env.ENVIRONMENT}
-    />
-  </main>
-  <!-- Below 768px the map takes the whole screen; the footer links are in the menu. -->
-  <Footer hideOnMobile />
-</Layout>
-
-<style>
-  main {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    position: relative;
-  }
-</style>
+</MapLayout>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The CMS is for editors only: never indexed (robots.txt also disallows /cms, and
+         public/_headers sends X-Robots-Tag), never sends a referrer. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="same-origin" />
+    <title>Content Manager – Toilet Map</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <!-- Sveltia CMS reads its configuration from here (absolute, so /cms and /cms/ agree). -->
+    <link href="/cms/config.yml" type="application/yaml" rel="cms-config-url" />
+    <style>
+      .cms-notice {
+        max-width: 40rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+        color: #0a165e;
+      }
+      .cms-notice a {
+        color: inherit;
+      }
+      .cms-notice details {
+        margin-block: 1rem;
+      }
+      .cms-notice summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .cms-notice code {
+        font-size: 0.95em;
+        overflow-wrap: anywhere;
+      }
+      .cms-notice button {
+        font: inherit;
+        padding: 0.5rem 1rem;
+        border: 2px solid currentColor;
+        border-radius: 0.5rem;
+        background: #fff;
+        color: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- cms-loader.js asks /api/cms-oauth/status first, then either loads Sveltia CMS
+         (pinned version, with Subresource Integrity) or explains that GitHub sign-in isn't
+         set up yet. See apps/toiletmap-client/docs/cms.md. -->
+    <main class="cms-notice" id="cms-notice" aria-live="polite">
+      <p><a href="/">Back to the Toilet Map</a></p>
+      <p id="cms-loading">Loading the content manager…</p>
+      <noscript><p>The content manager needs JavaScript.</p></noscript>
+      <div id="cms-not-configured" hidden>
+        <h1>CMS sign-in isn't configured yet</h1>
+        <p>
+          Editing the blog and pages here needs GitHub sign-in, which hasn't been set up for this
+          site yet.
+        </p>
+        <p>
+          Until then you can still open the editor and sign in with a GitHub personal access
+          token, or work on a local copy of the repository (Chrome or Edge).
+        </p>
+        <details>
+          <summary>For the site owner: turning on GitHub sign-in</summary>
+          <p>
+            Create a GitHub OAuth app and set <code>GITHUB_OAUTH_CLIENT_ID</code> and
+            <code>GITHUB_OAUTH_CLIENT_SECRET</code> on the client worker. The steps are in
+            <code>apps/toiletmap-client/docs/cms.md</code> in the repository.
+          </p>
+        </details>
+        <p><button type="button" id="cms-open-anyway">Open the editor anyway</button></p>
+      </div>
+    </main>
+    <script src="/cms/cms-loader.js"></script>
+  </body>
+</html>

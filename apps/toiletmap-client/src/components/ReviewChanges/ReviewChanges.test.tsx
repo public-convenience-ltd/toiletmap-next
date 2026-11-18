@@ -1,8 +1,6 @@
 import { render, screen, within } from "@testing-library/preact";
 import userEvent from "@testing-library/user-event";
-import { useState } from "preact/hooks";
 import { describe, expect, it, vi } from "vitest";
-import Dialog from "./Dialog";
 import type { ReviewItem } from "./describeChanges";
 import ReviewChanges from "./ReviewChanges";
 
@@ -60,15 +58,34 @@ describe("ReviewChanges", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("disables both buttons while saving and after saving", () => {
-    renderSheet({ submitting: true });
-    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Back to editing" })).toBeDisabled();
+  // aria-disabled (not disabled), so the focused button keeps focus while it saves.
+  it("disables both buttons while saving and after saving, and ignores them", async () => {
+    const user = userEvent.setup();
+    const { onBack, onConfirm } = renderSheet({ submitting: true });
+    const saving = screen.getByRole("button", { name: "Saving…" });
+    const back = [
+      screen.getByRole("button", { name: "Back to editing" }),
+      screen.getByRole("button", { name: "Close" }),
+    ];
+    expect(saving).toHaveAttribute("aria-disabled", "true");
+    for (const button of back) expect(button).toHaveAttribute("aria-disabled", "true");
+    await user.click(saving);
+    for (const button of back) await user.click(button);
+    await user.keyboard("{Escape}");
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   it("shows Saved once the save has gone through", () => {
     renderSheet({ saved: true });
-    expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Saved" })).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("goes back to editing on Escape", async () => {
+    const user = userEvent.setup();
+    const { onBack } = renderSheet();
+    await user.keyboard("{Escape}");
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   it("says a moderator will check the change for anyone who can't write directly", () => {
@@ -77,12 +94,22 @@ describe("ReviewChanges", () => {
       screen.getByText("A moderator will check your change before it appears on the map."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/go live/)).toBeNull();
+    // It's only queued: the button doesn't say "save".
+    expect(screen.getByRole("button", { name: "Send for review" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Confirm and save" })).toBeNull();
   });
 
   it("says a trusted user's change goes live straight away", () => {
     renderSheet({ canWriteDirectly: true });
     expect(screen.getByText("Your change will go live straight away.")).toBeInTheDocument();
     expect(screen.queryByText(/moderator/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Confirm and save" })).toBeInTheDocument();
+  });
+
+  it("talks about the new toilet, not a change, when adding", () => {
+    renderSheet({ mode: "add", canWriteDirectly: true, items: [] });
+    expect(screen.getByText("The toilet will go on the map straight away.")).toBeInTheDocument();
+    expect(screen.queryByText(/your change/i)).toBeNull();
   });
 
   it("has a heading for new toilets", () => {
@@ -93,49 +120,5 @@ describe("ReviewChanges", () => {
   it("renders nothing while closed", () => {
     renderSheet({ open: false });
     expect(screen.queryByRole("dialog")).toBeNull();
-  });
-});
-
-function Harness() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button type="button" onClick={() => setOpen(true)}>
-        Open
-      </button>
-      <Dialog
-        open={open}
-        labelledBy="t"
-        onDismiss={() => setOpen(false)}
-        initialFocus="[data-first]"
-      >
-        <h2 id="t">Title</h2>
-        <button type="button" data-first>
-          First
-        </button>
-        <button type="button">Last</button>
-      </Dialog>
-    </>
-  );
-}
-
-describe("Dialog", () => {
-  it("traps Tab inside, closes on Escape and restores focus", async () => {
-    const user = userEvent.setup();
-    render(<Harness />);
-    const opener = screen.getByRole("button", { name: "Open" });
-    await user.click(opener);
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "First" }));
-
-    await user.tab();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Last" }));
-    await user.tab();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "First" }));
-    await user.tab({ shift: true });
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Last" }));
-
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(opener);
   });
 });

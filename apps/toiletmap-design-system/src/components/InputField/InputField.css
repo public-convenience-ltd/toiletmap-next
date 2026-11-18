@@ -24,7 +24,7 @@
 }
 
 .input::placeholder {
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
 }
 
 .input[aria-invalid="true"] {

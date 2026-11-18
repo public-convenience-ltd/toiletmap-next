@@ -31,7 +31,7 @@ export const LocationMapPicker = ({ lat, lng, onChange }: Props) => {
       const center = [lat || 51.505, lng || -0.09] as L.LatLngExpression;
       mapInstance.current = L.map(mapContainer.current).setView(center, 13);
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(mapInstance.current);

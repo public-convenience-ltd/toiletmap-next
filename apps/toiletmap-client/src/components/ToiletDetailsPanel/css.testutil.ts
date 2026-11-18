@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 /**
  * A small CSS reader for tests: the style rules of a stylesheet with their at-rule context and
  * declarations, so tests can check what a rule says rather than how its source is formatted.
@@ -96,4 +99,30 @@ export function contrastRatio(a: string, b: string): number {
   };
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
+}
+
+let tokens: Record<string, string> | null = null;
+
+/**
+ * Resolves `var(--name)` (and chains of them) to the value the design system's tokens.css
+ * gives it, so a rule that uses a token can still be checked for contrast. Anything else is
+ * returned as it is.
+ */
+export function resolveToken(value: string): string {
+  if (!tokens) {
+    const source = readFileSync(
+      join(import.meta.dirname, "../../../../toiletmap-design-system/src/tokens.css"),
+      "utf8",
+    );
+    tokens = declarationsFor(parseCss(source), ":root");
+  }
+  let current = value.trim();
+  for (let i = 0; i < 10; i++) {
+    const match = /^var\((--[\w-]+)(?:,[^)]*)?\)$/.exec(current);
+    if (!match) return current;
+    const next = tokens[match[1]];
+    if (next === undefined) return current;
+    current = next.trim();
+  }
+  return current;
 }

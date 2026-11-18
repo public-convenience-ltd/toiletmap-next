@@ -233,6 +233,18 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # Key-state screenshots from e2e/screenshots.spec.ts (tagged @screenshots, part of the
+      # normal run), for reviewing UI changes. Not compared pixel by pixel: snapshots taken
+      # on macOS wouldn't match Linux CI. Always: a failed run's pictures help most.
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: apps/toiletmap-client/test-results/screenshots
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Stop Supabase
         if: always()
         working-directory: apps/toiletmap-server

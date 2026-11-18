@@ -58,6 +58,20 @@ export function writeMapView(view: MapView, storage: Storage | null = safeLocalS
   }
 }
 
+/** The zoom a pin can be placed at in the add/edit location picker. */
+export const PIN_PLACE_ZOOM = 17;
+/** A main-map view at least this close opens the add form at PIN_PLACE_ZOOM. */
+export const CLOSE_VIEW_ZOOM = 15;
+
+/**
+ * Where the add form's picker opens for a main-map view: a view at zoom 15 or closer is close
+ * enough to be the spot the user meant, so it opens at 17, where the pin can be placed straight
+ * away (and the streets around it are still in view). Further out, the view is used as it is.
+ */
+export function addFormView(view: MapView): MapView {
+  return view.zoom >= CLOSE_VIEW_ZOOM ? { ...view, zoom: PIN_PLACE_ZOOM } : view;
+}
+
 /** `?lat=…&lng=…&zoom=…` from a URL search string (e.g. the "Add a toilet here" link). */
 export function mapViewFromSearch(search: string): MapView | null {
   try {
@@ -67,6 +81,36 @@ export function mapViewFromSearch(search: string): MapView | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Where the main map opens: a `?lat=…&lng=…&zoom=…` link (e.g. a legacy `/map/:lng/:lat`
+ * URL, redirected by src/utils/legacyRedirects.ts), else the view the user left it at, else
+ * the default.
+ */
+export function initialMapView(
+  search: string | null | undefined,
+  storage: Storage | null = safeLocalStorage(),
+): MapView {
+  return (search ? mapViewFromSearch(search) : null) ?? readMapView(storage) ?? DEFAULT_MAP_VIEW;
+}
+
+/**
+ * `href` without its `?lat&lng&zoom` view (other parameters and the hash kept), as a
+ * same-origin path, or null when it carries no usable view. Once the map has opened there,
+ * the address bar drops it: reloading or sharing then follows where the map really is (its
+ * remembered view), not where the link first pointed.
+ */
+export function withoutMapViewParams(href: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (!mapViewFromSearch(url.search)) return null;
+  for (const key of ["lat", "lng", "zoom"]) url.searchParams.delete(key);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /** The add page, opened at a map view: `/loos/add?lat=51.5&lng=-0.12&zoom=17`. */

@@ -11,7 +11,6 @@ import ToiletDetailsPanel, {
   RESTORE_QUEUED_MESSAGE,
   RESTORED_MESSAGE,
   removalSummary,
-  SAVED_MESSAGE,
   type ToiletDetailsPanelProps,
   VERIFIED_MESSAGE,
   VERIFY_LABEL,
@@ -153,7 +152,6 @@ describe("ToiletDetailsPanel", () => {
       const details = document.getElementById(detailsToggle().getAttribute("aria-controls") ?? "");
       expect(details).toContainElement(screen.getByText(VERIFY_PROMPT));
       expect(details).toContainElement(screen.getByRole("heading", { name: /opening hours/i }));
-      expect(screen.queryByText(SAVED_MESSAGE)).not.toBeInTheDocument();
       expect(screen.queryByText(new RegExp(REMOVED_MESSAGE))).not.toBeInTheDocument();
       expect(screen.queryByText(PENDING_MESSAGE)).not.toBeInTheDocument();
       // No notices in the summary; the details' only live region (for verifying) is empty.
@@ -173,7 +171,7 @@ describe("ToiletDetailsPanel", () => {
       expect(screen.getByRole("heading", { level: 2, name: "Toilet" })).toBeInTheDocument();
     });
 
-    it("shows the key features as named icons, all-gender as the toilet icon", () => {
+    it("shows the key features as labelled chips, all-gender with the toilet icon", () => {
       render(
         <ToiletDetailsPanel
           toilet={{ ...toilet, babyChange: true, radar: true, allGender: true }}
@@ -181,18 +179,20 @@ describe("ToiletDetailsPanel", () => {
         />,
       );
       const list = screen.getByRole("list", { name: "Key features" });
-      const icons = within(list)
-        .getAllByRole("img")
-        .map((img) => [
-          img.getAttribute("aria-label"),
-          img.querySelector("use")?.getAttribute("href"),
+      const chips = within(list)
+        .getAllByRole("listitem")
+        .map((item) => [
+          item.textContent,
+          item.querySelector("use")?.getAttribute("href"),
+          // The word names it: the icon is decoration, not a second name.
+          item.querySelector("svg")?.getAttribute("aria-hidden"),
         ]);
-      expect(icons).toEqual([
-        ["Accessible", "/sprites/solid.svg#wheelchair-move"],
-        ["Baby changing", "/sprites/solid.svg#baby"],
-        ["RADAR key", "/sprites/solid.svg#key"],
+      expect(chips).toEqual([
+        ["Accessible", "/sprites/solid.svg#wheelchair-move", "true"],
+        ["Baby changing", "/sprites/solid.svg#baby", "true"],
+        ["RADAR key", "/sprites/solid.svg#key", "true"],
         // Not the women's icon (person-dress).
-        ["All-gender", "/sprites/solid.svg#toilet"],
+        ["All-gender", "/sprites/solid.svg#toilet", "true"],
       ]);
     });
 
@@ -621,24 +621,11 @@ describe("ToiletDetailsPanel", () => {
   });
 
   describe("Phase 3 behaviour", () => {
-    it("shows a dismissible saved notice as a status message in the summary", async () => {
-      const user = userEvent.setup();
-      const onDismiss = vi.fn();
-      render(
-        <ToiletDetailsPanel toilet={toilet} onClose={noop} saved onDismissSaved={onDismiss} />,
-      );
-      const status = screen.getByText(SAVED_MESSAGE).closest('[role="status"]');
-      expect(status).not.toBeNull();
-      await user.click(screen.getByRole("button", { name: "Dismiss message" }));
-      expect(onDismiss).toHaveBeenCalledTimes(1);
-    });
-
     it("shows the removed state and hides directions and edit actions", () => {
-      renderExpanded({ removed: true, saved: true });
+      renderExpanded({ removed: true });
       const status = screen.getByText(new RegExp(REMOVED_MESSAGE)).closest('[role="status"]');
       expect(status).not.toBeNull();
-      // The saved notice is superseded by the removed state.
-      expect(screen.queryByText(SAVED_MESSAGE)).not.toBeInTheDocument();
+      expect(status).toHaveClass("notice--warning");
       expect(screen.queryByRole("link", { name: /directions/i })).not.toBeInTheDocument();
       expect(editLinks()).toHaveLength(0);
       expect(screen.queryByRole("link", { name: /report a problem/i })).not.toBeInTheDocument();
@@ -650,9 +637,13 @@ describe("ToiletDetailsPanel", () => {
       expect(screen.getByRole("button", { name: /close/i })).toBeInTheDocument();
     });
 
-    it("renders a custom notice slot (e.g. offline) in the summary", () => {
-      render(<ToiletDetailsPanel toilet={toilet} onClose={noop} notice={<p>You're offline</p>} />);
-      expect(screen.getByText("You're offline")).toBeInTheDocument();
+    it("shows the map's offline notice in the summary, without a second live region", () => {
+      render(<ToiletDetailsPanel toilet={toilet} onClose={noop} notice="You're offline" />);
+      const notice = screen.getByText("You're offline").closest(".notice");
+      expect(notice).toHaveClass("notice--warning");
+      // The map's own copy is the live region; this one is hidden from screen readers.
+      expect(notice?.closest('[aria-hidden="true"]')).not.toBeNull();
+      expect(notice?.closest('[role="status"], [role="alert"]')).toBeNull();
     });
 
     it("links to suggest an edit and to report a problem", () => {
@@ -757,6 +748,8 @@ describe("ToiletDetailsPanel", () => {
 
         const thanks = await screen.findByText(VERIFIED_MESSAGE);
         expect(thanks.closest('[role="status"]')).not.toBeNull();
+        // The shared success Notice, not bespoke green text.
+        expect(thanks.closest(".notice")).toHaveClass("notice--success", "notice--compact");
         expect(screen.getByText("Last verified: 17 November 2026")).toBeInTheDocument();
         expect(
           screen.queryByRole("button", { name: "Yes, it's still here" }),
@@ -811,6 +804,32 @@ describe("ToiletDetailsPanel", () => {
         expect(
           removalSummary({ ...removedToilet, removalCategory: null, removalReason: " " }),
         ).toBe(null);
+      });
+
+      it("doesn't repeat a reason that only restates the category", () => {
+        // The server's default sentence when a report had no details.
+        expect(
+          removalSummary({
+            ...removedToilet,
+            removalCategory: "not_public",
+            removalReason: "Reported as not open to the public.",
+          }),
+        ).toBe("Removed from the map: Not open to the public");
+        expect(
+          removalSummary({
+            ...removedToilet,
+            removalCategory: "does_not_exist",
+            removalReason: "Reported as not existing at this location.",
+          }),
+        ).toBe("Removed from the map: Doesn't exist or is in the wrong place");
+        // Anything the reporter wrote is kept.
+        expect(
+          removalSummary({
+            ...removedToilet,
+            removalCategory: "not_public",
+            removalReason: "Staff only since the refit",
+          }),
+        ).toBe("Removed from the map: Not open to the public — Staff only since the refit");
       });
 
       it("shows an inactive toilet as removed in the summary, with a restore action", () => {
@@ -878,11 +897,15 @@ describe("ToiletDetailsPanel", () => {
         await waitFor(() => expect(heading).toHaveFocus());
       };
 
-      it("opens the prompt in the details, expanding a collapsed panel", async () => {
+      it("asks in a modal dialog, even from a collapsed panel", async () => {
         const user = userEvent.setup();
         renderCollapsed({ toilet: removedToilet });
         await openPrompt(user);
-        expect(detailsToggle()).toHaveAttribute("aria-expanded", "true");
+        const dialog = screen.getByRole("alertdialog", { name: "Is it still here?" });
+        expect(dialog).toHaveAttribute("aria-modal", "true");
+        expect(within(dialog).getByRole("button", { name: "Restore it" })).toBeInTheDocument();
+        // The panel behind is left as it was.
+        expect(detailsToggle()).toHaveAttribute("aria-expanded", "false");
       });
 
       it("restores the toilet and updates the panel on 200", async () => {
@@ -951,8 +974,16 @@ describe("ToiletDetailsPanel", () => {
         render(<ToiletDetailsPanel toilet={removedToilet} onClose={noop} />);
         await openPrompt(user);
         await user.click(screen.getByRole("button", { name: "Restore it" }));
-        expect(await screen.findByText("Database unavailable")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Restore it" })).toBeEnabled();
+        // The error is in the dialog, which stays open so it can be tried again.
+        const error = await screen.findByText("Database unavailable");
+        const dialog = screen.getByRole("alertdialog", { name: "Is it still here?" });
+        expect(dialog).toContainElement(error);
+        expect(error.closest('[role="alert"]')).not.toBeNull();
+        await waitFor(() =>
+          expect(screen.getByRole("button", { name: "Restore it" })).not.toHaveAttribute(
+            "aria-disabled",
+          ),
+        );
       });
 
       it("offers a reload on a conflict", async () => {
@@ -1145,7 +1176,7 @@ describe("ToiletDetailsPanel", () => {
       );
     });
 
-    it("says so when no facilities are known, and offers no edit link for a removed toilet", () => {
+    it("says so when no facilities are known, and hides them for a removed toilet", () => {
       const unknown = {
         accessible: null,
         allGender: null,
@@ -1163,8 +1194,11 @@ describe("ToiletDetailsPanel", () => {
       ).toBeInTheDocument();
       expect(within(facilitiesSection()).queryByRole("term")).toBeNull();
       unmount();
+      // A removed toilet shows neither its facilities nor its hours (nor a link to add them).
       renderExpanded({ toilet: { ...removedToilet, ...unknown } });
-      expect(within(facilitiesSection()).queryByRole("link")).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Facilities" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /opening hours/i })).toBeNull();
+      expect(screen.queryByRole("link", { name: /add them/i })).toBeNull();
     });
 
     it.each([

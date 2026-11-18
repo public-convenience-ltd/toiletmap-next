@@ -31,6 +31,18 @@ describe("Button", () => {
     expect(button.classList.contains("button--secondary")).toBe(true);
   });
 
+  it("marks the destructive variant", () => {
+    act(() =>
+      render(
+        <Button htmlElement="button" variant="destructive" type="button">
+          Discard
+        </Button>,
+        container,
+      ),
+    );
+    expect(container.querySelector("button")?.className).toBe("button button--destructive");
+  });
+
   it("keeps its own classes when given extra ones", () => {
     act(() =>
       render(

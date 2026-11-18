@@ -133,6 +133,25 @@ const jsonResponse = (status: number, body: unknown): Response =>
 const ALLOWED_API_PREFIXES = ["/api/loos"];
 
 /**
+ * Exact paths of public, unauthenticated POST endpoints. Unlike the prefixes
+ * above they may be called without an `Origin` header, because the Flutter
+ * app (a native HTTP client, not a browser) sends none. To keep that safe:
+ * - a request that does send `Origin` must still be same-origin, and a
+ *   browser-flagged cross-site request (`Sec-Fetch-Site`) is refused;
+ * - the access-token cookie is never attached, so a request without `Origin`
+ *   carries no ambient credentials and there is nothing for CSRF to abuse
+ *   (anyone can already POST the same body to the server directly).
+ */
+const PUBLIC_POST_PATHS = new Set(["/api/feedback"]);
+
+/**
+ * Exact paths of public read-only endpoints: GET and HEAD only, anything else
+ * gets a 405 without contacting upstream. `/api/geocode` is the place search
+ * (postcodes.io, then Nominatim, run server-side).
+ */
+const PUBLIC_GET_PATHS = new Set(["/api/geocode"]);
+
+/**
  * Returns true when `pathname` (a URL pathname, still percent-encoded) may be
  * proxied upstream. Rejects anything that could be reinterpreted as a
  * different path upstream: dot segments (raw or encoded), encoded slashes or
@@ -152,10 +171,25 @@ export function isAllowedApiPath(pathname: string): boolean {
     return false;
   }
 
+  if (PUBLIC_POST_PATHS.has(pathname) || PUBLIC_GET_PATHS.has(pathname)) return true;
+
   return ALLOWED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
+
+/**
+ * CSRF rule for state-changing requests: `Origin` must equal the client's own
+ * origin. The one exception is a POST to a {@link PUBLIC_POST_PATHS} path with
+ * no `Origin` at all (native apps), unless the browser marked it cross-site.
+ */
+const passesOriginCheck = (request: Request, url: URL, method: string): boolean => {
+  const origin = request.headers.get("origin");
+  if (origin) return origin === url.origin;
+  if (method !== "POST" || !PUBLIC_POST_PATHS.has(url.pathname)) return false;
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return fetchSite === null || fetchSite === "same-origin" || fetchSite === "none";
+};
 
 export interface ProxyOptions {
   /** Browser request hitting `/api/*` on the client worker. */
@@ -177,6 +211,10 @@ export interface ProxyOptions {
  * - State-changing methods require `Origin` to equal the client's own origin
  *   (CSRF protection) and get `Authorization: Bearer <access_token>` attached
  *   server-side from the httpOnly cookie, so the token never reaches page JS.
+ *   Public read-only paths (`PUBLIC_GET_PATHS`, e.g. `/api/geocode`) accept
+ *   only GET and HEAD.
+ *   Public POST endpoints (`PUBLIC_POST_PATHS`, e.g. `/api/feedback`) also
+ *   accept a missing `Origin` (native apps) and never get the token.
  * - Returns upstream status/body/headers (cache headers included) minus
  *   `set-cookie`, `access-control-*` and upstream CSP; every response gets a
  *   strict `content-security-policy` and `x-content-type-options: nosniff`.
@@ -195,11 +233,14 @@ export async function proxyApiRequest({
   const method = request.method.toUpperCase();
   const isSafe = SAFE_METHODS.has(method);
 
-  if (!isSafe) {
-    const origin = request.headers.get("origin");
-    if (!origin || origin !== url.origin) {
-      return jsonResponse(403, { message: "Forbidden" });
-    }
+  if (PUBLIC_GET_PATHS.has(url.pathname) && method !== "GET" && method !== "HEAD") {
+    const response = jsonResponse(405, { message: "Method Not Allowed" });
+    response.headers.set("allow", "GET, HEAD");
+    return response;
+  }
+
+  if (!isSafe && !passesOriginCheck(request, url, method)) {
+    return jsonResponse(403, { message: "Forbidden" });
   }
 
   const headers = new Headers();
@@ -207,7 +248,8 @@ export async function proxyApiRequest({
     const value = request.headers.get(name);
     if (value !== null) headers.set(name, value);
   }
-  if (!isSafe && accessToken) {
+  // Public endpoints are unauthenticated: never attach the cookie's token.
+  if (!isSafe && accessToken && !PUBLIC_POST_PATHS.has(url.pathname)) {
     headers.set("authorization", `Bearer ${accessToken}`);
   }
   if (clientIp) {

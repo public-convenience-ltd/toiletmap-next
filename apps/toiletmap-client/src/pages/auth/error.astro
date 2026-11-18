@@ -1,0 +1,56 @@
+---
+import { Button } from "toiletmap-design-system";
+import ContentLayout from "../../layouts/ContentLayout.astro";
+import { authErrorCopy, resolveAuthError } from "../../utils/authError";
+import { loginHref, safeReturnTo } from "../../utils/returnTo";
+import { pageTitle } from "../../utils/seo";
+
+/**
+ * Why signing in didn't work, in the site layout. /auth/callback rewrites here with the
+ * details in `Astro.locals.authError` (src/utils/authError.ts); opened directly it shows
+ * fixed copy for `?reason=` (one of the known kinds) and nothing from the URL otherwise.
+ */
+export const prerender = false;
+
+const info = resolveAuthError(Astro.locals, Astro.url.searchParams.get("reason"));
+const copy = authErrorCopy(info.kind);
+Astro.response.status = copy.status;
+Astro.response.headers.set("Cache-Control", "no-store");
+const tryAgain = loginHref(safeReturnTo(info.returnTo));
+---
+
+<ContentLayout
+  title={pageTitle(copy.title)}
+  description={copy.message}
+  heading={copy.title}
+  noindex
+  nofollow
+  canonical={false}
+  signInReturnTo={safeReturnTo(info.returnTo)}
+>
+  <p>{copy.message}</p>
+  {
+    info.description && (
+      <p class="auth-error__detail">
+        The sign-in service said: <q>{info.description}</q>
+      </p>
+    )
+  }
+  <div class="auth-error__actions">
+    <Button htmlElement="a" variant="primary" href={tryAgain}>Try signing in again</Button>
+    <Button htmlElement="a" variant="secondary" href="/">Back to the map</Button>
+    <Button htmlElement="a" variant="secondary" href="/feedback">Send feedback</Button>
+  </div>
+</ContentLayout>
+
+<style>
+  .auth-error__detail {
+    overflow-wrap: anywhere;
+  }
+
+  .auth-error__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+  }
+</style>

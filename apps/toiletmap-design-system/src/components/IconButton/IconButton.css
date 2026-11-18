@@ -14,6 +14,16 @@
     color 0.15s ease;
 }
 
+/* Keyboard focus: the shared ring (tokens), as on buttons, not the browser's default. */
+.icon-button:focus {
+  outline: none;
+}
+
+.icon-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
 .icon-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;

@@ -19,7 +19,7 @@
   display: flex;
   gap: 0;
   border: 1.5px solid var(--color-primary-navy);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -46,6 +46,9 @@
   flex: 1;
   align-items: center;
   justify-content: center;
+  /* Every segment is a full tap target (44px on touch, 36px with a mouse). */
+  min-height: var(--tap-min);
+  box-sizing: border-box;
   padding: var(--space-3xs) var(--space-2xs);
   font-size: var(--text--1);
   font-family: var(--font-family);
@@ -74,14 +77,15 @@
 }
 
 .tri-state-hint {
-  font-size: var(--text--2);
-  color: var(--color-neutral-grey);
+  font-size: var(--text--1);
+  color: var(--color-text-muted);
   margin: var(--space-2xs) 0 0;
 }
 
 .tri-state-error {
   display: block;
-  font-size: var(--text--2);
-  color: var(--color-accent-pink);
+  font-size: var(--text--1);
+  font-weight: 600;
+  color: var(--color-text-error);
   margin-top: var(--space-2xs);
 }

@@ -1,6 +1,6 @@
 import type { ComponentChildren, JSX } from "preact";
 
-export interface TagProps extends Omit<JSX.HTMLAttributes<HTMLButtonElement>, "children"> {
+export interface TagProps extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   active?: boolean;
   children: ComponentChildren;
 }

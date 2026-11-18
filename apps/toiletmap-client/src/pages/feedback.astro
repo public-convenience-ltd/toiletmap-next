@@ -1,0 +1,147 @@
+---
+/**
+ * /feedback: send the Toilet Map team a message (optionally with an email address for a
+ * reply). `?loo=<id>` makes it about one toilet ("Report a problem → Something else"): the
+ * page names the toilet and stores its path as the message's `route`.
+ *
+ * Progressive enhancement: the FeedbackForm island posts JSON to /api/feedback (through
+ * the /api proxy). Without JavaScript the form posts here instead: this page validates,
+ * sends it upstream itself and, on success, redirects to `?sent=1` (post/redirect/get), or
+ * shows the form again with the errors and what was typed.
+ */
+import { env } from "cloudflare:workers";
+import {
+  FEEDBACK_LOO_PARAM,
+  FEEDBACK_PATH,
+  type FeedbackOutcome,
+  feedbackBody,
+  feedbackOutcome,
+  feedbackRoute,
+  hasErrors,
+  RATE_LIMITED_MESSAGE,
+  SERVER_MESSAGE,
+  validateFeedback,
+} from "../api/feedback";
+import FeedbackForm, {
+  FEEDBACK_TITLES,
+  type FeedbackFormInitial,
+  type FeedbackLoo,
+} from "../components/Feedback/FeedbackForm";
+import ContentLayout from "../layouts/ContentLayout.astro";
+import { BROWSER_API_URL, fetchApi } from "../utils/api";
+import { isPlausibleLooId, loadLoo } from "../utils/looPage";
+
+export const prerender = false;
+
+const clientIp = Astro.request.headers.get("cf-connecting-ip");
+const forwardedIp: Record<string, string> = clientIp
+  ? { "cf-connecting-ip": clientIp, "x-forwarded-for": clientIp }
+  : {};
+const field = (form: FormData | null, name: string) => {
+  const value = form?.get(name);
+  return typeof value === "string" ? value : "";
+};
+
+let initial: FeedbackFormInitial = {};
+let looId: string | null = Astro.url.searchParams.get(FEEDBACK_LOO_PARAM);
+
+if (Astro.request.method === "POST") {
+  // The no-JavaScript path. (Astro's checkOrigin has already refused cross-site form posts.)
+  Astro.response.headers.set("cache-control", "no-store");
+  let form: FormData | null = null;
+  try {
+    form = await Astro.request.formData();
+  } catch {
+    form = null;
+  }
+  const text = field(form, "text");
+  const email = field(form, "email");
+  looId = field(form, FEEDBACK_LOO_PARAM) || null;
+  if (!isPlausibleLooId(looId)) looId = null;
+
+  const errors = validateFeedback({ text, email });
+  let outcome: FeedbackOutcome;
+  if (hasErrors(errors)) {
+    outcome = { kind: "invalid", errors };
+  } else {
+    try {
+      const response = await fetchApi(env, Astro.url, "/api/feedback", {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          ...forwardedIp,
+        },
+        body: JSON.stringify(feedbackBody({ text, email, route: feedbackRoute(looId) })),
+      });
+      outcome = await feedbackOutcome(response);
+    } catch (error) {
+      console.error("Sending feedback failed:", error instanceof Error ? error.name : "error");
+      outcome = { kind: "error", message: SERVER_MESSAGE };
+    }
+  }
+
+  if (outcome.kind === "sent") {
+    const params = new URLSearchParams();
+    if (looId) params.set(FEEDBACK_LOO_PARAM, looId);
+    params.set("sent", "1");
+    return Astro.redirect(`${FEEDBACK_PATH}?${params}`, 303);
+  }
+  if (outcome.kind === "invalid") {
+    Astro.response.status = 400;
+    initial = { text, email, errors: outcome.errors };
+  } else if (outcome.kind === "rateLimited") {
+    Astro.response.status = 429;
+    initial = { text, email, submitError: RATE_LIMITED_MESSAGE };
+  } else {
+    Astro.response.status = 502;
+    initial = { text, email, submitError: outcome.message };
+  }
+} else {
+  if (!isPlausibleLooId(looId)) looId = null;
+  if (Astro.url.searchParams.get("sent") === "1") initial = { sent: true };
+}
+
+// The toilet the message is about. Unknown ids are dropped; if the API is down, the message
+// still records the toilet's path, it just can't be named.
+let loo: FeedbackLoo | null = null;
+if (looId) {
+  const load = await loadLoo({ env, url: Astro.url, id: looId, clientIp, purpose: "feedback" });
+  if (load.kind === "found") loo = { id: load.loo.id, name: load.loo.name?.trim() || null };
+  else if (load.kind === "unavailable") loo = { id: looId, name: null };
+}
+
+const failed = hasErrors(initial.errors ?? {}) || !!initial.submitError;
+// Only the plain page is for search engines; the sent page, error pages and the per-toilet
+// versions point their canonical at it.
+const noindex = Astro.request.method === "POST" || !!initial.sent || !!looId;
+// "Sign in" comes back to this form (about the same toilet), not to its "sent" state.
+const signInUrl = new URL(Astro.url);
+signInUrl.searchParams.delete("sent");
+const signInReturnTo = `${signInUrl.pathname}${signInUrl.search}`;
+const title = initial.sent
+  ? FEEDBACK_TITLES.sent
+  : failed
+    ? FEEDBACK_TITLES.failed
+    : FEEDBACK_TITLES.form;
+---
+
+<ContentLayout
+  title={title}
+  description="Tell the Toilet Map team about a problem, an idea or anything else. We read every message."
+  heading="Send us feedback"
+  canonical={FEEDBACK_PATH}
+  noindex={noindex}
+  signInReturnTo={signInReturnTo}
+>
+  {
+    !initial.sent && (
+      <p data-feedback-intro>
+        Tell us about a problem with the site or the map, an idea, or anything else. If a
+        toilet's details are wrong, you can also fix them yourself: find it on the map and
+        choose <strong>Suggest an edit</strong>.
+      </p>
+    )
+  }
+  <FeedbackForm slot="after" client:load apiUrl={BROWSER_API_URL} loo={loo} initial={initial} />
+</ContentLayout>

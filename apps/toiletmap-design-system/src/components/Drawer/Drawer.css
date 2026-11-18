@@ -14,7 +14,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   background-color: var(--color-white);
-  z-index: 2000;
+  z-index: var(--z-drawer);
   padding: var(--space-s) calc(var(--space-s) + var(--safe-right, 0px))
     calc(var(--space-s) + var(--safe-bottom, 0px)) calc(var(--space-s) + var(--safe-left, 0px));
   visibility: hidden;

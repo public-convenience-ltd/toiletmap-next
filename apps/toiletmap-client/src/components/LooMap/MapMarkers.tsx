@@ -3,7 +3,8 @@ import "leaflet.markercluster";
 import ngeohash from "ngeohash";
 import { useEffect, useRef } from "preact/hooks";
 import { getLooById, type LooDetail, peekLooDetail } from "../../api/loos";
-import { type ActiveFilters, FILTER_BIT, type FilterKey } from "../../types/filters";
+import type { ActiveFilters } from "../../types/filters";
+import { filterLoos } from "./filterLoos";
 import { makeIcon } from "./looIcon";
 import type { CompressedLoo } from "./useMapData";
 
@@ -57,14 +58,8 @@ export function diffMarkers(
   return { added, removed, updated };
 }
 
-/** Rows that pass the active filters (every selected feature bit must be set). */
-export function filterLoos(data: CompressedLoo[], activeFilters: ActiveFilters): CompressedLoo[] {
-  const requiredMask = (Object.keys(FILTER_BIT) as FilterKey[]).reduce(
-    (acc, key) => (activeFilters[key] ? acc | FILTER_BIT[key] : acc),
-    0,
-  );
-  return requiredMask === 0 ? data : data.filter((loo) => (loo[2] & requiredMask) === requiredMask);
-}
+// Shared with LooMap's empty state (a module of its own, so tests can stub MapMarkers).
+export { filterLoos } from "./filterLoos";
 
 // Shared icon instances: ~14k markers don't need ~14k identical icon objects.
 let icons: { normal: L.DivIcon; highlighted: L.DivIcon } | null = null;

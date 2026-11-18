@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { Banner, Button, Icon } from "toiletmap-design-system";
+import { Button, Icon, Notice } from "toiletmap-design-system";
+import { feedbackHref } from "../../api/feedback";
 import type { LooDetail } from "../../api/loos";
 import {
   type ChangeOutcome,
@@ -13,20 +14,22 @@ import {
   reportLoo,
   restoreLoo,
 } from "../../api/reports";
+import { currentPath, loginHref } from "../../utils/returnTo";
 import { compassDirection } from "../ReviewChanges/describeChanges";
 import styles from "./ReportProblem.module.css";
 
 /**
  * A choice on step 1. `temporarily_closed` and `wrong_place` aren't reports: the toilet stays on
- * the map, and they point at the edit form instead.
+ * the map, and they point at the edit form instead. "Something else" (`other`) isn't one
+ * either: it points at the feedback page, about this toilet.
  */
 export type ReportChoice = ReportReason | "temporarily_closed" | "wrong_place";
 
-type FixInstead = "temporarily_closed" | "wrong_place";
+type FixInstead = "temporarily_closed" | "wrong_place" | "other";
 
-/** Choices answered by editing the toilet rather than reporting it. */
+/** Choices answered by editing the toilet or sending feedback, rather than reporting it. */
 const isFixInstead = (choice: ReportChoice | null): choice is FixInstead =>
-  choice === "temporarily_closed" || choice === "wrong_place";
+  choice === "temporarily_closed" || choice === "wrong_place" || choice === "other";
 
 interface ChoiceDef {
   value: ReportChoice;
@@ -69,6 +72,21 @@ type NearbyState =
   | { status: "error" }
   | { status: "loaded"; items: NearbyLoo[] };
 
+/** The check step's button for a report a moderator checks first. */
+export const REPORT_LABEL = "Report it";
+/** …and for one that removes the toilet straight away (any signed-in user). */
+export const REMOVE_LABEL = "Remove it from the map";
+
+/** Where the error summary's links point. */
+const ERROR_ANCHORS = {
+  choice: "report-choice",
+  duplicate: "report-duplicate",
+  details: "report-details",
+} as const;
+
+/** The error summary's order: the order of the fields on the page. */
+const ERROR_ORDER = ["choice", "duplicate", "details"] as const;
+
 interface Errors {
   choice?: string;
   duplicate?: string;
@@ -77,12 +95,8 @@ interface Errors {
 
 type UndoState = { status: "idle" | "sending" } | { status: "done"; outcome: ChangeOutcome };
 
-const signInHref = (path: string) => `/auth/login?returnTo=${encodeURIComponent(path)}`;
-
-const currentPath = () =>
-  typeof window === "undefined"
-    ? "/"
-    : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+/** Sign in, then come back to this page (a same-origin path only: see safeReturnTo). */
+const signInHref = () => loginHref(currentPath("/"));
 
 /** Focus an element once it is on screen (after the render that mounts it). */
 function useFocusOnChange(key: unknown) {
@@ -112,6 +126,8 @@ export default function ReportProblem({
   canWriteDirectly = false,
 }: ReportProblemProps) {
   const trusted = isAuthenticated && canWriteDirectly;
+  /** The check step's button says what it does: a trusted report removes the toilet at once. */
+  const submitLabel = trusted ? REMOVE_LABEL : REPORT_LABEL;
   const name = loo.name?.trim() || "this toilet";
   /** `name` for the start of a sentence. */
   const Name = loo.name?.trim() || "This toilet";
@@ -180,16 +196,21 @@ export default function ReportProblem({
     if (choice === "duplicate" && !duplicateOf) {
       next.duplicate = "Choose the toilet this one duplicates.";
     }
-    if (choice === "other" && !trimmed) next.details = "Tell us what's wrong.";
     if (trimmed.length > MAX_DETAILS_LENGTH) {
       next.details = `Keep the details to ${MAX_DETAILS_LENGTH} characters or fewer.`;
     }
     setErrors(next);
-    if (next.choice) choiceRef.current?.focus();
-    else if (next.duplicate) {
-      duplicateRef.current?.querySelector<HTMLElement>("input, button")?.focus();
-    } else if (next.details) detailsRef.current?.focus();
+    const first = ERROR_ORDER.find((key) => next[key]);
+    if (first) focusError(first);
     return Object.keys(next).length === 0;
+  };
+
+  /** Puts focus on the field an error is about (validation, and the error summary's links). */
+  const focusError = (key: keyof Errors) => {
+    if (key === "choice") choiceRef.current?.focus();
+    else if (key === "duplicate") {
+      duplicateRef.current?.querySelector<HTMLElement>("input, button")?.focus();
+    } else detailsRef.current?.focus();
   };
 
   const onContinue = (event: Event) => {
@@ -291,7 +312,9 @@ export default function ReportProblem({
     }
     return (
       <div ref={undoResultRef} tabIndex={-1} role="status" className={styles.undoResult}>
-        <Banner variant={variant}>{message}</Banner>
+        <Notice tone={variant} announce="off">
+          {message}
+        </Notice>
       </div>
     );
   }
@@ -310,12 +333,23 @@ export default function ReportProblem({
             : undone
               ? "Undone — it's back on the map"
               : "Removed — thanks.";
+        // The outcome pattern (shared with the edit form): a heading, a Notice saying where
+        // things stand, then the next step as the primary button, first.
         return (
           <>
             {resultHeading(heading)}
-            {!undone && <p>{Name} is no longer on the map.</p>}
+            {!undone && (
+              <div className={styles.outcomeNotice}>
+                <Notice tone="success" announce="off">
+                  {Name} is no longer on the map.
+                </Notice>
+              </div>
+            )}
             {renderUndoResult()}
             <div className={styles.actions}>
+              <Button htmlElement="a" variant="primary" href="/">
+                Back to map
+              </Button>
               {!undone && (
                 <Button
                   htmlElement="button"
@@ -327,9 +361,6 @@ export default function ReportProblem({
                   {undo.status === "sending" ? "Undoing…" : "Undo"}
                 </Button>
               )}
-              <Button htmlElement="a" variant="primary" href="/">
-                Back to map
-              </Button>
             </div>
           </>
         );
@@ -338,7 +369,11 @@ export default function ReportProblem({
         return (
           <>
             {resultHeading("Thanks — a moderator will review your report")}
-            <p>{Name} stays on the map until they've checked it.</p>
+            <div className={styles.outcomeNotice}>
+              <Notice tone="success" announce="off">
+                {Name} stays on the map until they've checked it.
+              </Notice>
+            </div>
             <div className={styles.actions}>
               <Button htmlElement="a" variant="primary" href={looHref}>
                 Back to the toilet
@@ -348,8 +383,8 @@ export default function ReportProblem({
               </Button>
             </div>
             {!isAuthenticated && (
-              <p className={styles.hint}>
-                <a href={signInHref(currentPath())}>Sign in</a> to keep track of your contributions.
+              <p className={styles.signInPrompt}>
+                <a href={signInHref()}>Sign in</a> to keep track of your contributions.
               </p>
             )}
           </>
@@ -358,7 +393,11 @@ export default function ReportProblem({
         return (
           <>
             {resultHeading("It's already been removed")}
-            <p>Someone has already removed {name} from the map, so there's nothing more to do.</p>
+            <div className={styles.outcomeNotice}>
+              <Notice tone="info" announce="off">
+                Someone has already removed {name} from the map, so there's nothing more to do.
+              </Notice>
+            </div>
             <div className={styles.actions}>
               <Button htmlElement="a" variant="primary" href="/">
                 Back to map
@@ -370,10 +409,12 @@ export default function ReportProblem({
         return (
           <>
             {resultHeading("This toilet has just been changed")}
-            <p>
-              Someone else updated {name} since you opened this page. Reload to check the latest
-              details, then report it again if it's still wrong.
-            </p>
+            <div className={styles.outcomeNotice}>
+              <Notice tone="warning" announce="off">
+                Someone else updated {name} since you opened this page. Reload to check the latest
+                details, then report it again if it's still wrong.
+              </Notice>
+            </div>
             <div className={styles.actions}>
               <Button
                 htmlElement="button"
@@ -390,7 +431,11 @@ export default function ReportProblem({
         return (
           <>
             {resultHeading("We couldn't find this toilet")}
-            <p>It may already have been deleted.</p>
+            <div className={styles.outcomeNotice}>
+              <Notice tone="error" announce="off">
+                It may already have been deleted.
+              </Notice>
+            </div>
             <div className={styles.actions}>
               <Button htmlElement="a" variant="primary" href="/">
                 Back to map
@@ -439,20 +484,33 @@ export default function ReportProblem({
             </div>
           )}
         </dl>
-        <p className={styles.consequence}>
-          <Icon icon="info" size="small" />
-          <span>
+        <div className={styles.consequence}>
+          {/* What the button will do: a warning when it removes the toilet at once. */}
+          <Notice tone={trusted ? "warning" : "info"} announce="off">
             {trusted
               ? `${Name} will be removed from the map straight away. You can undo this on the next screen.`
               : `A moderator will check your report before ${name} is removed from the map.`}
-          </span>
-        </p>
+          </Notice>
+        </div>
         {submitError && (
           <div ref={submitErrorRef} tabIndex={-1} className={styles.submitError}>
-            <Banner variant="error">{renderSubmitError(submitError)}</Banner>
+            <Notice tone="error">{renderSubmitError(submitError)}</Notice>
           </div>
         )}
+        {/* Primary first, as on every outcome screen and the form's own Continue. */}
         <div className={styles.actions}>
+          <Button
+            htmlElement="button"
+            type="button"
+            // Removing a toilet at once is destructive (even with Undo), and says so; a report
+            // a moderator checks first is not.
+            variant={trusted ? "destructive" : "primary"}
+            onClick={onSubmit}
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {submitting ? (trusted ? "Removing…" : "Sending…") : submitLabel}
+          </Button>
           <Button
             htmlElement="button"
             type="button"
@@ -461,16 +519,6 @@ export default function ReportProblem({
             disabled={submitting}
           >
             Back
-          </Button>
-          <Button
-            htmlElement="button"
-            type="button"
-            variant="primary"
-            onClick={onSubmit}
-            disabled={submitting}
-            aria-busy={submitting}
-          >
-            {submitting ? "Sending…" : "Report it"}
           </Button>
         </div>
       </section>
@@ -481,8 +529,7 @@ export default function ReportProblem({
     if (error.kind === "auth") {
       return (
         <>
-          Your sign-in has expired. <a href={signInHref(currentPath())}>Sign in again</a> to send
-          your report.
+          Your sign-in has expired. <a href={signInHref()}>Sign in again</a> to send your report.
         </>
       );
     }
@@ -507,10 +554,7 @@ export default function ReportProblem({
   }
 
   // ── Step 1: choose ────────────────────────────────────────────────────────
-  const detailsRequired = choice === "other";
-  const detailsLabel = detailsRequired
-    ? "What's wrong?"
-    : "Anything else we should know? (optional)";
+  const detailsLabel = "Anything else we should know? (optional)";
   const detailsHintId = "report-details-hint";
   const detailsErrorId = "report-details-error";
 
@@ -519,8 +563,31 @@ export default function ReportProblem({
       <h1 id="report-heading" className={styles.title} tabIndex={-1} ref={headingRef}>
         Report a problem with {loo.name?.trim() || "this toilet"}
       </h1>
+      {ERROR_ORDER.some((key) => errors[key]) && (
+        // The same summary as the add and edit forms: every problem, each linked to its field.
+        <div className={styles.errorSummary}>
+          <Notice tone="error" title="There's a problem" headingLevel={2}>
+            <ul className={styles.errorList}>
+              {ERROR_ORDER.filter((key) => errors[key]).map((key) => (
+                <li key={key}>
+                  <a
+                    href={`#${ERROR_ANCHORS[key]}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      focusError(key);
+                    }}
+                  >
+                    {errors[key]}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Notice>
+        </div>
+      )}
       <form onSubmit={onContinue} noValidate>
         <fieldset
+          id={ERROR_ANCHORS.choice}
           className={styles.fieldset}
           aria-describedby={errors.choice ? "report-choice-error" : undefined}
         >
@@ -590,8 +657,24 @@ export default function ReportProblem({
           </p>
         )}
 
+        {choice === "other" && (
+          <div className={styles.explain}>
+            <p>
+              Tell the Toilet Map team about it in a message. It will say which toilet it's about,
+              and the toilet stays on the map.
+            </p>
+            <div className={styles.actions}>
+              <Button htmlElement="a" variant="primary" href={feedbackHref(loo.id)}>
+                <Icon icon="comments" size="small" />
+                Send us a message
+              </Button>
+            </div>
+          </div>
+        )}
+
         {choice === "duplicate" && (
           <fieldset
+            id={ERROR_ANCHORS.duplicate}
             className={styles.fieldset}
             ref={duplicateRef}
             aria-describedby={errors.duplicate ? "report-duplicate-error" : undefined}
@@ -612,9 +695,7 @@ export default function ReportProblem({
               {detailsLabel}
             </label>
             <p id={detailsHintId} className={styles.hint}>
-              {detailsRequired
-                ? "Describe the problem so a moderator can check it."
-                : "For example when it closed, or what's there now."}
+              For example when it closed, or what's there now.
             </p>
             {errors.details && (
               <p id={detailsErrorId} className={styles.error}>
@@ -628,8 +709,6 @@ export default function ReportProblem({
               value={details}
               rows={4}
               maxLength={MAX_DETAILS_LENGTH}
-              required={detailsRequired}
-              aria-required={detailsRequired || undefined}
               aria-invalid={errors.details ? true : undefined}
               aria-describedby={`${detailsHintId}${errors.details ? ` ${detailsErrorId}` : ""}`}
               onInput={(e) => setDetails((e.currentTarget as HTMLTextAreaElement).value)}
@@ -638,14 +717,14 @@ export default function ReportProblem({
         )}
 
         <div className={styles.actions}>
-          <Button htmlElement="a" variant="secondary" href={looHref}>
-            Cancel
-          </Button>
           {!isFixInstead(choice) && (
             <Button htmlElement="button" type="submit" variant="primary">
               Continue
             </Button>
           )}
+          <Button htmlElement="a" variant="secondary" href={looHref}>
+            Cancel
+          </Button>
         </div>
       </form>
     </section>
@@ -669,12 +748,13 @@ export default function ReportProblem({
     }
     if (nearby.status === "error") {
       return (
-        <div role="alert" className={styles.hint}>
-          <p>We couldn't load nearby toilets.</p>
-          <Button htmlElement="button" type="button" variant="secondary" onClick={loadNearby}>
-            Try again
-          </Button>
-        </div>
+        <Notice
+          tone="error"
+          size="compact"
+          action={{ label: "Try again", onClick: () => loadNearby() }}
+        >
+          We couldn't load nearby toilets.
+        </Notice>
       );
     }
     if (nearby.items.length === 0) {

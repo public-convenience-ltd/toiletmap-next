@@ -12,6 +12,8 @@ import {
 } from "../../api/mapCache";
 import { draftKey } from "./draft";
 import LooForm, {
+  ADD_MODERATOR_WILL_CHECK,
+  ADDED_STRAIGHT_AWAY,
   LIVE_STRAIGHT_AWAY,
   MESSAGES,
   MODERATOR_WILL_CHECK,
@@ -51,17 +53,84 @@ const OTHER_ID = "fffffffffffffffffffffff1";
 
 // Leaflet does not run in happy-dom, so the map picker is replaced with a stub that drives
 // the same callbacks the real picker does (its own behaviour is tested in LocationPicker.test).
-const pickerProps = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
+// Like the real one, its handle keeps a pending move when the form asks it to settle (Save),
+// answers "unplaced" for a new toilet whose pin was never moved, or what `resolution` says.
+type LatLngStub = { lat: number; lng: number };
+const pickerProps = vi.hoisted(() => ({
+  last: null as Record<string, unknown> | null,
+  /** A move the stub reported as pending (not yet kept). */
+  pending: null as { lat: number; lng: number } | null,
+  /** Forces what resolve() answers (e.g. a blocked pin). */
+  resolution: null as Record<string, unknown> | null,
+  /** What the form last asked resolve() for. */
+  resolveOptions: undefined as { save?: boolean } | undefined,
+  placeHere: vi.fn(),
+  focusMap: vi.fn(),
+  fixIssue: vi.fn(),
+}));
+/** About 22 m north of the toilet's saved location (makeLoo). */
+const NUDGED = { lat: 51.501435, lng: -0.141235 };
 vi.mock("./LocationPicker", () => ({
   default: function LocationPickerStub(props: {
-    location: { lat: number; lng: number } | null;
-    onChange: (lat: number, lng: number) => void;
+    location: LatLngStub | null;
+    onChange: (lat: number, lng: number, source?: string) => void;
     onMovingChange?: (moving: boolean) => void;
+    onPendingChange?: (
+      pending: {
+        location: LatLngStub;
+        keepable: boolean;
+        issue: string | null;
+        checked: boolean;
+      } | null,
+    ) => void;
+    onIssueChange?: (issue: string | null) => void;
     onEditExisting?: (id: string) => void;
     onRestoreExisting?: (id: string) => void;
+    controllerRef?: { current: unknown };
   }) {
     pickerProps.last = props as unknown as Record<string, unknown>;
-    const { location, onChange, onMovingChange, onEditExisting, onRestoreExisting } = props;
+    const {
+      location,
+      onChange,
+      onMovingChange,
+      onPendingChange,
+      onIssueChange,
+      onEditExisting,
+      onRestoreExisting,
+      controllerRef,
+    } = props;
+    const keepPending = () => {
+      const pending = pickerProps.pending;
+      if (!pending) return null;
+      pickerProps.pending = null;
+      onChange(pending.lat, pending.lng, "auto");
+      onPendingChange?.(null);
+      return pending;
+    };
+    if (controllerRef) {
+      controllerRef.current = {
+        resolve: (options?: { save?: boolean }) => {
+          pickerProps.resolveOptions = options;
+          if (pickerProps.resolution) return Promise.resolve(pickerProps.resolution);
+          const kept = keepPending();
+          if (kept) return Promise.resolve({ kind: "ok", location: kept, source: "auto" });
+          return Promise.resolve(
+            location ? { kind: "ok", location, source: null } : { kind: "unplaced" },
+          );
+        },
+        placeHere: () => {
+          pickerProps.placeHere();
+          onChange(51.5074, -0.1278, "confirmed");
+          return { lat: 51.5074, lng: -0.1278 };
+        },
+        focusMap: pickerProps.focusMap,
+        fixIssue: pickerProps.fixIssue,
+      };
+    }
+    const reportPending = (at: LatLngStub, issue: string | null, checked = true) => {
+      pickerProps.pending = at;
+      onPendingChange?.({ location: at, keepable: issue === null, issue, checked });
+    };
     return (
       <div data-testid="location-picker">
         <span data-testid="picker-location">
@@ -75,6 +144,21 @@ vi.mock("./LocationPicker", () => ({
         </button>
         <button type="button" onClick={() => onMovingChange?.(true)}>
           Stub: start moving
+        </button>
+        <button type="button" onClick={() => reportPending(NUDGED, null)}>
+          Stub: nudge pin
+        </button>
+        <button type="button" onClick={() => reportPending(NUDGED, null, false)}>
+          Stub: nudge pin, not yet checked
+        </button>
+        <button type="button" onClick={() => onIssueChange?.(null)}>
+          Stub: nothing blocks the pin
+        </button>
+        <button type="button" onClick={() => reportPending({ lat: 51.6, lng: -0.2 }, "bigMove")}>
+          Stub: big move pending
+        </button>
+        <button type="button" onClick={() => keepPending()}>
+          Stub: move on
         </button>
         <button type="button" onClick={() => onEditExisting?.("fffffffffffffffffffffff1")}>
           Stub: edit existing
@@ -192,6 +276,12 @@ let locationStub: { href: string; pathname: string; search: string };
 beforeEach(async () => {
   vi.mocked(applyLocalMutation).mockClear();
   pickerProps.last = null;
+  pickerProps.pending = null;
+  pickerProps.resolution = null;
+  pickerProps.resolveOptions = undefined;
+  pickerProps.placeHere.mockClear();
+  pickerProps.focusMap.mockClear();
+  pickerProps.fixIssue.mockClear();
   await clearMapCache();
   resetMapCacheForTests();
   sessionStorage.clear();
@@ -254,7 +344,9 @@ const notesInput = () =>
 const saveButton = () => screen.getByRole("button", { name: /^(save|no changes|add toilet)/i });
 const facility = (label: string) => within(screen.getByRole("group", { name: label }));
 const reviewSheet = () => screen.getByRole("dialog", { name: /^Check / });
-const confirmButton = () => screen.getByRole("button", { name: "Confirm and save" });
+/** "Confirm and save", or "Send for review" when the change is only queued. */
+const CONFIRM_NAME = /^(Confirm and save|Send for review)$/;
+const confirmButton = () => screen.getByRole("button", { name: CONFIRM_NAME });
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -266,7 +358,7 @@ const changeName = async (user: User, value: string) => {
 /** Save through the review sheet. */
 const saveAndConfirm = async (user: User) => {
   await user.click(saveButton());
-  await user.click(await screen.findByRole("button", { name: "Confirm and save" }));
+  await user.click(await screen.findByRole("button", { name: CONFIRM_NAME }));
 };
 
 /** Text of each line of the review sheet. */
@@ -397,13 +489,15 @@ describe("LooForm (edit)", () => {
     expect(request().body).toEqual({ radar: true, baseUpdatedAt: BASE_UPDATED_AT });
   });
 
-  it("sends urinalOnly from the Who can use it question", async () => {
+  it("sends urinalOnly from the Accessibility and facilities question", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ urinalOnly: true })));
     renderEdit();
 
-    const who = within(screen.getByRole("region", { name: "Who can use it?" }));
-    await user.click(within(who.getByRole("group", { name: "Urinal only" })).getByLabelText("Yes"));
+    const facilities = within(screen.getByRole("region", { name: "Accessibility and facilities" }));
+    await user.click(
+      within(facilities.getByRole("group", { name: "Urinal only" })).getByLabelText("Yes"),
+    );
     await user.click(saveButton());
     expect(reviewLines()).toEqual(["Urinal only: Don't know → changes to Yes"]);
     await user.click(confirmButton());
@@ -516,20 +610,72 @@ describe("LooForm (edit)", () => {
     expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
   });
 
-  it("won't save while the pin is being moved and not yet confirmed", async () => {
+  it.each([
+    ["bigMove", "Confirm the big move with “Use this location”, or cancel it."],
+    ["jump", "Check the pin after your search, then choose “Use this location”."],
+    ["zoom", "Zoom in on the map so the pin can be placed accurately."],
+    ["duplicate", "Tell us if this is the same toilet as Station toilets."],
+  ])(
+    "won't save while the picker can't keep the pin (%s), and the error link fixes it",
+    async (issue, message) => {
+      const user = userEvent.setup();
+      pickerProps.resolution = { kind: "blocked", issue, name: "Station toilets" };
+      renderEdit();
+
+      await changeName(user, "Renamed");
+      await user.click(saveButton());
+
+      const link = await screen.findByRole("link", { name: message });
+      expect(link).toHaveAttribute("href", "#field-location");
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      await user.click(link);
+      expect(pickerProps.fixIssue).toHaveBeenCalledWith(issue);
+    },
+  );
+
+  it.each([
+    ["search", MESSAGES.locationJump],
+    ["gps", "Check the pin is on the toilet, then choose “Use this location”."],
+    ["coords", "Check the pin is on the toilet, then choose “Use this location”."],
+  ])("names what moved the pin for a jump (%s)", async (jump, message) => {
     const user = userEvent.setup();
+    pickerProps.resolution = { kind: "blocked", issue: "jump", jump };
     renderEdit();
-
     await changeName(user, "Renamed");
-    await user.click(screen.getByRole("button", { name: "Stub: start moving" }));
     await user.click(saveButton());
+    expect(await screen.findByRole("link", { name: message })).toBeVisible();
+  });
 
-    expect(screen.getByRole("link", { name: MESSAGES.locationUnconfirmed })).toHaveAttribute(
-      "href",
-      "#field-location",
-    );
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+  it("clears the location error once the picker says nothing blocks the pin any more", async () => {
+    const user = userEvent.setup();
+    pickerProps.resolution = { kind: "blocked", issue: "zoom" };
+    renderEdit();
+    await changeName(user, "Renamed");
+    await user.click(saveButton());
+    expect(await screen.findByRole("link", { name: MESSAGES.locationZoom })).toBeVisible();
+    expect(screen.getAllByText(MESSAGES.locationZoom)).toHaveLength(2); // summary and field
+
+    // e.g. the error link zoomed the map in: the pin could be kept now.
+    await user.click(screen.getByRole("button", { name: "Stub: nothing blocks the pin" }));
+    expect(screen.queryByText(MESSAGES.locationZoom)).toBeNull();
+    expect(screen.queryByText("There's a problem")).toBeNull();
+  });
+
+  it("lists every problem at once: a blocked pin and a missing name", async () => {
+    const user = userEvent.setup();
+    pickerProps.resolution = { kind: "blocked", issue: "bigMove" };
+    renderEdit();
+    await user.clear(nameInput());
+    await user.click(saveButton());
+    const summary = await screen.findByText("There's a problem");
+    const links = within(summary.closest('[role="alert"]') as HTMLElement).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual([
+      MESSAGES.nameRequired,
+      MESSAGES.locationBigMove,
+    ]);
   });
 
   it("on 409 lists the conflicting fields and resubmits the user's change against the latest version", async () => {
@@ -817,6 +963,213 @@ describe("LooForm (edit)", () => {
   });
 });
 
+describe("LooForm: a pending move", () => {
+  it("counts as a change and arms the unsaved-changes warning and the draft", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+    expect(saveButton()).toHaveTextContent("No changes to save");
+    const fire = () => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(fire()).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    expect(saveButton()).toHaveTextContent("Save 1 change");
+    expect(saveButton()).toBeEnabled();
+    expect(fire()).toBe(true);
+    const draft = JSON.parse(sessionStorage.getItem(draftKey(LOO_ID)) ?? "null");
+    expect(draft?.form.location).toEqual(NUDGED);
+
+    await user.click(screen.getByRole("link", { name: "Cancel" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Discard your changes?" });
+    expect(within(dialog).getByText("You've made 1 change that haven't been saved.")).toBeVisible();
+  });
+
+  it("a big move counts and warns, but is never put in the draft unconfirmed", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+    await user.click(screen.getByRole("button", { name: "Stub: big move pending" }));
+    expect(saveButton()).toHaveTextContent("Save 1 change");
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
+  });
+
+  it("isn't put in the draft before its duplicate check is done", async () => {
+    const user = userEvent.setup();
+    renderEdit();
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin, not yet checked" }));
+    expect(saveButton()).toHaveTextContent("Save 1 change");
+    // A restored location isn't checked again, so an unchecked spot never reaches the draft.
+    expect(sessionStorage.getItem(draftKey(LOO_ID))).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    expect(JSON.parse(sessionStorage.getItem(draftKey(LOO_ID)) ?? "null")?.form.location).toEqual(
+      NUDGED,
+    );
+  });
+
+  it("anonymous: Save keeps it, and the review sheet lists the move", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(202, { queued: true, id: "pending-1" }));
+    renderEdit(makeLoo(), false);
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("dialog", { name: "Check your changes" })).toBeVisible();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(reviewLines()).toEqual(["Location: Moved 22 m north"]);
+    await user.click(confirmButton());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(request().body).toEqual({ location: NUDGED, baseUpdatedAt: BASE_UPDATED_AT });
+  });
+});
+
+describe("LooForm: 'Save the new location?' (changes that go live)", () => {
+  const renderTrusted = () => renderEdit(makeLoo(), true, { canWriteDirectly: true });
+  const locationDialog = () => screen.findByRole("alertdialog", { name: "Save the new location?" });
+
+  it("asks before saving a move that was kept automatically", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ location: NUDGED })));
+    renderTrusted();
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(screen.getByRole("button", { name: "Stub: move on" }));
+    expect(saveButton()).toHaveTextContent("Save 1 change");
+    await user.click(saveButton());
+
+    const dialog = await locationDialog();
+    expect(dialog).toHaveAccessibleDescription("You moved the pin 22 m north.");
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole("button", { name: "Yes, save the new location" }),
+      ).toHaveFocus(),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // The move was the only change, so this was its check: no review sheet asking again.
+    await user.click(within(dialog).getByRole("button", { name: "Yes, save the new location" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("dialog", { name: "Check your changes" })).toBeNull();
+    expect(request().body).toEqual({ location: NUDGED, baseUpdatedAt: BASE_UPDATED_AT });
+  });
+
+  it("asks the picker to settle for Save, so a typed-coordinates move gets this check, not an error", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ location: NUDGED })));
+    renderTrusted();
+    // The picker keeps a coordinates jump for Save (LocationPicker.test): a move kept "auto".
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(saveButton());
+    expect(pickerProps.resolveOptions).toEqual({ save: true });
+    expect(await locationDialog()).toBeVisible();
+    expect(screen.queryByText("There's a problem")).toBeNull();
+  });
+
+  it("'Yes, save the new location' with other changes still shows them in the review sheet", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "Renamed", location: NUDGED })));
+    renderTrusted();
+    await changeName(user, "Renamed");
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(saveButton());
+    await user.click(
+      within(await locationDialog()).getByRole("button", { name: "Yes, save the new location" }),
+    );
+    expect(await screen.findByRole("dialog", { name: "Check your changes" })).toBeVisible();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await user.click(confirmButton());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(request().body).toEqual({
+      name: "Renamed",
+      location: NUDGED,
+      baseUpdatedAt: BASE_UPDATED_AT,
+    });
+  });
+
+  it("still asks after a reload restores a move that was kept automatically", async () => {
+    const user = userEvent.setup();
+    const first = renderTrusted();
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(screen.getByRole("button", { name: "Stub: move on" }));
+    expect(JSON.parse(sessionStorage.getItem(draftKey(LOO_ID)) ?? "null")).toMatchObject({
+      form: { location: NUDGED },
+      locationUnconfirmed: true,
+    });
+    first.unmount();
+
+    renderTrusted();
+    expect(screen.getByTestId("picker-location")).toHaveTextContent(`${NUDGED.lat},${NUDGED.lng}`);
+    await user.click(saveButton());
+    expect(await locationDialog()).toHaveAccessibleDescription("You moved the pin 22 m north.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("asks for a pending move Save kept, too", async () => {
+    const user = userEvent.setup();
+    renderTrusted();
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(saveButton());
+    expect(await locationDialog()).toBeVisible();
+  });
+
+  it("'No, keep the old location' saves the other changes without the move", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "Renamed" })));
+    renderTrusted();
+    await changeName(user, "Renamed");
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    expect(saveButton()).toHaveTextContent("Save 2 changes");
+    await user.click(saveButton());
+    await user.click(
+      within(await locationDialog()).getByRole("button", { name: "No, keep the old location" }),
+    );
+
+    expect(await screen.findByRole("dialog", { name: "Check your changes" })).toBeVisible();
+    expect(reviewLines()).toEqual(["Name: High Street toilets → changes to Renamed"]);
+    await user.click(confirmButton());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(request().body).toEqual({ name: "Renamed", baseUpdatedAt: BASE_UPDATED_AT });
+    expect(screen.getByTestId("picker-location")).toHaveTextContent("51.501234567,-0.141234567");
+  });
+
+  it("'No, keep the old location' with nothing else changed goes back to the form", async () => {
+    const user = userEvent.setup();
+    renderTrusted();
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(saveButton());
+    await user.click(
+      within(await locationDialog()).getByRole("button", { name: "No, keep the old location" }),
+    );
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(saveButton()).toHaveTextContent("No changes to save");
+    expect(saveButton()).toBeDisabled();
+    expect(screen.getByTestId("picker-location")).toHaveTextContent("51.501234567,-0.141234567");
+    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement?.id).toBe("field-location"));
+  });
+
+  it("doesn't ask about a move confirmed with 'Use this location'", async () => {
+    const user = userEvent.setup();
+    renderTrusted();
+    await user.click(screen.getByRole("button", { name: "Stub: move pin far" }));
+    await user.click(saveButton());
+    expect(await screen.findByRole("dialog", { name: "Check your changes" })).toBeVisible();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("isn't shown to anonymous users (the review sheet lists the move instead)", async () => {
+    const user = userEvent.setup();
+    renderEdit(makeLoo(), false);
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(screen.getByRole("button", { name: "Stub: move on" }));
+    await user.click(saveButton());
+    expect(await screen.findByRole("dialog", { name: "Check your changes" })).toBeVisible();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+});
+
 describe("LooForm layout", () => {
   it("asks the seven questions in order, as labelled regions", () => {
     renderEdit();
@@ -828,7 +1181,7 @@ describe("LooForm layout", () => {
       "What's it called?",
       "Where is it?",
       "Who can use it?",
-      "Accessibility",
+      "Accessibility and facilities",
       "Does it cost money?",
       "When is it open?",
       "Anything else people should know?",
@@ -889,8 +1242,11 @@ describe("LooForm review sheet", () => {
 
     await changeName(user, "Renamed");
     await user.click(saveButton());
-    expect(document.activeElement).toBe(
-      within(reviewSheet()).getByRole("heading", { name: "Check your changes" }),
+    // Save first lets the picker settle, so the sheet (and its focus) follow a moment later.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(reviewSheet()).getByRole("heading", { name: "Check your changes" }),
+      ),
     );
     await user.click(screen.getByRole("button", { name: "Back to editing" }));
 
@@ -1017,8 +1373,10 @@ describe("LooForm review sheet", () => {
 const actionBar = () => saveButton().closest("[data-action-bar]") as HTMLElement;
 /** The "goes live / a moderator will check" notice above the questions. */
 const saveNotice = () => {
-  const text = screen.getByText(/^(Your change will go live|A moderator will check)/);
-  return text.closest(".banner") as HTMLElement;
+  const text = screen.getByText(
+    /^(Your change will go live|A moderator will check|The toilet will go on the map)/,
+  );
+  return text.closest(".notice") as HTMLElement;
 };
 
 describe("LooForm save notice", () => {
@@ -1050,7 +1408,9 @@ describe("LooForm save notice", () => {
     locationStub.pathname = "/loos/add";
     locationStub.search = "?lat=51.5&lng=-0.1&zoom=17";
     renderAdd(false);
-    expect(screen.getAllByText(MODERATOR_WILL_CHECK)).toHaveLength(1);
+    // A new toilet, not "your change".
+    expect(screen.getAllByText(ADD_MODERATOR_WILL_CHECK)).toHaveLength(1);
+    expect(screen.queryByText(MODERATOR_WILL_CHECK)).toBeNull();
     const notice = saveNotice();
     expect(within(notice).getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
@@ -1058,6 +1418,12 @@ describe("LooForm save notice", () => {
     );
     // Only the one link (the bar has no status line of its own any more).
     expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
+  });
+
+  it("tells a signed-in user adding a toilet it goes on the map straight away", () => {
+    render(<LooForm mode="add" initialData={null} apiUrl="" isAuthenticated canWriteDirectly />);
+    expect(screen.getAllByText(ADDED_STRAIGHT_AWAY)).toHaveLength(1);
+    expect(screen.queryByText(LIVE_STRAIGHT_AWAY)).toBeNull();
   });
 
   it("stays put as the form changes", async () => {
@@ -1527,39 +1893,97 @@ describe("LooForm drafts", () => {
     expect(nameInput()).toHaveValue("New one");
     expect(screen.getByTestId("picker-location")).toHaveTextContent("51.5074,-0.1278");
     await saveAndConfirm(user);
-    await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=1"));
+    await waitFor(() =>
+      expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=added"),
+    );
     expect(sessionStorage.getItem("loo-draft:new")).toBeNull();
   });
 });
 
 describe("LooForm (add)", () => {
-  it("requires a location before submitting", async () => {
+  it("asks 'Is the pin on the toilet?' when the map was never moved: Move the map", async () => {
     const user = userEvent.setup();
     renderAdd();
 
     await user.type(nameInput(), "Brand new toilet");
     await user.click(saveButton());
 
-    expect(screen.getByRole("link", { name: MESSAGES.locationRequired })).toHaveAttribute(
-      "href",
-      "#field-location",
+    const dialog = await screen.findByRole("alertdialog", { name: "Is the pin on the toilet?" });
+    expect(dialog).toHaveAccessibleDescription(
+      "You haven't moved the map, so the pin is where the map opened.",
     );
+    // The DS order (primary first in the DOM, on the right or on top), and the safe answer,
+    // Move the map, has focus.
+    const buttons = within(dialog).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "",
+      "Yes, it's on the toilet",
+      "Move the map",
+    ]);
+    expect(buttons[0]).toHaveAccessibleName("Close");
+    const moveTheMap = within(dialog).getByRole("button", { name: "Move the map" });
+    await waitFor(() => expect(moveTheMap).toHaveFocus());
+    expect(screen.queryByText("There's a problem")).toBeNull();
+
+    await user.click(moveTheMap);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(pickerProps.focusMap).toHaveBeenCalled();
+    expect(pickerProps.placeHere).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("tells the user to place the pin when it hasn't been confirmed yet", async () => {
+  it("after a rough 'Use my location' fix, says where the pin is instead", async () => {
     const user = userEvent.setup();
+    pickerProps.resolution = { kind: "unplaced", accuracy: 120 };
     renderAdd();
-    // A new toilet's picker starts moving, with nothing to cancel back to.
-    await user.click(screen.getByRole("button", { name: "Stub: start moving" }));
     await user.type(nameInput(), "Brand new toilet");
     await user.click(saveButton());
-
-    expect(screen.getByRole("link", { name: MESSAGES.locationNotPlaced })).toHaveAttribute(
-      "href",
-      "#field-location",
+    const dialog = await screen.findByRole("alertdialog", { name: "Is the pin on the toilet?" });
+    expect(dialog).toHaveAccessibleDescription(
+      "The pin is at your approximate location, which is only accurate to about 120 m.",
     );
-    expect(screen.queryByText(/cancel the move/)).toBeNull();
+  });
+
+  it("'Yes, it's on the toilet' keeps the pin where the map opened and carries on", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(
+      jsonResponse(201, { ...makeLoo(), id: "fedcba9876543210fedcba98" }),
+    );
+    renderAdd();
+    await user.type(nameInput(), "Brand new toilet");
+    await user.click(saveButton());
+    await user.click(await screen.findByRole("button", { name: "Yes, it's on the toilet" }));
+
+    expect(pickerProps.placeHere).toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: "Check the new toilet" })).toBeVisible();
+    await user.click(confirmButton());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(request().body).toMatchObject({ location: { lat: 51.5074, lng: -0.1278 } });
+  });
+
+  it("a pin placed by moving the map saves with no extra step (legacy-style add)", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(
+      jsonResponse(201, { ...makeLoo(), id: "fedcba9876543210fedcba98" }),
+    );
+    renderAdd();
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.type(nameInput(), "Brand new toilet");
+    await saveAndConfirm(user);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(request().body).toMatchObject({ name: "Brand new toilet", location: NUDGED });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("blocks Add toilet while the pin is too far out, with a link that zooms in", async () => {
+    const user = userEvent.setup();
+    pickerProps.resolution = { kind: "blocked", issue: "zoom" };
+    renderAdd();
+    await user.type(nameInput(), "Brand new toilet");
+    await user.click(saveButton());
+    await user.click(await screen.findByRole("link", { name: MESSAGES.locationZoom }));
+    expect(pickerProps.fixIssue).toHaveBeenCalledWith("zoom");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -1567,6 +1991,13 @@ describe("LooForm (add)", () => {
     renderAdd();
     const question = screen.getByRole("region", { name: /Where is it\?/ });
     expect(within(question).queryByText(/entrance/)).toBeNull();
+  });
+
+  it("adds no hint of its own to the edit form's location either (the picker says it)", () => {
+    renderEdit();
+    const question = screen.getByRole("region", { name: /Where is it\?/ });
+    expect(within(question).queryByText(/Only move the pin/)).toBeNull();
+    expect(question.querySelector("[id$='-hint']")).toBeNull();
   });
 
   it("requires a name before submitting", async () => {
@@ -1599,7 +2030,9 @@ describe("LooForm (add)", () => {
     await user.click(facility("Is there a wheelchair-accessible toilet?").getByLabelText("Yes"));
     await saveAndConfirm(user);
 
-    await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=1"));
+    await waitFor(() =>
+      expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=added"),
+    );
     const { url, init, body } = request();
     expect(url).toBe("/api/loos");
     expect(init.method).toBe("POST");
@@ -1641,7 +2074,7 @@ describe("LooForm (add)", () => {
     await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
     await saveAndConfirm(user);
 
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${newId}?saved=1`));
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${newId}?saved=added`));
     expect(applyLocalMutation).toHaveBeenCalledWith(newId, compressed, BASE_UPDATED_AT);
     expect((await loadMapCache())?.data).toEqual([OTHER_ROW, compressed]);
   });

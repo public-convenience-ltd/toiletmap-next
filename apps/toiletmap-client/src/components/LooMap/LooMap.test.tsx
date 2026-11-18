@@ -1,9 +1,17 @@
 import { act, render, screen, waitFor } from "@testing-library/preact";
 import userEvent from "@testing-library/user-event";
+import { toast } from "toiletmap-design-system";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LooDetail } from "../../api/loos";
-import { REMOVED_MESSAGE, SAVED_MESSAGE } from "../ToiletDetailsPanel";
+import { REMOVED_MESSAGE } from "../ToiletDetailsPanel";
 import LooMap from "./index";
+import {
+  ADDED_MESSAGE,
+  EMPTY_FILTERED_MESSAGE,
+  EMPTY_MESSAGE,
+  NOT_FOUND_MESSAGE,
+  SAVED_MESSAGE,
+} from "./messages";
 import type { CompressedLoo, MapDataState } from "./useMapData";
 
 // Leaflet doesn't run in happy-dom: a minimal fake map is enough for LooMap's own logic.
@@ -20,7 +28,7 @@ const fakeMap = vi.hoisted(() => {
     addLayer: vi.fn(),
     removeLayer: vi.fn(),
     remove: vi.fn(),
-    getBounds: vi.fn(() => ({ contains: () => true })),
+    getBounds: vi.fn(() => ({ contains: (_point: unknown): boolean => true })),
     on: vi.fn((name: string, fn: () => void) => {
       handlers.set(name, [...(handlers.get(name) ?? []), fn]);
       return m;
@@ -149,21 +157,31 @@ beforeEach(() => {
   fakeMap.handlers.clear();
   fakeMap.getCenter.mockReturnValue({ lat: 51.505, lng: -0.09 });
   fakeMap.getZoom.mockReturnValue(13);
+  fakeMap.getBounds.mockReturnValue({ contains: () => true });
   window.history.replaceState(null, "", "/");
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  // The toast store is shared by the whole page (module level).
+  act(() => toast.clear());
 });
 
 describe("LooMap ?saved=1", () => {
-  it("shows the changes-are-live banner for the saved toilet and strips the param", async () => {
+  const toasts = () => screen.getByRole("list", { name: "Notifications" });
+
+  it("confirms the save in a toast, outside the panel, and strips the param", async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, "", "/loos/aaa?saved=1");
     render(<LooMap apiUrl="" initialToiletId="aaa" />);
 
-    await panelHeading("Toilet aaa");
-    expect(screen.getByText(SAVED_MESSAGE)).toBeInTheDocument();
+    const heading = await panelHeading("Toilet aaa");
+    const message = await screen.findByText(SAVED_MESSAGE);
+    // In the polite live region the page rendered first, not in the panel.
+    expect(toasts()).toContainElement(message);
+    expect(toasts()).toHaveAttribute("aria-live", "polite");
+    expect(heading.closest(".toilet-panel")).not.toContainElement(message);
+    expect(message.closest(".notice")).toHaveClass("notice--success");
     expect(window.location.pathname).toBe("/loos/aaa");
     expect(window.location.search).toBe("");
 
@@ -171,15 +189,31 @@ describe("LooMap ?saved=1", () => {
     expect(screen.queryByText(SAVED_MESSAGE)).not.toBeInTheDocument();
   });
 
-  it("does not show the banner without the param, or for another toilet", async () => {
-    const user = userEvent.setup();
+  it("says a new toilet is on the map after saved=added", async () => {
+    window.history.replaceState(null, "", "/loos/aaa?saved=added");
+    render(<LooMap apiUrl="" initialToiletId="aaa" />);
+    await panelHeading("Toilet aaa");
+    expect(toasts()).toContainElement(await screen.findByText(ADDED_MESSAGE));
+    expect(screen.queryByText(SAVED_MESSAGE)).not.toBeInTheDocument();
+    expect(window.location.search).toBe("");
+  });
+
+  it("does not show the toast without the param", async () => {
+    window.history.replaceState(null, "", "/loos/aaa");
+    render(<LooMap apiUrl="" initialToiletId="aaa" />);
+    await panelHeading("Toilet aaa");
+    expect(screen.queryByText(SAVED_MESSAGE)).not.toBeInTheDocument();
+    // The region is there all along (empty), so a later toast is announced.
+    expect(toasts()).toBeEmptyDOMElement();
+  });
+
+  it("keeps the toast clear of the panel and the bottom controls: at the top of the map", async () => {
     window.history.replaceState(null, "", "/loos/aaa?saved=1");
     render(<LooMap apiUrl="" initialToiletId="aaa" />);
     await panelHeading("Toilet aaa");
-
-    await user.click(screen.getByRole("button", { name: "Marker bbb" }));
-    await panelHeading("Toilet bbb");
-    expect(screen.queryByText(SAVED_MESSAGE)).not.toBeInTheDocument();
+    await screen.findByText(SAVED_MESSAGE);
+    // Below the search bar (toastLayout covers the geometry; happy-dom has no layout).
+    expect(document.querySelector(".toast-region")).toHaveClass("toast-region--top");
   });
 });
 
@@ -463,6 +497,10 @@ describe("LooMap initial /loos/:id load", () => {
     render(<LooMap apiUrl="" initialToiletId="aaa" />);
     await waitFor(() => expect(window.location.pathname).toBe("/"));
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    // And says why the map opened without it.
+    expect(screen.getByRole("list", { name: "Notifications" })).toContainElement(
+      await screen.findByText(NOT_FOUND_MESSAGE),
+    );
   });
 });
 
@@ -588,6 +626,11 @@ describe("LooMap freshness", () => {
     const { rerender } = render(<LooMap apiUrl="" />);
     const notice = screen.getByText("Couldn't refresh — showing data from 14:30");
     expect(notice.closest('[role="status"]')).not.toBeNull();
+    // A DS Notice in the bottom-right column, above "Add a toilet here", never over it.
+    expect(notice.closest(".notice")).toHaveClass("notice--warning");
+    const column = notice.closest(".map-chrome-bottom-right");
+    expect(column).not.toBeNull();
+    expect(column).toContainElement(screen.getByRole("link", { name: "Add a toilet here" }));
 
     setMapData({ status: "offline" });
     rerender(<LooMap apiUrl="" />);
@@ -610,10 +653,9 @@ describe("LooMap freshness", () => {
     const panel = heading.closest(".toilet-panel");
     expect(panel).toHaveTextContent("Offline — showing saved data");
     // The panel's copy is visual only; the map's live region still carries it.
-    expect(panel?.querySelector('span[aria-hidden="true"]')).toHaveTextContent(
+    expect(panel?.querySelector('div[aria-hidden="true"] .notice')).toHaveTextContent(
       "Offline — showing saved data",
     );
-    expect(mapNotice).toHaveClass("map-freshness-notice--in-panel");
     expect(mapNotice).not.toHaveClass("map-freshness-notice--shown");
     expect(mapNotice).toHaveTextContent("Offline — showing saved data");
 
@@ -624,10 +666,83 @@ describe("LooMap freshness", () => {
       "aria-expanded",
       "false",
     );
-    expect(mapNotice).toHaveClass("map-freshness-notice--in-panel");
+    expect(mapNotice).not.toHaveClass("map-freshness-notice--shown");
+    expect(mapNotice).toHaveTextContent("Offline — showing saved data");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(container.querySelector(".toilet-panel")).toBeNull());
     expect(mapNotice).toHaveClass("map-freshness-notice--shown");
+  });
+});
+
+describe("LooMap empty state", () => {
+  const nothingInView = () => fakeMap.getBounds.mockReturnValue({ contains: () => false });
+
+  it("says so when there are no toilets in view, once the data is in", () => {
+    nothingInView();
+    setMapData({ loading: true });
+    const { rerender } = render(<LooMap apiUrl="" />);
+    expect(screen.queryByText(EMPTY_MESSAGE)).not.toBeInTheDocument();
+
+    setMapData({ loading: false });
+    rerender(<LooMap apiUrl="" />);
+    const notice = screen.getByText(EMPTY_MESSAGE);
+    expect(notice.closest(".notice")).toHaveClass("notice--info");
+    expect(notice.closest(".map-chrome-bottom-right")).not.toBeNull();
+  });
+
+  it("announces through a live region that is on the page before the message", () => {
+    nothingInView();
+    setMapData({ loading: true });
+    const { container, rerender } = render(<LooMap apiUrl="" />);
+    const region = container.querySelector(".map-empty-notice");
+    expect(region).toHaveAttribute("role", "status");
+    expect(region).toBeEmptyDOMElement();
+    expect(region).not.toHaveClass("map-empty-notice--shown");
+    expect(region).not.toHaveAttribute("data-map-control");
+
+    setMapData({ loading: false });
+    rerender(<LooMap apiUrl="" />);
+    // The same element, now with the message in it (the Notice itself isn't a second region).
+    expect(container.querySelector(".map-empty-notice")).toBe(region);
+    expect(region).toHaveTextContent(EMPTY_MESSAGE);
+    expect(region).toHaveClass("map-empty-notice--shown");
+    expect(region?.querySelector(".notice")).not.toHaveAttribute("role");
+  });
+
+  it.each([
+    ["offline", "Offline — showing saved data"],
+    ["stale", "Couldn't refresh"],
+  ] as const)(
+    "doesn't claim the area is empty when the first load failed (%s) and nothing is cached",
+    (status, freshness) => {
+      nothingInView();
+      setMapData({ loading: false, status, data: [], lastSyncedAt: null });
+      render(<LooMap apiUrl="" />);
+      expect(screen.getByText(new RegExp(freshness))).toBeInTheDocument();
+      expect(screen.queryByText(EMPTY_MESSAGE)).not.toBeInTheDocument();
+      expect(screen.queryByText(EMPTY_FILTERED_MESSAGE)).not.toBeInTheDocument();
+    },
+  );
+
+  it("still says the area is empty when saved data is on screen while offline", () => {
+    nothingInView();
+    setMapData({ loading: false, status: "offline" });
+    render(<LooMap apiUrl="" />);
+    expect(screen.getByText(EMPTY_MESSAGE)).toBeInTheDocument();
+  });
+
+  it("shows nothing while toilets are in view", () => {
+    render(<LooMap apiUrl="" />);
+    expect(screen.queryByText(EMPTY_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_FILTERED_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  it("updates as the map moves", () => {
+    render(<LooMap apiUrl="" />);
+    expect(screen.queryByText(EMPTY_MESSAGE)).not.toBeInTheDocument();
+    nothingInView();
+    act(() => fakeMap.fire("moveend"));
+    expect(screen.getByText(EMPTY_MESSAGE)).toBeInTheDocument();
   });
 });
 
@@ -667,6 +782,23 @@ describe("LooMap view memory and 'Add a toilet here'", () => {
     render(<LooMap apiUrl="" />);
     expect(fakeMap.setView).toHaveBeenCalledWith([53.48, -2.24], 15);
     expect(addLink()).toHaveAttribute("href", "/loos/add?lat=53.48&lng=-2.24&zoom=15");
+  });
+
+  it("opens at a ?lat&lng&zoom link (a legacy /map URL), then drops it from the address bar", () => {
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ lat: 53.48, lng: -2.24, zoom: 15 }));
+    window.history.replaceState(null, "", "/?lat=51.539&lng=-0.1426&zoom=16&utm_source=x#top");
+    render(<LooMap apiUrl="" />);
+    expect(fakeMap.setView).toHaveBeenCalledWith([51.539, -0.1426], 16);
+    expect(addLink()).toHaveAttribute("href", "/loos/add?lat=51.539&lng=-0.1426&zoom=16");
+    // A reload (or the shared address) follows the map: the link's view is remembered for it.
+    expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+      "/?utm_source=x#top",
+    );
+    expect(JSON.parse(localStorage.getItem(VIEW_KEY) ?? "null")).toEqual({
+      lat: 51.539,
+      lng: -0.1426,
+      zoom: 16,
+    });
   });
 
   it("ignores the remembered view for a /loos/:id deep link", () => {
