@@ -19,6 +19,7 @@ import {
   publishedPosts,
 } from "../../utils/content";
 import { absoluteUrl, pageTitle, SITE_NAME } from "../../utils/seo";
+import { SHARE_BUTTON_SCRIPT } from "../../utils/shareButtonScript";
 import { BLOG_PATH } from "../../utils/siteNav";
 
 export const prerender = true;
@@ -144,27 +145,8 @@ const jsonLd = {
       </p>
     </header>
     <Content />
-    <script is:inline>
-      // The native share sheet, where the browser has one (most phones). Without it, or without
-      // JavaScript, the button stays hidden and the Bluesky link is still there. Inline (not a
-      // bundled script) because Vite inlines it into the prerendered page anyway, and a bundled
-      // copy leaves a dangling _astro/ entry in the server manifest that check-build-assets flags.
-      for (const button of document.querySelectorAll(".post__share-native")) {
-        if (typeof navigator.share !== "function") continue;
-        button.hidden = false;
-        button.addEventListener("click", () => {
-          navigator
-            .share({
-              title: button.dataset.shareTitle,
-              text: "Check out this post on the Toilet Map blog",
-              url: button.dataset.shareUrl,
-            })
-            .catch(() => {
-              // Dismissed by the visitor, or not allowed: nothing to do.
-            });
-        });
-      }
-    </script>
+    {/* The Share button: its text lives in shareButtonScript.ts so the CSP can allow it by hash. */}
+    <script is:inline set:html={SHARE_BUTTON_SCRIPT} />
   </article>
   <p slot="after" class="post__back"><a href={BLOG_PATH}>All blog posts</a></p>
 </ContentLayout>

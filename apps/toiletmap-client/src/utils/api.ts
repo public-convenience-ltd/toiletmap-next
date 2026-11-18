@@ -145,6 +145,13 @@ const ALLOWED_API_PREFIXES = ["/api/loos"];
 const PUBLIC_POST_PATHS = new Set(["/api/feedback"]);
 
 /**
+ * Exact paths of public read-only endpoints: GET and HEAD only, anything else
+ * gets a 405 without contacting upstream. `/api/geocode` is the place search
+ * (postcodes.io, then Nominatim, run server-side).
+ */
+const PUBLIC_GET_PATHS = new Set(["/api/geocode"]);
+
+/**
  * Returns true when `pathname` (a URL pathname, still percent-encoded) may be
  * proxied upstream. Rejects anything that could be reinterpreted as a
  * different path upstream: dot segments (raw or encoded), encoded slashes or
@@ -164,7 +171,7 @@ export function isAllowedApiPath(pathname: string): boolean {
     return false;
   }
 
-  if (PUBLIC_POST_PATHS.has(pathname)) return true;
+  if (PUBLIC_POST_PATHS.has(pathname) || PUBLIC_GET_PATHS.has(pathname)) return true;
 
   return ALLOWED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -204,6 +211,8 @@ export interface ProxyOptions {
  * - State-changing methods require `Origin` to equal the client's own origin
  *   (CSRF protection) and get `Authorization: Bearer <access_token>` attached
  *   server-side from the httpOnly cookie, so the token never reaches page JS.
+ *   Public read-only paths (`PUBLIC_GET_PATHS`, e.g. `/api/geocode`) accept
+ *   only GET and HEAD.
  *   Public POST endpoints (`PUBLIC_POST_PATHS`, e.g. `/api/feedback`) also
  *   accept a missing `Origin` (native apps) and never get the token.
  * - Returns upstream status/body/headers (cache headers included) minus
@@ -223,6 +232,12 @@ export async function proxyApiRequest({
 
   const method = request.method.toUpperCase();
   const isSafe = SAFE_METHODS.has(method);
+
+  if (PUBLIC_GET_PATHS.has(url.pathname) && method !== "GET" && method !== "HEAD") {
+    const response = jsonResponse(405, { message: "Method Not Allowed" });
+    response.headers.set("allow", "GET, HEAD");
+    return response;
+  }
 
   if (!isSafe && !passesOriginCheck(request, url, method)) {
     return jsonResponse(403, { message: "Forbidden" });

@@ -93,4 +93,49 @@ describe("SiteHeader", () => {
       ),
     ).toContain("/privacy");
   });
+
+  describe("sign-in follows the page", () => {
+    const originalPath = `${window.location.pathname}${window.location.search}`;
+    afterEach(() => {
+      window.history.replaceState(null, "", originalPath);
+    });
+
+    const signInLinks = () =>
+      [...document.querySelectorAll<HTMLAnchorElement>("a")].filter((a) =>
+        (a.getAttribute("href") ?? "").startsWith("/auth/login"),
+      );
+
+    it("returns to the page the browser is on, as the map changes the URL", () => {
+      window.history.replaceState(null, "", "/");
+      render(
+        <SiteHeader
+          logoSrc="/logo.svg"
+          isAuthenticated={false}
+          signInHref="/auth/login?returnTo=%2F"
+          signInFollowsPage
+        />,
+      );
+      expect(navHrefs()).toContain("/auth/login?returnTo=%2F");
+
+      // The map selects a toilet: the URL changes without a reload.
+      window.history.pushState(null, "", "/loos/abc?x=1");
+      const link = signInLinks()[0];
+      if (!link) throw new Error("no sign-in link");
+      // Keep the test page where it is.
+      const stop = (event: Event) => event.preventDefault();
+      document.addEventListener("click", stop);
+      link.click();
+      document.removeEventListener("click", stop);
+      expect(link.getAttribute("href")).toBe(
+        `/auth/login?returnTo=${encodeURIComponent("/loos/abc?x=1")}`,
+      );
+    });
+
+    it("keeps a fixed returnTo when the page chose one", () => {
+      window.history.replaceState(null, "", "/somewhere");
+      render(<SiteHeader logoSrc="/logo.svg" isAuthenticated={false} signInHref="/auth/login" />);
+      expect(navHrefs()).toContain("/auth/login");
+      expect(navHrefs()).not.toContain(`/auth/login?returnTo=${encodeURIComponent("/somewhere")}`);
+    });
+  });
 });

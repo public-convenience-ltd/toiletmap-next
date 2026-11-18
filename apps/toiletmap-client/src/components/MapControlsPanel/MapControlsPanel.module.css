@@ -150,12 +150,14 @@
 }
 
 .suggestion > :global(.icon) {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   color: var(--color-text-muted);
 }
 
-.suggestion span {
-  flex: 1;
+/* The label takes the room the icon leaves (the icon is a span too: never stretch it). */
+.suggestionLabel {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -165,6 +167,30 @@
 .suggestion:focus {
   background: var(--color-frost-ice);
   outline: none;
+}
+
+/* "Searching…" / "No places found" under the bar: empty (and zero height) otherwise. */
+.searchStatus {
+  margin: 0;
+  font-size: var(--bar-text-small);
+  color: var(--bar-muted);
+}
+
+.searchStatus:not(:empty) {
+  padding: 0 var(--space-m) var(--space-2xs);
+}
+
+/* OpenStreetMap's credit under place results from Nominatim. */
+.attribution {
+  margin: 0;
+  padding: var(--space-3xs) var(--space-m) var(--space-2xs);
+  border-top: 1px solid var(--color-light-grey);
+  font-size: var(--bar-text-small);
+  color: var(--bar-muted);
+}
+
+.attribution a {
+  color: inherit;
 }
 
 /* ── Filter panel ────────────────────────────────────────── */

@@ -11,6 +11,7 @@ import {
   restoreLoo,
   verifyLoo,
 } from "../../api/reports";
+import { loginHref } from "../../utils/returnTo";
 import {
   directionsUrl,
   distanceText,
@@ -368,10 +369,7 @@ export default function ToiletDetailsPanel({
         return line(
           "error",
           <>
-            Your sign-in has expired.{" "}
-            <a href={`/auth/login?returnTo=${encodeURIComponent(`${looHref}?restore=1`)}`}>
-              Sign in again
-            </a>{" "}
+            Your sign-in has expired. <a href={loginHref(`${looHref}?restore=1`)}>Sign in again</a>{" "}
             to restore it.
           </>,
         );

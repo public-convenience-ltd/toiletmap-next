@@ -4,8 +4,8 @@ import { proxyApiRequest } from "../../utils/api";
 
 /**
  * Same-origin API proxy: the browser calls `/api/*` on this worker and we
- * forward allow-listed paths (`/api/loos[/...]` and the public `POST
- * /api/feedback`) to toiletmap-server,
+ * forward allow-listed paths (`/api/loos[/...]`, the public `POST
+ * /api/feedback` and `GET /api/geocode`) to toiletmap-server,
  * attaching the httpOnly access token for state-changing requests. Other
  * paths get a 404. See `proxyApiRequest` / `isAllowedApiPath` for the rules.
  */

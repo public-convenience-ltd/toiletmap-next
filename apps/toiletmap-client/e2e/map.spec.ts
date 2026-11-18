@@ -5,6 +5,7 @@ import {
   deepLinkSpot,
   detailsPanelHeading,
   firstUnobscuredMarker,
+  markerAt,
   waitForMap,
   waitForMapToSettle,
 } from "./support/map";
@@ -46,8 +47,16 @@ test.describe("map", () => {
     // The deep link left the marker clear of the floating controls (see the test below), so
     // a real (hit-tested) click reopens it. Both icons are anchored at the pin's tip, so the
     // plain marker sits where the highlighted one did.
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 12);
-    await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
+    // Wait for the plain marker to be drawn there and the map to stop moving first, then
+    // click it where it is now (a click measured too early could miss it in WebKit).
+    await waitForMapToSettle(page.locator("#map"));
+    const plain = await markerAt(page, box);
+    await expect(async () => {
+      const now = await plain.boundingBox();
+      if (!now) throw new Error("the plain marker has no bounding box");
+      await page.mouse.click(now.x + now.width / 2, now.y + now.height - 12);
+      await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "", { timeout: 2_000 });
+    }).toPass({ timeout: 10_000 });
     await expect(page).toHaveURL(new RegExp(`/loos/${loo.id}$`));
   });
 

@@ -4,7 +4,7 @@ date: 2025-05-05T00:57:00.000Z
 authors:
   - name: Gail
     social_url: https://bsky.app/profile/gaillyk.bsky.social
-    profile_image_url: https://rca-media2.rca.ac.uk/images/GailRAMSTER.2e16d0ba.fill-456x456.jpg
+    profile_image_url: /images/uploads/gailramster.webp
 ---
 At the Toilet Map, we’re saddened by the Supreme Court’s rulings around single-sex spaces, and the implications for transgender and non-binary people’s access to toilets. Our whole project is about helping people to find toilets that meet their needs, so we can all get out, meet up, explore, work, love, play, and generally live our best lives, even when we need a wee. That challenge, and people's lives, have become that bit harder, now transgender and non-binary people have been told or made to feel they have less right to access toilets than others, spaces they’ve used their whole lives.
 

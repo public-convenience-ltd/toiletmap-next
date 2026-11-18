@@ -4,12 +4,12 @@ The public-facing frontend for the Toilet Map, built with Astro and Preact.
 
 ## Stack
 
-- **Framework**: [Astro](https://astro.build) 5.x (SSR mode)
+- **Framework**: [Astro](https://astro.build) 7.x (SSR mode)
 - **UI Library**: [Preact](https://preactjs.com) (client-side hydration)
 - **Deployment**: Cloudflare Workers
 - **Styling**: CSS Modules
 - **Map**: [Leaflet](https://leafletjs.com/) with [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) for marker clustering
-- **Caching**: [idb-keyval](https://github.com/jakearchibald/idb-keyval) for IndexedDB storage
+- **Caching**: [idb-keyval](https://github.com/jakearchibald/idb-keyval) keeps the map dataset in IndexedDB
 
 ## Architecture
 
@@ -27,8 +27,9 @@ same-origin requests to `/api/*` on this worker, handled by the proxy in
 [src/pages/api/[...path].ts](src/pages/api/[...path].ts) (logic in
 [src/utils/api.ts](src/utils/api.ts) `proxyApiRequest`):
 
-- Only allow-listed paths are forwarded: `/api/loos` and `/api/loos/*` (the only
-  endpoints browser code calls). Anything else (e.g. the server's `/api/docs`
+- Only allow-listed paths are forwarded: `/api/loos` and `/api/loos/*`, `POST
+  /api/feedback` and `GET /api/geocode` (the endpoints browser code calls; other
+  methods on `/api/geocode` get a 405). Anything else (e.g. the server's `/api/docs`
   Swagger UI) gets a 404 JSON response. Paths containing dot segments, encoded
   slashes/backslashes (`%2f`, `%5c`), backslashes or `//` are rejected. When the
   browser starts calling a new endpoint, add its prefix to `ALLOWED_API_PREFIXES`
@@ -59,6 +60,12 @@ fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
 - `GET /api/loos/updates?since=…` - Incremental changes since a timestamp
 - `GET /api/loos/:id` - Fetches detailed information for a specific loo
 - `POST /api/loos`, `PUT /api/loos/:id` - Create / update a loo
+- `GET /api/geocode?q=…` - Place and postcode search for the map and location picker
+  search boxes. The server asks postcodes.io, then OpenStreetMap's Nominatim (GB only,
+  throttled and cached), so the browser never calls a geocoder itself; results from
+  Nominatim are shown with OpenStreetMap's credit. Typing only looks postcodes up
+  (`&mode=suggest`, never Nominatim, whose policy forbids autocomplete); place names are
+  searched on Enter
 
 ### Routes
 
@@ -66,6 +73,11 @@ fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
 - `/loos/:id` - map with a toilet selected
 - `/loos/:id/edit`, `/loos/add` - edit / add forms
 - `/loo/*` - legacy aliases, 301-redirected to `/loos/*` (query string preserved)
+- `/map/:lng/:lat`, `/explorer/*`, `/login`, `/api/auth/*`, `/api/admin`,
+  `/api/decap-oauth/*` - the legacy site's URLs, 301-redirected (`?lat&lng` map view,
+  `/dataset`, `/auth/*`, `/cms/`); the table is in [docs/security.md](docs/security.md)
+- `/auth/login?returnTo=<path>`, `/auth/callback`, `/auth/logout`, `/auth/error` - sign-in,
+  back to a same-origin path, with friendly error pages
 - `/feedback` - message to the team (`POST /api/feedback` through the proxy; the email is
   optional). `?loo=<id>` makes it about one toilet ("Report a problem → Something else"
   links there) and stores `/loos/<id>` as the message's `route`. Works without JavaScript:
@@ -103,21 +115,23 @@ fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
   collections (`src/content.config.ts`) and every active toilet from `/api/loos/dump`
   (503 with `Retry-After` when the API is down).
 
+### Security headers
+
+Every response carries HSTS (production), `nosniff`, `Referrer-Policy`, `Permissions-Policy`
+(geolocation for this origin only), `X-Frame-Options: DENY`, COOP and a Content Security
+Policy (report-only for now; violations are logged via `/api/csp-report`): from
+`src/middleware.ts` for worker responses and from the generated `_headers` for static
+assets. See [docs/security.md](docs/security.md).
+
 ### Caching Strategy
 
-The application implements a two-tier caching approach using IndexedDB:
+1. **Map dataset** (IndexedDB, persistent): the compressed list from `/api/loos/dump` in one
+   versioned record (`loos-cache-v2`), kept current with `/api/loos/updates?since=<cursor>`
+   and shared between tabs. See [src/api/mapCache.ts](src/api/mapCache.ts).
+2. **Loo details** (in memory only, up to 200): revalidated with `If-None-Match`, so a reload
+   starts empty. See [src/api/loos.ts](src/api/loos.ts).
 
-1. **Loos List Cache** (1-hour TTL)
-   - Caches the compressed list of all loos
-   - Reduces network requests and improves initial load time
-   - Keys: `loos-cache`, `loos-cache-time`
-
-2. **Individual Loo Details Cache** (persistent)
-   - Caches detailed loo information by ID
-   - Cache-first strategy: checks cache before fetching from API
-   - Key: `loos-detail-cache`
-
-All cache keys are centralized in [src/api/constants.ts](src/api/constants.ts).
+Cache keys are in [src/api/constants.ts](src/api/constants.ts).
 
 ## Environment Variables
 
@@ -263,7 +277,7 @@ src/
 │   └── loos.ts       # Loo-related API functions
 ├── assets/           # Static assets (images, SVGs)
 ├── components/       # Preact components
-│   └── LooMap.tsx    # Main map component with clustering
+│   └── LooMap/       # Main map component with clustering
 ├── content/          # Markdown content collections (posts, pages; schema in content.config.ts)
 ├── layouts/          # BaseLayout, MapLayout, ContentLayout
 ├── pages/            # Astro pages (routes)

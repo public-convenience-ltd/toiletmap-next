@@ -455,3 +455,61 @@ describe("public feedback endpoint (/api/feedback)", () => {
     expect(calls).toHaveLength(2);
   });
 });
+
+describe("public place search (/api/geocode)", () => {
+  const GEOCODE_URL = `${ORIGIN}/api/geocode?q=Leeds`;
+
+  it("is allow-listed as an exact path only", () => {
+    expect(isAllowedApiPath("/api/geocode")).toBe(true);
+    for (const path of [
+      "/api/geocode/",
+      "/api/geocode/x",
+      "/api/geocoder",
+      "/api/geocode/../docs",
+    ]) {
+      expect(isAllowedApiPath(path), path).toBe(false);
+    }
+  });
+
+  it("forwards a GET with its query string, client IP and cache headers, never the token", async () => {
+    const { binding, calls } = makeBinding(
+      () =>
+        new Response('{"results":[],"attribution":null}', {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "public, max-age=86400",
+          },
+        }),
+    );
+    const res = await proxyApiRequest({
+      request: new Request(GEOCODE_URL, { headers: { accept: "application/json" } }),
+      env: envWith(binding),
+      accessToken: "secret",
+      clientIp: "1.2.3.4",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
+    const upstream = calls[0];
+    expect(upstream?.url).toBe("https://toiletmap-server.example.dev/api/geocode?q=Leeds");
+    expect(upstream?.method).toBe("GET");
+    expect(upstream?.headers.get("authorization")).toBeNull();
+    expect(upstream?.headers.get("cf-connecting-ip")).toBe("1.2.3.4");
+  });
+
+  it.each(["POST", "PUT", "PATCH", "DELETE"])(
+    "refuses %s with 405 without contacting upstream",
+    async (method) => {
+      const { binding, calls } = makeBinding();
+      const res = await proxyApiRequest({
+        request: new Request(GEOCODE_URL, { method, headers: { origin: ORIGIN }, body: "{}" }),
+        env: envWith(binding),
+        accessToken: "secret",
+      });
+      expect(res.status).toBe(405);
+      expect(res.headers.get("allow")).toBe("GET, HEAD");
+      expect(calls).toHaveLength(0);
+    },
+  );
+});

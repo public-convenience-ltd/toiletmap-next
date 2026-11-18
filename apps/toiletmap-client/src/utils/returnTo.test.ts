@@ -50,6 +50,66 @@ describe("safeReturnTo", () => {
   it("does not let dot segments normalise into a protocol-relative path", () => {
     expect(safeReturnTo("/.//evil.example")).toBeNull();
   });
+
+  it.each([
+    ["encoded protocol-relative", "/%2F%2Fevil.example"],
+    ["encoded second slash", "/%2Fevil.example"],
+    ["lower-case encoded slashes", "/%2f%2fevil.example"],
+    ["encoded backslash", "/%5Cevil.example"],
+    ["encoded slash and backslash", "/%2F%5Cevil.example"],
+    ["double-encoded protocol-relative", "/%252F%252Fevil.example"],
+    ["triple-encoded protocol-relative", "/%25252F%25252Fevil.example"],
+    ["encoded tab", "/%09/evil.example"],
+    ["encoded newline", "/%0A/evil.example"],
+    ["encoded backslash in the query", "/loos?x=%5C"],
+    ["malformed escape", "/loos/%E0%A4%A"],
+    ["encoded javascript: scheme", "%6Aavascript:alert(1)"],
+    ["encoded leading slash", "%2F%2Fevil.example"],
+  ])("rejects %s", (_label, value) => {
+    expect(safeReturnTo(value)).toBeNull();
+  });
+
+  it.each([
+    "/auth/login",
+    "/auth/login?returnTo=%2F",
+    "/auth/logout",
+    "/auth/callback?x=1",
+    "/auth",
+  ])("rejects the sign-in routes themselves (%s)", (value) => {
+    expect(safeReturnTo(value)).toBeNull();
+  });
+
+  it.each([
+    ["dot segment before an encoded slash", "/./%2F/evil.example"],
+    ["dot-dot segment before an encoded slash", "/a/../%2F/evil.example"],
+    ["dot segment before an encoded backslash", "/./%5C/evil.example"],
+    ["dot segment before a double-encoded slash", "/./%252F/evil.example"],
+  ])("re-checks the normalised path in decoded form (%s)", (_label, value) => {
+    expect(safeReturnTo(value)).toBeNull();
+  });
+
+  it.each([
+    "/login",
+    "/login/",
+    "/login?returnTo=%2Fposts",
+    "/api/auth/login",
+    "/api/auth/callback?code=x",
+    "/%61uth/logout",
+    "/%2561uth/logout",
+    "/./auth/login",
+    "/AUTH/logout",
+  ])("rejects the legacy sign-in URLs and encoded sign-in routes (%s)", (value) => {
+    expect(safeReturnTo(value)).toBeNull();
+  });
+
+  it("keeps encoded characters that stay on this site", () => {
+    expect(safeReturnTo("/loos/a%20b")).toBe("/loos/a%20b");
+    expect(safeReturnTo("/?q=caf%C3%A9")).toBe("/?q=caf%C3%A9");
+    expect(safeReturnTo("/authors")).toBe("/authors");
+    expect(safeReturnTo("/loginhelp")).toBe("/loginhelp");
+    expect(safeReturnTo("/api/authors")).toBe("/api/authors");
+    expect(safeReturnTo("/loos/add?from=%2Floos%2Fabc")).toBe("/loos/add?from=%2Floos%2Fabc");
+  });
 });
 
 describe("loginHref", () => {

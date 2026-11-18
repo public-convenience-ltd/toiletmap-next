@@ -61,7 +61,8 @@ dependency.
     (`.github/workflows/deploy-production.yml`).
   - Sveltia supports this with the GitHub backend.
 - **Search engines:** `/cms` is noindex in three ways: the page's robots meta tag,
-  `public/_headers` (`X-Robots-Tag`), and `Disallow: /cms` in robots.txt. It is not in the
+  the `X-Robots-Tag` header (generated into `_headers` at build time, see
+  [security.md](security.md)), and `Disallow: /cms` in robots.txt. It is not in the
   sitemap.
 - **Developing locally:** open `http://localhost:4321/cms/index.html`. The dev server may not
   map `/cms/` to the folder's `index.html`, but the deployed site does.
@@ -146,7 +147,9 @@ Until the GitHub OAuth app is set up:
      | openssl dgst -sha384 -binary | openssl base64 -A
    ```
 
-3. **Update the loader.** In `public/cms/cms-loader.js`, set `SVELTIA_VERSION`, and set
-   `SVELTIA_INTEGRITY` to `sha384-<hash>`.
-4. **Test it.** Run `pnpm test`; `src/cms.test.ts` checks the pin and the config. Then try
-   `/cms/` locally.
+3. **Update the loader and the CSP.** In `public/cms/cms-loader.js`, set `SVELTIA_VERSION`,
+   and set `SVELTIA_INTEGRITY` to `sha384-<hash>`. Set the same version in
+   `SVELTIA_CMS_VERSION` (`src/utils/securityHeaders.ts`): the `/cms` CSP only allows scripts
+   from that exact package path on unpkg.
+4. **Test it.** Run `pnpm test`; `src/cms.test.ts` checks the pin, that the CSP allows the
+   same version, and the config. Then try `/cms/` locally.
