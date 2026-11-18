@@ -1036,10 +1036,10 @@ The project uses GitHub Actions to automatically deploy migrations to Supabase e
 
 **Production Environment:**
 
-- Triggered automatically when code is pushed to the `main` branch
-- Can also be manually triggered via GitHub Actions workflow dispatch
+- Triggered automatically when code is pushed to the `main` branch, as the first job (`migrate`) of the production deploy; the workers deploy only after it succeeds
+- Can also be manually triggered via GitHub Actions workflow dispatch (which runs the whole deploy)
 - Deploys to the production Supabase project
-- Workflow: [.github/workflows/supabase-migrations-prod.yml](.github/workflows/supabase-migrations-prod.yml)
+- Workflow: [.github/workflows/deploy-production.yml](.github/workflows/deploy-production.yml) (see [docs/deployment.md](docs/deployment.md))
 
 Both workflows:
 

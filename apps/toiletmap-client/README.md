@@ -66,6 +66,42 @@ fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
 - `/loos/:id` - map with a toilet selected
 - `/loos/:id/edit`, `/loos/add` - edit / add forms
 - `/loo/*` - legacy aliases, 301-redirected to `/loos/*` (query string preserved)
+- `/feedback` - message to the team (`POST /api/feedback` through the proxy; the email is
+  optional). `?loo=<id>` makes it about one toilet ("Report a problem → Something else"
+  links there) and stores `/loos/<id>` as the message's `route`. Works without JavaScript:
+  the form posts to the page itself, which redirects to `?sent=1` on success
+- `/about`, `/contact`, `/privacy`, `/app`, `/app/privacy` - text pages from
+  `src/content/pages/*.md` (prerendered; `/app/privacy` is the app's store-listed policy)
+- `/posts`, `/posts/<slug>` (the legacy slugs), `/posts/page/<n>` past 20 posts - the blog,
+  from `src/content/posts/*.md` (prerendered). Uploads live at `/images/uploads/*`
+- `/cms/` - Sveltia CMS for the pages and posts (noindex), signing in with GitHub through
+  `/api/cms-oauth/*`; see [docs/cms.md](docs/cms.md)
+- `/sitemap.xml` (and `/sitemap-<n>.xml` chunks past 45,000 URLs), `/robots.txt`,
+  `/posts/rss.xml` - SEO endpoints; see [Layouts, meta and SEO](#layouts-meta-and-seo)
+- any unknown path or toilet - the site's 404 page (`src/pages/404.astro`, real 404 status);
+  unhandled errors - the prerendered 500 page (`src/pages/500.astro`)
+
+### Layouts, meta and SEO
+
+- `layouts/BaseLayout.astro` - the document and `<head>`: `title`, `description`,
+  `canonical` (defaults to the page's path on `site`), `image`, `ogType`, `noindex`,
+  `nofollow`, `jsonLd` (escaped by `serializeJsonLd`), plus a `head` slot. Preview and
+  development deployments (`ENVIRONMENT`) are always `noindex, nofollow`.
+- `layouts/MapLayout.astro` - map pages: one screen tall, no scrolling.
+- `layouts/ContentLayout.astro` - text pages in the design system's `.prose` column
+  (`Prose` in toiletmap-design-system), with `heading` and `before`/`after` slots.
+- `components/SiteChrome/` - the header and footer for every page; the nav is defined once
+  in `utils/siteNav.ts`. On prerendered pages the header reads the sign-in cookie in the
+  browser.
+- `/loos/:id` fetches the toilet on the server (`utils/looPage.ts`): unknown or invalid ids
+  are a 404; removed toilets are a 200 with `noindex` (the panel explains and offers restore,
+  so old links keep working); active ones get a title, description, canonical and schema.org
+  `PublicToilet` JSON-LD (`utils/looSeo.ts`).
+- `site` in `astro.config.ts` is `SITE_URL` or `https://www.toiletmap.org.uk`. robots.txt
+  disallows `/cms`, `/auth`, `/api`, `/dev` and the contribution forms in production and
+  everything on previews. The sitemap lists the fixed pages, the `pages` and `posts`
+  collections (`src/content.config.ts`) and every active toilet from `/api/loos/dump`
+  (503 with `Retry-After` when the API is down).
 
 ### Caching Strategy
 
@@ -106,6 +142,22 @@ The base URL for the toiletmap-server API.
    `wrangler.jsonc`) takes precedence over `PUBLIC_API_URL`. The binding only
    exists in a build made with `CLOUDFLARE_ENV=production` (see
    [Deploy](#deploy)).
+
+### `PLAUSIBLE_DOMAIN` (optional, off by default)
+
+The site domain to count pageviews under in [Plausible](https://plausible.io). A plain var
+(not a secret), unset everywhere today. When set (in `env.production.vars` in
+`wrangler.jsonc`), pages load the script from our own origin (`/js/p.js`) and send events to
+our `/api/event`, which forwards them to plausible.io; when unset, nothing is rendered and
+both routes 404. See [docs/analytics.md](docs/analytics.md) for what is and isn't tracked
+(GPC / Do Not Track are honoured) and the privacy policy wording it needs.
+
+### `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (optional, unset today)
+
+The GitHub OAuth app the CMS signs in with (worker secrets). Until both are set,
+`/api/cms-oauth/auth` and `/api/cms-oauth/callback` answer 503 "CMS sign-in isn't configured
+yet" and `/cms/` says so. [docs/cms.md](docs/cms.md) explains how to create the app (callback
+URL `https://www.toiletmap.org.uk/api/cms-oauth/callback`) and set them.
 
 ## Development
 
@@ -192,11 +244,14 @@ to deploy `--env preview` from a production build (and vice versa). Validate
 without deploying via `pnpm build:production && pnpm exec wrangler deploy --env production --dry-run`
 and check the output lists `env.API (toiletmap-server)`.
 
-Per-branch previews (`.github/workflows/deploy-preview.yml`) use a plain
-`pnpm build` and `wrangler deploy --env preview --name <branch>-toiletmap-client`
-with `--var` overrides; that works because a plain build has no target
-environment and no service binding (previews reach their branch server over
-`PUBLIC_API_URL`).
+Per-branch previews (`.github/workflows/deploy-preview.yml`) use
+`pnpm build:preview` and `wrangler deploy --env preview --name <branch>-toiletmap-client`
+with `--var` overrides (the preview env has no service binding either; previews
+reach their branch server over `PUBLIC_API_URL`). It has to be the preview build,
+not a plain `pnpm build`: prerendered pages (about, privacy, posts, ...) take
+`ENVIRONMENT` at build time, and only `env.preview` sets it to `preview`, which
+makes them `noindex`. The `--var` flags reach server-rendered pages only. The
+workflow checks the built `about.html` carries the noindex tag before deploying.
 
 ## Project Structure
 
@@ -209,7 +264,8 @@ src/
 ├── assets/           # Static assets (images, SVGs)
 ├── components/       # Preact components
 │   └── LooMap.tsx    # Main map component with clustering
-├── layouts/          # Astro layout components
+├── content/          # Markdown content collections (posts, pages; schema in content.config.ts)
+├── layouts/          # BaseLayout, MapLayout, ContentLayout
 ├── pages/            # Astro pages (routes)
 │   └── index.astro   # Homepage with map
 └── env.d.ts          # TypeScript environment definitions

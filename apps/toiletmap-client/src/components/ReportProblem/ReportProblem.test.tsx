@@ -145,20 +145,23 @@ describe("ReportProblem — step 1", () => {
 
   it("lists the problems in an error summary, as the add and edit forms do, linked to their fields", async () => {
     const user = setup();
-    await choose(user, "Something else");
     await user.click(screen.getByRole("button", { name: "Continue" }));
     const summary = screen.getByRole("heading", { name: "There's a problem" }).closest(".notice");
     expect(summary).toHaveClass("notice--error");
     const link = within(summary as HTMLElement).getByRole("link", {
-      name: "Tell us what's wrong.",
+      name: "Choose what's wrong with this toilet.",
     });
-    expect(link).toHaveAttribute("href", "#report-details");
-    screen.getAllByRole("radio")[0].focus();
+    expect(link).toHaveAttribute("href", "#report-choice");
+    screen.getByRole("button", { name: "Continue" }).focus();
     await user.click(link);
-    expect(screen.getByLabelText("What's wrong?")).toHaveFocus();
+    expect(screen.getAllByRole("radio")[0]).toHaveFocus();
 
     // Fixed: the summary goes once Continue passes.
-    await user.type(screen.getByLabelText("What's wrong?"), "The building is a shop now");
+    await choose(user, "It doesn't exist");
+    await user.type(
+      screen.getByLabelText("Anything else we should know? (optional)"),
+      "The building is a shop now",
+    );
     await continueToConfirm(user);
     expect(screen.queryByText("There's a problem")).not.toBeInTheDocument();
   });
@@ -231,17 +234,19 @@ describe("ReportProblem — step 1", () => {
     expect(posts("report")).toEqual([{ reason: "does_not_exist", baseUpdatedAt: UPDATED_AT }]);
   });
 
-  it("requires details for 'Something else'", async () => {
+  it("sends 'Something else' to the feedback page, about this toilet, instead of reporting it", async () => {
     const user = setup();
     await choose(user, "Something else");
-    const details = screen.getByLabelText("What's wrong?");
-    expect(details).toBeRequired();
-    await user.click(screen.getByRole("button", { name: "Continue" }));
-    // Inline, and in the error summary.
-    expect(screen.getAllByText("Tell us what's wrong.")).toHaveLength(2);
-    expect(details).toHaveFocus();
-    expect(details).toHaveAttribute("aria-invalid", "true");
-    expect(details.getAttribute("aria-describedby")).toContain("report-details-error");
+    expect(screen.getByRole("link", { name: "Send us a message" })).toHaveAttribute(
+      "href",
+      `/feedback?loo=${ID}`,
+    );
+    expect(screen.getByText(/the toilet stays on the map/)).toBeInTheDocument();
+    // Not a report: no details box and no Continue, only Cancel.
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cancel" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("makes details optional for the other reasons", async () => {
@@ -477,19 +482,6 @@ describe("ReportProblem — confirm and submit", () => {
       await screen.findByText("A moderator will review your request to put it back."),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Undo requested");
-  });
-
-  it("submits 'Something else' as reason other with its details", async () => {
-    onReport(202, { queued: true, id: "p" });
-    const user = setup();
-    await choose(user, "Something else");
-    await user.type(screen.getByLabelText("What's wrong?"), "Wrong name");
-    await continueToConfirm(user);
-    await user.click(submitButton());
-    await screen.findByRole("heading", { name: /moderator will review/ });
-    expect(posts("report")).toEqual([
-      { reason: "other", details: "Wrong name", baseUpdatedAt: UPDATED_AT },
-    ]);
   });
 
   it("says when the toilet was already removed", async () => {

@@ -1,0 +1,238 @@
+---
+/**
+ * One blog post, at /posts/<id>: the legacy site's slugs (the Markdown file names), so links
+ * to old posts keep working. Drafts are not built.
+ *
+ * Prerendered (posts change only with a deploy); the header reads the sign-in state in the
+ * browser. Any other /posts/* path falls through to the 404 page.
+ */
+import { getCollection, render } from "astro:content";
+import type { InferGetStaticPropsType } from "astro";
+import { Icon } from "toiletmap-design-system";
+import ContentLayout from "../../layouts/ContentLayout.astro";
+import {
+  formatPostDate,
+  postAuthors,
+  postImage,
+  postPath,
+  postSummary,
+  publishedPosts,
+} from "../../utils/content";
+import { absoluteUrl, pageTitle, SITE_NAME } from "../../utils/seo";
+import { BLOG_PATH } from "../../utils/siteNav";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const posts = publishedPosts(await getCollection("posts"));
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
+const { post } = Astro.props as Props;
+const { Content } = await render(post);
+
+const path = postPath(post.id);
+const url = absoluteUrl(path, Astro.site);
+const authors = postAuthors(post);
+const summary = postSummary(post);
+const image = postImage(post);
+const date = post.data.date;
+
+const shareText = `Check out this post on the Toilet Map blog: ${post.data.title} ${url}`;
+const blueskyShareUrl = `https://bsky.app/intent/compose?text=${encodeURIComponent(shareText)}`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: post.data.title,
+  ...(summary ? { description: summary } : {}),
+  datePublished: date.toISOString(),
+  url,
+  mainEntityOfPage: url,
+  ...(image ? { image: absoluteUrl(image.src, Astro.site) } : {}),
+  ...(authors.length
+    ? {
+        author: authors.map((author) => ({
+          "@type": "Person",
+          name: author.name,
+          ...(author.url ? { url: author.url } : {}),
+        })),
+      }
+    : {}),
+  publisher: { "@type": "Organization", name: SITE_NAME, url: absoluteUrl("/", Astro.site) },
+};
+---
+
+<ContentLayout
+  title={pageTitle(post.data.title)}
+  description={summary}
+  canonical={path}
+  signInReturnTo={path}
+  ogType="article"
+  image={image?.src}
+  imageAlt={image?.alt}
+  jsonLd={jsonLd}
+>
+  <meta slot="head" property="article:published_time" content={date.toISOString()} />
+  {/* .prose on the article too: Prose's flow rules match direct children, and the post's
+       Markdown sits in here, not directly in the layout's .prose. */}
+  <article class="post prose">
+    <header class="post__header">
+      <h1>{post.data.title}</h1>
+      <div class="post__meta">
+        {
+          authors.some((author) => author.image) && (
+            <div class="post__avatars" aria-hidden="true">
+              {authors
+                .filter((author) => author.image)
+                .map((author) => (
+                  <img
+                    class="post__avatar"
+                    src={author.image}
+                    alt=""
+                    width="48"
+                    height="48"
+                    loading="lazy"
+                    decoding="async"
+                    referrerpolicy="no-referrer"
+                  />
+                ))}
+            </div>
+          )
+        }
+        <p class="post__byline">
+          {
+            authors.length > 0 && (
+              <>
+                By{" "}
+                {authors.map((author, index) => (
+                  <>
+                    {author.url ? (
+                      <a href={author.url} rel="noopener noreferrer">
+                        {author.name}
+                      </a>
+                    ) : (
+                      <span>{author.name}</span>
+                    )}
+                    {index < authors.length - 2 ? ", " : index === authors.length - 2 ? " and " : ""}
+                  </>
+                ))}
+                {" · "}
+              </>
+            )
+          }
+          <time datetime={date.toISOString()}>{formatPostDate(date)}</time>
+        </p>
+      </div>
+      <p class="post__share">
+        <a class="post__share-link" href={blueskyShareUrl} rel="noopener noreferrer" target="_blank">
+          <Icon icon="bluesky" />
+          <span>Share on Bluesky</span>
+        </a>
+        <button
+          type="button"
+          class="post__share-link post__share-native"
+          data-share-title={pageTitle(post.data.title)}
+          data-share-url={url}
+          hidden
+        >
+          <Icon icon="share" />
+          <span>Share</span>
+        </button>
+      </p>
+    </header>
+    <Content />
+    <script is:inline>
+      // The native share sheet, where the browser has one (most phones). Without it, or without
+      // JavaScript, the button stays hidden and the Bluesky link is still there. Inline (not a
+      // bundled script) because Vite inlines it into the prerendered page anyway, and a bundled
+      // copy leaves a dangling _astro/ entry in the server manifest that check-build-assets flags.
+      for (const button of document.querySelectorAll(".post__share-native")) {
+        if (typeof navigator.share !== "function") continue;
+        button.hidden = false;
+        button.addEventListener("click", () => {
+          navigator
+            .share({
+              title: button.dataset.shareTitle,
+              text: "Check out this post on the Toilet Map blog",
+              url: button.dataset.shareUrl,
+            })
+            .catch(() => {
+              // Dismissed by the visitor, or not allowed: nothing to do.
+            });
+        });
+      }
+    </script>
+  </article>
+  <p slot="after" class="post__back"><a href={BLOG_PATH}>All blog posts</a></p>
+</ContentLayout>
+
+<style>
+  .post__header {
+    margin-block-end: var(--space-l);
+  }
+
+  .post__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-s);
+  }
+
+  .post__avatars {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  .post__avatar {
+    inline-size: 3rem;
+    block-size: 3rem;
+    margin: 0;
+    border: 2px solid var(--color-primary-navy);
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--color-light-grey);
+  }
+
+  .post__avatar + .post__avatar {
+    margin-inline-start: calc(var(--space-s) * -1);
+  }
+
+  .post__byline {
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+
+  .post__share {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+    margin-block: var(--space-s) 0;
+  }
+
+  .post__share-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3xs);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .post__share-link[hidden] {
+    display: none;
+  }
+
+  button.post__share-link {
+    text-decoration: underline;
+  }
+
+  .post__back {
+    margin-block-start: var(--space-l);
+  }
+</style>

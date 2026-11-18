@@ -232,6 +232,11 @@ Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteD
 
 `LooResponse` includes `removalCategory` and `duplicateOf`. Optional secret `MODERATION_SLACK_WEBHOOK` (off when unset) posts a counts-only "N changes awaiting review" message when something is queued.
 
+### Feedback (public, unauthenticated)
+
+- **POST /api/feedback** - `{text, email?, route?}` as JSON or a URL-encoded form (`src/routes/feedback/index.ts`). Stored in `public.feedback`; 200 `{ok: true, message}` (200, not 201: the Flutter app treats only 200 as success). Legacy-compatible: the Flutter app posts a form with `email: ""` and no Origin header; the legacy website posted the same fields as JSON. 400 for empty/over-5000-character text or an invalid email; `route` is truncated to 255. Rate limited per IP on the write binding (`feedback:<ip>`). When `MODERATION_SLACK_WEBHOOK` is set, an escaped 500-character excerpt plus the route goes to Slack via `waitUntil`; the email and IP are never sent to Slack or logged. Optional secret `TURNSTILE_SECRET_KEY` (off when unset) requires a `turnstileToken`/`cf-turnstile-response`; enabling it rejects the legacy Flutter app, which cannot send one, and the website's own /feedback form, which has no Turnstile widget yet (add one, with a public site key, before setting the secret). The client worker proxies it (`PUBLIC_POST_PATHS` in `apps/toiletmap-client/src/utils/api.ts`), allowing a missing Origin and never attaching the access token.
+- **GET /admin/feedback** (newest first, 25 a page), **GET /admin/feedback/:id/delete** (confirmation), **POST /admin/feedback/:id/delete** (needs `confirm=delete`). Deleting needs migration `20261118001500_feedback_admin_delete.sql` (DELETE grant and policy for `toiletmap_web`).
+
 ### Admin Interface Routes (Session Auth Required)
 
 - **GET /admin** - Admin dashboard
@@ -358,7 +363,7 @@ The project uses **Supabase migration tooling** (NOT Prisma migrations) because 
    - Always run integration tests after applying migrations
 
 **Production Deployment**:
-Migrations are automatically applied by Supabase when deploying. Coordinate timing with the team for migrations that may impact performance (e.g., creating indexes on large tables).
+Production migrations are applied by the `migrate` job of `.github/workflows/deploy-production.yml` on every push to `main`, before either worker deploys (see `docs/deployment.md`). Coordinate timing with the team for migrations that may impact performance (e.g., creating indexes on large tables).
 
 **CRITICAL**: Do NOT use `prisma migrate` commands - they will not work correctly with this project's schema.
 

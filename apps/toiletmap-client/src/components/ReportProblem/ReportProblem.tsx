@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Button, Icon, Notice } from "toiletmap-design-system";
+import { feedbackHref } from "../../api/feedback";
 import type { LooDetail } from "../../api/loos";
 import {
   type ChangeOutcome,
@@ -18,15 +19,16 @@ import styles from "./ReportProblem.module.css";
 
 /**
  * A choice on step 1. `temporarily_closed` and `wrong_place` aren't reports: the toilet stays on
- * the map, and they point at the edit form instead.
+ * the map, and they point at the edit form instead. "Something else" (`other`) isn't one
+ * either: it points at the feedback page, about this toilet.
  */
 export type ReportChoice = ReportReason | "temporarily_closed" | "wrong_place";
 
-type FixInstead = "temporarily_closed" | "wrong_place";
+type FixInstead = "temporarily_closed" | "wrong_place" | "other";
 
-/** Choices answered by editing the toilet rather than reporting it. */
+/** Choices answered by editing the toilet or sending feedback, rather than reporting it. */
 const isFixInstead = (choice: ReportChoice | null): choice is FixInstead =>
-  choice === "temporarily_closed" || choice === "wrong_place";
+  choice === "temporarily_closed" || choice === "wrong_place" || choice === "other";
 
 interface ChoiceDef {
   value: ReportChoice;
@@ -197,7 +199,6 @@ export default function ReportProblem({
     if (choice === "duplicate" && !duplicateOf) {
       next.duplicate = "Choose the toilet this one duplicates.";
     }
-    if (choice === "other" && !trimmed) next.details = "Tell us what's wrong.";
     if (trimmed.length > MAX_DETAILS_LENGTH) {
       next.details = `Keep the details to ${MAX_DETAILS_LENGTH} characters or fewer.`;
     }
@@ -557,10 +558,7 @@ export default function ReportProblem({
   }
 
   // ── Step 1: choose ────────────────────────────────────────────────────────
-  const detailsRequired = choice === "other";
-  const detailsLabel = detailsRequired
-    ? "What's wrong?"
-    : "Anything else we should know? (optional)";
+  const detailsLabel = "Anything else we should know? (optional)";
   const detailsHintId = "report-details-hint";
   const detailsErrorId = "report-details-error";
 
@@ -663,6 +661,21 @@ export default function ReportProblem({
           </p>
         )}
 
+        {choice === "other" && (
+          <div className={styles.explain}>
+            <p>
+              Tell the Toilet Map team about it in a message. It will say which toilet it's about,
+              and the toilet stays on the map.
+            </p>
+            <div className={styles.actions}>
+              <Button htmlElement="a" variant="primary" href={feedbackHref(loo.id)}>
+                <Icon icon="comments" size="small" />
+                Send us a message
+              </Button>
+            </div>
+          </div>
+        )}
+
         {choice === "duplicate" && (
           <fieldset
             id={ERROR_ANCHORS.duplicate}
@@ -686,9 +699,7 @@ export default function ReportProblem({
               {detailsLabel}
             </label>
             <p id={detailsHintId} className={styles.hint}>
-              {detailsRequired
-                ? "Describe the problem so a moderator can check it."
-                : "For example when it closed, or what's there now."}
+              For example when it closed, or what's there now.
             </p>
             {errors.details && (
               <p id={detailsErrorId} className={styles.error}>
@@ -702,8 +713,6 @@ export default function ReportProblem({
               value={details}
               rows={4}
               maxLength={MAX_DETAILS_LENGTH}
-              required={detailsRequired}
-              aria-required={detailsRequired || undefined}
               aria-invalid={errors.details ? true : undefined}
               aria-describedby={`${detailsHintId}${errors.details ? ` ${detailsErrorId}` : ""}`}
               onInput={(e) => setDetails((e.currentTarget as HTMLTextAreaElement).value)}
