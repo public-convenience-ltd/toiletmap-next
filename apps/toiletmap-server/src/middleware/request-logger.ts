@@ -10,9 +10,13 @@ import { createLogger } from "../utils/logger";
  * - Response status and timing
  * - User information (if authenticated)
  * - Error details (if any)
+ *
+ * The client IP and user agent are left out for paths matching
+ * `omitClientDetails` (the legacy GraphQL endpoint promises not to log them).
  */
 export const requestLogger = (
   env?: "production" | "preview" | "development",
+  { omitClientDetails = () => false }: { omitClientDetails?: (path: string) => boolean } = {},
 ): MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> => {
   const logger = createLogger(env);
 
@@ -27,8 +31,12 @@ export const requestLogger = (
       requestId,
       method,
       path,
-      userAgent: c.req.header("user-agent"),
-      ip: c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for"),
+      ...(omitClientDetails(path)
+        ? {}
+        : {
+            userAgent: c.req.header("user-agent"),
+            ip: c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for"),
+          }),
     });
 
     try {

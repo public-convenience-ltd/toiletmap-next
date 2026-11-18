@@ -192,16 +192,17 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 ### Public API
 
-| Endpoint                     | Method | Description                   |
-| ---------------------------- | ------ | ----------------------------- |
-| `/api/loos/:id`              | GET    | Get loo by ID                 |
-| `/api/loos?ids=`             | GET    | Get loos by IDs (batch)       |
-| `/api/loos/proximity`        | GET    | Search by lat/lng/radius      |
-| `/api/loos/geohash/:geohash` | GET    | Search by geohash prefix      |
-| `/api/loos/search`           | GET    | Full-text search with filters |
-| `/api/loos/:id/reports`      | GET    | Get loo update history        |
-| `/api/loos`                  | POST   | Create loo (auth required)    |
-| `/api/loos/:id`              | PUT    | Update loo (auth required)    |
+| Endpoint                     | Method   | Description                            |
+| ---------------------------- | -------- | -------------------------------------- |
+| `/api/loos/:id`              | GET      | Get loo by ID                          |
+| `/api/loos?ids=`             | GET      | Get loos by IDs (batch)                |
+| `/api/loos/proximity`        | GET      | Search by lat/lng/radius               |
+| `/api/loos/geohash/:geohash` | GET      | Search by geohash prefix               |
+| `/api/loos/search`           | GET      | Full-text search with filters          |
+| `/api/loos/:id/reports`      | GET      | Get loo update history                 |
+| `/api/loos`                  | POST     | Create loo (auth required)             |
+| `/api/loos/:id`              | PUT      | Update loo (auth required)             |
+| `/api/graphql`               | GET/POST | Legacy GraphQL (deprecated, read-only) |
 
 ### Admin UI
 
@@ -215,6 +216,27 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 | `/admin/login`       | GET      | Login page      |
 
 See [API Documentation](docs/openapi.json) for OpenAPI spec.
+
+### Legacy GraphQL compatibility endpoint
+
+`/api/graphql` serves the old `www.toiletmap.org.uk/api` GraphQL API for existing clients: the Flutter app (`GET /api/?query=`), the GraphQL explorer and third parties. The client worker proxies exactly `/api` and `/api/` to it, forwarding no cookies and attaching no token. Code: `src/routes/legacy-graphql/`.
+
+- **Frozen contract.** The schema is the legacy SDL minus the three mutations (and the types and `@auth` directive only they used). No new fields: new capabilities go to REST. Apart from the deliberate deviations listed below, output matches the legacy API byte for byte: field names and nullability, `OpeningTimes` (`null` or 7 days of `[]` / `["HH:MM","HH:MM"]`; the current API's `24:00` is sent as `00:00`), `DateTime` (graphql-iso-date rules), the compressed `loosByGeohash` / `fullLoosByGeohash` strings, status codes, and `"Unexpected error."` masking. Legacy quirks are kept on purpose (for example an unknown `loo` id is an error, `loosByProximity` includes removed loos, `contributors` is ignored). `graphql` is pinned to 16.10.0, the version the legacy API ran, so error messages and introspection match too.
+- **Read-only.** Any `mutation` or `subscription` fails validation with `This API is read-only; use the REST API.`
+- **Limits.** Depth 8, 250 fields after fragment expansion (`__typename` and introspection fields included), 15 aliases, a per-request cost budget (`statistics` 10, `loos` and `fullLoosByGeohash` 5, ...), 1,000 tokens, 10,000-character queries, 32 KiB bodies, `loos` pages of at most 100, at most 100 `looNamesByIds` ids (and a list is required), `maxDistance` at most 50,000 m, no empty geohash prefix, and at most one `loosByGeohash` / `fullLoosByGeohash` with a prefix shorter than 4 characters per request. The read-only and limit checks run before graphql-js's own validation rules and stop the request on failure, so a document over the limits never reaches the (quadratic) field-overlap check. Requests share the read rate limiter, introspection included. Constants: `src/routes/legacy-graphql/limits.ts`.
+- **Headers.** `Deprecation: true` and `Link: <.../api/docs>; rel="deprecation"` on every response; `Sunset` only when `GRAPHQL_SUNSET` (an HTTP-date) is set. Successful `GET ?query=` responses are `public, max-age=60` (like REST proximity) and edge-cached for 60 s; POSTs and errors are `no-store`. Every response carries `Vary: Accept`, because the content type follows `Accept`. CORS: `Access-Control-Allow-Origin: *` on GET/POST, preflights answered only for the legacy allow-list (`explorer.toiletmap.org.uk` and friends), never credentials.
+- **Usage logging.** One info log per request with the operation name, root fields, a hash of the query shape (literals stripped) and the `Origin`. No IP, user agent or variables are logged for this path anywhere: the global request logger leaves out its `ip` and `userAgent` fields here, and the read rate limiter's "Rate limit exceeded" warning leaves out its IP-based key.
+- **Deliberate deviations from the legacy API** (tell third parties before cutover):
+  - Read-only: the three mutations are gone (see above).
+  - CORS: simple GET/POST responses send `Access-Control-Allow-Origin: *` without `Access-Control-Allow-Credentials`. Legacy reflected any `Origin` with credentials, so a browser caller using `credentials: "include"` on a simple request is now blocked. No cookies are used, so nothing is lost by sending none.
+  - Caching: `public, max-age=60` on successful GETs instead of `public, max-age=0, must-revalidate`.
+  - Hardenings that legacy did not have, each of which nulls the whole response (`data: null`, so sibling root fields too): `looNamesByIds` without `idList` (legacy returned every toilet) or with more than 100 ids; `loosByProximity` `maxDistance` above 50,000 m (legacy had no cap); an empty geohash prefix (legacy returned everything); more than one short-prefix geohash field; and the query limits above.
+  - Transport: multipart POST bodies get `415` (yoga accepted them for uploads, which this schema never used). `application/json`, `application/graphql+json`, `application/graphql` (raw query) and `application/x-www-form-urlencoded` POSTs are accepted as before. GraphiQL is gone: `GET` with `Accept: text/html` and no query gets the JSON `Must provide query string.` error. Use the REST docs at `/api/docs`.
+  - `openingTimes`: the current API's `24:00` closing time is sent as `00:00` (legacy failed the field for those rows; 4 rows in the 2025-11-04 export). `["00:00","24:00"]` therefore becomes `["00:00","00:00"]`, which legacy clients read as open 24 hours. A stored value that fails the current opening-times schema is `null` here (legacy returned `null` plus an error, and `fullLoosByGeohash` still encoded it); the 2025-11-04 export has no such rows.
+  - `loosByProximity` drops a loo whose area row has a null name and type (legacy's inner join kept it), and `statistics.areaToiletCount` has one entry per area id (legacy keyed by name, so duplicate names merged and a null name became `"null"`). Live data had no such areas at capture time.
+- **Not covered: `POST /api/feedback`.** The Flutter app also posts feedback (form fields) to `www.toiletmap.org.uk/api/feedback` (`lib/model/user_agent_client.dart`). That route does not exist in this stack (the client worker answers `404`), so app feedback stops working at cutover. This is a cutover blocker outside Phase 6.2: port the route or ship an app update that drops it before switching DNS.
+- **Sunset plan.** About 12 months after cutover (date not fixed yet). Announce it by setting `GRAPHQL_SUNSET`, contact the known consumers, review usage per operation from the logs at 6 months, remove unused operations, then delete `src/routes/legacy-graphql/` and the client's `/api` route at sunset.
+- **Golden fixtures and contract tests.** `test/fixtures/legacy-graphql/` holds responses captured read-only from the live legacy API (see its README). `test/integration/legacy-graphql.contract.spec.ts` seeds the fixture toilets and audit rows into the local test DB and replays every fixture; its header comment lists exactly which fields are normalised and why. `legacy-graphql.http.spec.ts` covers the Flutter request, limits, headers, CORS and mutation rejection. To recapture (only while the legacy API is still live, and only with the owner's go-ahead): `node test/fixtures/legacy-graphql/capture.mjs --dry-run`, then without `--dry-run` (read-only, at most 1 request per second).
 
 ## Rate Limiting
 

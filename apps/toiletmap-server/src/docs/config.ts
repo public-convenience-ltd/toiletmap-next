@@ -8,6 +8,10 @@ export const openApiTags = [
   { name: "Meta", description: "General service endpoints." },
   { name: "Areas", description: "Administrative area operations." },
   { name: "Loos", description: "Operations relating to loos." },
+  {
+    name: "Legacy GraphQL",
+    description: "Deprecated read-only compatibility endpoint for the old GraphQL API.",
+  },
 ];
 
 export const openApiServers = [

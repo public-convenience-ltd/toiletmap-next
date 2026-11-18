@@ -47,6 +47,17 @@ same-origin requests to `/api/*` on this worker, handled by the proxy in
   `access-control-*` and upstream `content-security-policy` are stripped. Every
   proxy response carries `content-security-policy: default-src 'none'; frame-ancestors 'none'`
   and `x-content-type-options: nosniff` (responses are JSON, never documents).
+- **Exception: the legacy GraphQL API.** Exactly `/api` and `/api/` (what the Flutter
+  app and other old clients call: `GET /api/?query=`, `POST /api`) are proxied to the
+  server's read-only `/api/graphql` by `proxyLegacyGraphqlRequest`. These calls come
+  from apps and other origins, so this route has no CSRF `Origin` check, never
+  forwards cookies or attaches a token, passes upstream `access-control-*` headers
+  through (the server decides CORS), and still forwards the client IP for rate
+  limiting. Bodies are capped at 64 KiB while they are read (chunked bodies
+  included), and the proxy's own `405`/`413` errors carry
+  `access-control-allow-origin: *`. `/api/feedback` and every other path keep the
+  rules above, so the Flutter app's `POST /api/feedback` is a `404`: a known
+  cutover blocker (see the server README, "Legacy GraphQL compatibility endpoint").
 
 Pages therefore pass `apiUrl=""` to islands, and `getApiUrl("", path)` from
 [src/api/config.ts](src/api/config.ts) yields relative URLs. Server-side (SSR)

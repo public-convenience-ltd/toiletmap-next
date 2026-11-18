@@ -58,6 +58,19 @@ export type DatasetVersion = {
   cursor: string;
 };
 
+/** Parameters for {@link LooService.searchLegacy} (legacy GraphQL `loos`). */
+export type LegacyLooSearchParams = {
+  active?: boolean | null;
+  noPayment?: boolean | null;
+  nameContains?: string;
+  areaName?: string;
+  updatedFrom?: Date;
+  updatedTo?: Date;
+  order: "asc" | "desc";
+  limit: number;
+  offset: number;
+};
+
 /** A loo as read for mutation purposes: the public response plus its raw `areaId`. */
 export type LooMutationBase = LooDiffBase & { areaId: string | null };
 
@@ -609,6 +622,60 @@ export class LooService {
       createdAt,
       diff,
     }));
+  }
+
+  /**
+   * Every audit snapshot recorded for a loo, unfiltered and unmapped, in
+   * recording order: the record_version id plus the toilets row as stored
+   * (timestamps stay the Postgres JSON strings). For the legacy GraphQL
+   * `reportsForLoo` adapter, which must reproduce the old mapping, including
+   * the system location rows that {@link getReports} leaves out.
+   */
+  async getAuditSnapshots(id: string): Promise<Array<{ id: string; record: unknown }>> {
+    const rows = await this.prisma.record_version.findMany({
+      where: { record: { path: ["id"], equals: id } },
+      select: { id: true, record: true },
+      orderBy: [{ ts: "asc" }, { id: "asc" }],
+    });
+    return rows.map((row) => ({ id: row.id.toString(), record: row.record }));
+  }
+
+  /**
+   * Search with the legacy GraphQL `loos` semantics, which differ from
+   * {@link search}: `nameContains` matches the name only (case-insensitive),
+   * `areaName` is an exact match, the date bounds apply to `updated_at`, and
+   * `null` for `active`/`noPayment` means "IS NULL" (undefined means no
+   * filter). Ordered by `updated_at`, then id so pages are stable.
+   */
+  async searchLegacy(
+    params: LegacyLooSearchParams,
+  ): Promise<{ data: LooResponse[]; total: number }> {
+    const where: Prisma.toiletsWhereInput = {};
+    if (params.active !== undefined) where.active = params.active;
+    if (params.noPayment !== undefined) where.no_payment = params.noPayment;
+    if (params.nameContains) {
+      where.name = { contains: params.nameContains, mode: "insensitive" };
+    }
+    if (params.updatedFrom || params.updatedTo) {
+      where.updated_at = {
+        ...(params.updatedFrom ? { gte: params.updatedFrom } : {}),
+        ...(params.updatedTo ? { lte: params.updatedTo } : {}),
+      };
+    }
+    if (params.areaName) where.areas = { is: { name: { equals: params.areaName } } };
+
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.toilets.count({ where }),
+      this.prisma.toilets.findMany({
+        where,
+        include: { areas: areaSelection },
+        orderBy: [{ updated_at: params.order }, { id: "asc" }],
+        skip: params.offset,
+        take: params.limit,
+      }),
+    ]);
+
+    return { data: rows.map(mapLoo), total };
   }
 
   // ===========================================================================
