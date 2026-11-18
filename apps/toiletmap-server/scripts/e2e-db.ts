@@ -82,6 +82,36 @@ export function getPendingChangesForLoo(looId: string): Promise<PendingChangeRow
   });
 }
 
+export type FeedbackRow = {
+  id: number;
+  email: string | null;
+  feedback_text: string;
+  route: string;
+};
+
+/**
+ * Feedback rows whose text contains `marker` (each e2e message carries a unique one), oldest
+ * first. Feedback has no e2e name prefix, so the specs delete their own rows by id.
+ */
+export function getFeedbackContaining(marker: string): Promise<FeedbackRow[]> {
+  return withClient(async (client) => {
+    const res = await client.query<FeedbackRow>(
+      `select id, email, feedback_text, route from feedback
+        where strpos(feedback_text, $1) > 0 order by id asc`,
+      [marker],
+    );
+    return res.rows;
+  });
+}
+
+export function deleteFeedback(ids: number[]): Promise<number> {
+  if (ids.length === 0) return Promise.resolve(0);
+  return withClient(async (client) => {
+    const res = await client.query("delete from feedback where id = any($1::int[])", [ids]);
+    return res.rowCount ?? 0;
+  });
+}
+
 export function deletePendingChanges(ids: string[]): Promise<number> {
   if (ids.length === 0) return Promise.resolve(0);
   return withClient(async (client) => {

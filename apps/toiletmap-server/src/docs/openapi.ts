@@ -146,6 +146,34 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       },
     ],
   },
+  FeedbackRequest: {
+    type: "object",
+    required: ["text"],
+    properties: {
+      text: {
+        type: "string",
+        minLength: 1,
+        maxLength: 5000,
+        description: "The message (trimmed).",
+      },
+      email: {
+        type: ["string", "null"],
+        maxLength: 255,
+        description: "Optional reply address. Empty means none. Never logged or sent to Slack.",
+      },
+      route: {
+        type: ["string", "null"],
+        maxLength: 255,
+        description:
+          "Page path or app version the message was sent from. Longer values are truncated.",
+      },
+      turnstileToken: {
+        type: "string",
+        maxLength: 2048,
+        description: "Cloudflare Turnstile token; required only when the server enables Turnstile.",
+      },
+    },
+  },
   HealthResponse: {
     type: "object",
     required: ["status", "service", "timestamp"],
@@ -898,6 +926,56 @@ export const openApiDocument: OpenAPIObject = {
           200: {
             description: "Service is running.",
             content: jsonContent("HealthResponse"),
+          },
+        },
+      },
+    },
+    "/api/feedback": {
+      post: {
+        tags: ["Feedback"],
+        summary: "Send feedback to the Toilet Map team",
+        description:
+          "Public and unauthenticated. Accepts JSON or a URL-encoded form with the same fields (the legacy website and the Flutter app use these shapes). `email` is optional; an empty string means none. Unknown fields are ignored. Stored for the team; an excerpt of the text and the `route` (never the email or IP) may be posted to Slack. Rate limited per IP. When the server has a Turnstile secret configured, `turnstileToken` (or `cf-turnstile-response`) is required.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: schemaRef("FeedbackRequest") },
+            "application/x-www-form-urlencoded": { schema: schemaRef("FeedbackRequest") },
+          },
+        },
+        responses: {
+          200: {
+            description: "Stored. (200, not 201, for compatibility with the Flutter app.)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["ok", "message"],
+                  properties: {
+                    ok: { type: "boolean", const: true },
+                    message: { type: "string", example: "Thank you for your feedback." },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: "Missing or too-long text, an invalid email address, or a malformed body.",
+            content: jsonContent("ValidationErrorResponse"),
+          },
+          403: {
+            description: "Turnstile is enabled and the token is missing or invalid.",
+            content: jsonContent("ErrorResponse"),
+          },
+          413: { description: "Body too large.", content: jsonContent("ErrorResponse") },
+          415: {
+            description: "Not JSON or a form.",
+            content: jsonContent("ErrorResponse"),
+          },
+          429: { description: "Too many messages.", content: jsonContent("ErrorResponse") },
+          503: {
+            description: "Turnstile is enabled but could not be reached.",
+            content: jsonContent("ErrorResponse"),
           },
         },
       },

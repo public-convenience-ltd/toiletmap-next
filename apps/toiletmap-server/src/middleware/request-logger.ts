@@ -22,13 +22,19 @@ export const requestLogger = (
     const method = c.req.method;
     const path = c.req.path;
 
-    // Log incoming request
+    // Log incoming request. Feedback promises never to log the submitter's
+    // IP, so its line carries neither IP nor user agent.
+    const isFeedback = path === "/api/feedback" || path.startsWith("/api/feedback/");
     logger.info("Incoming request", {
       requestId,
       method,
       path,
-      userAgent: c.req.header("user-agent"),
-      ip: c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for"),
+      ...(isFeedback
+        ? {}
+        : {
+            userAgent: c.req.header("user-agent"),
+            ip: c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for"),
+          }),
     });
 
     try {

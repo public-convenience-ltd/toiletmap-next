@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { createPrismaClient } from "../prisma";
+import { FeedbackService } from "../services/feedback/feedback.service";
 import { LooService } from "../services/loo";
 import { PendingChangeService } from "../services/pending-change/pending-change.service";
 import type { AppVariables, Env } from "../types";
@@ -27,5 +28,6 @@ export const services = createMiddleware<{
   const prisma = createPrismaClient(connectionString);
   c.set("looService", new LooService(prisma));
   c.set("pendingChangeService", new PendingChangeService(prisma));
+  c.set("feedbackService", new FeedbackService(prisma));
   await next();
 });
