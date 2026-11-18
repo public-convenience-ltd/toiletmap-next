@@ -1,0 +1,91 @@
+{
+  "name": "loo-removed",
+  "description": "loo(id) for a removed (active: false) loo.",
+  "capturedAt": "2026-11-18T00:34:43.754Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query findLooById($id: ID) {\n  loo(id: $id) {\n    ...LooFragment\n    reports {\n      id\n    }\n  }\n}\nfragment LooFragment on Loo {\n  id\n  createdAt\n  updatedAt\n  verifiedAt\n  active\n  location {\n    lat\n    lng\n  }\n  name\n  openingTimes\n  accessible\n  men\n  women\n  allGender\n  babyChange\n  children\n  urinalOnly\n  radar\n  automatic\n  noPayment\n  paymentDetails\n  notes\n  removalReason\n  attended\n  geohash\n  area {\n    name\n    type\n  }\n}",
+  "variables": {
+    "id": "22c44a1e75743f30d729e6c1"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loo": {
+        "id": "22c44a1e75743f30d729e6c1",
+        "createdAt": "2018-08-07T05:28:19.172Z",
+        "updatedAt": "2018-08-18T09:25:13.732Z",
+        "verifiedAt": null,
+        "active": false,
+        "location": {
+          "lat": 51.505445843,
+          "lng": -0.088849068
+        },
+        "name": "Pret",
+        "openingTimes": [
+          [
+            "09:00",
+            "17:00"
+          ],
+          [
+            "09:00",
+            "17:00"
+          ],
+          [
+            "09:00",
+            "17:00"
+          ],
+          [
+            "09:00",
+            "17:00"
+          ],
+          [
+            "09:00",
+            "17:00"
+          ],
+          [
+            "09:00",
+            "17:00"
+          ],
+          [
+            "09:00",
+            "17:00"
+          ]
+        ],
+        "accessible": false,
+        "men": true,
+        "women": true,
+        "allGender": null,
+        "babyChange": true,
+        "children": null,
+        "urinalOnly": null,
+        "radar": true,
+        "automatic": false,
+        "noPayment": true,
+        "paymentDetails": null,
+        "notes": null,
+        "removalReason": null,
+        "attended": false,
+        "geohash": "gcpvjbr2cxj248vkcypu",
+        "area": [
+          {
+            "name": "Southwark",
+            "type": "Local Authority"
+          }
+        ],
+        "reports": []
+      }
+    }
+  }
+}

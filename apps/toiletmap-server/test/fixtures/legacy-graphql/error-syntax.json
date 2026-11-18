@@ -1,0 +1,34 @@
+{
+  "name": "error-syntax",
+  "description": "Syntax error.",
+  "capturedAt": "2026-11-18T00:35:14.561Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "{ loo(id: ",
+  "variables": null,
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Syntax Error: Unexpected <EOF>.",
+        "locations": [
+          {
+            "line": 1,
+            "column": 11
+          }
+        ]
+      }
+    ]
+  }
+}

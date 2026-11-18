@@ -1,0 +1,60 @@
+{
+  "name": "loosByProximity-default-distance",
+  "description": "maxDistance omitted (defaults to 1000).",
+  "capturedAt": "2026-11-18T00:35:01.422Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query($lat: Float!, $lng: Float!) { loosByProximity(from: { lat: $lat, lng: $lng }) { id } }",
+  "variables": {
+    "lat": 52.7077,
+    "lng": -2.754
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByProximity": [
+        {
+          "id": "06fb5f07d52e8493ea45f97a"
+        },
+        {
+          "id": "d438f44779c07f9c8288bdc8"
+        },
+        {
+          "id": "0220bb6e020eba5484124139"
+        },
+        {
+          "id": "c16827ebe7c9fc0b4a2789b2"
+        },
+        {
+          "id": "8d846ff1154a5b79ed3f72f6"
+        },
+        {
+          "id": "b29fb7508c04bc2ade91f29a"
+        },
+        {
+          "id": "f94ec2960cfc221de9e1c4bb"
+        },
+        {
+          "id": "8505c95f9356422865e0f9fe"
+        },
+        {
+          "id": "a62c554358606a7ca7e10f5f"
+        },
+        {
+          "id": "23113ed968c5668a947de1b0"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "loosByGeohash-unknown-cell",
+  "description": "A cell with no loos -> empty list.",
+  "capturedAt": "2026-11-18T00:35:05.763Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query loosByGeohash($geohash: String!, $active: Boolean = true) {\n  loosByGeohash(geohash: $geohash, active: $active)\n}",
+  "variables": {
+    "geohash": "zzzzzz"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByGeohash": []
+    }
+  }
+}

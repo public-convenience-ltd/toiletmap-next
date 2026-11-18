@@ -1,0 +1,442 @@
+{
+  "name": "get-flutter-loosByProximity-shrewsbury",
+  "description": "EXACT Flutter request: GET /api/?query=<template> with default radius 2000 and default feature list, no Origin, Dart-style URL encoding (spaces %20, braces %7B %7D).",
+  "capturedAt": "2026-11-18T00:34:26.216Z",
+  "method": "GET",
+  "url": "/api?query=%7BloosByProximity(from%3A%20%7Blat%3A%2052.7077%2C%20lng%3A%20-2.754%2C%20maxDistance%3A%202000%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures"
+  },
+  "query": "{loosByProximity(from: {lat: 52.7077, lng: -2.754, maxDistance: 2000}){ id name active location{lat lng} notes accessible allGender men women openingTimes babyChange noPayment urinalOnly radar attended}}",
+  "variables": null,
+  "operationName": null,
+  "redirects": [
+    {
+      "url": "/api/?query=%7BloosByProximity(from:%20%7Blat:%2052.7077,%20lng:%20-2.754,%20maxDistance:%202000%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D",
+      "status": 308,
+      "headers": {
+        "content-type": "text/plain",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "location": "/api?query=%7BloosByProximity(from%3A%20%7Blat%3A%2052.7077%2C%20lng%3A%20-2.754%2C%20maxDistance%3A%202000%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D"
+      }
+    }
+  ],
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByProximity": [
+        {
+          "id": "06fb5f07d52e8493ea45f97a",
+          "name": "Shrewsbury Railway Station",
+          "active": true,
+          "location": {
+            "lat": 52.7114008,
+            "lng": -2.7487182
+          },
+          "notes": "Behind ticket barriers.\r\nAsk nicely and will be allowed through with a free platform ticket.",
+          "accessible": false,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ]
+          ],
+          "babyChange": true,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": true
+        },
+        {
+          "id": "d438f44779c07f9c8288bdc8",
+          "name": "Shrewsbury Bus Station Toilets",
+          "active": true,
+          "location": {
+            "lat": 52.710606463,
+            "lng": -2.752547264
+          },
+          "notes": null,
+          "accessible": true,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ]
+          ],
+          "babyChange": false,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": false
+        },
+        {
+          "id": "0220bb6e020eba5484124139",
+          "name": "Abbey Foregate",
+          "active": true,
+          "location": {
+            "lat": 52.706590922,
+            "lng": -2.744575739
+          },
+          "notes": "Accessible facilities 24/7 (RADAR Key)\r\nOther facilities daylight only",
+          "accessible": false,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ]
+          ],
+          "babyChange": false,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": true
+        },
+        {
+          "id": "c16827ebe7c9fc0b4a2789b2",
+          "name": "The Quarry",
+          "active": true,
+          "location": {
+            "lat": 52.708848185,
+            "lng": -2.761779428
+          },
+          "notes": null,
+          "accessible": null,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": null,
+          "babyChange": null,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": null,
+          "attended": null
+        },
+        {
+          "id": "8d846ff1154a5b79ed3f72f6",
+          "name": null,
+          "active": true,
+          "location": {
+            "lat": 52.707681378,
+            "lng": -2.759724855
+          },
+          "notes": null,
+          "accessible": false,
+          "allGender": null,
+          "men": null,
+          "women": null,
+          "openingTimes": null,
+          "babyChange": null,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": null,
+          "attended": null
+        },
+        {
+          "id": "b29fb7508c04bc2ade91f29a",
+          "name": "Shrewsbury Indoor Market",
+          "active": true,
+          "location": {
+            "lat": 52.707637855,
+            "lng": -2.756575942
+          },
+          "notes": "The toilets are located on the upper floor, lift access available.",
+          "accessible": true,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            []
+          ],
+          "babyChange": true,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": null
+        },
+        {
+          "id": "8505c95f9356422865e0f9fe",
+          "name": "Barker St Car Park",
+          "active": true,
+          "location": {
+            "lat": 52.70869093,
+            "lng": -2.756064534
+          },
+          "notes": "Closed as at Oct 2024",
+          "accessible": false,
+          "allGender": null,
+          "men": null,
+          "women": null,
+          "openingTimes": null,
+          "babyChange": null,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": null,
+          "attended": null
+        },
+        {
+          "id": "dc7013119dfaa49934a9b331",
+          "name": "Sydney Avenue, Shrewsbury",
+          "active": true,
+          "location": {
+            "lat": 52.713330703,
+            "lng": -2.74056673
+          },
+          "notes": "This toilet has ramps to the doors of both the male and female facilities. This toilet is also open 7 days a week from Easter until winter (possibly the end of October) from 10 AM to 4 PM. There is no baby changing facility in the male toilet anyway. Council website says open 7 days from Easter - am here on a Monday in Mayand I have found them locked. Perhaps relates to cafe opening hours.",
+          "accessible": false,
+          "allGender": false,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [],
+            [],
+            [],
+            [],
+            [
+              "10:00",
+              "16:00"
+            ],
+            [
+              "10:00",
+              "16:00"
+            ],
+            [
+              "10:00",
+              "16:00"
+            ]
+          ],
+          "babyChange": null,
+          "noPayment": true,
+          "urinalOnly": false,
+          "radar": false,
+          "attended": null
+        },
+        {
+          "id": "23113ed968c5668a947de1b0",
+          "name": "Butcher Row",
+          "active": true,
+          "location": {
+            "lat": 52.7079333,
+            "lng": -2.7526333
+          },
+          "notes": "Changing Places toilet locked due to \"vandalism\" council not allowing access.",
+          "accessible": true,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "16:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ]
+          ],
+          "babyChange": true,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": false
+        },
+        {
+          "id": "f94ec2960cfc221de9e1c4bb",
+          "name": "Theatre Severn ",
+          "active": true,
+          "location": {
+            "lat": 52.710748752,
+            "lng": -2.757723927
+          },
+          "notes": null,
+          "accessible": true,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": null,
+          "babyChange": true,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": null,
+          "attended": null
+        },
+        {
+          "id": "a62c554358606a7ca7e10f5f",
+          "name": "Darwin Shopping Centre",
+          "active": true,
+          "location": {
+            "lat": 52.709507954,
+            "lng": -2.75277257
+          },
+          "notes": null,
+          "accessible": true,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ]
+          ],
+          "babyChange": true,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": true
+        }
+      ]
+    }
+  }
+}

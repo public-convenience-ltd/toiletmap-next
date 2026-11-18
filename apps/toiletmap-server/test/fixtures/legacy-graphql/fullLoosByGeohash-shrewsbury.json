@@ -1,0 +1,35 @@
+{
+  "name": "fullLoosByGeohash-shrewsbury",
+  "description": "Full compressed loos (id|geohash9|combinedMask|base64urlMeta), precision-6 cell.",
+  "capturedAt": "2026-11-18T00:35:06.878Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query fullLoosByGeohash($geohash: String!, $active: Boolean = true) {\n  fullLoosByGeohash(geohash: $geohash, active: $active)\n}",
+  "variables": {
+    "geohash": "gcq5c7"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "fullLoosByGeohash": [
+        "b29fb7508c04bc2ade91f29a|gcq5c70sp|377|eyJuIjoiU2hyZXdzYnVyeSBJbmRvb3IgTWFya2V0IiwidCI6IlRoZSB0b2lsZXRzIGFyZSBsb2NhdGVkIG9uIHRoZSB1cHBlciBmbG9vciwgbGlmdCBhY2Nlc3MgYXZhaWxhYmxlLiIsIm8iOiIuMDgwMDE2MDAuMDgwMDE2MDAuMDgwMDE2MDAuMDgwMDE2MDAuMDgwMDE2MDAuIn0",
+        "8505c95f9356422865e0f9fe|gcq5c7347|1|eyJuIjoiQmFya2VyIFN0IENhciBQYXJrIiwidCI6IkNsb3NlZCBhcyBhdCBPY3QgMjAyNCJ9",
+        "23113ed968c5668a947de1b0|gcq5c75tf|377|eyJuIjoiQnV0Y2hlciBSb3ciLCJ0IjoiQ2hhbmdpbmcgUGxhY2VzIHRvaWxldCBsb2NrZWQgZHVlIHRvIFwidmFuZGFsaXNtXCIgY291bmNpbCBub3QgYWxsb3dpbmcgYWNjZXNzLiIsIm8iOiIwOTAwMTgwMC4wOTAwMTgwMC4wOTAwMTgwMC4wOTAwMTgwMC4wOTAwMTgwMC4wOTAwMTYwMC4wOTAwMTgwMCJ9",
+        "a62c554358606a7ca7e10f5f|gcq5c77rp|377|eyJuIjoiRGFyd2luIFNob3BwaW5nIENlbnRyZSIsIm8iOiIwOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMCJ9",
+        "d438f44779c07f9c8288bdc8|gcq5c7ett|361|eyJuIjoiU2hyZXdzYnVyeSBCdXMgU3RhdGlvbiBUb2lsZXRzIiwibyI6IjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwIn0",
+        "06fb5f07d52e8493ea45f97a|gcq5c7y6n|369|eyJuIjoiU2hyZXdzYnVyeSBSYWlsd2F5IFN0YXRpb24iLCJ0IjoiQmVoaW5kIHRpY2tldCBiYXJyaWVycy5cclxuQXNrIG5pY2VseSBhbmQgd2lsbCBiZSBhbGxvd2VkIHRocm91Z2ggd2l0aCBhIGZyZWUgcGxhdGZvcm0gdGlja2V0LiIsIm8iOiIwOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMCJ9"
+      ]
+    }
+  }
+}

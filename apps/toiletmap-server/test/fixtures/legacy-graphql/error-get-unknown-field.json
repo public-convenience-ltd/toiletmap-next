@@ -1,0 +1,33 @@
+{
+  "name": "error-get-unknown-field",
+  "description": "Validation error over GET.",
+  "capturedAt": "2026-11-18T00:35:18.976Z",
+  "method": "GET",
+  "url": "/api?query=%7B%20statistics%20%7B%20total%20nope%20%7D%20%7D",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures"
+  },
+  "query": "{ statistics { total nope } }",
+  "variables": null,
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Cannot query field \"nope\" on type \"Statistics\".",
+        "locations": [
+          {
+            "line": 1,
+            "column": 22
+          }
+        ]
+      }
+    ]
+  }
+}
