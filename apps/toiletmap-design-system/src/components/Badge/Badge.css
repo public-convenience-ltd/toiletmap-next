@@ -1,8 +1,42 @@
+/*
+ * Badge: a short status label. A pill (--radius-pill) in the same status tones as Notice and
+ * Toast; the tone only swaps the three custom properties.
+ */
 .badge {
-  padding: var(--space-3xs);
-  border-radius: 3px;
-  font-weight: bold;
-  border: var(--color-pink) solid 2px;
-  display: inline-block;
+  --badge-bg: var(--color-light-grey);
+  --badge-border: var(--color-light-grey);
+  --badge-text: var(--color-text);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: 0.125rem var(--space-xs);
+  border: 1px solid var(--badge-border);
+  border-radius: var(--radius-pill);
+  background: var(--badge-bg);
+  color: var(--badge-text);
   font-size: var(--text--1);
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge--info {
+  --badge-bg: var(--color-info-bg);
+  --badge-border: var(--color-info-border);
+}
+
+.badge--success {
+  --badge-bg: var(--color-success-bg);
+  --badge-border: var(--color-success-border);
+}
+
+.badge--warning {
+  --badge-bg: var(--color-warning-bg);
+  --badge-border: var(--color-warning-border);
+}
+
+.badge--error {
+  --badge-bg: var(--color-error-bg);
+  --badge-border: var(--color-error-border);
 }

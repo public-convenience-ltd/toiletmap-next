@@ -115,17 +115,28 @@ describe("consumeSavedParam", () => {
   it("detects saved=1 and strips it, keeping other params and the hash", () => {
     expect(consumeSavedParam("https://x.test/loos/aaa?saved=1")).toEqual({
       saved: true,
+      added: false,
       cleanUrl: "/loos/aaa",
     });
     expect(consumeSavedParam("https://x.test/loos/aaa?a=1&saved=1#h")).toEqual({
       saved: true,
+      added: false,
       cleanUrl: "/loos/aaa?a=1#h",
+    });
+  });
+
+  it("tells a new toilet (saved=added) from an edit", () => {
+    expect(consumeSavedParam("https://x.test/loos/aaa?saved=added")).toEqual({
+      saved: true,
+      added: true,
+      cleanUrl: "/loos/aaa",
     });
   });
 
   it("strips a saved param with another value without showing the banner", () => {
     expect(consumeSavedParam("https://x.test/loos/aaa?saved=0")).toEqual({
       saved: false,
+      added: false,
       cleanUrl: "/loos/aaa",
     });
   });
@@ -133,6 +144,7 @@ describe("consumeSavedParam", () => {
   it("leaves URLs without the param alone", () => {
     expect(consumeSavedParam("https://x.test/loos/aaa?a=1")).toEqual({
       saved: false,
+      added: false,
       cleanUrl: null,
     });
   });

@@ -26,7 +26,7 @@ function picker(page: Page) {
     coords: page.getByRole("textbox", { name: "Latitude, longitude" }),
     showOnMap: page.getByRole("button", { name: "Show on map" }),
     chip: page.getByText(/^Moved [\d.]+ k?m [a-z-]+$/),
-    strip: page.locator("p[id$='-strip']"),
+    strip: page.locator("[id$='-strip']"),
     bigMoveWarning: page.getByText("That's a big move — are you sure this is the same toilet?"),
     lockedMessage: pickerMap(page)
       .locator("..")

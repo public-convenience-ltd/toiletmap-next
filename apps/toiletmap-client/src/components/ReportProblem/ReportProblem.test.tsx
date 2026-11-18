@@ -99,6 +99,10 @@ const setup = (props: Partial<Parameters<typeof ReportProblem>[0]> = {}) => {
   return user;
 };
 
+/** The check step's send button: "Report it", or "Remove it from the map" when trusted. */
+const submitButton = () =>
+  screen.getByRole("button", { name: /^(Report it|Remove it from the map)$/ });
+
 const choose = (user: ReturnType<typeof userEvent.setup>, label: RegExp | string) =>
   user.click(screen.getByRole("radio", { name: label }));
 
@@ -134,9 +138,50 @@ describe("ReportProblem — step 1", () => {
   it("requires a choice and focuses the first option", async () => {
     const user = setup();
     await user.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("Choose what's wrong with this toilet.")).toBeInTheDocument();
+    expect(screen.getAllByText("Choose what's wrong with this toilet.")).toHaveLength(2);
     expect(screen.getAllByRole("radio")[0]).toHaveFocus();
     expect(screen.queryByRole("heading", { name: "Check your report" })).not.toBeInTheDocument();
+  });
+
+  it("lists the problems in an error summary, as the add and edit forms do, linked to their fields", async () => {
+    const user = setup();
+    await choose(user, "Something else");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    const summary = screen.getByRole("heading", { name: "There's a problem" }).closest(".notice");
+    expect(summary).toHaveClass("notice--error");
+    const link = within(summary as HTMLElement).getByRole("link", {
+      name: "Tell us what's wrong.",
+    });
+    expect(link).toHaveAttribute("href", "#report-details");
+    screen.getAllByRole("radio")[0].focus();
+    await user.click(link);
+    expect(screen.getByLabelText("What's wrong?")).toHaveFocus();
+
+    // Fixed: the summary goes once Continue passes.
+    await user.type(screen.getByLabelText("What's wrong?"), "The building is a shop now");
+    await continueToConfirm(user);
+    expect(screen.queryByText("There's a problem")).not.toBeInTheDocument();
+  });
+
+  it("puts the primary action first on both steps", async () => {
+    const user = setup();
+    await choose(user, "It doesn't exist");
+    const names = (el: HTMLElement) =>
+      Array.from(el.querySelectorAll("a, button"), (b) => b.textContent?.trim());
+    const formActions = screen.getByRole("button", { name: "Continue" })
+      .parentElement as HTMLElement;
+    expect(names(formActions)).toEqual(["Continue", "Cancel"]);
+    await continueToConfirm(user);
+    expect(names(submitButton().parentElement as HTMLElement)).toEqual(["Report it", "Back"]);
+  });
+
+  it("names what a signed-in report does: 'Remove it from the map'", async () => {
+    const user = setup({ isAuthenticated: true, canWriteDirectly: true });
+    await choose(user, "It doesn't exist");
+    await continueToConfirm(user);
+    const button = screen.getByRole("button", { name: "Remove it from the map" });
+    expect(button).toHaveClass("button--destructive");
+    expect(screen.queryByRole("button", { name: "Report it" })).not.toBeInTheDocument();
   });
 
   it("sends temporarily closed toilets to the hours and notes edit instead", async () => {
@@ -181,7 +226,7 @@ describe("ReportProblem — step 1", () => {
     expect(screen.queryByRole("link", { name: "Move the pin" })).not.toBeInTheDocument();
     await continueToConfirm(user);
     expect(screen.getByText("Problem").nextElementSibling).toHaveTextContent("It doesn't exist");
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     await screen.findByRole("heading", { name: /moderator will review/ });
     expect(posts("report")).toEqual([{ reason: "does_not_exist", baseUpdatedAt: UPDATED_AT }]);
   });
@@ -192,7 +237,8 @@ describe("ReportProblem — step 1", () => {
     const details = screen.getByLabelText("What's wrong?");
     expect(details).toBeRequired();
     await user.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("Tell us what's wrong.")).toBeInTheDocument();
+    // Inline, and in the error summary.
+    expect(screen.getAllByText("Tell us what's wrong.")).toHaveLength(2);
     expect(details).toHaveFocus();
     expect(details).toHaveAttribute("aria-invalid", "true");
     expect(details.getAttribute("aria-describedby")).toContain("report-details-error");
@@ -244,7 +290,8 @@ describe("ReportProblem — duplicates", () => {
     expect(proximity.searchParams.get("exclude")).toBe(ID);
 
     await user.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("Choose the toilet this one duplicates.")).toBeInTheDocument();
+    // Inline, and in the error summary.
+    expect(screen.getAllByText("Choose the toilet this one duplicates.")).toHaveLength(2);
     expect(options[0]).toHaveFocus();
 
     await user.click(within(group).getByRole("radio", { name: /Station toilets/ }));
@@ -253,7 +300,7 @@ describe("ReportProblem — duplicates", () => {
       "Station toilets (23 m north)",
     );
 
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     await screen.findByRole("heading", { name: /moderator will review/ });
     expect(posts("report")).toEqual([
       { reason: "duplicate", duplicateOf: DUP, baseUpdatedAt: UPDATED_AT },
@@ -339,7 +386,7 @@ describe("ReportProblem — confirm and submit", () => {
     await choose(user, /permanently closed/);
     await user.type(screen.getByLabelText(/anything else/i), "Gone");
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
 
     const heading = await screen.findByRole("heading", { name: "Removed — thanks." });
     await waitFor(() => expect(heading).toHaveFocus());
@@ -370,7 +417,7 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup({ isAuthenticated: true });
     await choose(user, /permanently closed/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     await user.click(await screen.findByRole("button", { name: "Undo" }));
     expect(await screen.findByText("Try later")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
@@ -381,7 +428,7 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup();
     await choose(user, /not open to the public/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
 
     expect(
       await screen.findByRole("heading", { name: "Thanks — a moderator will review your report" }),
@@ -410,7 +457,7 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup({ isAuthenticated: true, canWriteDirectly: true });
     await choose(user, /permanently closed/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     expect(
       await screen.findByText("Thanks — a moderator will review your report"),
     ).toBeInTheDocument();
@@ -424,7 +471,7 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup({ isAuthenticated: true, canWriteDirectly: true });
     await choose(user, /permanently closed/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     await user.click(await screen.findByRole("button", { name: "Undo" }));
     expect(
       await screen.findByText("A moderator will review your request to put it back."),
@@ -438,7 +485,7 @@ describe("ReportProblem — confirm and submit", () => {
     await choose(user, "Something else");
     await user.type(screen.getByLabelText("What's wrong?"), "Wrong name");
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     await screen.findByRole("heading", { name: /moderator will review/ });
     expect(posts("report")).toEqual([
       { reason: "other", details: "Wrong name", baseUpdatedAt: UPDATED_AT },
@@ -450,7 +497,7 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup();
     await choose(user, /permanently closed/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     expect(
       await screen.findByRole("heading", { name: "It's already been removed" }),
     ).toBeInTheDocument();
@@ -461,7 +508,7 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup();
     await choose(user, /permanently closed/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     expect(
       await screen.findByRole("heading", { name: "This toilet has just been changed" }),
     ).toBeInTheDocument();
@@ -473,10 +520,10 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup();
     await choose(user, /permanently closed/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     const error = await screen.findByText("Database unavailable");
     await waitFor(() => expect(error.closest("[tabindex]")).toHaveFocus());
-    expect(screen.getByRole("button", { name: "Report it" })).toBeEnabled();
+    expect(submitButton()).toBeEnabled();
   });
 
   it("explains rate limits and expired sign-ins", async () => {
@@ -484,12 +531,12 @@ describe("ReportProblem — confirm and submit", () => {
     const user = setup({ isAuthenticated: true });
     await choose(user, /permanently closed/);
     await continueToConfirm(user);
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     expect(await screen.findByText(/a lot of reports in a short time/)).toBeInTheDocument();
 
     routes = [];
     onReport(401, {});
-    await user.click(screen.getByRole("button", { name: "Report it" }));
+    await user.click(submitButton());
     expect(await screen.findByRole("link", { name: "Sign in again" })).toHaveAttribute(
       "href",
       `/auth/login?returnTo=${encodeURIComponent(`/loos/${ID}/remove`)}`,

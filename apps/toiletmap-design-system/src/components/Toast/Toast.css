@@ -1,0 +1,63 @@
+/*
+ * Toast region: pinned to the viewport, centred, clear of the safe-area
+ * insets. --toast-offset moves it off its edge (above a bottom sheet, below
+ * the header). The region lets clicks through; only the toasts take them.
+ */
+.toast-region {
+  position: fixed;
+  z-index: var(--z-toast);
+  left: calc(var(--safe-left) + var(--space-s));
+  right: calc(var(--safe-right) + var(--space-s));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast-region--bottom {
+  bottom: calc(var(--toast-offset, 0px) + var(--safe-bottom) + var(--space-s));
+}
+
+/* --header-height already includes the top safe-area inset (the header pads by it). */
+.toast-region--top {
+  top: calc(var(--toast-offset, var(--header-height, var(--safe-top))) + var(--space-s));
+}
+
+.toast-region__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  width: min(100%, 30rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toast-region__item {
+  pointer-events: auto;
+  animation: toast-in 0.2s ease-out;
+}
+
+.toast .notice {
+  box-shadow: var(--shadow-2);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--toast-enter-from, 0.5rem));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toast-region--top .toast-region__item {
+  --toast-enter-from: -0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-region__item {
+    animation: none;
+  }
+}

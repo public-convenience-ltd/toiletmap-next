@@ -2,14 +2,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { contrastRatio, declarationsFor, parseCss } from "./css.testutil";
+import { contrastRatio, declarationsFor, parseCss, resolveToken } from "./css.testutil";
 
 const rules = parseCss(
   readFileSync(join(import.meta.dirname, "ToiletDetailsPanel.module.css"), "utf8"),
 );
 const rule = (selector: string, at: string[] = []) => declarationsFor(rules, selector, at);
 
-const SHORT_LANDSCAPE = "@media (min-width: 768px) and (max-height: 560px)";
+const SHORT_LANDSCAPE = "@media (max-height: 560px)";
 
 describe("ToiletDetailsPanel.module.css", () => {
   it("lets the card scroll as a whole on a short (landscape phone) screen", () => {
@@ -33,6 +33,9 @@ describe("ToiletDetailsPanel.module.css", () => {
     expect(rule('.sheet[data-state="expanded"] .summary', ["@media (max-height: 560px)"])).toEqual({
       position: "static",
     });
+    // Nothing is pinned inside the short card; a focused result keeps room above it.
+    expect(rule(".panel.card .summaryHeader", [SHORT_LANDSCAPE])).toEqual({});
+    expect(rule(".panel.card .focusTarget", [SHORT_LANDSCAPE])["scroll-margin-top"]).toBe("6rem");
   });
 
   it("keeps focused elements clear of the pinned summary (scroll padding by its height)", () => {
@@ -63,7 +66,10 @@ describe("ToiletDetailsPanel.module.css", () => {
   });
 
   it("uses a secondary text colour with at least 4.5:1 contrast on white", () => {
-    const muted = rule(".panel")["--panel-muted"];
+    // The design system's muted text token, not a local copy of it.
+    expect(rule(".panel")["--panel-muted"]).toBe("var(--color-text-muted)");
+    const muted = resolveToken(rule(".panel")["--panel-muted"]);
+    expect(muted).toMatch(/^#[0-9a-f]{6}$/i);
     expect(contrastRatio(muted, "#ffffff")).toBeGreaterThanOrEqual(4.5);
     // The design system's neutral grey (#807f7f, about 4:1) isn't used for text.
     const greyText = rules.filter((r) => r.declarations.color === "var(--color-neutral-grey)");
@@ -136,7 +142,7 @@ describe("ToiletDetailsPanel.module.css", () => {
         "line-height": "var(--panel-leading-small)",
         color: "var(--panel-muted)",
       });
-      for (const selector of [".meta", ".notice", ".noticeSlot", ".verifyRow", ".textAction"]) {
+      for (const selector of [".meta", ".notices :global(.notice)", ".verifyRow", ".textAction"]) {
         expect(rule(selector)["font-size"], selector).toBe("var(--panel-text-small)");
       }
     });

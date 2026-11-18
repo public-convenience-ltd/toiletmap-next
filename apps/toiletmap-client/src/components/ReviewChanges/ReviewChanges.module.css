@@ -1,80 +1,16 @@
-/* ── Modal layer ─────────────────────────────────────────── */
+/*
+ * The review sheet is a DS ConfirmDialog (its layer, backdrop, sheet, radius and shadow);
+ * these rules only lay out the list of changes inside it.
+ */
 
-.layer {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(10, 22, 94, 0.45);
-}
-
-.sheet {
-  position: relative;
-  width: 100%;
-  max-width: 640px;
-  max-height: min(85vh, 85dvh);
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: var(--space-m) var(--space-m) calc(var(--space-m) + env(safe-area-inset-bottom, 0px));
-  background: var(--color-base-white);
-  color: var(--color-primary-navy);
-  font-family: var(--font-family);
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 -8px 32px rgba(10, 22, 94, 0.2);
-}
-
-.sheet:focus {
-  outline: none;
-}
-
-@media (min-width: 720px) {
-  .layer {
-    align-items: center;
-  }
-
-  .sheet {
-    border-radius: 16px;
-  }
-}
-
-/* ── Content ─────────────────────────────────────────────── */
-
-.title {
-  font-size: var(--text-1);
-  font-weight: 700;
-  margin: 0 0 var(--space-2xs);
-}
-
-.title:focus {
-  outline: none;
-}
-
-.title:focus-visible {
-  outline: 2px solid var(--color-primary-navy);
-  outline-offset: 2px;
-}
-
-.intro,
-.note {
-  margin: 0 0 var(--space-s);
-  font-size: var(--text-0);
-}
-
-.note {
-  font-size: var(--text--1);
-  color: var(--color-neutral-grey);
+/* Wider than a yes/no question: the list of changes needs the room. */
+.review :global(.confirm-dialog__panel) {
+  width: min(100%, 40rem);
 }
 
 .list {
   list-style: none;
-  margin: 0 0 var(--space-m);
+  margin: 0 0 var(--space-s);
   padding: 0;
   border-top: 1px solid var(--color-light-grey);
 }
@@ -90,14 +26,21 @@
   font-weight: 700;
 }
 
+/* The old value: muted (6.46:1) and struck through. */
 .from {
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
 
 .to {
   font-weight: 600;
+}
+
+.note {
+  margin: 0 0 var(--space-m);
+  font-size: var(--text--1);
+  color: var(--color-text-muted);
 }
 
 .srOnly {
@@ -110,32 +53,4 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-s);
-}
-
-.message {
-  margin: 0 0 var(--space-m);
-}
-
-@media (pointer: coarse) {
-  .actions :global(.button) {
-    min-height: 44px;
-  }
-}
-
-@media (max-width: 480px) {
-  .actions {
-    flex-direction: column-reverse;
-  }
-
-  .actions > * {
-    width: 100%;
-    justify-content: center;
-  }
 }

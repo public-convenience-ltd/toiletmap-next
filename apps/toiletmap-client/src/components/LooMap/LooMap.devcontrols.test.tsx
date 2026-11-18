@@ -35,6 +35,7 @@ const fakeMap = vi.hoisted(() => {
   const m: Record<string, unknown> = {
     getZoom: () => 13,
     getCenter: () => ({ lat: 51.5, lng: -0.1 }),
+    getBounds: () => ({ contains: () => true }),
     remove: () => undefined,
     on: () => m,
   };

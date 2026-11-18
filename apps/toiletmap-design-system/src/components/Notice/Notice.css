@@ -1,0 +1,153 @@
+/*
+ * Notice: one look for every inline message. The tone only swaps the four
+ * custom properties below; layout, spacing and type are shared.
+ */
+.notice {
+  --notice-bg: var(--color-info-bg);
+  --notice-border: var(--color-info-border);
+  --notice-icon: var(--color-info-icon);
+
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  box-sizing: border-box;
+  padding: var(--space-xs) var(--space-s);
+  border: 1px solid var(--notice-border);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--notice-bg);
+  color: var(--color-text);
+  font-size: var(--text-0);
+  line-height: 1.5;
+  text-align: start;
+}
+
+.notice--info {
+  --notice-bg: var(--color-info-bg);
+  --notice-border: var(--color-info-border);
+  --notice-icon: var(--color-info-icon);
+}
+
+.notice--success {
+  --notice-bg: var(--color-success-bg);
+  --notice-border: var(--color-success-border);
+  --notice-icon: var(--color-success-icon);
+}
+
+.notice--warning {
+  --notice-bg: var(--color-warning-bg);
+  --notice-border: var(--color-warning-border);
+  --notice-icon: var(--color-warning-icon);
+}
+
+.notice--error {
+  --notice-bg: var(--color-error-bg);
+  --notice-border: var(--color-error-border);
+  --notice-icon: var(--color-error-icon);
+}
+
+.notice:focus {
+  outline: none;
+}
+
+.notice:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.notice__icon {
+  display: flex;
+  flex: none;
+  /* Line the icon up with the first line of text. */
+  padding-block-start: 0.2em;
+  color: var(--notice-icon);
+}
+
+.notice__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.notice__title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.notice__content {
+  margin: 0;
+}
+
+.notice__title + .notice__content {
+  margin-block-start: var(--space-3xs);
+}
+
+.notice__content > * {
+  margin-block: 0;
+}
+
+.notice__content > * + * {
+  margin-block-start: var(--space-2xs);
+}
+
+.notice__content :where(ul, ol) {
+  padding-inline-start: 1.25em;
+}
+
+/* Links inside a notice read as links on every tone, not the browser's blue. */
+.notice :where(a:not(.button)) {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.notice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-block-start: var(--space-xs);
+}
+
+.notice__dismiss {
+  flex: none;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  /* Pull the button into the padding so it doesn't add height to a one-line notice. */
+  margin-block: calc(-1 * var(--space-2xs));
+  margin-inline-end: calc(-1 * var(--space-2xs));
+  color: var(--color-text);
+}
+
+/*
+ * Compact: for panels, cards and toasts, where the notice sits among other content. Like the
+ * default size, the icon and the dismiss button line up with the first line of text (not the
+ * middle of the block), so a notice with a title, an action or several lines reads the same
+ * as a one-line one.
+ */
+.notice--compact {
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  font-size: var(--text--1);
+}
+
+.notice--compact .notice__icon {
+  padding-block-start: 0.2em;
+}
+
+.notice--compact .notice__actions {
+  margin-block-start: var(--space-2xs);
+}
+
+/*
+ * The tap-sized button is centred on the first line (1.5 × the compact text size), as far as
+ * the notice's top padding allows, and pulled into the padding below so a one-line notice
+ * isn't made much taller by it.
+ */
+.notice--compact .notice__dismiss {
+  margin-block: max(calc((var(--text--1) * 1.5 - var(--tap-min)) / 2), calc(-1 * var(--space-2xs)))
+    calc(-1 * var(--space-3xs) - 2px);
+  margin-inline-end: calc(-1 * var(--space-3xs));
+}

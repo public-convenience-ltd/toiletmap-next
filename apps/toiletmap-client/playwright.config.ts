@@ -49,6 +49,8 @@ const MOBILE_SPECS = [
   "picker.spec.ts",
   "report.spec.ts",
   "panel.spec.ts",
+  // Key-state screenshots (test-results/screenshots), on phones too.
+  "screenshots.spec.ts",
 ];
 
 /** Specs that also run on a phone in landscape. */
@@ -96,6 +98,12 @@ export default defineConfig({
       // (scrolling as a whole) and the map is a short strip.
       name: "mobile-landscape",
       use: { ...devices["Pixel 7 landscape"] },
+      testMatch: LANDSCAPE_SPECS,
+    },
+    {
+      // An iPhone on its side: under 768px wide (750×342) but short, so it gets the card too.
+      name: "mobile-landscape-webkit",
+      use: { ...devices["iPhone 13 landscape"] },
       testMatch: LANDSCAPE_SPECS,
     },
   ],

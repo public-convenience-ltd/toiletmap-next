@@ -1,7 +1,7 @@
 import L from "leaflet";
 import type { RefObject } from "preact";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { Banner, Button, InputField } from "toiletmap-design-system";
+import { Button, InputField, Notice } from "toiletmap-design-system";
 import { useNominatimSearch } from "../../hooks/useNominatimSearch";
 import { BRAND_PINK, getIconString, makeIcon, PIN_PATH } from "../LooMap/looIcon";
 import {
@@ -57,8 +57,12 @@ export const BIG_MOVE_WARNING = "That's a big move — are you sure this is the 
 export const BIG_MOVE_HINT = "Confirm it with “Use this location”, or cancel it.";
 export const LOCKED_MESSAGE =
   "Locked to stop accidental moves. Choose Move pin to change the location.";
+/**
+ * The one-time intro, on the edit form only (adding works as it always has): what's new, in
+ * words that agree with the locked strip under the map.
+ */
 export const INTRO_MESSAGE =
-  "The map works as before: move it so the pin is on the toilet. To change an existing toilet's location, choose Move pin first.";
+  "To change where this toilet is, choose Move pin first, then move the map.";
 /** localStorage key remembering that the one-time intro banner was dismissed. */
 export const INTRO_STORAGE_KEY = "toiletmap-picker-intro-dismissed";
 
@@ -146,10 +150,21 @@ export type PickerResolution =
    */
   | { kind: "unplaced"; accuracy?: number };
 
+export interface ResolveOptions {
+  /** Resolving for Save, which checks a kept move itself (see LocationPickerHandle.resolve). */
+  save?: boolean;
+}
+
 /** What the form can ask of the picker (LooForm holds it in a ref). */
 export interface LocationPickerHandle {
-  /** Keep a pending move if it is safe to (Save waits for this), or say what blocks it. */
-  resolve: () => Promise<PickerResolution>;
+  /**
+   * Keep a pending move if it is safe to, or say what blocks it. Moving on to another question
+   * resolves without options. Save passes `save: true`: a jump to typed coordinates or the
+   * device's position is then kept too (the form asks "Save the new location?" about it, as
+   * it does for a dragged move), where moving on leaves it for "Use this location". A search
+   * jump, a big move, too little zoom and a duplicate question still block.
+   */
+  resolve: (options?: ResolveOptions) => Promise<PickerResolution>;
   /** "Yes, it's on the toilet": keep a never-moved pin where the map opened. */
   placeHere: () => LatLng | null;
   /** Put focus on the map, moving if needed ("Move the map"). */
@@ -349,6 +364,7 @@ export default function LocationPicker({
     coordsHint: `${uid}-coords-hint`,
     coordsError: `${uid}-coords-error`,
     strip: `${uid}-strip`,
+    prompt: `${uid}-prompt`,
   };
 
   const container = useRef<HTMLDivElement>(null);
@@ -1035,7 +1051,7 @@ export default function LocationPicker({
    * Save), or say what needs answering first. Never keeps anything below zoom 17, a big move,
    * an unchecked jump while editing, or a pin with an open (or new) duplicate question.
    */
-  const keep = async (): Promise<PickerResolution> => {
+  const keep = async ({ save = false }: ResolveOptions = {}): Promise<PickerResolution> => {
     const map = mapRef.current;
     if (!map || phaseRef.current !== "moving") {
       return { kind: "ok", location: currentLocation(), source: null };
@@ -1062,9 +1078,14 @@ export default function LocationPicker({
     }
     if (z < MIN_CONFIRM_ZOOM) return { kind: "blocked", issue: "zoom" };
     if (candidate.kind === "move" && candidate.issue && candidate.issue !== "duplicate") {
-      return candidate.issue === "jump" && jumpRef.current
-        ? { kind: "blocked", issue: "jump", jump: jumpRef.current }
-        : { kind: "blocked", issue: candidate.issue };
+      const jump = jumpRef.current;
+      // Saving: typed coordinates or the device's position are kept for the form's own check.
+      const saveChecksIt = save && candidate.issue === "jump" && !!jump && jump !== "search";
+      if (!saveChecksIt) {
+        return candidate.issue === "jump" && jump
+          ? { kind: "blocked", issue: "jump", jump }
+          : { kind: "blocked", issue: candidate.issue };
+      }
     }
     const open = promptRef.current;
     if (open) return { kind: "blocked", issue: "duplicate", name: matchName(open.match) };
@@ -1075,7 +1096,9 @@ export default function LocationPicker({
         return { kind: "ok", location: currentLocation(), source: null };
       }
       // The map moved while we looked: start again from where it is now.
-      if (distanceMeters(toLatLng(map.getCenter()), target) > NOT_MOVED_METERS) return keep();
+      if (distanceMeters(toLatLng(map.getCenter()), target) > NOT_MOVED_METERS) {
+        return keep({ save });
+      }
       const asked = promptRef.current;
       if (asked) return { kind: "blocked", issue: "duplicate", name: matchName(asked.match) };
       const match = matchAt(target, nearby);
@@ -1093,13 +1116,21 @@ export default function LocationPicker({
   };
 
   /** One keep at a time: moving on and pressing Save often happen together. */
-  const keepOnce = (): Promise<PickerResolution> => {
-    if (!keepInFlightRef.current) {
-      keepInFlightRef.current = keep().finally(() => {
-        keepInFlightRef.current = null;
-      });
+  const keepOnce = (options: ResolveOptions = {}): Promise<PickerResolution> => {
+    const inFlight = keepInFlightRef.current;
+    if (inFlight) {
+      // Save pressed while moving on was still keeping: a jump that blocked that keep is
+      // Save's to check, so ask again for Save.
+      if (!options.save) return inFlight;
+      return inFlight.then((result) =>
+        result.kind === "blocked" && result.issue === "jump" ? keepOnce(options) : result,
+      );
     }
-    return keepInFlightRef.current;
+    const next = keep(options).finally(() => {
+      if (keepInFlightRef.current === next) keepInFlightRef.current = null;
+    });
+    keepInFlightRef.current = next;
+    return next;
   };
 
   // Moving on to another question (focus or a click outside the picker) keeps a safe move.
@@ -1493,58 +1524,77 @@ export default function LocationPicker({
     const distance = formatDistance(match.distance);
     const name = match.loo.name ?? "an unnamed toilet";
     return (
-      <fieldset class={styles.prompt} tabIndex={-1} data-focus="prompt">
-        <legend class={styles.promptText}>
-          {match.kind === "active" ? (
+      // A group (fieldset) named by its question, focused when it appears.
+      <fieldset
+        class={styles.prompt}
+        aria-labelledby={ids.prompt}
+        tabIndex={-1}
+        data-focus="prompt"
+      >
+        <Notice
+          tone="info"
+          size="compact"
+          announce="off"
+          title={
+            <span id={ids.prompt}>
+              {match.kind === "active" ? (
+                <>
+                  There's already a toilet {distance} away: <strong>{name}</strong>. Is it the same
+                  one?
+                </>
+              ) : (
+                <>
+                  A removed toilet was recorded {distance} away. Is this the same toilet, back
+                  again?
+                </>
+              )}
+            </span>
+          }
+          actions={
             <>
-              There's already a toilet {distance} away: <strong>{name}</strong>. Is it the same one?
+              {match.kind === "active" ? (
+                onEditExisting ? (
+                  <Button
+                    htmlElement="button"
+                    type="button"
+                    variant="primary"
+                    onClick={() => onEditExisting(match.loo.id)}
+                  >
+                    Edit that toilet
+                  </Button>
+                ) : (
+                  <Button
+                    htmlElement="a"
+                    variant="primary"
+                    href={`/loos/${encodeURIComponent(match.loo.id)}/edit`}
+                  >
+                    Edit that toilet
+                  </Button>
+                )
+              ) : onRestoreExisting ? (
+                <Button
+                  htmlElement="button"
+                  type="button"
+                  variant="primary"
+                  onClick={() => onRestoreExisting(match.loo.id)}
+                >
+                  Restore it
+                </Button>
+              ) : (
+                <Button
+                  htmlElement="a"
+                  variant="primary"
+                  href={`/loos/${encodeURIComponent(match.loo.id)}`}
+                >
+                  Restore it
+                </Button>
+              )}
+              <Button htmlElement="button" type="button" variant="secondary" onClick={notTheSame}>
+                No, this is a different toilet
+              </Button>
             </>
-          ) : (
-            <>A removed toilet was recorded {distance} away. Is this the same toilet, back again?</>
-          )}
-        </legend>
-        <div class={styles.actions}>
-          {match.kind === "active" ? (
-            onEditExisting ? (
-              <Button
-                htmlElement="button"
-                type="button"
-                variant="primary"
-                onClick={() => onEditExisting(match.loo.id)}
-              >
-                Edit that toilet
-              </Button>
-            ) : (
-              <Button
-                htmlElement="a"
-                variant="primary"
-                href={`/loos/${encodeURIComponent(match.loo.id)}/edit`}
-              >
-                Edit that toilet
-              </Button>
-            )
-          ) : onRestoreExisting ? (
-            <Button
-              htmlElement="button"
-              type="button"
-              variant="primary"
-              onClick={() => onRestoreExisting(match.loo.id)}
-            >
-              Restore it
-            </Button>
-          ) : (
-            <Button
-              htmlElement="a"
-              variant="primary"
-              href={`/loos/${encodeURIComponent(match.loo.id)}`}
-            >
-              Restore it
-            </Button>
-          )}
-          <Button htmlElement="button" type="button" variant="secondary" onClick={notTheSame}>
-            No, this is a different toilet
-          </Button>
-        </div>
+          }
+        />
       </fieldset>
     );
   };
@@ -1560,16 +1610,11 @@ export default function LocationPicker({
       data-placed={placed ? "true" : undefined}
       ref={rootRef}
     >
-      {introVisible && (
+      {introVisible && !addFlow && (
         <div class={styles.intro}>
-          <Banner variant="info">
-            <p class={styles.introText}>
-              {INTRO_MESSAGE}{" "}
-              <button type="button" class={styles.linkButton} onClick={dismissIntro}>
-                Dismiss
-              </button>
-            </p>
-          </Banner>
+          <Notice tone="info" size="compact" announce="off" onDismiss={dismissIntro}>
+            {INTRO_MESSAGE}
+          </Notice>
         </div>
       )}
 
@@ -1647,9 +1692,13 @@ export default function LocationPicker({
         </div>
       )}
       {moving && (geo.kind === "error" || geo.kind === "approximate") && (
-        <p class={geo.kind === "error" ? styles.error : styles.hint} role="alert">
+        <Notice
+          tone={geo.kind === "error" ? "error" : "warning"}
+          size="compact"
+          announce="assertive"
+        >
           {geo.message}
-        </p>
+        </Notice>
       )}
 
       <div class={mapWrapClass}>
@@ -1730,29 +1779,38 @@ export default function LocationPicker({
       </div>
 
       <div class={styles.panel}>
-        <p
+        {/* What the pin is doing, as a compact DS Notice: success for a pin that is placed and
+            would be kept as it is, warning while something has to be answered, else info. */}
+        <div
           id={ids.strip}
           class={styles.strip}
           data-placed={stripPlaced ? "true" : undefined}
           data-blocked={liveIssue && !zoomTooFar ? "true" : undefined}
           data-too-far={zoomTooFar ? "true" : undefined}
         >
-          {stripText()}
-          {moving &&
-            nearbyCount > 0 &&
-            " Grey dots are toilets already on the map; hollow ones have been removed."}
-        </p>
+          <Notice
+            tone={liveIssue || zoomTooFar ? "warning" : stripPlaced ? "success" : "info"}
+            size="compact"
+            announce="off"
+          >
+            {stripText()}
+            {moving &&
+              nearbyCount > 0 &&
+              " Grey dots are toilets already on the map; hollow ones have been removed."}
+          </Notice>
+        </div>
 
         {moving && move?.big && (
-          <div class={styles.warning} role="alert">
-            <p>{BIG_MOVE_WARNING}</p>
-            <p class={styles.warningHint}>{BIG_MOVE_HINT}</p>
+          <Notice tone="warning" size="compact" announce="assertive" title={BIG_MOVE_WARNING}>
+            <p>{BIG_MOVE_HINT}</p>
             {centre && (
-              <a href={addToiletHref({ lat: centre.lat, lng: centre.lng, zoom })}>
-                Add as a new toilet instead
-              </a>
+              <p>
+                <a href={addToiletHref({ lat: centre.lat, lng: centre.lng, zoom })}>
+                  Add as a new toilet instead
+                </a>
+              </p>
             )}
-          </div>
+          </Notice>
         )}
 
         {moving && renderPrompt()}

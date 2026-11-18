@@ -1,8 +1,13 @@
 import type { RefObject } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 
-/** At this width and above the panel is a floating card; below, a bottom sheet. */
-export const CARD_MEDIA_QUERY = "(min-width: 768px)";
+/**
+ * Where the panel is a floating card (else a bottom sheet): from 768px wide, and on a phone in
+ * landscape narrower than that (an iPhone on its side is 667–750px wide but under 400px
+ * tall), where a bottom sheet would leave only its header above the fold. The card scrolls as
+ * a whole there and keeps the map visible beside it.
+ */
+export const CARD_MEDIA_QUERY = "(min-width: 768px), (min-width: 600px) and (max-height: 500px)";
 
 export type PanelMode = "sheet" | "card";
 export type PanelState = "peek" | "expanded";
@@ -30,7 +35,7 @@ const matches = (query: string) => {
   }
 };
 
-/** "card" at ≥768px, else "sheet"; follows the media query as the window resizes. */
+/** "card" where CARD_MEDIA_QUERY matches, else "sheet"; follows it as the window resizes. */
 export function usePanelMode(): PanelMode {
   const [card, setCard] = useState(() => matches(CARD_MEDIA_QUERY));
   useEffect(() => {

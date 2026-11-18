@@ -1,14 +1,18 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
+import ngeohash from "ngeohash";
 import { lazy, Suspense } from "preact/compat";
-import { useEffect, useRef, useState } from "preact/hooks";
-import { Button, IconButton } from "toiletmap-design-system";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { Button, IconButton, Notice, ToastRegion, toast } from "toiletmap-design-system";
 import { getLooById, getLooDetail, type LooDetail, peekLooDetail } from "../../api/loos";
 import { type ActiveFilters, DEFAULT_FILTERS, type FilterKey } from "../../types/filters";
 import MapControlsPanel from "../MapControlsPanel";
 import ToiletDetailsPanel from "../ToiletDetailsPanel";
+import { usePanelMode } from "../ToiletDetailsPanel/layout";
 import "./LooMap.css";
+import { showDeveloperControls } from "../../utils/developerControls";
+import { filterLoos } from "./filterLoos";
 import MapMarkers from "./MapMarkers";
 import {
   addToiletHref,
@@ -17,6 +21,13 @@ import {
   readMapView,
   writeMapView,
 } from "./mapView";
+import {
+  ADDED_MESSAGE,
+  EMPTY_FILTERED_MESSAGE,
+  EMPTY_MESSAGE,
+  NOT_FOUND_MESSAGE,
+  SAVED_MESSAGE,
+} from "./messages";
 import {
   consumeSavedParam,
   freshnessNotice,
@@ -42,7 +53,9 @@ import {
   type PanelLayout,
   panPadding,
   prefersReducedMotion,
-  showDeveloperControls,
+  type ToastLayout,
+  toastLayout,
+  toastLayoutEqual,
 } from "./viewport";
 
 /**
@@ -52,6 +65,8 @@ import {
  */
 interface MapDataView {
   data: CompressedLoo[];
+  /** False once the first data (cached or fetched) is in; the empty state waits for it. */
+  loading?: boolean;
   /** "stale" (couldn't refresh) and "offline" show a notice; anything else shows none. */
   status?: string;
   /** Ids touched by the last update; null/absent when unknown (e.g. a full snapshot). */
@@ -131,11 +146,28 @@ export default function LooMap({
   selectedRef.current = selectedToilet;
   /** Id of the selected toilet once we know it has left the map (deleted or inactive). */
   const [removedId, setRemovedId] = useState<string | null>(null);
-  /** Id the "your changes are live" banner belongs to (from `?saved=1`), until dismissed. */
-  const [savedId, setSavedId] = useState<string | null>(() =>
-    initialToiletId && consumeSavedParam(window.location.href).saved ? initialToiletId : null,
+  /**
+   * The "your changes are live" toast to show once the saved toilet is on screen (from
+   * `?saved=1`, or `?saved=added` for a new toilet), read once on mount.
+   */
+  const [savedParam] = useState(() =>
+    initialToiletId ? consumeSavedParam(window.location.href) : null,
+  );
+  const savedToastRef = useRef<string | null>(
+    savedParam?.saved ? (savedParam.added ? ADDED_MESSAGE : SAVED_MESSAGE) : null,
   );
   const mountedRef = useRef(true);
+  /** The panel's mode for this viewport (card from 768px), open or not: where toasts go. */
+  const panelMode = usePanelMode();
+  const panelModeRef = useRef(panelMode);
+  panelModeRef.current = panelMode;
+  const [toastPosition, setToastPosition] = useState<ToastLayout>({
+    offset: 0,
+    left: null,
+    right: null,
+  });
+  /** The map's visible bounds, for the empty state (null until the map is created). */
+  const [viewBounds, setViewBounds] = useState<Pick<L.LatLngBounds, "contains"> | null>(null);
 
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>(DEFAULT_FILTERS);
 
@@ -180,7 +212,9 @@ export default function LooMap({
       const view = { lat: centre.lat, lng: centre.lng, zoom: created.getZoom() };
       writeMapView(view);
       setAddHref(addToiletHref(view));
+      setViewBounds(created.getBounds());
     });
+    setViewBounds(created.getBounds());
 
     return () => {
       map.current?.remove();
@@ -196,7 +230,7 @@ export default function LooMap({
     };
   }, []);
 
-  // Strip `?saved=1` from the address bar once read, so a reload doesn't repeat the banner.
+  // Strip `?saved=1` from the address bar once read, so a reload doesn't repeat the toast.
   useEffect(() => {
     const { cleanUrl } = consumeSavedParam(window.location.href);
     if (cleanUrl) history.replaceState(history.state, "", cleanUrl);
@@ -281,12 +315,27 @@ export default function LooMap({
       );
       if (outcome.kind === "ignore") return;
       if (outcome.kind === "reset") {
-        // The toilet couldn't be loaded: don't leave the address bar on a page we don't show.
+        // The toilet couldn't be loaded: don't leave the address bar on a page we don't show,
+        // and say why the map opened without it.
         history.replaceState(history.state, "", outcome.url);
+        savedToastRef.current = null;
+        toast.show({ id: "loo-not-found", tone: "warning", message: NOT_FOUND_MESSAGE });
         return;
       }
       const { toilet } = outcome;
       showToilet(toilet);
+      const saved = savedToastRef.current;
+      savedToastRef.current = null;
+      // A save just landed here: confirm it in a toast, clear of the panel (the toast region
+      // was rendered on mount, so screen readers announce it).
+      if (saved && toilet.active !== false) {
+        toast.show({
+          id: "saved",
+          tone: "success",
+          message: saved,
+          dismissLabel: "Dismiss message",
+        });
+      }
       if (toilet.location && map.current) {
         // Jump there now; once the panel is up, centre it in the part of the map left free.
         map.current.setView(
@@ -369,6 +418,52 @@ export default function LooMap({
 
   const notice = freshnessNotice(mapData.status, mapData.lastSyncedAt);
 
+  const filtersActive = Object.values(activeFilters).some(Boolean);
+  /**
+   * Nothing to show in view: no toilet (that passes the filters) inside the map's bounds, once
+   * the data is in. Stops at the first toilet it finds.
+   */
+  const emptyView = useMemo(() => {
+    if (mapData.loading !== false || !viewBounds) return false;
+    // Nothing loaded because the first sync failed (offline, a 5xx): that isn't an empty
+    // area, and the freshness notice already says what went wrong.
+    if (data.length === 0 && mapData.status !== "ok") return false;
+    return !filterLoos(data, activeFilters).some((loo) => {
+      const { latitude, longitude } = ngeohash.decode(loo[1]);
+      return viewBounds.contains([latitude, longitude]);
+    });
+  }, [data, activeFilters, viewBounds, mapData.loading, mapData.status]);
+
+  /**
+   * Places the toasts clear of the open panel, the floating controls and the safe areas (see
+   * toastLayout). Reads only refs and the DOM, so it can run from any effect or callback.
+   */
+  const rightControlsLeft = (): number | null => {
+    const root = rootRef.current;
+    if (!root) return null;
+    let left: number | null = null;
+    for (const el of root.querySelectorAll(".map-chrome-utilities, .map-zoom-controls")) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      left = left === null ? rect.left : Math.min(left, rect.left);
+    }
+    return left;
+  };
+
+  const measureToasts = () => {
+    const container = mapContainer.current;
+    if (!container) return;
+    const next = toastLayout({
+      mode: panelModeRef.current,
+      container: container.getBoundingClientRect(),
+      occludes: shownIdRef.current === null ? null : (panelLayoutRef.current?.occludes ?? null),
+      searchBottom: chromeTopRef.current?.getBoundingClientRect().bottom ?? null,
+      rightControlsLeft: rightControlsLeft(),
+      viewportWidth: document.documentElement.clientWidth || window.innerWidth,
+    });
+    setToastPosition((prev) => (toastLayoutEqual(prev, next) ? prev : next));
+  };
+
   /**
    * How much of the map the panel covers: what it last reported, or (before its first
    * report) a measurement of its box.
@@ -381,8 +476,8 @@ export default function LooMap({
 
   /**
    * Keeps the selected toilet's marker in the part of the map the user can see: clear of the
-   * details panel and of the floating controls (anything marked `data-map-control`), with a
-   * 16px margin. With reduced motion the map jumps rather than glides.
+   * details panel and of the floating controls (anything marked `data-map-control`, and any
+   * toast), with a 16px margin. With reduced motion the map jumps rather than glides.
    */
   const revealSelected = (reveal: Reveal) => {
     const m = map.current;
@@ -392,8 +487,12 @@ export default function LooMap({
     const containerRect = mapContainer.current.getBoundingClientRect();
     const size = { width: containerRect.width, height: containerRect.height };
     if (size.width <= 0 || size.height <= 0) return;
+    // A toast showing now (e.g. "your changes are live" as the saved toilet opens) counts as
+    // a control too, so the marker isn't revealed underneath it.
     const controls = controlsInsets(
-      Array.from(root.querySelectorAll("[data-map-control]"), (el) => el.getBoundingClientRect()),
+      Array.from(root.querySelectorAll("[data-map-control], .map-toasts .toast"), (el) =>
+        el.getBoundingClientRect(),
+      ),
       containerRect,
     );
     const padding = panPadding(size, panelOccludes(containerRect), controls);
@@ -416,7 +515,13 @@ export default function LooMap({
     pendingRevealRef.current = null;
     // Expanding (or switching to the card) can cover the marker: keep it in view.
     if (pending || layoutChanged(prev, layout)) revealSelected(pending ?? "inside");
+    if (layoutChanged(prev, layout)) measureToasts();
   };
+
+  // The panel opened, closed or changed mode: move the toasts with it.
+  useEffect(() => {
+    measureToasts();
+  }, [selectedToilet === null, panelMode]);
 
   // Once the panel for a new selection has rendered, bring its marker into view (unless the
   // panel's first layout report already did).
@@ -467,21 +572,31 @@ export default function LooMap({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Keep the desktop card below the search bar as the bar grows (filters, suggestions).
+  // Keep the card below the search bar as the bar grows (filters, suggestions). The bar
+  // itself, not the whole top row: below 768px (a phone in landscape gets the card too) the
+  // settings buttons are stacked beside it, and the card on the left needn't clear them.
   useEffect(() => {
     const chrome = chromeTopRef.current;
     const container = mapContainer.current;
     if (!chrome || !container) return;
     const measure = () => {
-      const top = cardTopBelow(chrome.getBoundingClientRect(), container.getBoundingClientRect());
+      const bar = chrome.querySelector("search") ?? chrome;
+      const top = cardTopBelow(bar.getBoundingClientRect(), container.getBoundingClientRect());
       setCardTop((prev) => (prev === top ? prev : top));
+      measureToasts();
     };
     measure();
-    if (typeof ResizeObserver === "undefined") return;
+    window.addEventListener("resize", measureToasts);
+    if (typeof ResizeObserver === "undefined") {
+      return () => window.removeEventListener("resize", measureToasts);
+    }
     const observer = new ResizeObserver(measure);
     observer.observe(chrome);
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measureToasts);
+    };
   }, []);
 
   /** "Find a toilet near me": start tracking the viewer, and centre on their first fix. */
@@ -561,6 +676,48 @@ export default function LooMap({
       <UserLocationMarker map={mapInstance} location={userLocation.location} />
 
       <div className="map-chrome-bottom-right">
+        {/*
+         * Messages about the map sit in the same column as its bottom controls, above them, so
+         * they can never cover "Add a toilet here" (on a short screen, to their left: CSS).
+         *
+         * Both are live regions that stay on the page (screen readers only announce a region
+         * whose content changes, not one added with its text), visually hidden while they have
+         * nothing to show. While a toilet is open the freshness notice is shown in its panel
+         * instead (which would otherwise cover it), and the empty state isn't shown at all.
+         */}
+        <div className="map-notices">
+          <div
+            role="status"
+            className={`map-freshness-notice${notice && !selectedToilet ? " map-freshness-notice--shown" : ""}`}
+            data-map-control={notice && !selectedToilet ? "" : undefined}
+          >
+            {notice && (
+              <Notice tone="warning" size="compact" announce="off">
+                {notice}
+              </Notice>
+            )}
+          </div>
+          <div
+            role="status"
+            className={`map-empty-notice${emptyView && !selectedToilet ? " map-empty-notice--shown" : ""}`}
+            data-map-control={emptyView && !selectedToilet ? "" : undefined}
+          >
+            {emptyView && !selectedToilet && (
+              <Notice
+                tone="info"
+                size="compact"
+                announce="off"
+                action={
+                  filtersActive
+                    ? { label: "Reset filters", onClick: handleResetFilters }
+                    : undefined
+                }
+              >
+                {filtersActive ? EMPTY_FILTERED_MESSAGE : EMPTY_MESSAGE}
+              </Notice>
+            )}
+          </div>
+        </div>
         {/* Desktop only (CSS): phones pinch to zoom. */}
         <div className="map-zoom-controls" data-map-control>
           <IconButton
@@ -585,23 +742,17 @@ export default function LooMap({
         </div>
       </div>
 
-      {/*
-       * The live region stays here for screen readers; while a toilet is open the notice is
-       * shown in its panel instead (which would otherwise cover it), so this copy is hidden.
-       * Only the shown notice covers the map (the hidden one is a 1px box).
-       */}
+      {/* Toasts ("your changes are live"): clear of the panel and the controls (measureToasts). */}
       <div
-        role="status"
-        className={`map-freshness-notice${
-          !notice
-            ? ""
-            : selectedToilet
-              ? " map-freshness-notice--in-panel"
-              : " map-freshness-notice--shown"
-        }`}
-        data-map-control={notice && !selectedToilet ? "" : undefined}
+        className="map-toasts"
+        style={{
+          ...(toastPosition.left === null ? {} : { "--map-toast-left": `${toastPosition.left}px` }),
+          ...(toastPosition.right === null
+            ? {}
+            : { "--map-toast-right": `${toastPosition.right}px` }),
+        }}
       >
-        {notice}
+        <ToastRegion class="map-toast-region" placement="top" offset={toastPosition.offset} />
       </div>
 
       {selectedToilet && (
@@ -611,11 +762,9 @@ export default function LooMap({
             toilet={selectedToilet}
             onClose={() => selectToilet(null)}
             removed={removedId === selectedToilet.id}
-            saved={savedId === selectedToilet.id}
-            onDismissSaved={() => setSavedId(null)}
             canWriteDirectly={canWriteDirectly}
             onLayoutChange={handlePanelLayout}
-            notice={notice ? <span aria-hidden="true">{notice}</span> : undefined}
+            notice={notice ?? undefined}
             returnFocusTo={mapContainer.current}
             cardTop={cardTop}
             userLocation={userLocation.location ?? undefined}

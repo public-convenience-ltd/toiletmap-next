@@ -25,7 +25,7 @@
 }
 
 .text-area::placeholder {
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
 }
 
 .text-area[aria-invalid="true"] {

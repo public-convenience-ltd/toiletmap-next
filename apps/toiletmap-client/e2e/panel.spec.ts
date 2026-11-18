@@ -1,6 +1,7 @@
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import type { OpeningTimes } from "./support/api";
 import { expect, test } from "./support/fixtures";
+import { SAVED_BANNER_TEXT, toasts } from "./support/form";
 import { expectNoHorizontalOverflow } from "./support/layout";
 import {
   collapseDetails,
@@ -51,12 +52,18 @@ const expandedSheetCap = (map: Box) => Math.min(map.height * 0.7, map.height - 1
  */
 const PINNED_HEADER_MAX = 96;
 
-/** Below 768px the panel is a bottom sheet (ToiletDetailsPanel usePanelMode). */
-const isSheet = (page: Page) => (page.viewportSize()?.width ?? 1280) < 768;
+/**
+ * The panel is a bottom sheet below 768px, except on a phone in landscape (600px wide or more,
+ * at most 500px tall), which gets the card (ToiletDetailsPanel CARD_MEDIA_QUERY).
+ */
+const isSheet = (page: Page) => {
+  const { width, height } = page.viewportSize() ?? { width: 1280, height: 720 };
+  return width < 768 && !(width >= 600 && height <= 500);
+};
 /** A phone on its side: the card, on a screen ≤560px tall (it then scrolls as a whole). */
 const isShortCard = (page: Page) => {
-  const { width, height } = page.viewportSize() ?? { width: 1280, height: 720 };
-  return width >= 768 && height <= 560;
+  const { height } = page.viewportSize() ?? { width: 1280, height: 720 };
+  return !isSheet(page) && height <= 560;
 };
 
 const intersects = (a: Box, b: Box) =>
@@ -582,8 +589,8 @@ test.describe("details panel", () => {
       { location: deepLinkSpot(), notes: LONG_NOTES, openingTimes: WEEKDAYS_AND_WEEKENDS },
       "panel landscape notices",
     );
-    // Two notices above Directions: "your changes are live" (?saved=1) and a pending
-    // suggestion remembered in this browser.
+    // A notice above Directions (a pending suggestion remembered in this browser), and the
+    // "your changes are live" toast (?saved=1), which is outside the panel.
     await page.addInitScript(({ key, entry }) => localStorage.setItem(key, entry), {
       key: `toiletmap-pending:${loo.id}`,
       entry: JSON.stringify({ kind: "edit", pendingId: "", at: new Date().toISOString() }),
@@ -592,8 +599,13 @@ test.describe("details panel", () => {
     await waitForMap(page);
     await expect(detailsPanelHeading(page)).toHaveText(loo.name ?? "");
     const panel = detailsPanel(page);
-    await expect(panel.getByText("Thanks — your changes are live.")).toBeAttached();
+    await expect(toasts(page).getByText(SAVED_BANNER_TEXT)).toBeVisible();
+    await expect(panel.getByText(SAVED_BANNER_TEXT)).toHaveCount(0);
     await expect(panel.getByText(/You suggested a change to this toilet/)).toBeAttached();
+    // The toast keeps clear of the card (to its right) and of the search bar (below it).
+    const toast = (await toasts(page).getByRole("listitem").boundingBox()) as Box;
+    const card = (await panel.boundingBox()) as Box;
+    expect(toast.x, "toast right of the card").toBeGreaterThanOrEqual(card.x + card.width);
 
     // The card scrolls as a whole on a short screen, so the notices can't push Directions out
     // of reach: scrolled to, it is on screen, inside the card, and nothing covers it.
