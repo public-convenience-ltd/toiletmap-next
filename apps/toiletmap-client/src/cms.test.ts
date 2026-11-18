@@ -5,6 +5,8 @@ import { parseFrontmatter } from "astro/markdown";
 import { describe, expect, it } from "vitest";
 import { pageSchema, postSchema } from "./utils/contentSchemas";
 import { DISALLOWED_PATHS, robotsTxt } from "./utils/robots";
+import { cmsContentSecurityPolicy, SVELTIA_CMS_VERSION } from "./utils/securityHeaders";
+import { withStaticSecurityHeaders } from "./utils/staticSecurityHeaders";
 
 /**
  * The CMS at /cms (public/cms/): Sveltia CMS's config matches the repository layout and the
@@ -139,6 +141,15 @@ describe("public/cms/index.html and cms-loader.js", () => {
     expect(loader).not.toMatch(/@latest|@\^|@~/);
   });
 
+  it("loads the version the /cms CSP allows scripts from, and only that package", () => {
+    const version = loader.match(/const SVELTIA_VERSION = "([^"]+)";/)?.[1];
+    expect(version).toBe(SVELTIA_CMS_VERSION);
+    const scriptSrc = cmsContentSecurityPolicy()
+      .split("; ")
+      .find((directive) => directive.startsWith("script-src "));
+    expect(scriptSrc).toBe(`script-src 'self' https://unpkg.com/@sveltia/cms@${version}/`);
+  });
+
   it("signs in through the page's own origin", () => {
     expect(loader).toContain("window.CMS_MANUAL_INIT = true;");
     expect(loader).toContain("backend: { base_url: window.location.origin }");
@@ -153,18 +164,31 @@ describe("/cms and search engines", () => {
     ).toContain("Disallow: /cms");
   });
 
+  // public/_headers plus the rules the build generates (src/utils/staticSecurityHeaders.ts).
+  const builtHeaders = () =>
+    withStaticSecurityHeaders(read(join(clientRoot, "public/_headers")), {
+      production: true,
+      scriptHashes: [],
+    });
+  const ruleBlock = (headers: string, rule: string) =>
+    headers.split(/\n(?=\S)/).find((part) => part.split("\n")[0] === rule);
+
   it("sends X-Robots-Tag: noindex for everything under /cms", () => {
-    const headers = read(join(clientRoot, "public/_headers"));
-    expect(headers).toMatch(/^\/cms\/\*\n {2}X-Robots-Tag: noindex, nofollow$/m);
-    expect(headers).toMatch(/^\/cms\n {2}X-Robots-Tag: noindex, nofollow$/m);
+    const headers = builtHeaders();
+    for (const rule of ["/cms", "/cms/*"]) {
+      expect(ruleBlock(headers, rule), rule).toContain("X-Robots-Tag: noindex, nofollow");
+    }
   });
 
-  it("refuses to be framed at /cms as well as /cms/*", () => {
-    const headers = read(join(clientRoot, "public/_headers"));
+  it("refuses to be framed at /cms as well as /cms/*, and sends no referrer elsewhere", () => {
+    const headers = builtHeaders();
+    // X-Frame-Options comes from the catch-all rule, which the /cms rules don't remove.
+    expect(ruleBlock(headers, "/*")).toContain("X-Frame-Options: DENY");
     for (const rule of ["/cms", "/cms/*"]) {
-      const block = headers.split(/\n(?=\S)/).find((part) => part.split("\n")[0] === rule);
-      expect(block, rule).toContain("X-Frame-Options: DENY");
+      const block = ruleBlock(headers, rule);
+      expect(block, rule).not.toContain("! X-Frame-Options");
       expect(block, rule).toContain("Referrer-Policy: same-origin");
+      expect(block, rule).toContain("frame-ancestors 'none'");
     }
   });
 

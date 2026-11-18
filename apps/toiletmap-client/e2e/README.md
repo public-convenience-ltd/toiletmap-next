@@ -225,6 +225,14 @@ the viewport and never scroll; form pages scroll the document), and its
 safe-area tests stub `--safe-top` / `--safe-bottom` to check the map's floating
 controls don't add an inset the header or footer already pads.
 
+**Security headers, legacy URLs and sign-in.** `csp.spec.ts` loads the main pages (map, a
+toilet, add, edit, report, a content page, the blog and a post, `/feedback`, the kitchen
+sink, a sign-in error page and `/cms` with its production policy) and fails on any
+`securitypolicyviolation` event; it decides whether the CSP can move from report-only to
+enforced (docs/security.md). `redirects.spec.ts` checks the legacy redirect routes answer
+in the running app; `sign-in.spec.ts` checks Sign in on a toilet comes back to it and the
+callback's friendly error pages.
+
 ## Known failures
 
 Known app bugs are kept as `test.fixme` with the reason. Search the specs for

@@ -194,6 +194,19 @@ export const rateLimiters = {
     logKey: false,
   }),
 
+  /**
+   * Explicit place searches (`GET /api/geocode` without `mode=suggest`, the
+   * ones that may reach Nominatim): the write binding (20 req/min) under its
+   * own per-IP key, on top of the read limiter. The key is never logged.
+   */
+  geocode: cloudflareRateLimit({
+    binding: "RATE_LIMIT_WRITE",
+    keyGenerator: (c) => `geocode:${getClientIp(c)}`,
+    message: "Too many place searches, please try again in a minute",
+    name: "geocode",
+    logKey: false,
+  }),
+
   /** Admin operations (60 req/min, user or IP-based) */
   admin: cloudflareRateLimit({
     binding: "RATE_LIMIT_ADMIN",

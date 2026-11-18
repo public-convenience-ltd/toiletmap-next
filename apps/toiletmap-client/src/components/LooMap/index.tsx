@@ -17,8 +17,9 @@ import MapMarkers from "./MapMarkers";
 import {
   addToiletHref,
   DEFAULT_MAP_VIEW,
+  initialMapView,
   type MapView,
-  readMapView,
+  withoutMapViewParams,
   writeMapView,
 } from "./mapView";
 import {
@@ -171,10 +172,12 @@ export default function LooMap({
 
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>(DEFAULT_FILTERS);
 
-  // Where the map opens: the last view the user left it at, unless a /loos/{id} deep link
-  // will move it to that toilet anyway.
+  // Where the map opens: a ?lat&lng link, else the last view the user left it at, unless a
+  // /loos/{id} deep link will move it to that toilet anyway.
   const [startView] = useState<MapView>(() =>
-    initialToiletId ? DEFAULT_MAP_VIEW : (readMapView() ?? DEFAULT_MAP_VIEW),
+    initialToiletId
+      ? DEFAULT_MAP_VIEW
+      : initialMapView(typeof window === "undefined" ? null : window.location.search),
   );
   /** The "Add a toilet here" link, following the map centre. */
   const [addHref, setAddHref] = useState(() => addToiletHref(startView));
@@ -202,7 +205,7 @@ export default function LooMap({
     }).setView([startView.lat, startView.lng], startView.zoom);
     map.current = created;
     setMapInstance(created);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(created);
@@ -228,6 +231,17 @@ export default function LooMap({
     return () => {
       mountedRef.current = false;
     };
+  }, []);
+
+  // A `?lat&lng&zoom` link (a legacy /map/:lng/:lat URL) has opened the map: remember that
+  // view, as moving the map would, and take it out of the address bar, so a reload or a shared
+  // link follows the map from here on rather than going back to the link's spot.
+  useEffect(() => {
+    if (initialToiletId) return;
+    const cleanUrl = withoutMapViewParams(window.location.href);
+    if (!cleanUrl) return;
+    writeMapView(startView);
+    history.replaceState(history.state, "", cleanUrl);
   }, []);
 
   // Strip `?saved=1` from the address bar once read, so a reload doesn't repeat the toast.

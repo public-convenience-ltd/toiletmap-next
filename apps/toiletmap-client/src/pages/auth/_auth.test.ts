@@ -76,16 +76,24 @@ describe("GET /auth/login", () => {
     expect(cookies.jar.has("auth_state")).toBe(true);
   });
 
-  it.each(["https://evil.example/", "//evil.example", "/\\evil.example", "javascript:alert(1)"])(
-    "ignores an unsafe returnTo (%s)",
-    async (returnTo) => {
-      const cookies = makeCookies({ [RETURN_TO_COOKIE]: "/stale" });
-      const url = new URL("https://site.example/auth/login");
-      url.searchParams.set("returnTo", returnTo);
-      await call(login, { cookies, redirect, url });
-      expect(cookies.jar.has(RETURN_TO_COOKIE)).toBe(false);
-    },
-  );
+  it.each([
+    "https://evil.example/",
+    "//evil.example",
+    "/\\evil.example",
+    "\\\\evil.example",
+    "/%2F%2Fevil.example",
+    "/%5Cevil.example",
+    "%2F%2Fevil.example",
+    "/%09/evil.example",
+    "javascript:alert(1)",
+    "/auth/logout",
+  ])("ignores an unsafe returnTo (%s)", async (returnTo) => {
+    const cookies = makeCookies({ [RETURN_TO_COOKIE]: "/stale" });
+    const url = new URL("https://site.example/auth/login");
+    url.searchParams.set("returnTo", returnTo);
+    await call(login, { cookies, redirect, url });
+    expect(cookies.jar.has(RETURN_TO_COOKIE)).toBe(false);
+  });
 });
 
 describe("GET /auth/callback", () => {
@@ -108,6 +116,8 @@ describe("GET /auth/callback", () => {
     const res = (await call(callback, {
       cookies,
       redirect,
+      locals: {},
+      rewrite: vi.fn(),
       url: new URL("https://site.example/auth/callback?code=abc&state=state-1"),
     })) as Response;
     return { res, cookies };
@@ -141,14 +151,139 @@ describe("GET /auth/callback", () => {
     const tokenOpts = cookies.set.mock.calls.find(([n]) => n === "access_token")?.[2];
     expect(tokenOpts).toMatchObject({ httpOnly: true });
   });
+});
 
-  it("still rejects a mismatched state", async () => {
-    const cookies = makeCookies({ auth_state: "other", auth_nonce: "n" });
+describe("GET /auth/callback errors: the friendly error page", () => {
+  /** Calls the callback; any error comes back as the rewrite's target plus locals.authError. */
+  const failWith = async ({
+    query,
+    jar = { auth_state: "state-1", auth_nonce: "nonce-123", [RETURN_TO_COOKIE]: "/loos/abc" },
+    token,
+  }: {
+    query: string;
+    jar?: Record<string, string>;
+    token?: Response;
+  }) => {
+    const fetchMock = vi.fn(async () => token ?? new Response("{}", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const cookies = makeCookies(jar);
+    const locals: Record<string, unknown> = {};
+    const rewrite = vi.fn(async (path: string) => new Response(`page:${path}`, { status: 200 }));
     const res = (await call(callback, {
       cookies,
       redirect,
-      url: new URL("https://site.example/auth/callback?code=abc&state=state-1"),
+      locals,
+      rewrite,
+      url: new URL(`https://site.example/auth/callback?${query}`),
     })) as Response;
-    expect(res.status).toBe(400);
+    return { res, rewrite, error: locals.authError, cookies, fetchMock };
+  };
+
+  it("shows Auth0's access_denied with its description when the state matches", async () => {
+    const { rewrite, error, cookies, fetchMock } = await failWith({
+      query: "error=access_denied&error_description=Please%20verify%20your%20email&state=state-1",
+    });
+    expect(rewrite).toHaveBeenCalledWith("/auth/error");
+    expect(error).toEqual({
+      kind: "denied",
+      description: "Please verify your email",
+      returnTo: "/loos/abc",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    // The one-time cookies are cleared either way.
+    expect(cookies.jar.has("auth_state")).toBe(false);
+    expect(cookies.jar.has(RETURN_TO_COOKIE)).toBe(false);
+  });
+
+  it("drops Auth0's description when the state doesn't match (it could be a crafted link)", async () => {
+    const { error } = await failWith({
+      query: "error=access_denied&error_description=Call%200800%20000%20000&state=forged",
+    });
+    expect(error).toEqual({ kind: "denied", description: undefined, returnTo: "/loos/abc" });
+  });
+
+  it.each([
+    ["temporarily_unavailable", "unavailable"],
+    ["server_error", "unavailable"],
+    ["login_required", "expired"],
+    ["unauthorized", "denied"],
+    ["invalid_request", "failed"],
+  ])("maps Auth0's %s to %s", async (code, kind) => {
+    const { error } = await failWith({ query: `error=${code}&state=state-1` });
+    expect(error).toMatchObject({ kind });
+  });
+
+  it("says the sign-in expired when the state cookie is gone", async () => {
+    const { error } = await failWith({ query: "code=abc&state=state-1", jar: {} });
+    expect(error).toEqual({ kind: "expired", description: undefined, returnTo: null });
+  });
+
+  it("stops a sign-in whose state doesn't match this browser's", async () => {
+    const { error, fetchMock } = await failWith({
+      query: "code=abc&state=state-1",
+      jar: { auth_state: "other", auth_nonce: "n" },
+    });
+    expect(error).toMatchObject({ kind: "state" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("stops a callback with no state at all", async () => {
+    const { error } = await failWith({ query: "code=abc" });
+    expect(error).toMatchObject({ kind: "state" });
+  });
+
+  it("reports a missing code", async () => {
+    const { error } = await failWith({ query: "state=state-1" });
+    expect(error).toMatchObject({ kind: "failed", returnTo: "/loos/abc" });
+  });
+
+  it("treats a used or expired code (invalid_grant) as an expired sign-in", async () => {
+    const { error } = await failWith({
+      query: "code=abc&state=state-1",
+      token: new Response(JSON.stringify({ error: "invalid_grant" }), { status: 403 }),
+    });
+    expect(error).toMatchObject({ kind: "expired" });
+  });
+
+  it("reports other token failures as failed", async () => {
+    const { error } = await failWith({
+      query: "code=abc&state=state-1",
+      token: new Response("nope", { status: 401 }),
+    });
+    expect(error).toMatchObject({ kind: "failed" });
+  });
+
+  it("reports a nonce mismatch like a state mismatch", async () => {
+    const accessToken = jwt({ exp: Date.now() / 1000 + 3600 });
+    const { error } = await failWith({
+      query: "code=abc&state=state-1",
+      jar: { auth_state: "state-1", auth_nonce: "different-nonce" },
+      token: new Response(JSON.stringify({ access_token: accessToken, id_token: "id.token.x" })),
+    });
+    expect(error).toMatchObject({ kind: "state" });
+  });
+
+  it("reports an exception as our error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("network down"))),
+    );
+    const locals: Record<string, unknown> = {};
+    await call(callback, {
+      cookies: makeCookies({ auth_state: "state-1", auth_nonce: "nonce-123" }),
+      redirect,
+      locals,
+      rewrite: vi.fn(),
+      url: new URL("https://site.example/auth/callback?code=abc&state=state-1"),
+    });
+    expect(locals.authError).toMatchObject({ kind: "error" });
+  });
+
+  it("never keeps an unsafe remembered returnTo for Try again", async () => {
+    const { error } = await failWith({
+      query: "error=access_denied&state=state-1",
+      jar: { auth_state: "state-1", auth_nonce: "n", [RETURN_TO_COOKIE]: "//evil.example" },
+    });
+    expect(error).toMatchObject({ returnTo: null });
   });
 });

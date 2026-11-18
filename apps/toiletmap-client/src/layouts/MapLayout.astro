@@ -8,7 +8,7 @@ import SiteChrome from "../components/SiteChrome/SiteChrome.astro";
 import BaseLayout, { type Props as BaseProps } from "./BaseLayout.astro";
 
 interface Props extends Omit<BaseProps, "bodyClass"> {
-  /** See SiteChrome. Map pages sign in without a returnTo (Phase 7 revisits this). */
+  /** See SiteChrome. By default "Sign in" returns to the toilet or map view on screen. */
   signInReturnTo?: string | null;
 }
 

@@ -429,6 +429,9 @@ let proximityRows: unknown[];
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+/** The attribution `/api/geocode` sends with Nominatim results. */
+const OSM = "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright";
+
 const proximityCalls = () =>
   fetchMock.mock.calls
     .map(([url]) => String(url))
@@ -1467,17 +1470,20 @@ describe("LocationPicker: search", () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((input) => {
       const url = String(input);
-      if (url.includes("nominatim")) {
+      if (url.startsWith("/api/geocode?")) {
         return Promise.resolve(
-          json([
-            {
-              place_id: 1,
-              display_name: "Leeds Station",
-              lat: "53.7951",
-              lon: "-1.5481",
-              boundingbox: ["53.794", "53.796", "-1.549", "-1.547"],
-            },
-          ]),
+          json({
+            results: [
+              {
+                label: "Leeds Station",
+                lat: 53.7951,
+                lng: -1.5481,
+                bbox: [-1.549, 53.794, -1.547, 53.796],
+                kind: "place",
+              },
+            ],
+            attribution: OSM,
+          }),
         );
       }
       return Promise.resolve(json({ data: [] }));
@@ -1485,7 +1491,7 @@ describe("LocationPicker: search", () => {
     const onChange = vi.fn();
     render(<LocationPicker mode="add" apiUrl="" location={null} onChange={onChange} />);
 
-    await user.type(screen.getByRole("searchbox", { name: "Search for a place" }), "Leeds");
+    await user.type(screen.getByRole("searchbox", { name: "Search for a place" }), "Leeds{Enter}");
     await user.click(await screen.findByRole("button", { name: "Leeds Station" }));
 
     expect(theMap().fitBounds).toHaveBeenCalledWith(
@@ -1501,9 +1507,12 @@ describe("LocationPicker: search", () => {
   const leeds = () =>
     fetchMock.mockImplementation((input) => {
       const url = String(input);
-      if (url.includes("nominatim")) {
+      if (url.startsWith("/api/geocode?")) {
         return Promise.resolve(
-          json([{ place_id: 1, display_name: "Leeds Station", lat: "53.7951", lon: "-1.5481" }]),
+          json({
+            results: [{ label: "Leeds Station", lat: 53.7951, lng: -1.5481, kind: "place" }],
+            attribution: OSM,
+          }),
         );
       }
       return Promise.resolve(json({ data: [] }));
@@ -1522,7 +1531,7 @@ describe("LocationPicker: search", () => {
         controllerRef={controller}
       />,
     );
-    await user.type(screen.getByRole("searchbox", { name: "Search for a place" }), "Leeds");
+    await user.type(screen.getByRole("searchbox", { name: "Search for a place" }), "Leeds{Enter}");
     await user.click(await screen.findByRole("button", { name: "Leeds Station" }));
     expect(strip()).toHaveTextContent(
       "Pin placed at the search result. Move the map if the entrance is somewhere else.",
@@ -1548,7 +1557,7 @@ describe("LocationPicker: search", () => {
       />,
     );
     await user.click(button("Move pin"));
-    await user.type(screen.getByRole("searchbox", { name: "Search for a place" }), "Leeds");
+    await user.type(screen.getByRole("searchbox", { name: "Search for a place" }), "Leeds{Enter}");
     await user.click(await screen.findByRole("button", { name: "Leeds Station" }));
     expect(strip()).toHaveTextContent(
       "Check the pin after your search, then choose “Use this location”.",
@@ -1577,17 +1586,17 @@ describe("LocationPicker: search", () => {
 
 describe("LocationPicker: search keyboard and feedback", () => {
   const RESULTS = [
-    { place_id: 1, display_name: "Leeds Station", lat: "53.7951", lon: "-1.5481" },
-    { place_id: 2, display_name: "Leeds Market", lat: "53.7970", lon: "-1.5410" },
+    { label: "Leeds Station", lat: 53.7951, lng: -1.5481, kind: "place" },
+    { label: "Leeds Market", lat: 53.797, lng: -1.541, kind: "place" },
   ];
-  /** Nominatim answers with `results`; every call is counted. */
-  const nominatim = (results: unknown[] = RESULTS) => {
+  /** /api/geocode answers with `results`; every call is counted. */
+  const geocode = (results: unknown[] = RESULTS, attribution: string | null = OSM) => {
     const calls: string[] = [];
     fetchMock.mockImplementation((input) => {
       const url = String(input);
-      if (url.includes("nominatim")) {
+      if (url.startsWith("/api/geocode?")) {
         calls.push(url);
-        return Promise.resolve(json(results));
+        return Promise.resolve(json({ results, attribution }));
       }
       return Promise.resolve(json({ data: [] }));
     });
@@ -1599,9 +1608,9 @@ describe("LocationPicker: search keyboard and feedback", () => {
 
   it("Enter picks the first result", async () => {
     const user = userEvent.setup();
-    nominatim();
+    geocode();
     renderPicker();
-    await user.type(searchbox(), "Leeds");
+    await user.type(searchbox(), "Leeds{Enter}");
     await screen.findByRole("button", { name: "Leeds Station" });
     await user.keyboard("{Enter}");
     expect(theMap().setView).toHaveBeenLastCalledWith([53.7951, -1.5481], 18, { animate: false });
@@ -1610,7 +1619,7 @@ describe("LocationPicker: search keyboard and feedback", () => {
 
   it("Enter before the results arrive searches straight away", async () => {
     const user = userEvent.setup();
-    const calls = nominatim();
+    const calls = geocode();
     renderPicker();
     await user.type(searchbox(), "Leeds{Enter}");
     // Sent at once, not after the debounce.
@@ -1620,29 +1629,107 @@ describe("LocationPicker: search keyboard and feedback", () => {
 
   it("says when it is searching and when nothing was found", async () => {
     const user = userEvent.setup();
-    nominatim([]);
+    geocode([]);
     renderPicker();
     await user.type(searchbox(), "Zzqx");
+    // Typing a place name never searches (Nominatim forbids autocomplete): it says how to.
+    expect(screen.getByText("Press Enter to search for places.")).toHaveAttribute("role", "status");
+    // Hold the answer back, so "Searching…" can be seen.
+    let answer: (response: Response) => void = () => undefined;
+    fetchMock.mockImplementation((input) =>
+      String(input).startsWith("/api/geocode?")
+        ? new Promise<Response>((resolve) => {
+            answer = resolve;
+          })
+        : Promise.resolve(json({ data: [] })),
+    );
+    await user.keyboard("{Enter}");
     const status = await screen.findByText("Searching…");
     expect(status).toHaveAttribute("role", "status");
+    answer(json({ results: [], attribution: null }));
     expect(
       await screen.findByText("No places found. Try a postcode or street name."),
     ).toBeInTheDocument();
   });
 
+  it("searches through the same-origin /api/geocode, never a geocoder directly", async () => {
+    const user = userEvent.setup();
+    const calls = geocode();
+    renderPicker();
+    await user.type(searchbox(), "Leeds{Enter}");
+    await screen.findByRole("button", { name: "Leeds Station" });
+    expect(calls).toEqual(["/api/geocode?q=Leeds"]);
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(urls.some((url) => /^https?:/.test(url))).toBe(false);
+  });
+
+  it("looks typed postcodes up as you type (mode=suggest), and places only on Enter", async () => {
+    const user = userEvent.setup();
+    const calls = geocode(
+      [{ label: "M1, Manchester", lat: 53.48, lng: -2.24, kind: "postcode" }],
+      null,
+    );
+    renderPicker();
+    await user.type(searchbox(), "M1");
+    expect(await screen.findByRole("button", { name: "M1, Manchester" })).toBeInTheDocument();
+    expect(calls).toEqual(["/api/geocode?q=M1&mode=suggest"]);
+
+    await user.clear(searchbox());
+    await user.type(searchbox(), "Manchester");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(calls).toHaveLength(1);
+    await user.keyboard("{Enter}");
+    expect(calls).toEqual(["/api/geocode?q=M1&mode=suggest", "/api/geocode?q=Manchester"]);
+  });
+
+  it("credits OpenStreetMap under Nominatim results, and nothing under postcodes", async () => {
+    const user = userEvent.setup();
+    geocode();
+    renderPicker();
+    await user.type(searchbox(), "Leeds{Enter}");
+    await screen.findByRole("button", { name: "Leeds Station" });
+    expect(screen.getByRole("link", { name: "OpenStreetMap" })).toHaveAttribute(
+      "href",
+      "https://www.openstreetmap.org/copyright",
+    );
+
+    geocode([{ label: "LS1 4DY, Leeds", lat: 53.7951, lng: -1.5481, kind: "postcode" }], null);
+    await user.clear(searchbox());
+    await user.type(searchbox(), "LS1 4DY");
+    await screen.findByRole("button", { name: "LS1 4DY, Leeds" });
+    expect(screen.queryByRole("link", { name: "OpenStreetMap" })).toBeNull();
+  });
+
+  it("says when place search is unavailable", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((input) =>
+      Promise.resolve(
+        String(input).startsWith("/api/geocode?")
+          ? json({ message: "Place search is unavailable.", error: "geocoder_unavailable" }, 502)
+          : json({ data: [] }),
+      ),
+    );
+    renderPicker();
+    await user.type(searchbox(), "Leeds{Enter}");
+    expect(
+      await screen.findByText("Place search isn't working right now. Try again in a moment."),
+    ).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("list", { name: "Search results" })).toBeNull();
+  });
+
   it("closes the results on Escape, a tap elsewhere, or the map moving", async () => {
     const user = userEvent.setup();
-    nominatim();
+    geocode();
     renderPicker();
     const results = () => screen.queryByRole("list", { name: "Search results" });
 
-    await user.type(searchbox(), "Leeds");
+    await user.type(searchbox(), "Leeds{Enter}");
     await screen.findByRole("button", { name: "Leeds Station" });
     await user.keyboard("{Escape}");
     expect(results()).toBeNull();
     expect(searchbox()).toHaveValue("Leeds");
 
-    await user.type(searchbox(), "s");
+    await user.type(searchbox(), "s{Enter}");
     await screen.findByRole("button", { name: "Leeds Station" });
     // The outside-tap listener is attached by an effect, once the list is showing.
     await waitFor(() => {
@@ -1650,7 +1737,7 @@ describe("LocationPicker: search keyboard and feedback", () => {
       expect(results()).toBeNull();
     });
 
-    await user.type(searchbox(), "x");
+    await user.type(searchbox(), "x{Enter}");
     await screen.findByRole("button", { name: "Leeds Station" });
     pan({ lat: 51.6, lng: -0.1 });
     expect(results()).toBeNull();

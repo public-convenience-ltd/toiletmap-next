@@ -4,7 +4,7 @@ date: 2024-12-23T14:32:00.000Z
 authors:
   - name: Gail
     social_url: https://bsky.app/profile/gaillyk.bsky.social
-    profile_image_url: https://rca-media2.rca.ac.uk/images/GailRAMSTER.2e16d0ba.fill-456x456.jpg
+    profile_image_url: /images/uploads/gailramster.webp
   - name: Ollie
     social_url: https://bsky.app/profile/olliethinks.bsky.social
     profile_image_url: https://avatars.githubusercontent.com/u/1771189?v=4
