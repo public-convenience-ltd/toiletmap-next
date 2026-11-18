@@ -42,3 +42,16 @@ describe("LooForm.module.css action bar", () => {
     for (const r of hovers) expect(r.at).toEqual(["@media (hover: hover)"]);
   });
 });
+
+describe("LooForm.module.css error summary", () => {
+  const COARSE = "@media (pointer: coarse)";
+
+  it("keeps a long error link inline on touch screens, so its bullet sits on the first line", () => {
+    const link = rule(".errorList a", [COARSE]);
+    expect(link.display).toBe("inline");
+    expect(link["line-height"]).not.toBe("44px");
+    // Still a 44px-tall target: a 1.5 line plus 10px of padding above and below.
+    expect(link["padding-block"]).toBe("10px");
+    expect(rule(".errorList li", [COARSE])["padding-block"]).toBe("10px");
+  });
+});
