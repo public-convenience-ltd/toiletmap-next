@@ -1,0 +1,46 @@
+---
+/**
+ * The site's header and footer around a page's <main> (the default slot). Every page uses
+ * this, directly or through MapLayout / ContentLayout, so the nav is defined once
+ * (src/utils/siteNav.ts).
+ *
+ * It renders no wrapper element: header, main and footer stay direct children of <body>,
+ * which BaseLayout lays out as a column.
+ */
+import { defaultFooterLinks, Footer } from "toiletmap-design-system";
+import logo from "../../assets/logo.svg?url";
+import { loginHref } from "../../utils/returnTo";
+import { siteFooterLinks } from "../../utils/siteNav";
+import SiteHeader from "./SiteHeader";
+
+interface Props {
+  /**
+   * Map pages: below 768px the footer is hidden (the map takes the whole screen) and its
+   * links move into the header's menu.
+   */
+  map?: boolean;
+  /**
+   * Where "Sign in" returns to: a same-origin path, or null for none. Defaults to none on
+   * server-rendered pages and to the page itself on prerendered ones.
+   */
+  signInReturnTo?: string | null;
+}
+
+const { map = false, signInReturnTo } = Astro.props;
+
+// Prerendered pages have no visitor cookies: the header reads them in the browser instead.
+const isAuthenticated = Astro.isPrerendered ? undefined : !!Astro.cookies.get("user_info")?.value;
+const returnTo =
+  signInReturnTo !== undefined ? signInReturnTo : Astro.isPrerendered ? Astro.url.pathname : null;
+const signInHref = loginHref(returnTo);
+---
+
+<SiteHeader
+  client:load
+  logoSrc={logo}
+  isAuthenticated={isAuthenticated}
+  signInHref={signInHref}
+  drawerLinks={map ? defaultFooterLinks : undefined}
+/>
+<slot />
+<Footer links={siteFooterLinks()} hideOnMobile={map} />

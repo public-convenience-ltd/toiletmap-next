@@ -4,11 +4,14 @@
  */
 export {
   checkDatabase,
+  deleteFeedback,
   deleteLoos,
   deletePendingChanges,
   E2E_SWEEP_MIN_AGE_MS,
   e2eDatabaseUrl,
   e2eRunStart,
+  type FeedbackRow,
+  getFeedbackContaining,
   getPendingChangesForLoo,
   isStaleE2eRow,
   type PendingChangeRow,

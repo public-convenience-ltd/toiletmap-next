@@ -1,0 +1,18 @@
+---
+/**
+ * Plausible Analytics script tag, served from our own origin (see src/utils/plausible.ts).
+ * Renders nothing unless PLAUSIBLE_DOMAIN is set, and nothing on untracked pages (CMS,
+ * dev, sign-in, the contribution forms) or for visitors sending GPC / Do Not Track.
+ */
+import { env } from "cloudflare:workers";
+import { plausibleScriptTag } from "../utils/plausible";
+
+// A prerendered page has no visitor request to read headers from.
+const tag = plausibleScriptTag(
+  env,
+  Astro.url.pathname,
+  Astro.isPrerendered ? null : Astro.request.headers,
+);
+---
+
+{tag && <script is:inline defer data-domain={tag["data-domain"]} data-api={tag["data-api"]} src={tag.src} />}

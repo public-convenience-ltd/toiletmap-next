@@ -23,7 +23,11 @@ Interactive components are hydrated on the client using Astro's [Island Architec
 
 - `src/pages`: File-based routing. `.astro` files here become routes.
 - `src/components`: Reusable UI components (`.astro`, `.jsx`, `.tsx`).
-- `src/layouts`: Page layouts.
+- `src/layouts`: `BaseLayout` (document and head meta), `MapLayout` (map pages, no scrolling)
+  and `ContentLayout` (text pages in the design system's prose column). The header and
+  footer come from `src/components/SiteChrome`. See the client README, "Layouts, meta and SEO".
+- `src/content`: Markdown content collections (`posts`, `pages`), defined in
+  `src/content.config.ts`.
 - `public`: Static assets.
 
 ## Deployment

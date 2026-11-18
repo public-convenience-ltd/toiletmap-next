@@ -1,0 +1,152 @@
+---
+/**
+ * The HTML document every page shares: <head> (meta, social cards, canonical, robots,
+ * JSON-LD, fonts, the design-system stylesheet, analytics) and a <body> laid out as a column
+ * (header, main, footer). It has no header or footer of its own: pages add them with
+ * SiteChrome, or use MapLayout (map pages) or ContentLayout (text pages), which do.
+ */
+import { env } from "cloudflare:workers";
+import Analytics from "../components/Analytics.astro";
+import {
+  absoluteUrl,
+  DEFAULT_DESCRIPTION,
+  robotsContent,
+  SITE_NAME,
+  serializeJsonLd,
+} from "../utils/seo";
+
+export interface Props {
+  /** The whole document title (see pageTitle()). Defaults to "Toilet Map". */
+  title?: string;
+  /** Meta and social-card description. Defaults to the site's description. */
+  description?: string;
+  /**
+   * Canonical URL: a path ("/about") or an absolute URL. Defaults to this page's path on the
+   * production site (astro.config `site`); `false` leaves it out. Pages marked `noindex` get
+   * none unless one is passed.
+   */
+  canonical?: string | false;
+  /** Social-card image: a path under public/ or an absolute URL. */
+  image?: string;
+  imageAlt?: string;
+  /** og:type. "article" for blog posts. */
+  ogType?: "website" | "article";
+  /**
+   * Keep this page out of search results. Preview and dev deployments always are: SSR pages
+   * read ENVIRONMENT per request; prerendered pages read it at build time, so a preview must
+   * be built with its env (`pnpm build:preview`, as deploy-preview.yml does).
+   */
+  noindex?: boolean;
+  nofollow?: boolean;
+  /** schema.org data for a `<script type="application/ld+json">` (escaped safely). */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[] | null;
+  /**
+   * Classes for <body>. Map pages (MapLayout) use "map-page": exactly one screen tall,
+   * never scrolling (the map pans instead). Every other page scrolls normally.
+   */
+  bodyClass?: string;
+}
+
+const {
+  title = SITE_NAME,
+  description = DEFAULT_DESCRIPTION,
+  canonical,
+  image,
+  imageAlt,
+  ogType = "website",
+  noindex = false,
+  nofollow = false,
+  jsonLd,
+  bodyClass,
+} = Astro.props;
+
+const site = Astro.site;
+const robots = robotsContent({ noindex, nofollow, environment: env.ENVIRONMENT });
+const canonicalUrl =
+  canonical === false || (noindex && canonical === undefined)
+    ? null
+    : absoluteUrl(canonical ?? Astro.url.pathname, site);
+const pageUrl = canonicalUrl ?? absoluteUrl(Astro.url.pathname, site);
+const imageUrl = image ? absoluteUrl(image, site) : null;
+const structuredData = jsonLd ? serializeJsonLd(jsonLd) : null;
+---
+
+<!doctype html>
+<html lang="en-GB">
+	<head>
+		<meta charset="UTF-8" />
+		<!-- viewport-fit=cover lets the page reach under notches; the design system's
+		     --safe-* properties pad the header, footer and panels clear of them. -->
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<!-- --color-primary-navy -->
+		<meta name="theme-color" content="#0a165e" />
+		<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<meta name="generator" content={Astro.generator} />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		{robots && <meta name="robots" content={robots} />}
+		{canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+		<link rel="alternate" type="application/rss+xml" title="Toilet Map blog" href="/posts/rss.xml" />
+
+		<meta property="og:site_name" content={SITE_NAME} />
+		<meta property="og:locale" content="en_GB" />
+		<meta property="og:type" content={ogType} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={pageUrl} />
+		{imageUrl && <meta property="og:image" content={imageUrl} />}
+		{imageUrl && imageAlt && <meta property="og:image:alt" content={imageAlt} />}
+		<meta name="twitter:card" content={imageUrl ? "summary_large_image" : "summary"} />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		{imageUrl && <meta name="twitter:image" content={imageUrl} />}
+		{imageUrl && imageAlt && <meta name="twitter:image:alt" content={imageAlt} />}
+
+		{structuredData && <script is:inline type="application/ld+json" set:html={structuredData} />}
+		<!-- Extra head content from the page, e.g. <meta slot="head" property="article:published_time" …>. -->
+		<slot name="head" />
+		{/* Plausible, only when PLAUSIBLE_DOMAIN is set (src/utils/plausible.ts). */}
+		<Analytics />
+	</head>
+	<body class:list={[bodyClass]}>
+		<slot />
+	</body>
+</html>
+
+<style is:global>
+	@import "toiletmap-design-system/stylesheet.css";
+
+	/* Header, main, footer: the footer sits at the bottom of short pages. */
+	body {
+		display: flex;
+		flex-direction: column;
+		min-height: var(--app-height);
+	}
+
+	/* Map pages fill the visible viewport exactly; only the map moves. */
+	body.map-page {
+		height: var(--app-height);
+		overflow: hidden;
+	}
+
+	/*
+	 * Other pages scroll the document, not <main>: the mobile URL bar can then
+	 * collapse, and sticky bars (the form's Save bar) stick to the viewport.
+	 */
+	body:not(.map-page) > main {
+		flex: 1 0 auto;
+		overflow: visible;
+	}
+
+	/* Astro islands should not create layout boxes — let children be direct flex items */
+	astro-island {
+		display: contents;
+	}
+</style>

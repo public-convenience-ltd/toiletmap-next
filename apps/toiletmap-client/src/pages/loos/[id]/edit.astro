@@ -1,16 +1,16 @@
 ---
 import { env } from "cloudflare:workers";
-import { Footer, Header } from "toiletmap-design-system";
-import type { LooDetail } from "../../../api/loos";
-import logo from "../../../assets/logo.svg?url";
 import LooForm from "../../../components/LooForm/LooForm";
-import Layout from "../../../layouts/Layout.astro";
+import SiteChrome from "../../../components/SiteChrome/SiteChrome.astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
 
 const { id } = Astro.params;
 
-import { BROWSER_API_URL, fetchApi } from "../../../utils/api";
+import { BROWSER_API_URL } from "../../../utils/api";
+import { loadLoo, notFoundResponse } from "../../../utils/looPage";
+import { looDisplayName } from "../../../utils/looSeo";
 import { sessionCanWriteDirectly } from "../../../utils/permissions";
-import { loginHref } from "../../../utils/returnTo";
+import { pageTitle } from "../../../utils/seo";
 
 // LooForm calls the same-origin /api/* proxy, which attaches the access token
 // server-side; the token is never rendered into the page.
@@ -19,68 +19,34 @@ const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
 // Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
 const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
 
-if (!id) return new Response("Toilet not found", { status: 404 });
-
 // SSR fetch goes straight upstream (service binding or PUBLIC_API_URL), not via
 // the /api proxy (which is for browser requests only).
-let toilet: LooDetail;
-try {
-  const clientIp = Astro.request.headers.get("cf-connecting-ip");
-  const res = await fetchApi(env, Astro.url, `/api/loos/${encodeURIComponent(id)}`, {
-    headers: {
-      accept: "application/json",
-      ...(clientIp ? { "cf-connecting-ip": clientIp, "x-forwarded-for": clientIp } : {}),
-    },
-  });
-  if (res.status === 404 || res.status === 400) {
-    return new Response("Toilet not found", { status: 404 });
-  }
-  if (!res.ok) {
-    console.error(`Failed to load loo ${id} for editing: HTTP ${res.status}`);
-    return new Response("Could not load this toilet right now. Please try again later.", {
-      status: 502,
-    });
-  }
-  toilet = (await res.json()) as LooDetail;
-} catch (error) {
-  console.error(`Failed to load loo ${id} for editing:`, error);
-  return new Response("Could not load this toilet right now. Please try again later.", {
-    status: 502,
-  });
-}
-
-const navLinks = [
-  { href: "/about", label: "About" },
-  { href: "/blog", label: "Blog" },
-  { href: "/contact", label: "Contact" },
-  { href: "/feedback", label: "Feedback" },
-  { href: "/loos/add", label: "Add a toilet", button: true },
-  isAuthenticated
-    ? { href: "/auth/logout", label: "Sign out" }
-    : { href: loginHref(`/loos/${encodeURIComponent(id)}/edit`), label: "Sign in" },
-];
+const load = await loadLoo({
+  env,
+  url: Astro.url,
+  id,
+  clientIp: Astro.request.headers.get("cf-connecting-ip"),
+  purpose: "editing",
+});
+// Unknown toilet: the site's 404 page. API down: the site's error page (500.astro).
+if (load.kind === "not-found") return notFoundResponse();
+if (load.kind === "unavailable") return new Response(null, { status: 500 });
+const toilet = load.loo;
+const looId = id ?? toilet.id;
 ---
 
-<Layout>
-  <Header client:load logoSrc={logo} navLinks={navLinks} />
-  <main>
-    <LooForm
-      client:only="preact"
-      mode="edit"
-      initialData={toilet}
-      looId={id}
-      apiUrl={apiUrl}
-      isAuthenticated={isAuthenticated}
-      canWriteDirectly={canWriteDirectly}
-    />
-  </main>
-  <Footer />
-</Layout>
-
-<style>
-  main {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-  }
-</style>
+<BaseLayout title={pageTitle(`Edit ${looDisplayName(toilet)}`)} noindex>
+  <SiteChrome signInReturnTo={`/loos/${encodeURIComponent(looId)}/edit`}>
+    <main>
+      <LooForm
+        client:only="preact"
+        mode="edit"
+        initialData={toilet}
+        looId={looId}
+        apiUrl={apiUrl}
+        isAuthenticated={isAuthenticated}
+        canWriteDirectly={canWriteDirectly}
+      />
+    </main>
+  </SiteChrome>
+</BaseLayout>

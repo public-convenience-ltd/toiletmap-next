@@ -1,59 +1,59 @@
 ---
+/**
+ * A toilet's own page: the map with its details panel open. The toilet is fetched here, on
+ * the server, for a real status and its meta:
+ * - unknown or invalid id: 404, with the site's 404 page;
+ * - removed toilet: 200 with noindex. The panel says it was removed (and offers restore),
+ *   and old links and shares keep working, so it is not a 410; it is left out of the sitemap;
+ * - active toilet: title, description, canonical, social cards and schema.org JSON-LD;
+ * - API unavailable or slower than LOO_PAGE_TIMEOUT_MS: the map still renders (the panel
+ *   retries in the browser), with generic meta, rather than an error page for a problem the
+ *   island can recover from.
+ * The page sets no cache headers (as before); the API's own caching is unchanged.
+ */
 import { env } from "cloudflare:workers";
-import { defaultFooterLinks, Footer, Header } from "toiletmap-design-system";
-import logo from "../../assets/logo.svg?url";
 import LooMap from "../../components/LooMap";
-import Layout from "../../layouts/Layout.astro";
+import MapLayout from "../../layouts/MapLayout.astro";
+import { BROWSER_API_URL } from "../../utils/api";
+import { LOO_PAGE_TIMEOUT_MS, loadLoo, notFoundResponse } from "../../utils/looPage";
+import { looPageHeading, looPageMeta } from "../../utils/looSeo";
+import { sessionCanWriteDirectly } from "../../utils/permissions";
 
 const { id } = Astro.params;
 
-import { BROWSER_API_URL } from "../../utils/api";
-import { sessionCanWriteDirectly } from "../../utils/permissions";
-
 // Browser islands call the same-origin /api/* proxy.
 const apiUrl = BROWSER_API_URL;
-const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
 // Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
 const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
 
-const navLinks = [
-  { href: "/about", label: "About" },
-  { href: "/blog", label: "Blog" },
-  { href: "/contact", label: "Contact" },
-  { href: "/feedback", label: "Feedback" },
-  { href: "/loos/add", label: "Add a toilet", button: true },
-  isAuthenticated
-    ? { href: "/auth/logout", label: "Sign out" }
-    : { href: "/auth/login", label: "Sign in" },
-];
+const load = await loadLoo({
+  env,
+  url: Astro.url,
+  id,
+  clientIp: Astro.request.headers.get("cf-connecting-ip"),
+  purpose: "the details page",
+  // The map must not wait on a slow API: past this, render it with generic meta and let the
+  // panel fetch the toilet in the browser.
+  timeoutMs: LOO_PAGE_TIMEOUT_MS,
+});
+if (load.kind === "not-found") return notFoundResponse();
+
+const meta =
+  load.kind === "found"
+    ? looPageMeta(load.loo, Astro.site)
+    : { canonical: `/loos/${encodeURIComponent(id ?? "")}` };
+// The panel (client:only) renders nothing on the server, so the heading carries the toilet's
+// name for crawlers and screen readers before it loads (with the meta description and JSON-LD).
+const heading = load.kind === "found" ? looPageHeading(load.loo) : "Toilet Map";
 ---
 
-<Layout bodyClass="map-page">
-  <Header
-    client:load
-    logoSrc={logo}
-    navLinks={navLinks}
-    drawerLinks={defaultFooterLinks}
+<MapLayout {...meta}>
+  <h1 class="visually-hidden">{heading}</h1>
+  <LooMap
+    client:only="preact"
+    apiUrl={apiUrl}
+    initialToiletId={id}
+    canWriteDirectly={canWriteDirectly}
+    environment={env.ENVIRONMENT}
   />
-  <main>
-    <h1 class="visually-hidden">Toilet Map</h1>
-    <LooMap
-      client:only="preact"
-      apiUrl={apiUrl}
-      initialToiletId={id}
-      canWriteDirectly={canWriteDirectly}
-      environment={env.ENVIRONMENT}
-    />
-  </main>
-  <!-- Below 768px the map takes the whole screen; the footer links are in the menu. -->
-  <Footer hideOnMobile />
-</Layout>
-
-<style>
-  main {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    position: relative;
-  }
-</style>
+</MapLayout>
