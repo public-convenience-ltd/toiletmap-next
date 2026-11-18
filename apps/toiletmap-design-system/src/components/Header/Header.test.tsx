@@ -107,6 +107,51 @@ describe("Header", () => {
     expect(document.activeElement).toBe(toggle());
   });
 
+  // Outside act(), as in a browser: the click's render runs as a microtask but effects wait
+  // for the next paint, so a key pressed in between must not depend on an effect.
+  const openWithoutFlushingEffects = async () => {
+    toggle().click();
+    await Promise.resolve();
+    expect(toggle().getAttribute("aria-expanded")).toBe("true");
+  };
+
+  it("closes on an Escape pressed straight after opening, before the next paint", async () => {
+    renderHeader({ drawerLinks: defaultFooterLinks });
+    toggle().focus();
+    await openWithoutFlushingEffects();
+
+    toggle().dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+    await Promise.resolve();
+
+    expect(toggle().getAttribute("aria-expanded")).toBe("false");
+    expect(drawer().classList.contains("drawer--visible")).toBe(false);
+    expect(document.activeElement).toBe(toggle());
+  });
+
+  it("keeps Tab inside the menu straight after opening, before the next paint", async () => {
+    renderHeader({ drawerLinks: defaultFooterLinks });
+    await openWithoutFlushingEffects();
+    const links = drawer().querySelectorAll("a");
+    const last = links[links.length - 1] as HTMLAnchorElement;
+    last.focus();
+
+    const tab = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    last.dispatchEvent(tab);
+
+    expect(tab.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(toggle());
+  });
+
+  it("ignores Escape while the menu is closed", () => {
+    renderHeader();
+    const button = toggle();
+    act(() => {
+      button.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+    });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).not.toBe(button);
+  });
+
   it("closes when a drawer link is followed", () => {
     renderHeader({ drawerLinks: defaultFooterLinks });
     act(() => toggle().click());

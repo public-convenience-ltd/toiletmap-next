@@ -8,7 +8,7 @@ The public-facing frontend for the Toilet Map, built with Astro and Preact.
 - **UI Library**: [Preact](https://preactjs.com) (client-side hydration)
 - **Deployment**: Cloudflare Workers
 - **Styling**: CSS Modules
-- **Map**: [Leaflet](https://leafletjs.com/) with [Supercluster](https://github.com/mapbox/supercluster) for marker clustering
+- **Map**: [Leaflet](https://leafletjs.com/) with [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) for marker clustering
 - **Caching**: [idb-keyval](https://github.com/jakearchibald/idb-keyval) for IndexedDB storage
 
 ## Architecture
@@ -257,7 +257,7 @@ This regenerates `worker-configuration.d.ts` with the latest environment variabl
 ## Performance Optimization
 
 - **Compressed data format**: Loos are fetched in a compressed format `[id, geohash, filterMask]`
-- **Client-side clustering**: Supercluster groups nearby markers for better map performance
+- **Client-side clustering**: Leaflet.markercluster groups nearby markers for better map performance
 - **IndexedDB caching**: Reduces redundant API calls
 - **Geohash decoding**: Client-side geohash decoding reduces data transfer size
 

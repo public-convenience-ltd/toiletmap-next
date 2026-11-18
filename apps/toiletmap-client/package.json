@@ -7,6 +7,7 @@
     "build": "astro build",
     "build:production": "CLOUDFLARE_ENV=production astro build",
     "build:preview": "CLOUDFLARE_ENV=preview astro build",
+    "check:assets": "node scripts/check-build-assets.mjs",
     "preview": "astro preview",
     "deploy": "pnpm build:production && wrangler deploy --env production",
     "deploy:preview": "pnpm build:preview && wrangler versions upload --env preview",
@@ -18,13 +19,13 @@
     "typecheck": "tsc --noEmit -p . && astro check"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.2.0",
-    "@astrojs/preact": "^6.0.2",
+    "@astrojs/cloudflare": "^14.4.4",
+    "@astrojs/preact": "^6.1.1",
     "@toiletmap/auth": "workspace:*",
     "@toiletmap/opening-hours": "workspace:*",
     "@types/leaflet": "^1.9.22",
-    "astro": "^7.2.0",
-    "hono": "^4.13.1",
+    "astro": "^7.4.5",
+    "hono": "^4.13.16",
     "idb-keyval": "^6.3.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
@@ -33,21 +34,21 @@
     "toiletmap-design-system": "workspace:*"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.4",
-    "@playwright/test": "1.62.1",
+    "@astrojs/check": "^0.9.12",
+    "@playwright/test": "1.64.1",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/preact": "3.2.6",
     "@testing-library/user-event": "14.6.8",
     "@types/leaflet.markercluster": "^1.5.6",
     "@types/ngeohash": "^0.6.8",
-    "@types/node": "26.1.2",
+    "@types/node": "26.6.6",
     "astro-eslint-parser": "^1.1.0",
-    "concurrently": "^10.0.4",
+    "concurrently": "^10.0.6",
     "eslint": "^9.20.1",
     "fake-indexeddb": "6.2.7",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^21.0.4",
     "typescript": "6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   }
 }

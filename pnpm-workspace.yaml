@@ -11,3 +11,6 @@ onlyBuiltDependencies:
   - sharp
   - supabase
   - workerd
+
+# Only install package versions published at least 14 days ago (minutes). Matches renovate.json.
+minimumReleaseAge: 20160

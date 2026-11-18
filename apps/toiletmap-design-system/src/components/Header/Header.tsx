@@ -1,3 +1,4 @@
+import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import Center from "../../layout/Center/Center";
 import VisuallyHidden from "../../utilities/VisuallyHidden/VisuallyHidden";
@@ -33,7 +34,6 @@ const Header = ({ logoSrc, logoHref = "/", navLinks, drawerLinks, onLogoClick }:
   const [drawerTop, setDrawerTop] = useState<number | undefined>(undefined);
   const headerRef = useRef<HTMLElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const navRef = useRef<HTMLDivElement>(null);
 
   // Publish the header's real height (it grows with safe-area padding and
   // text zoom) so the drawer and the map pages can size against it.
@@ -70,45 +70,33 @@ const Header = ({ logoSrc, logoHref = "/", navLinks, drawerLinks, onLogoClick }:
     setIsMenuVisible(!isMenuVisible);
   };
 
-  useEffect(() => {
-    if (!isMenuVisible) return;
-
-    const navElement = navRef.current;
-    if (!navElement) return;
-
-    const focusableElements = navElement.querySelectorAll<HTMLElement>(
+  // The open menu's keyboard handling lives on the menu's own element as props, not in an
+  // effect per open menu: effects only run after the next paint, so a Tab or Escape pressed
+  // straight after opening would arrive before the listeners did, and the menu would stay
+  // open. Props are in place as soon as the open menu has rendered.
+  const trapFocus = (e: JSX.TargetedKeyboardEvent<HTMLDivElement>) => {
+    if (!isMenuVisible || e.key !== "Tab") return;
+    const focusableElements = e.currentTarget.querySelectorAll<HTMLElement>(
       "a[href]:not([disabled]), button:not([disabled])",
     );
     const first = focusableElements[0];
     const last = focusableElements[focusableElements.length - 1];
-
-    const focusTrap = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return;
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
         e.preventDefault();
-        first.focus();
+        last.focus();
       }
-    };
+    } else if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsMenuVisible(false);
-        buttonRef.current?.focus();
-      }
-    };
-
-    navElement.addEventListener("keydown", focusTrap);
-    navElement.addEventListener("keyup", handleEscape);
-    return () => {
-      navElement.removeEventListener("keydown", focusTrap);
-      navElement.removeEventListener("keyup", handleEscape);
-    };
-  }, [isMenuVisible]);
+  const closeOnEscape = (e: JSX.TargetedKeyboardEvent<HTMLDivElement>) => {
+    if (!isMenuVisible || e.key !== "Escape") return;
+    setIsMenuVisible(false);
+    buttonRef.current?.focus();
+  };
 
   return (
     <header class="header" ref={headerRef}>
@@ -123,7 +111,8 @@ const Header = ({ logoSrc, logoHref = "/", navLinks, drawerLinks, onLogoClick }:
               <h2 id="menu-main">Main menu</h2>
             </VisuallyHidden>
 
-            <div class="header__smaller-devices" ref={navRef}>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: delegated keyboard handling for the toggle and the menu's links inside it, which are the interactive elements */}
+            <div class="header__smaller-devices" onKeyDown={trapFocus} onKeyUp={closeOnEscape}>
               <IconButton
                 icon={isMenuVisible ? "xmark" : "bars"}
                 aria-label="Toggle main menu"

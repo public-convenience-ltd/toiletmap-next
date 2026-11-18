@@ -115,8 +115,9 @@ file per start; when wrangler dev dies it names the file in `server.log`. The
 Playwright reuses.
 
 The same wrapper restarts a server that exits mid-run without being asked to
-stop: wrangler dev 4.120 occasionally exits ("ProxyController ... Network
-connection lost") and would otherwise fail every later test. It waits 1s, 2s, …
+stop: wrangler dev before 4.129.1 occasionally exited ("ProxyController ...
+Network connection lost") and would otherwise fail every later test. 4.129.1
+retries such requests instead of exiting; the restart stays as a safety net. It waits 1s, 2s, …
 before restart 1, 2, …, gives up after 5 restarts, and first kills whatever the
 dead process left behind in its process group (workerd keeps holding :8787 when
 wrangler is killed). Each restart is written to the log and printed as

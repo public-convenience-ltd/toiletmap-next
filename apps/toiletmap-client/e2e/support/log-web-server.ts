@@ -9,8 +9,8 @@
  * to Playwright, which prints it with a [WebServer] prefix.
  *
  * Restarts: if the command exits without having been asked to stop (wrangler
- * dev 4.120 sometimes exits after "ProxyController ... Network connection
- * lost" and never comes back), it is started again after a short backoff, up
+ * dev before 4.129.1 sometimes exited after "ProxyController ... Network
+ * connection lost" and never came back), it is started again after a short backoff, up
  * to MAX_RESTARTS times per run; each restart is logged to the log file and
  * stderr. Leftovers of the dead command (e.g. workerd, which keeps holding
  * :8787 when wrangler is killed) are killed first, and again on the way out.

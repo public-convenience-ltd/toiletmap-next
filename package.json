@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Monorepo for Toilet Map workers",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
@@ -15,14 +16,14 @@
   },
   "pnpm": {
     "overrides": {
-      "hono": "^4.13.1",
+      "hono": "^4.13.16",
       "valibot@>=0.31.0 <1.2.0": ">=1.2.0"
     }
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.7",
+    "@biomejs/biome": "2.6.4",
     "husky": "^9.1.7",
     "typescript": "7.0.2",
-    "wrangler": "^4.120.0"
+    "wrangler": "4.156.1"
   }
 }

@@ -57,7 +57,7 @@ export function measureOverflow(page: Page): Promise<Overflow> {
       return false;
     };
 
-    const describe = (el: Element, right: number) => {
+    const describeElement = (el: Element, right: number) => {
       const id = el.id ? `#${el.id}` : "";
       const classes = [...el.classList].map((c) => `.${c}`).join("");
       const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
@@ -74,7 +74,7 @@ export function measureOverflow(page: Page): Promise<Overflow> {
         !el.closest(".leaflet-container")
       ) {
         sidewaysScrollers.push(
-          `${describe(el, el.getBoundingClientRect().right)} scrollWidth=${el.scrollWidth}px clientWidth=${el.clientWidth}px`,
+          `${describeElement(el, el.getBoundingClientRect().right)} scrollWidth=${el.scrollWidth}px clientWidth=${el.clientWidth}px`,
         );
       }
 
@@ -83,7 +83,7 @@ export function measureOverflow(page: Page): Promise<Overflow> {
       if (rect.right <= clientWidth + 1) continue;
       if (isVisuallyHidden(style, rect)) continue;
       if (clippedByAncestor(el)) continue;
-      offenders.push(describe(el, rect.right));
+      offenders.push(describeElement(el, rect.right));
     }
 
     return {

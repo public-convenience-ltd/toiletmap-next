@@ -15,10 +15,10 @@
     "preact": ">=10"
   },
   "devDependencies": {
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^21.0.4",
     "preact": "^10.29.8",
     "typescript": "7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   },
   "scripts": {
     "test": "vitest run",

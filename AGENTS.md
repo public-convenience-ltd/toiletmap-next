@@ -391,7 +391,7 @@ pnpm --filter toiletmap-server typecheck:test   # src + test/ + scripts/
 pnpm --filter toiletmap-server test:e2e         # needs local Supabase on :54322
 ```
 
-- **TypeScript versions**: the root uses TypeScript 7 (native compiler). The client pins `typescript` 6.0.3 because `@astrojs/check` needs the TypeScript JS language-service API, which TS 7 does not ship.
+- **TypeScript versions**: the root uses TypeScript 7 (native compiler). The client pins `typescript` 6.0.3 because `@astrojs/check` needs the TypeScript JS language-service API, which TS 7 does not ship. This still holds for `@astrojs/check` 0.9.12 (peer `typescript ^5 || ^6`), and `astro check` reports TS 7 as unsupported.
 - **Playwright prerequisites**: local Supabase running (`pnpm --filter toiletmap-server supabase:start`), `pnpm --filter toiletmap-server prisma:generate`, and browsers (`pnpm exec playwright install chromium webkit` in `apps/toiletmap-client`). Playwright starts the server and client itself. A reused local stack may be missing newer migrations: run `npx -y supabase@2.122.1 migration up --local` in `apps/toiletmap-server`.
 - **CI jobs** (`.github/workflows/ci.yml`): `Biome (Lint & Format)`, `Type Check` (server typecheck + typecheck:test) and `Integration Tests` (server `test:e2e`) are **required** by the branch ruleset. `Client Checks` (design-system tests + typecheck, client typecheck, build, client tests), `E2E (Playwright)`, `Mobile App (Flutter)` and `Cloudflare Build Check` also run on every PR but are not required.
 
@@ -466,7 +466,7 @@ Form-based loo creation with:
 {
   "name": "toiletmap-server",
   "main": "./src/index.ts",
-  "compatibility_date": "2025-11-18",
+  "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "AUTH0_ISSUER_BASE_URL": "https://gbptm.eu.auth0.com/",

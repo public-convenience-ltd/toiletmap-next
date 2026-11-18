@@ -1,0 +1,175 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "schedule:weekly"
+  ],
+  "timezone": "Europe/London",
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "separateMajorMinor": true,
+  "postUpdateOptions": [
+    "pnpmDedupe"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
+    {
+      "description": "Keep GitHub Actions on version tags rather than pinned digests.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "pinDigests": false
+    },
+    {
+      "description": "One PR per workspace for minor and patch updates; majors get their own PRs.",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchFileNames": [
+        "package.json"
+      ],
+      "groupName": "root tooling (non-major)"
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchFileNames": [
+        "apps/toiletmap-client/**"
+      ],
+      "groupName": "toiletmap-client (non-major)"
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchFileNames": [
+        "apps/toiletmap-server/**"
+      ],
+      "groupName": "toiletmap-server (non-major)"
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchFileNames": [
+        "apps/toiletmap-design-system/**"
+      ],
+      "groupName": "toiletmap-design-system (non-major)"
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchFileNames": [
+        "apps/toiletmap-app/**"
+      ],
+      "groupName": "toiletmap-app (non-major)"
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchFileNames": [
+        "packages/auth/**"
+      ],
+      "groupName": "@toiletmap/auth (non-major)"
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchFileNames": [
+        "packages/opening-hours/**"
+      ],
+      "groupName": "@toiletmap/opening-hours (non-major)"
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions (non-major)"
+    },
+    {
+      "description": "Patch updates to devDependencies merge themselves once ALL status checks pass (platformAutomerge off, so Renovate waits for every check, not only the ruleset's required ones). They get their own PR so a grouped runtime update never blocks them.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "groupName": "devDependencies (patch)",
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": false
+    },
+    {
+      "description": "Keep the Cloudflare toolchain on one version across workspaces (wrangler, miniflare, workerd, vite plugin, adapter).",
+      "matchPackageNames": [
+        "wrangler",
+        "miniflare",
+        "workerd",
+        "@cloudflare/**",
+        "@astrojs/cloudflare"
+      ],
+      "groupName": "Cloudflare toolchain"
+    },
+    {
+      "description": "Astro packages move together.",
+      "matchPackageNames": [
+        "astro",
+        "@astrojs/**",
+        "!@astrojs/cloudflare"
+      ],
+      "groupName": "Astro"
+    },
+    {
+      "description": "Prisma client, adapter and CLI must match.",
+      "matchPackageNames": [
+        "prisma",
+        "@prisma/**"
+      ],
+      "groupName": "Prisma"
+    },
+    {
+      "description": "Test tooling shared across workspaces.",
+      "matchPackageNames": [
+        "vitest",
+        "@vitest/**",
+        "happy-dom",
+        "@testing-library/**",
+        "@playwright/test"
+      ],
+      "groupName": "test tooling"
+    },
+    {
+      "description": "The client pins TypeScript 6 because @astrojs/check needs the TS 6 language service (see AGENTS.md). Don't propose TS 7 there.",
+      "matchFileNames": [
+        "apps/toiletmap-client/**"
+      ],
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    }
+  ]
+}
