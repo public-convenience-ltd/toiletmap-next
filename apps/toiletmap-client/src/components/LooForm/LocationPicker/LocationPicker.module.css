@@ -112,9 +112,19 @@
   z-index: 1;
 }
 
-/* Moving state lives on the wrapper: the map element's own class list belongs to Leaflet. */
-.mapWrap:not(.mapWrapMoving) .map {
+/* Moving state lives on the wrapper: the map element's own class list belongs to Leaflet.
+   Locked, a vertical swipe still scrolls the page (and pinch still zooms it); sideways drags
+   reach the picker, which explains the lock. */
+.mapWrapLocked .map {
   cursor: default;
+  touch-action: pan-y pinch-zoom;
+}
+
+/* With a mouse, dragging the locked map unlocks it and moves it. */
+@media (hover: hover) and (pointer: fine) {
+  .mapWrapLocked .map {
+    cursor: grab;
+  }
 }
 
 .map:focus-visible {
@@ -138,6 +148,12 @@
 .centrePinIcon,
 .centrePinIcon > svg {
   display: block;
+}
+
+/* Too far out to place the pin: an outline pin, so it reads as "not yet". */
+.centrePinHollow {
+  filter: none;
+  opacity: 0.9;
 }
 
 .centreDot {
@@ -168,10 +184,80 @@
   font-weight: 600;
   box-shadow: 0 1px 6px rgba(10, 22, 94, 0.2);
   pointer-events: none;
+  /* The grey pin can still show through if the chip ends up over it on a narrow map. */
+  opacity: 0.92;
+}
+
+/* The grey pin is above the centre (the pin moved south): the chip goes to the bottom, clear
+   of it. While moving there is no Move pin button there; the attribution is bottom-right. */
+.chip[data-position="bottom"] {
+  top: auto;
+  bottom: var(--space-xs);
 }
 
 .chipWarning {
   background: #fff4d6;
+}
+
+/* ── On the locked map: badge, Move pin, the "locked" message ── */
+
+.badge {
+  position: absolute;
+  top: var(--space-xs);
+  left: var(--space-xs);
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-xs);
+  border-radius: 999px;
+  background: var(--color-primary-navy);
+  color: var(--color-base-white);
+  font-size: var(--text--1);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Above the OpenStreetMap attribution, which runs under it on a phone-width map. */
+.mapActions {
+  position: absolute;
+  left: var(--space-xs);
+  bottom: calc(var(--space-xs) + 20px);
+  z-index: 1000;
+}
+
+.movePin {
+  min-height: 44px;
+  min-width: 44px;
+  box-shadow: 0 2px 8px rgba(10, 22, 94, 0.3);
+}
+
+.lockedMessage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1001;
+  width: min(20rem, calc(100% - 2 * var(--space-s)));
+  margin: 0;
+  padding: var(--space-xs) var(--space-s);
+  transform: translate(-50%, -50%);
+  border-radius: 8px;
+  background: rgba(10, 22, 94, 0.92);
+  color: var(--color-base-white);
+  font-size: var(--text--1);
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ── One-time intro ───────────────────────────────────────── */
+
+.intro :global(.banner) {
+  margin: 0;
+}
+
+.introText {
+  margin: 0;
 }
 
 /* ── Panel under the map ──────────────────────────────────── */
@@ -189,10 +275,26 @@
   gap: var(--space-xs);
 }
 
-.zoomNotice {
+/* What the pin is doing: placed, locked, moved 23 m, zoom in… */
+.strip {
   margin: 0;
+  padding: var(--space-2xs, 6px) var(--space-xs);
+  border-left: 4px solid var(--color-light-grey);
+  border-radius: 4px;
+  background: var(--color-base-white);
   font-size: var(--text--1);
   font-weight: 600;
+  color: var(--color-primary-navy);
+}
+
+.strip[data-placed="true"] {
+  border-left-color: var(--color-accent-turquoise);
+}
+
+/* Something must be answered first (a big move, a jump, a duplicate question): not "OK". */
+.strip[data-blocked="true"],
+.strip[data-too-far="true"] {
+  border-left-color: #e5a000;
 }
 
 .warning {
@@ -211,6 +313,10 @@
 .warning a {
   color: var(--color-primary-navy);
   font-weight: 600;
+}
+
+.warning p.warningHint {
+  font-weight: 400;
 }
 
 /* A fieldset (the question is its legend). The floated legend sits inside the border. */
@@ -309,6 +415,14 @@
   .coordsSummary {
     display: inline-flex;
     align-items: center;
+  }
+
+  /* Leaflet's +/- (for looking around the locked map) get the same 44px target as Move pin. */
+  .map :global(.leaflet-control-zoom a) {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    font-size: 22px;
   }
 }
 

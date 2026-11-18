@@ -15,8 +15,13 @@ export function locationPicker(page: Page) {
     coordsToggle: page.getByText("Enter coordinates", { exact: true }),
     coords: page.getByRole("textbox", { name: "Latitude, longitude" }),
     showOnMap: page.getByRole("button", { name: "Show on map" }),
-    /** "Moved 23 m north-east" (aria-hidden; the status region announces it). */
-    chip: page.getByText(/^Moved \d/),
+    /**
+     * "Moved 23 m north-east" (aria-hidden; the status region announces it). Anchored at both
+     * ends: the line under the map and the announcement start with the same words.
+     */
+    chip: page.getByText(/^Moved [\d.]+ k?m [a-z-]+$/),
+    /** The line under the map saying what the pin is doing ("Pin placed…", "Locked again."). */
+    strip: page.locator("p[id$='-strip']"),
     bigMoveWarning: page.getByText("That's a big move — are you sure this is the same toilet?"),
     addInstead: page.getByRole("link", { name: "Add as a new toilet instead" }),
     /** The duplicate prompt ("There's already a toilet 8 m away: …"). */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addFormView,
   addToiletHref,
   MAP_VIEW_STORAGE_KEY,
   mapViewFromSearch,
@@ -125,5 +126,25 @@ describe("addToiletHref", () => {
       lng: -2.2426,
       zoom: 15,
     });
+  });
+});
+
+describe("addFormView", () => {
+  it("opens any view at zoom 15 or closer at 17, where the pin can be placed", () => {
+    expect(addFormView({ lat: 51.5, lng: -0.12, zoom: 15 })).toEqual({
+      lat: 51.5,
+      lng: -0.12,
+      zoom: 17,
+    });
+    expect(addFormView({ lat: 51.5, lng: -0.12, zoom: 16 }).zoom).toBe(17);
+    expect(addFormView({ lat: 51.5, lng: -0.12, zoom: 17 }).zoom).toBe(17);
+    // Closer than 17 too (spec: "opens at zoom 17 when the main map was at 15 or closer").
+    expect(addFormView({ lat: 51.5, lng: -0.12, zoom: 18 }).zoom).toBe(17);
+    expect(addFormView({ lat: 51.5, lng: -0.12, zoom: 19 }).zoom).toBe(17);
+  });
+
+  it("leaves views further out as they are", () => {
+    expect(addFormView({ lat: 51.5, lng: -0.12, zoom: 14 }).zoom).toBe(14);
+    expect(addFormView({ lat: 51.5, lng: -0.12, zoom: 10 }).zoom).toBe(10);
   });
 });

@@ -16,16 +16,20 @@ test.describe("add (signed in)", () => {
     await page.goto("/loos/add");
     const form = looForm(page);
     await expect(form.heading).toHaveText("Add a toilet");
-    // Add mode opens moving: a fixed centre pin, nothing confirmed yet.
-    await expect(form.picker.useLocation).toBeVisible();
+    // Add mode opens moving: a fixed centre pin, not placed yet. The default view is too far
+    // out to place it, so the button under the pin is "Zoom in".
+    await expect(form.picker.zoomIn).toBeVisible();
     await expect(form.save).toBeDisabled();
 
-    // Saving without a confirmed pin is refused.
+    // Saving with the map zoomed out too far is refused, with a link that fixes it.
     const name = e2eName("added");
     await form.name.fill(name);
     await expect(form.save).toBeEnabled();
     await form.save.click();
     await expect(page.getByText("There's a problem")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Zoom in on the map so the pin can be placed accurately." }),
+    ).toBeVisible();
     await expect(form.review).toBeHidden();
 
     // Somewhere off the default (London) view so it never shows up in the map tests.
