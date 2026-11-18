@@ -216,23 +216,27 @@ test.describe("location picker guard rails", () => {
     const pinBefore = await box(form.pin);
     const map = await box(picker.map);
     const at = { x: map.x + map.width * 0.3, y: map.y + map.height * 0.4 };
+    // Scroll back towards the top of the page. With the map at the top of the viewport
+    // the page can always scroll up, but it may already be at its bottom (how tall the
+    // form is depends on the platform's fonts, so CI's Linux page is shorter).
+    expect(before).toBeGreaterThan(100);
 
     if (isMobile) {
-      // A real touch swipe up over the map (Chromium's synthetic gesture).
+      // A real touch swipe down over the map (Chromium's synthetic gesture).
       const cdp = await page.context().newCDPSession(page);
       await cdp.send("Input.synthesizeScrollGesture", {
         x: Math.round(at.x),
         y: Math.round(at.y),
-        yDistance: -200,
+        yDistance: 200,
         gestureSourceType: "touch",
         speed: 600,
       });
     } else {
       await page.mouse.move(at.x, at.y);
-      await page.mouse.wheel(0, 300);
+      await page.mouse.wheel(0, -300);
     }
 
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before + 50);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before - 50);
     await waitForMapToSettle(picker.map);
     // The map didn't move under the pin, and it is still locked.
     const pinAfter = await box(form.pin);
