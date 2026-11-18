@@ -9,6 +9,7 @@ The application uses the **Cloudflare Rate Limiting API** for global, datacenter
 |------|-------|-------|----------|
 | **Read** | 400/min | IP | Public API reads |
 | **Write** | 20/min | User/IP | Creating/updating loos |
+| **Feedback** | 20/min | IP | `POST /api/feedback` (shares the write binding under a `feedback:` key; the key is never logged) |
 | **Admin** | 60/min | User/IP | Admin panel operations |
 | **Auth** | 5/min | IP | Login attempts |
 
