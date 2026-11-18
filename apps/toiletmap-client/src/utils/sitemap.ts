@@ -15,8 +15,12 @@ import { escapeXml, XML_DECLARATION } from "./xml";
 /** Google allows 50,000 URLs (and 50 MB) per file; stay well under it. */
 export const SITEMAP_URL_LIMIT = 45_000;
 
-/** Pages that are always there (content pages come from the `pages` collection). */
-export const STATIC_SITEMAP_PATHS = ["/", BLOG_PATH, "/feedback"] as const;
+/**
+ * Pages that are always there (content pages come from the `pages` collection). `/dataset`
+ * is the open dataset page (src/pages/dataset.astro); its downloads under `/dataset/*` are
+ * files, not pages, so they are not listed.
+ */
+export const STATIC_SITEMAP_PATHS = ["/", BLOG_PATH, "/feedback", "/dataset"] as const;
 
 /** An hour fresh, then served stale for a day while it refreshes. */
 export const SITEMAP_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400";

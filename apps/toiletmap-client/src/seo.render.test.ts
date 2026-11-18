@@ -248,6 +248,7 @@ describe("robots.txt, sitemap and RSS in the built worker (needs dist/; skipped 
     expect(response.headers.get("cache-control")).toContain("max-age=3600");
     const xml = await response.text();
     expect(xml).toContain(`<url><loc>${SITE}/</loc></url>`);
+    expect(xml).toContain(`<url><loc>${SITE}/dataset</loc></url>`);
     expect(xml).toContain(`<url><loc>${SITE}/loos/${ID}</loc></url>`);
     expect(apiCalls).toEqual(["/api/loos/dump"]);
   });

@@ -22,6 +22,8 @@ describe("robotsTxt", () => {
     }
     // Toilet pages themselves stay crawlable.
     expect(lines).not.toContain("Disallow: /loos");
+    // The open dataset page and its downloads stay crawlable.
+    expect(text).not.toMatch(/^Disallow: \/dataset/m);
     expect(lines).not.toContain("Disallow: /");
     expect(lines).toContain(`Sitemap: ${SITE}/sitemap.xml`);
   });

@@ -30,6 +30,7 @@ const errorPages = {
   "/404": read("../pages/404.astro"),
   "/500": read("../pages/500.astro"),
 };
+const datasetPage = read("../pages/dataset.astro");
 
 describe("BaseLayout.astro", () => {
   it("lets the page reach under notches and stay unzoomed", () => {
@@ -150,6 +151,20 @@ describe.each(Object.entries(formPages))("form page %s", (_path, source) => {
 describe.each(Object.entries(errorPages))("error page %s", (_path, source) => {
   it("uses ContentLayout and is noindex", () => {
     expect(source).toMatch(/<ContentLayout[^>]*\bnoindex\b/s);
+  });
+});
+
+describe("/dataset", () => {
+  it("is a text page: ContentLayout (site chrome, scrolls), not a map page", () => {
+    expect(datasetPage).toMatch(/<ContentLayout[\s>]/);
+    expect(datasetPage).not.toContain("map-page");
+  });
+
+  it("sets its title, description and canonical, and stays indexable", () => {
+    expect(datasetPage).toContain('title={pageTitle("Our Data")}');
+    expect(datasetPage).toMatch(/<ContentLayout[^>]*\bdescription="[^"]+"/s);
+    expect(datasetPage).toContain("canonical={DATASET_PATH}");
+    expect(datasetPage).not.toMatch(/<ContentLayout[^>]*\bnoindex\b/s);
   });
 });
 

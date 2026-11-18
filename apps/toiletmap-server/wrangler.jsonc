@@ -56,6 +56,21 @@
           "id": "2bd669c375c645ff9f22fe6418adecc3"
         }
       ],
+      // Public dataset export (src/services/export). Production only: preview
+      // and dev workers have no bucket and no cron, and the export skips there.
+      // The owner creates the bucket once: wrangler r2 bucket create toiletmap-exports
+      "r2_buckets": [
+        {
+          "binding": "EXPORTS",
+          "bucket_name": "toiletmap-exports"
+        }
+      ],
+      // Daily at 00:17 UTC (off the hour, when cron load peaks). Runs within the
+      // Workers Paid default of 30 s CPU (the Free plan's 10 ms is far too little);
+      // no `limits` block, so requests keep that default too.
+      "triggers": {
+        "crons": ["17 0 * * *"]
+      },
       "ratelimits": [
         {
           "name": "RATE_LIMIT_READ",

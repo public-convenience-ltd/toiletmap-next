@@ -80,6 +80,12 @@ secrets) live on the workers in Cloudflare (`wrangler secret put`). Deploys don'
 Plain vars live in each app's `wrangler.jsonc` (`env.production.vars`); a deploy replaces
 any var set in the Cloudflare dashboard with the file's, so change vars in the file.
 
+Both workers' production config binds the dataset export's R2 bucket (`toiletmap-exports`,
+`EXPORTS`). Cloudflare rejects a deploy whose bucket doesn't exist, so deploy-server and
+deploy-client fail until the owner has created it once:
+`pnpm exec wrangler r2 bucket create toiletmap-exports`
+(see [the dataset export runbook](../apps/toiletmap-server/docs/operations/dataset-export.md#owner-setup-once)).
+
 Optional repository variables: `PRODUCTION_CLIENT_URL` and `PRODUCTION_SERVER_URL` override
 the smoke check's URLs (defaults: `https://toiletmap-client.gbtoiletmap.workers.dev` and
 `https://toiletmap-server.gbtoiletmap.workers.dev`), e.g. once the site moves to its own
