@@ -70,6 +70,30 @@ test.describe("location picker guard rails", () => {
     await expect(form.save).toHaveText("No changes to save");
   });
 
+  test("edit: Save after typed coordinates asks 'Save the new location?', like a dragged move", async ({
+    page,
+    loos,
+  }) => {
+    const loo = await loos.create({}, "picker typed save");
+    const origin = loo.location ?? { lat: 0, lng: 0 };
+    const form = await openEditForm(page, loo.id);
+
+    await showOnMap(page, north(origin, 0.0002));
+    await expect(form.save).toHaveText("Save 1 change");
+    // The bar offered to save: it does, after the same check a dragged move gets (not an
+    // error saying to press "Use this location" first).
+    const put = nextSave(page, "PUT");
+    await form.save.click();
+    const check = page.getByRole("alertdialog", { name: "Save the new location?" });
+    await expect(check).toContainText(/You moved the pin 2\d m north\./);
+    await expect(page.getByText("There's a problem")).toHaveCount(0);
+    await check.getByRole("button", { name: "Yes, save the new location" }).click();
+    expect(Object.keys(jsonBody(await put)).sort()).toEqual(["baseUpdatedAt", "location"]);
+    await waitForSaved(page, loo.id);
+    const after = await getLoo(loo.id);
+    expect(after.location?.lat).toBeGreaterThan(origin.lat);
+  });
+
   test("edit: a move over 50 m warns and offers to add a new toilet", async ({ page, loos }) => {
     const loo = await loos.create({}, "picker big move");
     const origin = loo.location ?? { lat: 0, lng: 0 };

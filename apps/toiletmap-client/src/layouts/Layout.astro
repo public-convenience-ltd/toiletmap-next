@@ -6,9 +6,11 @@ interface Props {
    * scrolls normally.
    */
   bodyClass?: string;
+  /** The document title. Defaults to "Toilet Map". */
+  title?: string;
 }
 
-const { bodyClass } = Astro.props;
+const { bodyClass, title = "Toilet Map" } = Astro.props;
 ---
 
 <!doctype html>
@@ -28,7 +30,9 @@ const { bodyClass } = Astro.props;
 			href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap"
 			rel="stylesheet"
 		/>
-		<title>Toilet Map</title>
+		<title>{title}</title>
+		<!-- Extra head content from the page, e.g. <meta slot="head" name="robots" …>. -->
+		<slot name="head" />
 	</head>
 	<body class:list={[bodyClass]}>
 		<slot />

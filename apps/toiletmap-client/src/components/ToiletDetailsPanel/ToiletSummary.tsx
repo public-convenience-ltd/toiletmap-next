@@ -30,7 +30,7 @@ export interface ToiletSummaryProps {
   detailsToggleRef: Ref<HTMLButtonElement>;
   onToggleDetails: () => void;
   onClose: () => void;
-  /** Slim notice lines: saved, removed, pending, offline, restore result. */
+  /** Compact DS Notices: removed, pending, offline, restore result. */
   notices?: ComponentChildren;
 }
 
@@ -76,11 +76,13 @@ export default function ToiletSummary({
       {payment}
     </span>
   );
+  // Words, not bare icons: "Accessible", "Baby changing", "RADAR key", "All-gender".
   const featuresItem = features.length > 0 && (
     <ul className={styles.keyFeatures} aria-label="Key features">
       {features.map((feature) => (
-        <li key={feature.key} className={styles.keyFeature} title={feature.label}>
-          <Icon icon={feature.icon} size="small" aria-label={feature.label} />
+        <li key={feature.key} className={styles.keyFeature}>
+          <Icon icon={feature.icon} size="small" />
+          {feature.label}
         </li>
       ))}
     </ul>

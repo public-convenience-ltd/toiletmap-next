@@ -22,7 +22,7 @@ const report = (page: Page) => ({
   reason: (label: string) => page.getByText(label, { exact: true }),
   details: page.getByRole("textbox", { name: /^(What's wrong\?|Anything else we should know\?)/ }),
   continue: page.getByRole("button", { name: "Continue" }),
-  reportIt: page.getByRole("button", { name: "Report it" }),
+  reportIt: page.getByRole("button", { name: /^(Report it|Remove it from the map)$/ }),
   undo: page.getByRole("button", { name: "Undo" }),
 });
 
@@ -186,7 +186,9 @@ test.describe("report a problem (anonymous)", () => {
     await expect(page.getByRole("textbox", { name: /^What's wrong\?/ })).toBeVisible();
     await r.continue.click();
 
-    await expect(page.getByText("Tell us what's wrong.")).toBeVisible();
+    // Inline, and linked from the error summary.
+    await expect(page.locator("#report-details-error")).toHaveText("Tell us what's wrong.");
+    await expect(page.getByRole("link", { name: "Tell us what's wrong." })).toBeVisible();
     await expect(r.details).toHaveAttribute("aria-invalid", "true");
     await expect(r.details).toBeFocused();
     await expect(page.getByRole("heading", { name: "Check your report" })).toHaveCount(0);

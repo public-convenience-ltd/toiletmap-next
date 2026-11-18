@@ -2,17 +2,25 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { contrastRatio, declarationsFor, parseCss } from "../ToiletDetailsPanel/css.testutil";
+import {
+  contrastRatio,
+  declarationsFor,
+  parseCss,
+  resolveToken,
+} from "../ToiletDetailsPanel/css.testutil";
 
 const rules = parseCss(
   readFileSync(join(import.meta.dirname, "MapControlsPanel.module.css"), "utf8"),
 );
 const rule = (selector: string, at: string[] = []) => declarationsFor(rules, selector, at);
 
-/** A custom property's value from the bar's own rule, for colours set through one. */
+/**
+ * A colour's value: through the bar's own custom properties, then the design system's tokens.
+ */
 const resolve = (value: string) => {
   const name = value.match(/^var\((--[\w-]+)\)$/)?.[1];
-  return name ? rule(".floatingBar")[name] : value;
+  const own = name ? rule(".floatingBar")[name] : undefined;
+  return resolveToken(own ?? value);
 };
 
 describe("MapControlsPanel.module.css", () => {

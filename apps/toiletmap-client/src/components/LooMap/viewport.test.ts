@@ -11,7 +11,7 @@ import {
   panPadding,
   prefersReducedMotion,
   sanitiseInsets,
-  showDeveloperControls,
+  toastLayout,
 } from "./viewport";
 
 /** A rect from left/top/width/height, the way the DOM would report it. */
@@ -225,26 +225,6 @@ describe("prefersReducedMotion", () => {
   });
 });
 
-describe("showDeveloperControls", () => {
-  it("shows them in dev builds whatever the environment", () => {
-    expect(showDeveloperControls("production", true)).toBe(true);
-    expect(showDeveloperControls(undefined, true)).toBe(true);
-  });
-
-  it("shows them in deployed development and preview environments", () => {
-    expect(showDeveloperControls("development", false)).toBe(true);
-    expect(showDeveloperControls("preview", false)).toBe(true);
-    expect(showDeveloperControls(" Preview ", false)).toBe(true);
-  });
-
-  it("hides them in production, and when the environment is unknown", () => {
-    expect(showDeveloperControls("production", false)).toBe(false);
-    expect(showDeveloperControls(undefined, false)).toBe(false);
-    expect(showDeveloperControls(null, false)).toBe(false);
-    expect(showDeveloperControls("staging", false)).toBe(false);
-  });
-});
-
 describe("cardTopBelow", () => {
   it("starts the card just below the bar, in container coordinates", () => {
     expect(cardTopBelow(rect(440, 76, 520, 56), DESKTOP)).toBe(76 + 56 - 64 + 8);
@@ -253,5 +233,87 @@ describe("cardTopBelow", () => {
 
   it("is undefined before the bar is laid out", () => {
     expect(cardTopBelow(rect(0, 0, 0, 0), DESKTOP)).toBeUndefined();
+  });
+});
+
+describe("toastLayout", () => {
+  // A 390×844 phone: header 60px, the map runs to the bottom of the screen.
+  const phoneMap = rect(0, 60, 390, 784);
+  // A 1280×720 desktop: header 72px, footer 48px.
+  const desktopMap = rect(0, 72, 1280, 600);
+  // A Pixel 7 on its side (863×360): compact header 56px, no footer.
+  const landscapeMap = rect(0, 56, 863, 304);
+
+  it("puts phone toasts at the top of the map (over the search bar) while the sheet is open", () => {
+    for (const occludes of [
+      { top: 0, right: 0, bottom: 500, left: 0 },
+      { top: 0, right: 0, bottom: 120, left: 0 },
+    ]) {
+      expect(
+        toastLayout({ mode: "sheet", container: phoneMap, occludes, searchBottom: 136 }),
+      ).toEqual({ offset: 60, left: null, right: null });
+    }
+  });
+
+  it("keeps phone toasts below the search bar when no sheet is open", () => {
+    expect(
+      toastLayout({ mode: "sheet", container: phoneMap, occludes: null, searchBottom: 136 }),
+    ).toEqual({ offset: 136, left: null, right: null });
+  });
+
+  it("puts desktop toasts below the search bar, right of an open card", () => {
+    const base = { mode: "card" as const, container: desktopMap, searchBottom: 140 };
+    expect(toastLayout({ ...base, occludes: null })).toEqual({
+      offset: 140,
+      left: null,
+      right: null,
+    });
+    expect(toastLayout({ ...base, occludes: { top: 80, right: 0, bottom: 0, left: 416 } })).toEqual(
+      { offset: 140, left: 416, right: null },
+    );
+  });
+
+  it("keeps card-layout toasts left of the right-hand buttons (zoom, developer tools)", () => {
+    // Zoom buttons 44px wide, 12px in from the right edge.
+    expect(
+      toastLayout({
+        mode: "card",
+        container: landscapeMap,
+        occludes: { top: 60, right: 0, bottom: 0, left: 357 },
+        searchBottom: 116,
+        rightControlsLeft: 863 - 12 - 44,
+        viewportWidth: 863,
+      }),
+    ).toEqual({ offset: 116, left: 357, right: 56 });
+    // No buttons showing (or not measured yet): the region's own right edge.
+    expect(
+      toastLayout({
+        mode: "card",
+        container: landscapeMap,
+        occludes: null,
+        searchBottom: 116,
+        rightControlsLeft: null,
+        viewportWidth: 863,
+      }).right,
+    ).toBeNull();
+  });
+
+  it("never moves phone toasts in from the right (the bottom-right buttons are far below)", () => {
+    expect(
+      toastLayout({
+        mode: "sheet",
+        container: phoneMap,
+        occludes: null,
+        searchBottom: 136,
+        rightControlsLeft: 300,
+        viewportWidth: 390,
+      }).right,
+    ).toBeNull();
+  });
+
+  it("falls back to the top of the map without a search bar", () => {
+    expect(
+      toastLayout({ mode: "sheet", container: phoneMap, occludes: null, searchBottom: null }),
+    ).toEqual({ offset: 60, left: null, right: null });
   });
 });

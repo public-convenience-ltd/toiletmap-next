@@ -3,10 +3,10 @@
 /* In-flow: LooMap's floating chrome (.map-chrome-top) places it beside the other buttons. */
 .floatingBar {
   /* Secondary text (Reset filters, the location error) never below 14px, at 4.5:1 or more on
-   * white: the DS neutral grey (#807f7f) and accent pink are only about 4:1. */
+   * white (the DS text tokens). */
   --bar-text-small: max(0.875rem, var(--text--1));
-  --bar-muted: #5f5e5e;
-  --bar-error: #a51d3b;
+  --bar-muted: var(--color-text-muted);
+  --bar-error: var(--color-text-error);
   position: relative;
   box-sizing: border-box;
   width: 100%;
@@ -39,7 +39,7 @@
 .searchIcon {
   position: absolute;
   left: var(--space-xs);
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
@@ -64,7 +64,7 @@
 .searchSpinner {
   position: absolute;
   right: var(--space-xs);
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
 }
 
 .geoBtn {
@@ -151,7 +151,7 @@
 
 .suggestion > :global(.icon) {
   flex-shrink: 0;
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
 }
 
 .suggestion span {

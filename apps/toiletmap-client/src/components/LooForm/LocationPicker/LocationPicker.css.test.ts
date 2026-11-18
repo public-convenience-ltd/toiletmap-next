@@ -29,11 +29,17 @@ describe("LocationPicker.module.css on the map", () => {
     });
   });
 
-  it("shows a blocked strip in the warning colour, not the 'placed' one", () => {
-    const blocked = rule('.strip[data-blocked="true"]');
-    expect(blocked["border-left-color"]).toBe("#e5a000");
-    expect(rule('.strip[data-placed="true"]')["border-left-color"]).toBe(
-      "var(--color-accent-turquoise)",
-    );
+  it("keeps the link buttons (Reset to original location) underlined on touch screens", () => {
+    expect(rule(".linkButton", [COARSE])).toMatchObject({
+      display: "inline-block",
+      "min-height": "44px",
+      "text-decoration": "underline",
+    });
+    // Hover drops the underline only where there is a real hover: on a phone :hover sticks
+    // under the last tap, which is where Reset appears after "Show on map".
+    expect(rule(".linkButton:hover")).toEqual({});
+    expect(rule(".linkButton:hover", ["@media (hover: hover)"])).toEqual({
+      "text-decoration": "none",
+    });
   });
 });

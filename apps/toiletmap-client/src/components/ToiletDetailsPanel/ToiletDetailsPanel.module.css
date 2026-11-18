@@ -21,8 +21,8 @@
  */
 
 .panel {
-  /* Secondary text: 6.4:1 on white (the DS neutral grey, #807f7f, is only 4:1). */
-  --panel-muted: #5f5e5e;
+  /* Secondary text: the DS muted text token (6.46:1 on white). */
+  --panel-muted: var(--color-text-muted);
   --panel-text-body: min(1rem, var(--text-0));
   --panel-text-small: max(0.875rem, var(--text--1));
   --panel-text-heading: var(--panel-text-small);
@@ -52,7 +52,7 @@
 /* Mobile: the DS BottomSheet places it; keep it over the map's floating buttons. The body
  * pads the bottom by the larger of --space-s and the safe area, so the content adds none. */
 .panel.sheet {
-  z-index: 1500;
+  z-index: var(--z-sheet, 1500);
   --bottom-sheet-padding-bottom: var(--space-s);
   /*
    * The expanded sheet's height cap (the design system's default is 60%): 70% of the map,
@@ -64,7 +64,7 @@
   --bottom-sheet-max-height: min(70%, 100% - 10rem);
 }
 
-/* Desktop (≥768px): a floating card on the left, below the search bar. */
+/* Desktop (≥768px) and a phone in landscape: a floating card on the left, below the search bar. */
 .panel.card {
   --toilet-panel-gap: var(--space-s);
   position: absolute;
@@ -84,8 +84,8 @@
   );
   overflow: hidden;
   background: var(--color-base-white);
-  border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(10, 22, 94, 0.18);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
 }
 
 .cardBody {
@@ -158,14 +158,13 @@
   overflow-wrap: anywhere;
 }
 
-.name:focus {
-  outline: none;
-}
-
+/*
+ * The heading takes focus on every open so screen readers start at the name; it is not a
+ * control, so it shows no focus ring (which mouse and touch users saw as a hard box).
+ */
+.name:focus,
 .name:focus-visible {
-  outline: 2px solid var(--color-primary-navy);
-  outline-offset: 2px;
-  border-radius: 2px;
+  outline: none;
 }
 
 .meta {
@@ -183,24 +182,25 @@
   font-weight: 600;
 }
 
+/* Chips: the DS status tones (AA text on their tints) and the pill radius. */
 .statusChip {
   display: inline-block;
   padding: 0.125rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 700;
   line-height: var(--panel-leading-small);
   background: var(--color-light-grey);
-  color: #4a4a4a;
+  color: var(--color-text-muted);
 }
 
 .statusChip[data-tone="open"] {
-  background: #e2f5f0;
-  color: #0f6b5a;
+  background: var(--color-success-bg);
+  color: var(--color-success-icon);
 }
 
 .statusChip[data-tone="closed"] {
-  background: #fde8ed;
-  color: #a51d3b;
+  background: var(--color-error-bg);
+  color: var(--color-text-error);
 }
 
 /* "Free", "Paid", "Paid: 20p": words, as one £ icon can't tell free from paid. */
@@ -208,11 +208,11 @@
   display: inline-block;
   max-width: 14rem;
   padding: 0.125rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 700;
   line-height: var(--panel-leading-small);
   font-size: var(--panel-text-small);
-  background: var(--color-frost-ice);
+  background: var(--color-info-bg);
   color: var(--color-primary-navy);
   white-space: nowrap;
   overflow: hidden;
@@ -332,14 +332,18 @@
   list-style: none;
 }
 
+/* Labelled chips (icon + word), the same shape as the payment chip. */
 .keyFeature {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  background: var(--color-frost-ice);
+  gap: var(--space-3xs);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--panel-text-small);
+  font-weight: 600;
+  line-height: var(--panel-leading-small);
+  white-space: nowrap;
+  background: var(--color-info-bg);
   color: var(--color-primary-navy);
 }
 
@@ -361,7 +365,7 @@
   transform: rotate(180deg);
 }
 
-/* ── Notices (slim lines in the summary) ─────────────────── */
+/* ── Notices (compact DS Notices in the summary) ──────────── */
 
 .notices {
   display: flex;
@@ -369,78 +373,10 @@
   gap: var(--space-3xs);
 }
 
-.notice {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2xs);
-  padding: var(--space-3xs) var(--space-2xs);
-  border-radius: 6px;
+.notices :global(.notice) {
   font-size: var(--panel-text-small);
   line-height: var(--panel-leading-small);
-  background: var(--color-frost-ice);
-  color: var(--color-primary-navy);
-}
-
-.notice[data-tone="success"] {
-  background: #e2f5f0;
-}
-
-.notice[data-tone="warning"] {
-  background: #fff3dc;
-}
-
-.notice[data-tone="error"] {
-  background: #fde8ed;
-  color: #8c1631;
-}
-
-.noticeIcon {
-  flex-shrink: 0;
-  margin-top: 0.15em;
-}
-
-.noticeText {
-  flex: 1;
-  min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.noticeText a {
-  color: inherit;
-}
-
-.noticeParagraph {
-  margin: 0;
-}
-
-.noticeParagraph + .noticeParagraph {
-  margin-top: var(--space-3xs);
-}
-
-.noticeSlot {
-  font-size: var(--panel-text-small);
-  line-height: var(--panel-leading-small);
-}
-
-.noticeDismiss {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  min-height: 28px;
-  margin: -0.25rem -0.25rem -0.25rem 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.noticeDismiss:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
 }
 
 .focusTarget:focus {
@@ -544,12 +480,12 @@
 
 .hoursTable td {
   text-align: right;
-  color: #4a4a4a;
+  color: var(--color-text-muted);
 }
 
 /* Today: highlighted (and aria-current="date"), no extra pill. */
 .hoursTable tr.today {
-  background: var(--color-frost-ice);
+  background: var(--color-info-bg);
   font-weight: 700;
 }
 
@@ -619,11 +555,11 @@
 }
 
 .facility[data-answer="yes"] .answer {
-  color: #0f6b5a;
+  color: var(--color-success-icon);
 }
 
 .facility[data-answer="no"] .answer {
-  color: #a51d3b;
+  color: var(--color-text-error);
 }
 
 .payment {
@@ -674,17 +610,10 @@
   display: none;
 }
 
-.verifyThanks {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  font-weight: 700;
-  color: #0f6b5a;
-}
-
-.verifyError {
-  font-weight: 700;
-  color: #a51d3b;
+/* The verify result ("Thanks!", or what went wrong): a compact DS Notice on its own line. */
+.verifyStatus {
+  flex: 1 1 100%;
+  min-width: 0;
 }
 
 /* Suggest an edit · Report a problem: one row of text buttons (fits 360px). */
@@ -735,15 +664,12 @@
   display: contents;
 }
 
-.restorePrompt {
-  padding: var(--space-xs);
-  border: 1.5px solid var(--color-primary-navy);
-  border-radius: 8px;
-  background: var(--color-base-white);
-}
-
-.restoreText {
-  margin: 0 0 var(--space-2xs);
+/*
+ * The restore dialog (a DS ConfirmDialog, rendered outside the panel) takes the .panel class
+ * too, for the panel's type scale.
+ */
+.restoreField {
+  margin-block-end: var(--space-m);
 }
 
 .restoreLabel {
@@ -756,17 +682,19 @@
 
 /* The body size: never below 16px, so iOS doesn't zoom on focus. */
 .restoreTextarea {
-  margin-bottom: var(--space-2xs);
+  width: 100%;
   font-size: var(--panel-text-body);
 }
 
 /* ── Short screens ───────────────────────────────────────────
- * A phone in landscape is ≥768px wide but only 360–430px tall: the card below the search bar
- * would leave its details a sliver to scroll, and pin the summary even when a notice pushes
- * Directions out of reach. There it scrolls as one, so everything stays reachable, and the
- * map stays visible to its right (the sheet would cover the whole width).
+ * A phone in landscape is only 340–430px tall (and the panel is the card there, whatever its
+ * width: layout.ts): the card below the search bar would leave its details a sliver to scroll,
+ * and pin the summary even when a notice pushes Directions out of reach. There it scrolls as
+ * one, so everything stays reachable, and the map stays visible to its right (the sheet would
+ * cover the whole width). Nothing is pinned inside it: on a 340px-tall screen a pinned name
+ * (up to three lines) would cover the actions under it.
  */
-@media (min-width: 768px) and (max-height: 560px) {
+@media (max-height: 560px) {
   .panel.card {
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -778,10 +706,19 @@
     min-height: auto;
     overflow: visible;
   }
-}
 
-/* A short sheet (a small phone in landscape) is too low to pin the summary: let it scroll. */
-@media (max-height: 560px) {
+  /* A little wider than on a tall screen, so a long name takes fewer of the few lines. */
+  .panel.card {
+    width: min(400px, 45vw);
+  }
+
+  /* A notice that takes focus (a restore's result) scrolls into view with room above it, so
+     the name and Close above it stay in view where the card is tall enough for both. */
+  .panel.card .focusTarget {
+    scroll-margin-top: 6rem;
+  }
+
+  /* A short sheet (a small phone in landscape) is too low to pin the summary: let it scroll. */
   .sheet[data-state="expanded"] .summary {
     position: static;
   }
@@ -797,12 +734,6 @@
   .iconButton {
     width: var(--tap-min, 44px);
     height: var(--tap-min, 44px);
-  }
-
-  .noticeDismiss {
-    min-width: var(--tap-min, 44px);
-    min-height: var(--tap-min, 44px);
-    margin: -0.5rem -0.5rem -0.5rem 0;
   }
 
   .summaryActions :global(.button),

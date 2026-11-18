@@ -117,12 +117,38 @@ export function freshnessLine(
 export const REMOVED_MESSAGE = "This toilet has been removed from the map";
 
 /**
+ * The sentence the server stores as `removalReason` when a report gives no details
+ * (loo.service.ts): it only restates the category.
+ */
+const DEFAULT_REMOVAL_REASONS: Record<string, string> = {
+  permanently_closed: "Reported as permanently closed.",
+  does_not_exist: "Reported as not existing at this location.",
+  not_public: "Reported as not open to the public.",
+  duplicate: "Reported as a duplicate of another toilet.",
+  other: "Reported as no longer available.",
+};
+
+/** Whether `reason` says no more than the category already does. */
+function restates(reason: string, category: unknown, label: string): boolean {
+  const plain = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/^reported as\s+/, "")
+      .replace(/[.!\s]+$/, "");
+  const defaultReason = typeof category === "string" ? DEFAULT_REMOVAL_REASONS[category] : null;
+  return reason === defaultReason || plain(reason) === plain(label);
+}
+
+/**
  * "Removed from the map: <category> — <reason>" for a removed toilet, or null when neither is
  * recorded (the generic {@link REMOVED_MESSAGE} is shown instead).
  */
 export function removalSummary(toilet: LooDetail): string | null {
   const label = removalCategoryLabel(toilet.removalCategory);
-  const reason = typeof toilet.removalReason === "string" ? toilet.removalReason.trim() : "";
+  const given = typeof toilet.removalReason === "string" ? toilet.removalReason.trim() : "";
+  // A reason that only restates the category ("Reported as not open to the public." under
+  // "Not open to the public") says nothing new: show the category alone.
+  const reason = label && restates(given, toilet.removalCategory, label) ? "" : given;
   if (!label && !reason) return null;
   return `Removed from the map${label ? `: ${label}` : ""}${reason ? ` — ${reason}` : ""}`;
 }

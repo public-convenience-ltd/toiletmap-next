@@ -12,6 +12,8 @@ import {
 } from "../../api/mapCache";
 import { draftKey } from "./draft";
 import LooForm, {
+  ADD_MODERATOR_WILL_CHECK,
+  ADDED_STRAIGHT_AWAY,
   LIVE_STRAIGHT_AWAY,
   MESSAGES,
   MODERATOR_WILL_CHECK,
@@ -60,6 +62,8 @@ const pickerProps = vi.hoisted(() => ({
   pending: null as { lat: number; lng: number } | null,
   /** Forces what resolve() answers (e.g. a blocked pin). */
   resolution: null as Record<string, unknown> | null,
+  /** What the form last asked resolve() for. */
+  resolveOptions: undefined as { save?: boolean } | undefined,
   placeHere: vi.fn(),
   focusMap: vi.fn(),
   fixIssue: vi.fn(),
@@ -105,7 +109,8 @@ vi.mock("./LocationPicker", () => ({
     };
     if (controllerRef) {
       controllerRef.current = {
-        resolve: () => {
+        resolve: (options?: { save?: boolean }) => {
+          pickerProps.resolveOptions = options;
           if (pickerProps.resolution) return Promise.resolve(pickerProps.resolution);
           const kept = keepPending();
           if (kept) return Promise.resolve({ kind: "ok", location: kept, source: "auto" });
@@ -273,6 +278,7 @@ beforeEach(async () => {
   pickerProps.last = null;
   pickerProps.pending = null;
   pickerProps.resolution = null;
+  pickerProps.resolveOptions = undefined;
   pickerProps.placeHere.mockClear();
   pickerProps.focusMap.mockClear();
   pickerProps.fixIssue.mockClear();
@@ -338,7 +344,9 @@ const notesInput = () =>
 const saveButton = () => screen.getByRole("button", { name: /^(save|no changes|add toilet)/i });
 const facility = (label: string) => within(screen.getByRole("group", { name: label }));
 const reviewSheet = () => screen.getByRole("dialog", { name: /^Check / });
-const confirmButton = () => screen.getByRole("button", { name: "Confirm and save" });
+/** "Confirm and save", or "Send for review" when the change is only queued. */
+const CONFIRM_NAME = /^(Confirm and save|Send for review)$/;
+const confirmButton = () => screen.getByRole("button", { name: CONFIRM_NAME });
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -350,7 +358,7 @@ const changeName = async (user: User, value: string) => {
 /** Save through the review sheet. */
 const saveAndConfirm = async (user: User) => {
   await user.click(saveButton());
-  await user.click(await screen.findByRole("button", { name: "Confirm and save" }));
+  await user.click(await screen.findByRole("button", { name: CONFIRM_NAME }));
 };
 
 /** Text of each line of the review sheet. */
@@ -481,13 +489,15 @@ describe("LooForm (edit)", () => {
     expect(request().body).toEqual({ radar: true, baseUpdatedAt: BASE_UPDATED_AT });
   });
 
-  it("sends urinalOnly from the Who can use it question", async () => {
+  it("sends urinalOnly from the Accessibility and facilities question", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ urinalOnly: true })));
     renderEdit();
 
-    const who = within(screen.getByRole("region", { name: "Who can use it?" }));
-    await user.click(within(who.getByRole("group", { name: "Urinal only" })).getByLabelText("Yes"));
+    const facilities = within(screen.getByRole("region", { name: "Accessibility and facilities" }));
+    await user.click(
+      within(facilities.getByRole("group", { name: "Urinal only" })).getByLabelText("Yes"),
+    );
     await user.click(saveButton());
     expect(reviewLines()).toEqual(["Urinal only: Don't know → changes to Yes"]);
     await user.click(confirmButton());
@@ -1043,6 +1053,18 @@ describe("LooForm: 'Save the new location?' (changes that go live)", () => {
     expect(request().body).toEqual({ location: NUDGED, baseUpdatedAt: BASE_UPDATED_AT });
   });
 
+  it("asks the picker to settle for Save, so a typed-coordinates move gets this check, not an error", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ location: NUDGED })));
+    renderTrusted();
+    // The picker keeps a coordinates jump for Save (LocationPicker.test): a move kept "auto".
+    await user.click(screen.getByRole("button", { name: "Stub: nudge pin" }));
+    await user.click(saveButton());
+    expect(pickerProps.resolveOptions).toEqual({ save: true });
+    expect(await locationDialog()).toBeVisible();
+    expect(screen.queryByText("There's a problem")).toBeNull();
+  });
+
   it("'Yes, save the new location' with other changes still shows them in the review sheet", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse(200, makeLoo({ name: "Renamed", location: NUDGED })));
@@ -1159,7 +1181,7 @@ describe("LooForm layout", () => {
       "What's it called?",
       "Where is it?",
       "Who can use it?",
-      "Accessibility",
+      "Accessibility and facilities",
       "Does it cost money?",
       "When is it open?",
       "Anything else people should know?",
@@ -1351,8 +1373,10 @@ describe("LooForm review sheet", () => {
 const actionBar = () => saveButton().closest("[data-action-bar]") as HTMLElement;
 /** The "goes live / a moderator will check" notice above the questions. */
 const saveNotice = () => {
-  const text = screen.getByText(/^(Your change will go live|A moderator will check)/);
-  return text.closest(".banner") as HTMLElement;
+  const text = screen.getByText(
+    /^(Your change will go live|A moderator will check|The toilet will go on the map)/,
+  );
+  return text.closest(".notice") as HTMLElement;
 };
 
 describe("LooForm save notice", () => {
@@ -1384,7 +1408,9 @@ describe("LooForm save notice", () => {
     locationStub.pathname = "/loos/add";
     locationStub.search = "?lat=51.5&lng=-0.1&zoom=17";
     renderAdd(false);
-    expect(screen.getAllByText(MODERATOR_WILL_CHECK)).toHaveLength(1);
+    // A new toilet, not "your change".
+    expect(screen.getAllByText(ADD_MODERATOR_WILL_CHECK)).toHaveLength(1);
+    expect(screen.queryByText(MODERATOR_WILL_CHECK)).toBeNull();
     const notice = saveNotice();
     expect(within(notice).getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
@@ -1392,6 +1418,12 @@ describe("LooForm save notice", () => {
     );
     // Only the one link (the bar has no status line of its own any more).
     expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
+  });
+
+  it("tells a signed-in user adding a toilet it goes on the map straight away", () => {
+    render(<LooForm mode="add" initialData={null} apiUrl="" isAuthenticated canWriteDirectly />);
+    expect(screen.getAllByText(ADDED_STRAIGHT_AWAY)).toHaveLength(1);
+    expect(screen.queryByText(LIVE_STRAIGHT_AWAY)).toBeNull();
   });
 
   it("stays put as the form changes", async () => {
@@ -1861,7 +1893,9 @@ describe("LooForm drafts", () => {
     expect(nameInput()).toHaveValue("New one");
     expect(screen.getByTestId("picker-location")).toHaveTextContent("51.5074,-0.1278");
     await saveAndConfirm(user);
-    await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=1"));
+    await waitFor(() =>
+      expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=added"),
+    );
     expect(sessionStorage.getItem("loo-draft:new")).toBeNull();
   });
 });
@@ -1878,13 +1912,20 @@ describe("LooForm (add)", () => {
     expect(dialog).toHaveAccessibleDescription(
       "You haven't moved the map, so the pin is where the map opened.",
     );
-    // The safe answer comes first, and has focus.
+    // The DS order (primary first in the DOM, on the right or on top), and the safe answer,
+    // Move the map, has focus.
     const buttons = within(dialog).getAllByRole("button");
-    expect(buttons.map((b) => b.textContent)).toEqual(["Move the map", "Yes, it's on the toilet"]);
-    await waitFor(() => expect(buttons[0]).toHaveFocus());
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "",
+      "Yes, it's on the toilet",
+      "Move the map",
+    ]);
+    expect(buttons[0]).toHaveAccessibleName("Close");
+    const moveTheMap = within(dialog).getByRole("button", { name: "Move the map" });
+    await waitFor(() => expect(moveTheMap).toHaveFocus());
     expect(screen.queryByText("There's a problem")).toBeNull();
 
-    await user.click(buttons[0]);
+    await user.click(moveTheMap);
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(pickerProps.focusMap).toHaveBeenCalled();
     expect(pickerProps.placeHere).not.toHaveBeenCalled();
@@ -1952,6 +1993,13 @@ describe("LooForm (add)", () => {
     expect(within(question).queryByText(/entrance/)).toBeNull();
   });
 
+  it("adds no hint of its own to the edit form's location either (the picker says it)", () => {
+    renderEdit();
+    const question = screen.getByRole("region", { name: /Where is it\?/ });
+    expect(within(question).queryByText(/Only move the pin/)).toBeNull();
+    expect(question.querySelector("[id$='-hint']")).toBeNull();
+  });
+
   it("requires a name before submitting", async () => {
     const user = userEvent.setup();
     renderAdd();
@@ -1982,7 +2030,9 @@ describe("LooForm (add)", () => {
     await user.click(facility("Is there a wheelchair-accessible toilet?").getByLabelText("Yes"));
     await saveAndConfirm(user);
 
-    await waitFor(() => expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=1"));
+    await waitFor(() =>
+      expect(locationStub.href).toBe("/loos/fedcba9876543210fedcba98?saved=added"),
+    );
     const { url, init, body } = request();
     expect(url).toBe("/api/loos");
     expect(init.method).toBe("POST");
@@ -2024,7 +2074,7 @@ describe("LooForm (add)", () => {
     await user.click(screen.getByRole("button", { name: "Stub: place pin" }));
     await saveAndConfirm(user);
 
-    await waitFor(() => expect(locationStub.href).toBe(`/loos/${newId}?saved=1`));
+    await waitFor(() => expect(locationStub.href).toBe(`/loos/${newId}?saved=added`));
     expect(applyLocalMutation).toHaveBeenCalledWith(newId, compressed, BASE_UPDATED_AT);
     expect((await loadMapCache())?.data).toEqual([OTHER_ROW, compressed]);
   });
