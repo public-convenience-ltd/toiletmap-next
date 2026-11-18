@@ -286,6 +286,58 @@ test.describe("page shell", () => {
 });
 
 /**
+ * A phone in landscape is too short to stack the map's notices above its bottom-right controls:
+ * they sit to the left of them instead, and must never cover the search bar, the filter button
+ * or the buttons beside it.
+ */
+test.describe("map notices on a landscape phone", () => {
+  /** Somewhere with no toilets at all: the North Sea. */
+  const EMPTY_VIEW = { lat: 54.8, lng: 3.5, zoom: 15 };
+
+  for (const viewport of [
+    { width: 863, height: 360 },
+    { width: 750, height: 342 },
+  ]) {
+    const size = `${viewport.width}×${viewport.height}`;
+
+    test(`the empty state doesn't cover the map controls at ${size}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((view) => {
+        localStorage.setItem("toiletmap-map-view", JSON.stringify(view));
+      }, EMPTY_VIEW);
+      await page.goto("/");
+      await waitForMap(page);
+      const notice = page.locator(".map-empty-notice");
+      await expect(notice).toContainText("No toilets here yet.");
+      await expect(page.getByRole("searchbox", { name: "Search for a location" })).toBeVisible();
+      expect(await overlappingMapControls(page)).toEqual([]);
+      // Beside "Add a toilet here", not above it.
+      const add = await page.getByRole("link", { name: "Add a toilet here" }).boundingBox();
+      const box = await notice.boundingBox();
+      expect(box && add && box.x + box.width <= add.x).toBe(true);
+    });
+
+    test(`a failed first load shows only the freshness notice, clear of the controls, at ${size}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((view) => {
+        localStorage.setItem("toiletmap-map-view", JSON.stringify(view));
+      }, EMPTY_VIEW);
+      await page.route(/\/api\/loos\/(updates|dump)(\?|$)/, (route) =>
+        route.fulfill({ status: 503, json: { message: "unavailable" } }),
+      );
+      await page.goto("/");
+      await waitForMap(page);
+      await expect(page.locator(".map-freshness-notice")).toContainText(/^Couldn't refresh/);
+      // Nothing loaded, so it can't say the area is empty ("zoom out" wouldn't help).
+      await expect(page.locator(".map-empty-notice")).toBeEmpty();
+      expect(await overlappingMapControls(page)).toEqual([]);
+    });
+  }
+});
+
+/**
  * Notched phones: the header pads the top safe-area inset and the footer (from 768px) the
  * bottom one, so the map's floating controls must not add them again. Emulation has no
  * insets, so they are stubbed on :root (where the design system defines --safe-*).

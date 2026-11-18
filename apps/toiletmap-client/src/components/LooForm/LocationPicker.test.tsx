@@ -373,10 +373,13 @@ function Harness({
 const makeController = () => ({ current: null as LocationPickerHandle | null });
 
 /** Asks the picker to settle, as pressing Save does. */
-const resolveWith = async (controller: { current: LocationPickerHandle | null }) => {
+const resolveWith = async (
+  controller: { current: LocationPickerHandle | null },
+  options?: { save?: boolean },
+) => {
   let result: PickerResolution | undefined;
   await act(async () => {
-    result = await controller.current?.resolve();
+    result = await controller.current?.resolve(options);
   });
   return result as PickerResolution;
 };
@@ -1421,6 +1424,16 @@ describe("LocationPicker: use my location", () => {
     );
     expect(await resolveWith(controller)).toEqual({ kind: "blocked", issue: "jump", jump: "gps" });
     expect(onChange).not.toHaveBeenCalled();
+
+    // Save keeps it, for the form to check ("Save the new location?"), like a dragged move.
+    expect(await resolveWith(controller, { save: true })).toMatchObject({
+      kind: "ok",
+      source: "auto",
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const [lat, lng] = onChange.mock.calls[0];
+    expect(lat).toBeCloseTo(near.lat, 5);
+    expect(lng).toBeCloseTo(near.lng, 5);
   });
 
   it("explains a blocked permission", async () => {
@@ -1547,6 +1560,13 @@ describe("LocationPicker: search", () => {
       issue: "jump",
       jump: "search",
     });
+    // Not even for Save: a search lands on a place, not the toilet, so it must be looked at.
+    expect(await resolveWith(controller, { save: true })).toEqual({
+      kind: "blocked",
+      issue: "jump",
+      jump: "search",
+    });
+    expect(onChange).not.toHaveBeenCalled();
 
     // A nudge of the map means the user has looked: now it is kept like any small move.
     pan({ lat: 53.79511, lng: -1.5481 });
@@ -2199,7 +2219,7 @@ describe("LocationPicker: one-time intro", () => {
   it("is shown until dismissed, and remembered", async () => {
     const user = userEvent.setup();
     const { unmount } = render(
-      <LocationPicker mode="add" apiUrl="" location={null} onChange={vi.fn()} />,
+      <Harness initial={ORIGINAL} originalLocation={ORIGINAL} onChange={vi.fn()} />,
     );
     expect(screen.getByText(INTRO_MESSAGE, { exact: false })).toBeInTheDocument();
     await user.click(button("Dismiss"));
@@ -2208,6 +2228,11 @@ describe("LocationPicker: one-time intro", () => {
     unmount();
     fake.maps.length = 0;
 
+    render(<Harness initial={ORIGINAL} originalLocation={ORIGINAL} onChange={vi.fn()} />);
+    expect(screen.queryByText(INTRO_MESSAGE, { exact: false })).toBeNull();
+  });
+
+  it("is only on the edit form: adding works as it always has", () => {
     render(<LocationPicker mode="add" apiUrl="" location={null} onChange={vi.fn()} />);
     expect(screen.queryByText(INTRO_MESSAGE, { exact: false })).toBeNull();
   });
@@ -2223,7 +2248,7 @@ describe("LocationPicker: one-time intro", () => {
       },
     };
     vi.stubGlobal("localStorage", throwing);
-    render(<LocationPicker mode="add" apiUrl="" location={null} onChange={vi.fn()} />);
+    render(<Harness initial={ORIGINAL} originalLocation={ORIGINAL} onChange={vi.fn()} />);
     expect(screen.getByText(INTRO_MESSAGE, { exact: false })).toBeInTheDocument();
     await user.click(button("Dismiss"));
     expect(screen.queryByText(INTRO_MESSAGE, { exact: false })).toBeNull();
@@ -2430,12 +2455,17 @@ describe("LocationPicker: what the strip and buttons look like", () => {
     expect(strip()).toHaveTextContent(/^Moved 60 m north\.$/);
     expect(strip()).toHaveAttribute("data-blocked", "true");
     expect(strip()).not.toHaveAttribute("data-placed");
+    // The strip is a compact DS Notice in the warning tone (not a bespoke bordered line).
+    expect(strip().querySelector(".notice")).toHaveClass("notice--warning", "notice--compact");
     const warning = screen.getByText(BIG_MOVE_WARNING).closest("[role=alert]") as HTMLElement;
     expect(warning).toHaveTextContent(BIG_MOVE_HINT);
 
     pan(offset(ORIGINAL, 10, 0));
     expect(strip()).toHaveAttribute("data-placed", "true");
     expect(strip()).not.toHaveAttribute("data-blocked");
+    expect(strip().querySelector(".notice")).toHaveClass("notice--success");
+    // The strip is described by the map, not announced (the picker has its own live region).
+    expect(strip().querySelector("[role]")).toBeNull();
   });
 
   it("puts the chip at the bottom when the grey pin is above the centre", async () => {

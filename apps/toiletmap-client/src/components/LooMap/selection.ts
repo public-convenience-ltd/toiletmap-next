@@ -77,19 +77,26 @@ export function initialLoadOutcome(
   return { kind: "reset", url: looPath(null) };
 }
 
-// ── `?saved=1` banner ───────────────────────────────────────────────────────
+// ── `?saved=1` toast ────────────────────────────────────────────────────────
 
 /**
- * Reads and strips the `saved=1` flag LooForm appends after a successful save.
- * Returns the URL to `replaceState` to (path + remaining query + hash), or null if unchanged.
+ * Reads and strips the flag LooForm appends after a successful save: `saved=1` for an edit,
+ * `saved=added` for a new toilet (`added`). Returns the URL to `replaceState` to (path +
+ * remaining query + hash), or null if unchanged.
  */
-export function consumeSavedParam(href: string): { saved: boolean; cleanUrl: string | null } {
+export function consumeSavedParam(href: string): {
+  saved: boolean;
+  added: boolean;
+  cleanUrl: string | null;
+} {
   const url = new URL(href, "http://localhost");
-  if (!url.searchParams.has("saved")) return { saved: false, cleanUrl: null };
-  const saved = url.searchParams.get("saved") === "1";
+  if (!url.searchParams.has("saved")) return { saved: false, added: false, cleanUrl: null };
+  const value = url.searchParams.get("saved");
+  const added = value === "added";
+  const saved = value === "1" || added;
   url.searchParams.delete("saved");
   const search = url.searchParams.toString();
-  return { saved, cleanUrl: `${url.pathname}${search ? `?${search}` : ""}${url.hash}` };
+  return { saved, added, cleanUrl: `${url.pathname}${search ? `?${search}` : ""}${url.hash}` };
 }
 
 // ── Refreshing the open panel when map data changes ─────────────────────────

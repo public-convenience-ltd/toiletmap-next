@@ -19,7 +19,7 @@ export const deepLinkSpot = () => ({
 /** The toilet name heading in the details panel. */
 export const detailsPanelHeading = (page: Page) => page.locator(".toilet-panel h2");
 
-/** The details panel: a bottom sheet below 768px, a floating card from 768px. */
+/** The details panel: a bottom sheet below 768px, a floating card from 768px and on a landscape phone. */
 export const detailsPanel = (page: Page) => page.locator(".toilet-panel");
 
 /** The summary's "Details" toggle (the sheet's drag handle is a separate button). */

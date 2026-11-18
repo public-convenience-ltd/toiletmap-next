@@ -2,7 +2,7 @@ import type L from "leaflet";
 import type { RefObject } from "preact";
 import { useId, useRef, useState } from "preact/hooks";
 import type { IconName } from "toiletmap-design-system";
-import { Icon, IconButton, InputField, Tag } from "toiletmap-design-system";
+import { Icon, IconButton, InputField, Notice, Tag } from "toiletmap-design-system";
 import { useNominatimSearch } from "../../hooks/useNominatimSearch";
 import type { ActiveFilters, FilterKey } from "../../types/filters";
 import styles from "./MapControlsPanel.module.css";
@@ -75,7 +75,8 @@ export default function MapControlsPanel({
             class={styles.searchInput}
             value={query}
             onInput={(e) => handleSearchInput((e.target as HTMLInputElement).value)}
-            placeholder="Search for a location…"
+            // Short enough to show whole beside the buttons on a 360px phone.
+            placeholder="Search places…"
             autoComplete="off"
             aria-label="Search for a location"
           />
@@ -166,9 +167,11 @@ export default function MapControlsPanel({
       )}
 
       {locationError && (
-        <p className={styles.geoError} role="alert">
-          {locationError}
-        </p>
+        <div className={styles.geoError}>
+          <Notice tone="error" size="compact">
+            {locationError}
+          </Notice>
+        </div>
       )}
     </search>
   );
