@@ -26,7 +26,7 @@ const defaultLinks: NavLink[] = [
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
   { href: "/posts", label: "Blog" },
-  { href: "/loos/add", label: "Add a Toilet" },
+  { href: "/loos/add", label: "Add a toilet" },
 ];
 
 const MainMenu = ({

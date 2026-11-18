@@ -4,7 +4,7 @@ import type { IconName } from "../Icon/Icon";
 import Icon from "../Icon/Icon";
 
 export interface IconButtonProps
-  extends Omit<JSX.HTMLAttributes<HTMLButtonElement>, "children" | "ref"> {
+  extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children" | "ref"> {
   icon: IconName;
   "aria-label": string;
   size?: "small" | "medium" | "large" | "x-large";
