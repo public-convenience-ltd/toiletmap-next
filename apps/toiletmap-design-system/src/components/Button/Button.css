@@ -29,6 +29,9 @@
   color: var(--color-turquoise);
   background-color: var(--color-blue);
   border-color: var(--color-blue);
+  /* The shared ring (tokens), not the browser's own, on every variant. */
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .button--secondary {
@@ -38,6 +41,19 @@
 
 .button--secondary:not(:disabled):focus-visible {
   color: var(--color-white);
+}
+
+.button--destructive {
+  color: var(--color-white);
+  background-color: var(--color-destructive);
+  border-color: var(--color-destructive);
+}
+
+/* Stays red on focus (not navy, which would read as a safe primary), with a navy ring. */
+.button--destructive:not(:disabled):focus-visible {
+  color: var(--color-white);
+  background-color: var(--color-destructive-hover);
+  border-color: var(--color-destructive-hover);
 }
 
 /* Hover only where there is a real hover: on touch screens it sticks after a tap. */
@@ -50,6 +66,12 @@
 
   .button--secondary:not(:disabled):hover {
     color: var(--color-white);
+  }
+
+  .button--destructive:not(:disabled):hover {
+    color: var(--color-white);
+    background-color: var(--color-destructive-hover);
+    border-color: var(--color-destructive-hover);
   }
 }
 

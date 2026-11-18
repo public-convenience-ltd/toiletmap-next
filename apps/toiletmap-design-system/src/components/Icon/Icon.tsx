@@ -75,8 +75,8 @@ const Icon = ({
 
   return (
     <span class={spanClass} {...props}>
+      {/* Decorative: no <title>, which would leak "icon" into the text of what it sits in. */}
       <svg fill="currentColor" class={svgClass} aria-hidden="true">
-        <title>icon</title>
         <use href={useHref} />
       </svg>
     </span>
