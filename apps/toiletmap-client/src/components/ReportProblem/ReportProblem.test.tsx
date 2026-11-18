@@ -511,4 +511,13 @@ describe("ReportProblem — already removed", () => {
       `/loos/${ID}?restore=1`,
     );
   });
+
+  it("offers a signed-in user to restore it themselves, not to ask", () => {
+    setup({ loo: { ...loo, active: false }, isAuthenticated: true, canWriteDirectly: true });
+    expect(screen.getByRole("link", { name: "It's still here — restore it" })).toHaveAttribute(
+      "href",
+      `/loos/${ID}?restore=1`,
+    );
+    expect(screen.queryByRole("link", { name: /ask to restore/ })).toBeNull();
+  });
 });

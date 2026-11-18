@@ -14,6 +14,11 @@ const fakeMap = vi.hoisted(() => {
     getZoom: vi.fn(() => 13),
     getCenter: vi.fn(() => ({ lat: 51.505, lng: -0.09 })),
     panBy: vi.fn(),
+    panInside: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    addLayer: vi.fn(),
+    removeLayer: vi.fn(),
     remove: vi.fn(),
     getBounds: vi.fn(() => ({ contains: () => true })),
     on: vi.fn((name: string, fn: () => void) => {
@@ -29,9 +34,32 @@ const fakeMap = vi.hoisted(() => {
   m.setView.mockReturnValue(m);
   return m;
 });
-vi.mock("leaflet", () => ({
-  default: { map: () => fakeMap, tileLayer: () => ({ addTo: () => undefined }) },
-}));
+/** Layers LooMap draws itself ("you are here"), recorded by kind. */
+const fakeLayers = vi.hoisted(() => [] as { kind: string; latlng: unknown; options: unknown }[]);
+vi.mock("leaflet", () => {
+  const layer = (kind: string) => (latlng: unknown, options: unknown) => {
+    const entry = { kind, latlng, options };
+    fakeLayers.push(entry);
+    const self = {
+      addTo: () => self,
+      setLatLng: (next: unknown) => {
+        entry.latlng = next;
+        return self;
+      },
+      setRadius: () => self,
+    };
+    return self;
+  };
+  return {
+    default: {
+      map: vi.fn(() => fakeMap),
+      tileLayer: () => ({ addTo: () => undefined }),
+      marker: layer("marker"),
+      circle: layer("circle"),
+      divIcon: (options: unknown) => options,
+    },
+  };
+});
 
 // Markers are replaced by one button per data row, calling onToiletSelect like a marker tap.
 vi.mock("./MapMarkers", () => ({
@@ -568,6 +596,38 @@ describe("LooMap freshness", () => {
     setMapData({ status: "ok" });
     rerender(<LooMap apiUrl="" />);
     expect(screen.queryByText(/showing saved data|Couldn't refresh/)).not.toBeInTheDocument();
+  });
+
+  it("shows the notice in the open panel (which would cover it), keeping one live region", async () => {
+    const user = userEvent.setup();
+    setMapData({ status: "offline" });
+    const { container } = render(<LooMap apiUrl="" />);
+    const mapNotice = container.querySelector(".map-freshness-notice");
+    expect(mapNotice).toHaveClass("map-freshness-notice--shown");
+
+    await user.click(screen.getByRole("button", { name: "Marker aaa" }));
+    const heading = await panelHeading("Toilet aaa");
+    const panel = heading.closest(".toilet-panel");
+    expect(panel).toHaveTextContent("Offline — showing saved data");
+    // The panel's copy is visual only; the map's live region still carries it.
+    expect(panel?.querySelector('span[aria-hidden="true"]')).toHaveTextContent(
+      "Offline — showing saved data",
+    );
+    expect(mapNotice).toHaveClass("map-freshness-notice--in-panel");
+    expect(mapNotice).not.toHaveClass("map-freshness-notice--shown");
+    expect(mapNotice).toHaveTextContent("Offline — showing saved data");
+
+    // The panel opens expanded: the first Escape (focus is on its heading) collapses it, and
+    // the notice stays in the panel; the second closes it.
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Details" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(mapNotice).toHaveClass("map-freshness-notice--in-panel");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(container.querySelector(".toilet-panel")).toBeNull());
+    expect(mapNotice).toHaveClass("map-freshness-notice--shown");
   });
 });
 

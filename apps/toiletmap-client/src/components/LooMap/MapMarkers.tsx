@@ -14,6 +14,12 @@ interface MapMarkersProps {
   apiUrl: string;
   selectedToiletId: string | null;
   onToiletSelect: (loo: LooDetail) => void;
+  /**
+   * Filled with a function that moves keyboard focus to a toilet's marker (or the cluster
+   * it is folded into), returning false when it isn't drawn. LooMap uses it to put focus
+   * back on the marker when the details panel closes.
+   */
+  focusMarkerRef?: { current: ((id: string) => boolean) | null };
 }
 
 export interface MarkerDiff {
@@ -74,6 +80,9 @@ const getIcon = (isHighlighted: boolean) => {
  */
 const FULL_REBUILD_RATIO = 0.5;
 
+/** Draws the selected marker above every other marker and cluster icon. */
+const SELECTED_Z_OFFSET = 10_000;
+
 export default function MapMarkers({
   map,
   data,
@@ -81,12 +90,19 @@ export default function MapMarkers({
   apiUrl,
   selectedToiletId,
   onToiletSelect,
+  focusMarkerRef,
 }: MapMarkersProps) {
   const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null);
   const markersById = useRef<Map<string, L.Marker>>(new Map());
   // The rows currently drawn, keyed by id (input to diffMarkers).
   const shownById = useRef<Map<string, CompressedLoo>>(new Map());
-  const prevSelectedIdRef = useRef<string | null>(null);
+  /**
+   * The selected toilet's marker, taken out of the cluster group and drawn straight on the
+   * map while it is selected, so it is never folded into a cluster (a deep link at street
+   * zoom in a busy area would otherwise show only a "12") and sits above the cluster icons.
+   * It is never in the group while detached.
+   */
+  const detachedRef = useRef<{ id: string; marker: L.Marker } | null>(null);
   const lastClickedIdRef = useRef<string | null>(null);
   // Refs keep marker click handlers stable so markers never need recreating
   // just because the parent re-rendered with a new callback or apiUrl.
@@ -127,6 +143,8 @@ export default function MapMarkers({
 
     return () => {
       map.removeLayer(group);
+      if (detachedRef.current) map.removeLayer(detachedRef.current.marker);
+      detachedRef.current = null;
       if (markerClusterGroup.current === group) markerClusterGroup.current = null;
       markersById.current = new Map();
       shownById.current = new Map();
@@ -170,10 +188,19 @@ export default function MapMarkers({
 
     const toRemove: L.Marker[] = [];
     const toAdd: L.Marker[] = [];
+    // The detached (selected) marker isn't in the group: take it off the map instead.
+    const retire = (marker: L.Marker) => {
+      if (detachedRef.current?.marker === marker) {
+        map?.removeLayer(marker);
+        detachedRef.current = null;
+      } else {
+        toRemove.push(marker);
+      }
+    };
 
     for (const id of diff.removed) {
       const marker = markers.get(id);
-      if (marker) toRemove.push(marker);
+      if (marker) retire(marker);
       markers.delete(id);
       shown.delete(id);
     }
@@ -184,7 +211,7 @@ export default function MapMarkers({
       // A filter-mask-only change doesn't alter how the marker looks.
       if (previous && previous[1] === loo[1] && markers.has(id)) continue;
       const old = markers.get(id);
-      if (old) toRemove.push(old);
+      if (old) retire(old);
       const marker = createMarker(loo);
       markers.set(id, marker);
       toAdd.push(marker);
@@ -196,24 +223,73 @@ export default function MapMarkers({
       toAdd.push(marker);
     }
 
+    // A new marker for the selected toilet is detached below, not clustered.
+    const selectedId = selectedToiletIdRef.current;
+    const clustered = (marker: L.Marker) => !selectedId || markers.get(selectedId) !== marker;
+
     if (toRemove.length > 0 && toRemove.length > shownBefore * FULL_REBUILD_RATIO) {
       group.clearLayers();
-      group.addLayers(Array.from(markers.values()));
+      group.addLayers(
+        Array.from(markers.values()).filter(
+          (m) => clustered(m) && m !== detachedRef.current?.marker,
+        ),
+      );
     } else {
       if (toRemove.length > 0) group.removeLayers(toRemove);
-      if (toAdd.length > 0) group.addLayers(toAdd);
+      const adding = toAdd.filter(clustered);
+      if (adding.length > 0) group.addLayers(adding);
     }
+    syncSelected();
   }, [map, data, activeFilters]);
 
+  /**
+   * Makes the drawn markers match the selection: the selected toilet's marker detached and
+   * highlighted, every other marker plain and back in the cluster group.
+   */
+  const syncSelected = () => {
+    const group = markerClusterGroup.current;
+    if (!map || !group) return;
+    const selectedId = selectedToiletIdRef.current;
+    const wanted = selectedId ? (markersById.current.get(selectedId) ?? null) : null;
+    const current = detachedRef.current;
+    if (current && current.marker !== wanted) {
+      map.removeLayer(current.marker);
+      current.marker.setIcon(getIcon(false));
+      current.marker.setZIndexOffset(0);
+      // Only re-cluster it if it's still one of the drawn markers.
+      if (markersById.current.get(current.id) === current.marker) group.addLayer(current.marker);
+      detachedRef.current = null;
+    }
+    if (wanted && selectedId && detachedRef.current?.marker !== wanted) {
+      if (group.hasLayer(wanted)) group.removeLayer(wanted);
+      wanted.setIcon(getIcon(true));
+      wanted.setZIndexOffset(SELECTED_Z_OFFSET);
+      map.addLayer(wanted);
+      detachedRef.current = { id: selectedId, marker: wanted };
+    }
+  };
+
   useEffect(() => {
-    if (prevSelectedIdRef.current && prevSelectedIdRef.current !== selectedToiletId) {
-      markersById.current.get(prevSelectedIdRef.current)?.setIcon(getIcon(false));
-    }
-    if (selectedToiletId) {
-      markersById.current.get(selectedToiletId)?.setIcon(getIcon(true));
-    }
-    prevSelectedIdRef.current = selectedToiletId;
-  }, [selectedToiletId]);
+    syncSelected();
+  }, [map, selectedToiletId]);
+
+  useEffect(() => {
+    if (!focusMarkerRef) return;
+    focusMarkerRef.current = (id: string) => {
+      const marker = markersById.current.get(id);
+      const group = markerClusterGroup.current;
+      if (!marker) return false;
+      const shown =
+        detachedRef.current?.marker === marker ? marker : group?.getVisibleParent(marker);
+      const element = (shown as L.Marker | null | undefined)?.getElement?.();
+      if (!element?.isConnected) return false;
+      element.focus({ preventScroll: true });
+      return document.activeElement === element;
+    };
+    return () => {
+      focusMarkerRef.current = null;
+    };
+  }, [focusMarkerRef]);
 
   return null;
 }

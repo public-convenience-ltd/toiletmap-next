@@ -240,8 +240,9 @@ export default function ReportProblem({
         </h1>
         <p>Nobody needs to report it again.</p>
         <div className={styles.actions}>
+          {/* Matches the toilet page's restore button: signed-in users restore it themselves. */}
           <Button htmlElement="a" variant="primary" href={`${looHref}?restore=1`}>
-            It's still here — ask to restore it
+            {trusted ? "It's still here — restore it" : "It's still here — ask to restore it"}
           </Button>
           <Button htmlElement="a" variant="secondary" href="/">
             Back to map

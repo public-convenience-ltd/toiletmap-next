@@ -1,9 +1,48 @@
+/*
+ * A full-width panel pinned under the header, filling the rest of the
+ * visible viewport (--app-height excludes the mobile URL bar; 100vh
+ * doesn't). The header publishes its real height as --header-height.
+ */
 .drawer {
+  --drawer-offset: var(--drawer-top, var(--header-height, 0px));
+
   position: fixed;
-  top: 60px;
-  height: calc(100vh - 60px);
+  top: var(--drawer-offset);
+  left: 0;
   width: 100%;
+  height: calc(var(--app-height, 100vh) - var(--drawer-offset));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background-color: var(--color-white);
   z-index: 2000;
-  padding: var(--space-s);
+  padding: var(--space-s) calc(var(--space-s) + var(--safe-right, 0px))
+    calc(var(--space-s) + var(--safe-bottom, 0px)) calc(var(--space-s) + var(--safe-left, 0px));
+  visibility: hidden;
+  /* Hide only once the slide-out has finished. */
+  transition:
+    transform 0.3s ease-in-out,
+    visibility 0s linear 0.3s;
+}
+
+.drawer--from-right {
+  transform: translateX(100%);
+}
+
+.drawer--from-left {
+  transform: translateX(-100%);
+}
+
+.drawer--visible {
+  visibility: visible;
+  transform: translateX(0);
+  transition:
+    transform 0.3s ease-in-out,
+    visibility 0s linear 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer--visible {
+    transition: none;
+  }
 }

@@ -27,3 +27,30 @@
 
 /* Utilities */
 @import "./utilities/VisuallyHidden/VisuallyHidden.css";
+
+/*
+ * Global reset. These come after the component imports but use element (or
+ * universal) selectors, so any component class still wins.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Form controls use the page font, not the browser's (13px system-ui). */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* iOS Safari zooms into any field whose text is under 16px when it is focused. */
+@media (pointer: coarse) {
+  input:where(:not([type="checkbox"], [type="radio"], [type="range"])),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}

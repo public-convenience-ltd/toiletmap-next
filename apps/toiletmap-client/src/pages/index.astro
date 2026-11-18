@@ -1,5 +1,6 @@
 ---
-import { Footer, Header } from "toiletmap-design-system";
+import { env } from "cloudflare:workers";
+import { defaultFooterLinks, Footer, Header } from "toiletmap-design-system";
 import logo from "../assets/logo.svg?url";
 import LooMap from "../components/LooMap";
 import Layout from "../layouts/Layout.astro";
@@ -25,12 +26,24 @@ const navLinks = [
 ];
 ---
 
-<Layout>
-  <Header client:load logoSrc={logo} navLinks={navLinks} />
+<Layout bodyClass="map-page">
+  <Header
+    client:load
+    logoSrc={logo}
+    navLinks={navLinks}
+    drawerLinks={defaultFooterLinks}
+  />
   <main>
-    <LooMap client:only="preact" apiUrl={apiUrl} canWriteDirectly={canWriteDirectly} />
+    <h1 class="visually-hidden">Toilet Map</h1>
+    <LooMap
+      client:only="preact"
+      apiUrl={apiUrl}
+      canWriteDirectly={canWriteDirectly}
+      environment={env.ENVIRONMENT}
+    />
   </main>
-  <Footer />
+  <!-- Below 768px the map takes the whole screen; the footer links are in the menu. -->
+  <Footer hideOnMobile />
 </Layout>
 
 <style>

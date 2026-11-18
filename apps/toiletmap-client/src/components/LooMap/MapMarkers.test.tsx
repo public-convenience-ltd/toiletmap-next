@@ -205,4 +205,101 @@ describe("MapMarkers", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(onToiletSelect).toHaveBeenCalledTimes(1);
   });
+
+  describe("the selected marker", () => {
+    /** Markers drawn straight on the map (not through the cluster group). */
+    const looseMarkers = () => {
+      const found: L.Marker[] = [];
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Marker && !(layer instanceof L.MarkerCluster)) {
+          if (!clusterGroup().hasLayer(layer)) found.push(layer);
+        }
+      });
+      return found;
+    };
+    const iconHeight = (marker: L.Marker) =>
+      (marker.options.icon as L.DivIcon).options.iconSize as [number, number];
+
+    it("is taken out of the clusters, highlighted and drawn on top", () => {
+      const { rerender } = render(<MapMarkers {...props([A, B, C])} />);
+      rerender(<MapMarkers {...props([A, B, C], { selectedToiletId: "b" })} />);
+
+      expect(markerIds()).toBe(2);
+      const loose = looseMarkers();
+      expect(loose).toHaveLength(1);
+      const target = ngeohash.decode(B[1]);
+      expect(loose[0].getLatLng().lat).toBeCloseTo(target.latitude, 6);
+      expect(iconHeight(loose[0])[1]).toBe(44);
+      expect(loose[0].options.zIndexOffset).toBeGreaterThan(1000);
+
+      // Deselecting puts it back in the group, plain.
+      rerender(<MapMarkers {...props([A, B, C])} />);
+      expect(markerIds()).toBe(3);
+      expect(looseMarkers()).toHaveLength(0);
+      expect(
+        clusterGroup()
+          .getLayers()
+          .every((m) => iconHeight(m as L.Marker)[1] === 33),
+      ).toBe(true);
+    });
+
+    it("moves between toilets as the selection changes", () => {
+      const { rerender } = render(<MapMarkers {...props([A, B])} />);
+      rerender(<MapMarkers {...props([A, B], { selectedToiletId: "a" })} />);
+      const first = looseMarkers()[0];
+      rerender(<MapMarkers {...props([A, B], { selectedToiletId: "b" })} />);
+      const loose = looseMarkers();
+      expect(loose).toHaveLength(1);
+      expect(loose[0]).not.toBe(first);
+      expect(clusterGroup().hasLayer(first)).toBe(true);
+      expect(markerIds()).toBe(1);
+    });
+
+    it("is detached once its row arrives, when selected before the data loaded (deep link)", () => {
+      const { rerender } = render(<MapMarkers {...props([], { selectedToiletId: "c" })} />);
+      expect(looseMarkers()).toHaveLength(0);
+      rerender(<MapMarkers {...props([A, C], { selectedToiletId: "c" })} />);
+      expect(markerIds()).toBe(1);
+      expect(looseMarkers()).toHaveLength(1);
+    });
+
+    it("leaves the map when its toilet leaves the data, and follows a move", () => {
+      const { rerender } = render(<MapMarkers {...props([A, B], { selectedToiletId: "b" })} />);
+      expect(looseMarkers()).toHaveLength(1);
+
+      const movedB: CompressedLoo = ["b", "u10hb0", B[2]];
+      rerender(<MapMarkers {...props([A, movedB], { selectedToiletId: "b" })} />);
+      const loose = looseMarkers();
+      expect(loose).toHaveLength(1);
+      expect(loose[0].getLatLng().lat).toBeCloseTo(ngeohash.decode("u10hb0").latitude, 6);
+      expect(markerIds()).toBe(1);
+
+      rerender(<MapMarkers {...props([A], { selectedToiletId: "b" })} />);
+      expect(looseMarkers()).toHaveLength(0);
+      expect(markerIds()).toBe(1);
+    });
+
+    it("stays out of the group through a full rebuild (a filter switched on)", () => {
+      const { rerender } = render(<MapMarkers {...props([A, B, C], { selectedToiletId: "c" })} />);
+      rerender(
+        <MapMarkers
+          {...props([A, B, C], {
+            selectedToiletId: "c",
+            activeFilters: { ...DEFAULT_FILTERS, ACCESSIBLE: true, NO_PAYMENT: true },
+          })}
+        />,
+      );
+      // Only C passes both filters, and it is the detached one.
+      expect(markerIds()).toBe(0);
+      expect(looseMarkers()).toHaveLength(1);
+    });
+
+    it("can be focused (to return focus from the panel)", () => {
+      const focusMarkerRef: { current: ((id: string) => boolean) | null } = { current: null };
+      render(<MapMarkers {...props([A, B], { selectedToiletId: "a", focusMarkerRef })} />);
+      expect(focusMarkerRef.current?.("a")).toBe(true);
+      expect(document.activeElement).toBe(looseMarkers()[0].getElement());
+      expect(focusMarkerRef.current?.("zzz")).toBe(false);
+    });
+  });
 });

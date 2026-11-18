@@ -1,5 +1,12 @@
 .footer {
-  padding-block: var(--space-xs);
+  padding-block: var(--space-xs) calc(var(--space-xs) + var(--safe-bottom));
+  padding-inline: var(--safe-left) var(--safe-right);
+}
+
+@media (max-width: 767.98px) {
+  .footer--hide-on-mobile {
+    display: none;
+  }
 }
 
 .footer__container {
@@ -38,4 +45,10 @@
 
 .footer__link:hover {
   text-decoration: underline;
+}
+
+@media (pointer: coarse) {
+  .footer__link {
+    min-height: var(--tap-min);
+  }
 }

@@ -1,6 +1,6 @@
 import type L from "leaflet";
 import type { RefObject } from "preact";
-import { useState } from "preact/hooks";
+import { useId, useRef, useState } from "preact/hooks";
 import type { IconName } from "toiletmap-design-system";
 import { Icon, IconButton, InputField, Tag } from "toiletmap-design-system";
 import { useNominatimSearch } from "../../hooks/useNominatimSearch";
@@ -12,6 +12,13 @@ interface MapControlsPanelProps {
   activeFilters: ActiveFilters;
   onFilterChange: (key: FilterKey, value: boolean) => void;
   onResetFilters: () => void;
+  /**
+   * "Find a toilet near me": the map owns geolocation (it tracks the viewer and draws the
+   * "you are here" dot), so the button only asks for it.
+   */
+  onFindNearMe: () => void;
+  /** Why the viewer's location couldn't be found, shown under the bar. */
+  locationError?: string | null;
 }
 
 const FILTER_OPTIONS: Array<{ key: FilterKey; label: string; icon: IconName }> = [
@@ -27,37 +34,41 @@ export default function MapControlsPanel({
   activeFilters,
   onFilterChange,
   onResetFilters,
+  onFindNearMe,
+  locationError = null,
 }: MapControlsPanelProps) {
-  const { query, isSearching, suggestions, handleSearchInput, handleSuggestionSelect } =
+  const { query, isSearching, suggestions, handleSearchInput, handleSuggestionSelect, dismiss } =
     useNominatimSearch({ mapRef });
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [geoError, setGeoError] = useState<string | null>(null);
+  const filterPanelId = useId();
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const suggestionsRef = useRef<HTMLUListElement>(null);
 
   const activeCount = Object.values(activeFilters).filter(Boolean).length;
 
-  const handleFindNearMe = () => {
-    setGeoError(null);
-    if (!navigator.geolocation) {
-      setGeoError("Geolocation is not supported by your browser.");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        mapRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 16, {
-          animate: false,
-        });
-      },
-      () => {
-        setGeoError("Unable to determine your location.");
-      },
-    );
-  };
-
   return (
-    <search className={styles.floatingBar} aria-label="Map search and filters">
+    // Positioned by LooMap's floating chrome; data-map-control marks it as covering the map
+    // (the selected marker is kept clear of it). Escape with the suggestions open closes them
+    // (from the box or a suggestion) and goes no further; otherwise only the search box keeps
+    // it (data-owns-escape: the browser clears the box), and Escape on the bar's buttons
+    // reaches the map like anywhere else on it.
+    <search
+      className={styles.floatingBar}
+      aria-label="Map search and filters"
+      data-map-control
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || e.defaultPrevented || suggestions.length === 0) return;
+        e.preventDefault();
+        // A focused suggestion is about to go: keep focus in the bar, on the search box.
+        const fromSuggestion =
+          e.target instanceof Node && suggestionsRef.current?.contains(e.target);
+        dismiss();
+        if (fromSuggestion) searchBoxRef.current?.querySelector("input")?.focus();
+      }}
+    >
       {/* Search row */}
       <div className={styles.searchRow}>
-        <div className={styles.searchWrapper}>
+        <div className={styles.searchWrapper} ref={searchBoxRef} data-owns-escape>
           <Icon icon="magnifying-glass" size="small" class={styles.searchIcon} aria-hidden="true" />
           <InputField
             type="search"
@@ -84,7 +95,7 @@ export default function MapControlsPanel({
           aria-label="Find a toilet near me"
           variant="filled"
           size="medium"
-          onClick={handleFindNearMe}
+          onClick={onFindNearMe}
           class={styles.geoBtn}
         />
 
@@ -96,6 +107,7 @@ export default function MapControlsPanel({
             size="medium"
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
+            aria-controls={filtersOpen ? filterPanelId : undefined}
             class={styles.filterBtn}
           />
           {activeCount > 0 && (
@@ -108,7 +120,7 @@ export default function MapControlsPanel({
 
       {/* Autocomplete suggestions */}
       {suggestions.length > 0 && (
-        <ul className={styles.suggestions} aria-label="Location suggestions">
+        <ul className={styles.suggestions} ref={suggestionsRef} aria-label="Location suggestions">
           {suggestions.map((s) => (
             <li key={s.place_id} className={styles.suggestionItem}>
               <button
@@ -126,7 +138,7 @@ export default function MapControlsPanel({
 
       {/* Filter chips */}
       {filtersOpen && (
-        <div className={styles.filterPanel}>
+        <div className={styles.filterPanel} id={filterPanelId}>
           <ul className={styles.filterList}>
             {FILTER_OPTIONS.map(({ key, label, icon }) => {
               const active = activeFilters[key];
@@ -153,7 +165,11 @@ export default function MapControlsPanel({
         </div>
       )}
 
-      {geoError && <p className={styles.geoError}>{geoError}</p>}
+      {locationError && (
+        <p className={styles.geoError} role="alert">
+          {locationError}
+        </p>
+      )}
     </search>
   );
 }

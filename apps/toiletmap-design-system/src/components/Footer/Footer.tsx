@@ -10,9 +10,15 @@ export interface FooterLink {
 
 interface FooterProps {
   links?: FooterLink[];
+  /**
+   * Hide the footer below 768px. Map pages use this to give the map the
+   * whole screen; pass the same links to `Header`'s `drawerLinks` so they
+   * are still reachable from the menu.
+   */
+  hideOnMobile?: boolean;
 }
 
-const defaultLinks: FooterLink[] = [
+export const defaultFooterLinks: FooterLink[] = [
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/dataset", label: "Dataset" },
   { href: "/app", label: "App" },
@@ -24,18 +30,18 @@ const defaultLinks: FooterLink[] = [
   },
 ];
 
-const Footer = ({ links = defaultLinks }: FooterProps) => (
-  <footer class="footer">
+/** `target`/`rel` for a link that leaves the site. */
+export const externalLinkProps = (external?: boolean) =>
+  external ? { target: "_blank", rel: "noopener noreferrer" } : {};
+
+const Footer = ({ links = defaultFooterLinks, hideOnMobile = false }: FooterProps) => (
+  <footer class={`footer${hideOnMobile ? " footer--hide-on-mobile" : ""}`}>
     <Center gutter>
       <div class="footer__container">
         <ul class="footer__list">
           {links.map(({ href, label, external, icon }) => (
             <li key={href} class="footer__list-item">
-              <a
-                class="footer__link"
-                href={href}
-                {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-              >
+              <a class="footer__link" href={href} {...externalLinkProps(external)}>
                 <span>{label}</span>
                 {icon && <Icon icon={icon} size="medium" />}
               </a>

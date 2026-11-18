@@ -5,8 +5,67 @@ export async function waitForMap(page: Page): Promise<void> {
   await expect(page.locator("#map.leaflet-container")).toBeVisible();
 }
 
+/**
+ * A random spot for a deep-linked fixture, in its own region away from the default home view
+ * (so the home tests only ever see seed rows) and from the random fixture band in
+ * support/api.ts. Random rather than fixed so that tests running at the same time (other
+ * projects, --repeat-each) never land close enough to cluster.
+ */
+export const deepLinkSpot = () => ({
+  lat: Number((53.0 + Math.random() * 0.6).toFixed(6)),
+  lng: Number((-2.5 + Math.random() * 1.5).toFixed(6)),
+});
+
 /** The toilet name heading in the details panel. */
 export const detailsPanelHeading = (page: Page) => page.locator(".toilet-panel h2");
+
+/** The details panel: a bottom sheet below 768px, a floating card from 768px. */
+export const detailsPanel = (page: Page) => page.locator(".toilet-panel");
+
+/** The summary's "Details" toggle (the sheet's drag handle is a separate button). */
+export const detailsToggle = (page: Page) =>
+  detailsPanel(page).getByRole("button", { name: "Details", exact: true });
+
+/**
+ * Makes sure the details panel is expanded, so the opening hours, facilities and the
+ * verify / edit / report actions are on screen. The panel opens expanded (a marker tap, a
+ * deep link, Back/Forward), so this only clicks "Details" if it has been collapsed:
+ * clicking it on an expanded panel would collapse it.
+ */
+export async function expandDetails(page: Page): Promise<void> {
+  const toggle = detailsToggle(page);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
+
+/** Collapses the details panel to its summary with the "Details" toggle (if expanded). */
+export async function collapseDetails(page: Page): Promise<void> {
+  const toggle = detailsToggle(page);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) !== "false") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+}
+
+/** Asserts the panel is open expanded, as every open (tap, deep link, Back/Forward) is. */
+export async function expectDetailsExpanded(page: Page): Promise<void> {
+  await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "true");
+}
+
+/**
+ * Closes the details panel with Escape from inside it (its heading, where focus goes on
+ * open). The panel opens expanded, so the first Escape collapses it to the summary and the
+ * second closes it.
+ */
+export async function closeDetailsWithEscape(page: Page): Promise<void> {
+  await expectDetailsExpanded(page);
+  await detailsPanelHeading(page).focus();
+  await page.keyboard.press("Escape");
+  await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "false");
+  await expect(detailsPanel(page)).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(detailsPanel(page)).toHaveCount(0);
+}
 
 /**
  * Returns the first map marker whose centre is not covered by other UI (the
@@ -143,8 +202,8 @@ export const selectedMarker = (page: Page) => page.locator("#map .loo-marker svg
  * Clicks the plain marker drawn where `box` (a marker's bounding box) was.
  * Both icons are anchored bottom-centre, so after closing the panel the plain
  * marker sits where the highlighted one did. The click is dispatched on the
- * marker element itself: the floating controls can cover that spot (see the
- * fixme in map.spec.ts), and this test is about data, not hit-testing.
+ * marker element itself: these tests are about data, not hit-testing (panel.spec.ts
+ * and map.spec.ts check that the selected marker is left uncovered).
  */
 export async function clickMarkerAt(
   page: Page,

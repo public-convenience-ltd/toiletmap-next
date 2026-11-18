@@ -82,7 +82,14 @@ test.describe("location picker", () => {
     const loo = await loos.create({}, "location locked");
     const form = await openEditForm(page, loo.id);
     const p = picker(page);
-    const before = await box(form.pin);
+    // The form page scrolls as a whole: bring the preview fully on screen, so the click and
+    // the drag below land on it, and measure the pin against the map.
+    await pickerMap(page).evaluate((el) => el.scrollIntoView({ block: "center" }));
+    const pinOnMap = async () => {
+      const [pin, on] = [await box(form.pin), await box(pickerMap(page))];
+      return { x: pin.x - on.x, y: pin.y - on.y, width: pin.width, height: pin.height };
+    };
+    const before = await pinOnMap();
 
     const map = await box(pickerMap(page));
     await page.mouse.click(map.x + map.width * 0.2, map.y + map.height * 0.25);
@@ -94,7 +101,7 @@ test.describe("location picker", () => {
 
     // Negative assertions: let the map and the form react first, then read once.
     await waitForMapToSettle(pickerMap(page));
-    expect(await box(form.pin)).toEqual(before);
+    expect(await pinOnMap()).toEqual(before);
     expect(await p.reset.isVisible()).toBe(false);
     expect(await p.useLocation.isVisible()).toBe(false);
     expect(await form.save.isDisabled()).toBe(true);

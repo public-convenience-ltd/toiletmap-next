@@ -9,11 +9,13 @@ import {
 } from "./support/map";
 
 /**
- * A removed toilet's page explains why it was removed and offers "It's still here — ask to
- * restore" (POST /api/loos/:id/restore): signed-in users put it straight back on the map,
- * an anonymous request is queued as a pending_change of type "restore".
+ * A removed toilet's page explains why it was removed and offers to restore it (POST
+ * /api/loos/:id/restore): signed-in users get "It's still here — restore it" and put it
+ * straight back on the map; anonymous visitors get "It's still here — ask to restore" and
+ * their request is queued as a pending_change of type "restore".
  */
 
+const RESTORE_NOW_BUTTON = "It's still here — restore it";
 const RESTORE_BUTTON = "It's still here — ask to restore";
 
 authedTest.describe("restore a removed toilet (trusted)", () => {
@@ -37,11 +39,13 @@ authedTest.describe("restore a removed toilet (trusted)", () => {
       await waitForWarmMapCache(page);
       expect(await mapCacheHas(page, loo.id)).toBe(false);
 
-      await page.getByRole("button", { name: RESTORE_BUTTON }).click();
+      // A signed-in user restores it themselves, so they aren't offered to "ask".
+      await expect(page.getByRole("button", { name: RESTORE_BUTTON })).toHaveCount(0);
+      await page.getByRole("button", { name: RESTORE_NOW_BUTTON }).click();
       await expect(page.getByRole("heading", { name: "Is it still here?" })).toBeFocused();
-      // A trusted restore is applied straight away, so there is no details box to fill in.
+      // A signed-in restore is applied straight away, so there is no details box to fill in.
       await expect(page.getByLabel("Anything we should know? (optional)")).toHaveCount(0);
-      await page.getByRole("button", { name: "Restore it" }).click();
+      await page.getByRole("button", { name: "Restore it", exact: true }).click();
 
       await expect(page.getByText("Thanks — it's back on the map.")).toBeVisible();
       await expect(page.getByRole("button", { name: "Yes, it's still here" })).toBeVisible();
@@ -76,9 +80,11 @@ contributorTest.describe("restore a removed toilet (signed in, no permissions)",
       await reportLooViaApi(await issueAccessToken(), loo.id, { reason: "not_public" });
 
       await page.goto(`/loos/${loo.id}`);
-      await page.getByRole("button", { name: RESTORE_BUTTON }).click();
+      // Signed in, so they restore it themselves rather than "ask".
+      await expect(page.getByRole("button", { name: RESTORE_BUTTON })).toHaveCount(0);
+      await page.getByRole("button", { name: RESTORE_NOW_BUTTON }).click();
       await expect(page.getByLabel("Anything we should know? (optional)")).toHaveCount(0);
-      await page.getByRole("button", { name: "Restore it" }).click();
+      await page.getByRole("button", { name: "Restore it", exact: true }).click();
       await expect(page.getByText("Thanks — it's back on the map.")).toBeVisible();
 
       expect(await getPendingChangesForLoo(loo.id)).toHaveLength(0);
@@ -93,12 +99,14 @@ test.describe("restore a removed toilet (anonymous)", () => {
     await reportLooViaApi(await issueAccessToken(), loo.id, { reason: "not_public" });
 
     await page.goto(`/loos/${loo.id}`);
+    await expect(page.getByRole("button", { name: RESTORE_BUTTON })).toBeVisible();
+    await expect(page.getByRole("button", { name: RESTORE_NOW_BUTTON })).toHaveCount(0);
     await page.getByRole("button", { name: RESTORE_BUTTON }).click();
     await expect(
       page.getByText(/tell us and a moderator will check before it goes back on the map\.$/),
     ).toBeVisible();
     await page.getByLabel("Anything we should know? (optional)").fill("Open again today");
-    await page.getByRole("button", { name: "Restore it" }).click();
+    await page.getByRole("button", { name: "Restore it", exact: true }).click();
     await expect(page.getByText("Thanks — a moderator will review your request.")).toBeVisible();
 
     const pending = await getPendingChangesForLoo(loo.id);

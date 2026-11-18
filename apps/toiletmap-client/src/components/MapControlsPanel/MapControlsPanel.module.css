@@ -1,12 +1,16 @@
 /* ── Floating bar container ──────────────────────────────── */
 
+/* In-flow: LooMap's floating chrome (.map-chrome-top) places it beside the other buttons. */
 .floatingBar {
-  position: absolute;
-  top: var(--space-s);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  width: min(520px, calc(100% - var(--space-m) * 2));
+  /* Secondary text (Reset filters, the location error) never below 14px, at 4.5:1 or more on
+   * white: the DS neutral grey (#807f7f) and accent pink are only about 4:1. */
+  --bar-text-small: max(0.875rem, var(--text--1));
+  --bar-muted: #5f5e5e;
+  --bar-error: #a51d3b;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   background: var(--color-base-white);
   border-radius: 12px;
   box-shadow: 0 4px 24px rgba(10, 22, 94, 0.14);
@@ -27,6 +31,7 @@
 .searchWrapper {
   position: relative;
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
 }
@@ -39,6 +44,10 @@
 }
 
 .searchInput {
+  /* 16px or more: iOS Safari zooms the page into smaller inputs. */
+  font-size: max(16px, 1rem);
+  width: 100%;
+  min-width: 0;
   padding-left: calc(var(--space-xs) * 2 + 1em);
   border-color: var(--color-light-grey);
   border-radius: 8px;
@@ -69,6 +78,20 @@
 
 .filterBtn {
   display: block;
+}
+
+/* 44px touch targets on phones and tablets (--tap-min from the layout, else 44px). */
+@media (pointer: coarse) {
+  .geoBtn,
+  .filterBtn {
+    min-width: var(--tap-min, 44px);
+    min-height: var(--tap-min, 44px);
+  }
+
+  .suggestion,
+  .resetBtn {
+    min-height: var(--tap-min, 44px);
+  }
 }
 
 .filterBadge {
@@ -165,15 +188,16 @@
 }
 
 .resetBtn {
-  display: block;
   margin-top: var(--space-xs);
-  font-size: var(--text--2);
-  color: var(--color-neutral-grey);
+  font-size: var(--bar-text-small);
+  color: var(--bar-muted);
   background: none;
   border: none;
   cursor: pointer;
   font-family: var(--font-family);
   padding: 0;
+  display: inline-flex;
+  align-items: center;
 }
 
 .resetBtn:hover {
@@ -183,8 +207,8 @@
 /* ── Geo error ───────────────────────────────────────────── */
 
 .geoError {
-  font-size: var(--text--2);
-  color: var(--color-accent-pink);
+  font-size: var(--bar-text-small);
+  color: var(--bar-error);
   margin: 0;
   padding: 0 var(--space-s) var(--space-xs);
 }

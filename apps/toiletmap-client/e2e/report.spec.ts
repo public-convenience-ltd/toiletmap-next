@@ -4,6 +4,7 @@ import { getPendingChangesForLoo } from "./support/db";
 import { authedTest, contributorTest, expect, test } from "./support/fixtures";
 import {
   detailsPanelHeading,
+  expectDetailsExpanded,
   mapCacheHas,
   selectedMarker,
   syncUntil,
@@ -52,6 +53,8 @@ authedTest.describe("report a problem (trusted)", () => {
         expect(await mapCacheHas(p, loo.id)).toBe(true);
       }
 
+      // The panel opens expanded: Report a problem is in its details straight away.
+      await expectDetailsExpanded(page);
       await page.locator(".toilet-panel").getByRole("link", { name: "Report a problem" }).click();
       const r = report(page);
       await expect(r.heading).toHaveText(`Report a problem with ${loo.name}`);
@@ -95,7 +98,13 @@ authedTest.describe("report a problem (trusted)", () => {
         ),
       ).toBeVisible();
       await expect(selectedMarker(page)).toHaveCount(0);
+      // Even with the details open (as the panel opens), a removed toilet offers no verify /
+      // edit / report.
+      await expectDetailsExpanded(page);
       await expect(page.getByRole("button", { name: "Yes, it's still here" })).toHaveCount(0);
+      await expect(
+        page.locator(".toilet-panel").getByRole("link", { name: "Report a problem" }),
+      ).toHaveCount(0);
 
       // Another browser loses it on its next sync.
       await syncUntil(other, async () => {

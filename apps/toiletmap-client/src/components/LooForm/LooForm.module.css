@@ -21,6 +21,18 @@
   color: var(--color-neutral-grey);
 }
 
+/* What a save will do (goes live / a moderator checks), said once, above the questions. */
+.saveNotice {
+  margin-bottom: var(--space-m);
+  font-size: var(--text--1);
+}
+
+.saveNotice a {
+  position: relative;
+  color: inherit;
+  font-weight: 600;
+}
+
 .alerts:focus,
 .errorSummary:focus,
 .outcome:focus {
@@ -172,46 +184,94 @@
 
 /* ── Sticky action bar ───────────────────────────────────── */
 
+/*
+ * One row: a text-style Cancel and the Save button. On a phone that's a 44px button with the
+ * same small padding above and below, the bottom padding growing into the home-indicator area
+ * (not added to it).
+ */
 .actionBar {
   position: sticky;
   bottom: 0;
   z-index: 20;
   margin: var(--space-l) calc(-1 * var(--space-m)) 0;
-  padding: var(--space-s) var(--space-m) calc(var(--space-s) + env(safe-area-inset-bottom, 0px));
+  padding: var(--space-2xs) var(--space-m) max(var(--space-2xs), var(--safe-bottom));
   background: var(--color-base-white);
   border-top: 1px solid var(--color-light-grey);
   box-shadow: 0 -4px 16px rgba(10, 22, 94, 0.08);
 }
 
+/*
+ * The on-screen keyboard is up (touch screens only, see useSoftKeyboardOpen): slide the bar
+ * below the screen, shadow and all, then hide it. Hidden, not just moved: with the page
+ * scrolled to the end the slide only takes it as far as the footer, and a screen reader's
+ * swipe would otherwise land on buttons that are off-screen. Its Save button is still the
+ * form's default button, so Enter in a field still submits; the bar comes back as soon as
+ * focus leaves the text fields.
+ */
+.actionBarHidden {
+  visibility: hidden;
+  transform: translateY(calc(100% + var(--space-m)));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Shown at once and slid up; hidden only once it has slid down. */
+  .actionBar {
+    transition:
+      transform 0.2s ease-out,
+      visibility 0s linear 0s;
+  }
+
+  .actionBarHidden {
+    transition:
+      transform 0.2s ease-out,
+      visibility 0s linear 0.2s;
+  }
+}
+
 .actionBarInner {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-xs) var(--space-s);
-}
-
-.actionStatus {
-  flex: 1 1 14rem;
-  margin: 0;
-  font-size: var(--text--1);
-  color: var(--color-neutral-grey);
-}
-
-.actionButtons {
-  display: flex;
+  justify-content: flex-end;
   gap: var(--space-s);
-  margin-left: auto;
+}
+
+.cancelButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  /* 36px with a mouse, 44px on a touch screen. */
+  min-width: var(--tap-min, 36px);
+  min-height: var(--tap-min, 36px);
+  padding: 0 var(--space-xs);
+  border-radius: calc(var(--tap-min, 36px) / 2);
+  font-weight: bold;
+  color: var(--color-primary-navy);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* Hover only where there is a real hover: on touch screens it sticks after a tap. */
+@media (hover: hover) {
+  .cancelButton:hover {
+    text-decoration: none;
+  }
+}
+
+.cancelButton:focus-visible {
+  outline: 3px solid var(--color-primary-navy);
+  outline-offset: 0;
 }
 
 @media (max-width: 480px) {
-  .actionButtons {
-    width: 100%;
+  .actionBarInner {
+    gap: var(--space-xs);
   }
 
-  .actionButtons > * {
+  .saveButton {
     flex: 1;
-    justify-content: center;
+    min-width: 0;
   }
 }
 
@@ -267,7 +327,7 @@
 /* ── Touch targets ───────────────────────────────────────── */
 
 @media (pointer: coarse) {
-  .actionButtons :global(.button),
+  .actionBar :global(.button),
   .outcomeActions :global(.button),
   .dialogActions :global(.button),
   .bannerActions :global(.button) {
@@ -280,6 +340,17 @@
     display: inline-block;
     min-height: 44px;
     line-height: 44px;
+  }
+
+  /* A 44px-tall hit area around the inline link, without making the notice any taller. */
+  .saveNotice a::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -8px;
+    right: -8px;
+    height: 44px;
+    margin-top: -22px;
   }
 
   .input {

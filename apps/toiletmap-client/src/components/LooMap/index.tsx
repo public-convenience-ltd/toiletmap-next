@@ -1,14 +1,12 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
+import { lazy, Suspense } from "preact/compat";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Button, IconButton } from "toiletmap-design-system";
 import { getLooById, getLooDetail, type LooDetail, peekLooDetail } from "../../api/loos";
 import { type ActiveFilters, DEFAULT_FILTERS, type FilterKey } from "../../types/filters";
-import DevTools from "../DevTools";
-import DevToolsButton from "../DevToolsButton";
 import MapControlsPanel from "../MapControlsPanel";
-import SettingsPanel from "../SettingsPanel";
 import ToiletDetailsPanel from "../ToiletDetailsPanel";
 import "./LooMap.css";
 import MapMarkers from "./MapMarkers";
@@ -31,7 +29,21 @@ import {
   type MapDataChange,
   selectionNeedsRefresh,
 } from "./selection";
+import UserLocationMarker from "./UserLocationMarker";
 import { type CompressedLoo, useMapData } from "./useMapData";
+import { useUserLocation } from "./useUserLocation";
+import {
+  cardTopBelow,
+  centreOffset,
+  controlsInsets,
+  insetsForRect,
+  layoutChanged,
+  NO_INSETS,
+  type PanelLayout,
+  panPadding,
+  prefersReducedMotion,
+  showDeveloperControls,
+} from "./viewport";
 
 /**
  * What LooMap reads from useMapData. Everything but `data` is optional so the map degrades
@@ -48,24 +60,68 @@ interface MapDataView {
   lastSyncedAt?: number | string | Date | null;
 }
 
+/**
+ * The developer controls are loaded only where they show (see showDeveloperControls), so a
+ * production page never fetches them (DevTools carries the cache-clearing code).
+ */
+const DevTools = lazy(() => import("../DevTools"));
+const DevToolsButton = lazy(() => import("../DevToolsButton"));
+const SettingsPanel = lazy(() => import("../SettingsPanel"));
+
 /** Marks history entries this map pushed, so closing the panel can step back over them. */
 const PUSHED_STATE = { toiletmapSelection: true } as const;
 const isPushedEntry = (state: unknown) =>
   !!state && typeof state === "object" && "toiletmapSelection" in state;
+
+/** The closest a selected toilet is shown (a deep link, Back/Forward to one off screen). */
+const SELECTED_MIN_ZOOM = 15;
+/** The zoom "Find a toilet near me" shows the viewer's surroundings at. */
+const NEAR_ME_ZOOM = 16;
+
+/**
+ * How to bring the selected toilet into view once the panel has rendered:
+ * - "centre": centre it in the free part of the map (a deep link, or a toilet off screen);
+ * - "inside": pan only as far as needed to keep it clear of the panel and controls.
+ */
+type Reveal = "centre" | "inside";
 
 interface LooMapProps {
   apiUrl: string;
   initialToiletId?: string;
   /** Passed to the details panel for its restore copy (see ToiletDetailsPanel). */
   canWriteDirectly?: boolean;
+  /**
+   * The worker's ENVIRONMENT ("production", "preview", "development"), passed by the page.
+   * The Settings gear and DevTools only show outside production (and in `astro dev`).
+   */
+  environment?: string;
 }
 
-export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = false }: LooMapProps) {
+export default function LooMap({
+  apiUrl,
+  initialToiletId,
+  canWriteDirectly = false,
+  environment = "production",
+}: LooMapProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  // True only for the initial /loos/{id} page load — cleared after first center
-  const shouldCenterRef = useRef(!!initialToiletId);
+  /** The map, as state, for children that add layers (set once Leaflet is created). */
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  /** What the open panel last reported covering (shared contract P1), until it closes. */
+  const panelLayoutRef = useRef<PanelLayout | null>(null);
+  /** A reveal waiting for the panel to render (see Reveal). */
+  const pendingRevealRef = useRef<Reveal | null>(null);
+  /** Filled by MapMarkers: focuses a toilet's marker (see focusMarkerRef there). */
+  const focusMarkerRef = useRef<((id: string) => boolean) | null>(null);
+  /** The toilet whose panel was just closed, to put focus back on its marker. */
+  const closedIdRef = useRef<string | null>(null);
+  const userLocation = useUserLocation();
+  /** The top row of floating controls (search bar, developer buttons). */
+  const chromeTopRef = useRef<HTMLDivElement>(null);
+  /** Where the desktop details card starts: below the search bar, however tall it is. */
+  const [cardTop, setCardTop] = useState<number | undefined>(undefined);
   const mapData: MapDataView = useMapData(apiUrl);
   const { data } = mapData;
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -99,15 +155,21 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
     setActiveFilters(DEFAULT_FILTERS);
   };
 
-  const isDev = import.meta.env.DEV || import.meta.env.MODE === "preview";
+  const showDevControls = showDeveloperControls(environment, !!import.meta.env.DEV);
+
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const created = L.map(mapContainer.current, { zoomControl: false }).setView(
-      [startView.lat, startView.lng],
-      startView.zoom,
-    );
+    const reducedMotion = prefersReducedMotion();
+    const created = L.map(mapContainer.current, {
+      zoomControl: false,
+      // With reduced motion, zooming and panning jump instead of animating.
+      zoomAnimation: !reducedMotion,
+      fadeAnimation: !reducedMotion,
+      markerZoomAnimation: !reducedMotion,
+    }).setView([startView.lat, startView.lng], startView.zoom);
     map.current = created;
+    setMapInstance(created);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -123,6 +185,7 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
     return () => {
       map.current?.remove();
       map.current = null;
+      setMapInstance(null);
     };
   }, []);
 
@@ -155,6 +218,13 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
 
   /** Show a toilet (or nothing), resetting per-toilet notices. */
   const showToilet = (toilet: LooDetail | null) => {
+    const prevId = shownIdRef.current;
+    if (prevId !== null && toilet === null) closedIdRef.current = prevId;
+    if (toilet) closedIdRef.current = null;
+    if (!toilet) {
+      panelLayoutRef.current = null;
+      pendingRevealRef.current = null;
+    }
     shownIdRef.current = toilet?.id ?? null;
     setSelectedToilet(toilet);
     setRemovedId(toilet && toilet.active === false ? toilet.id : null);
@@ -163,7 +233,6 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
   /** A selection change that takes over from the initial /loos/{id} load, if still pending. */
   const takeOverSelection = (toilet: LooDetail | null) => {
     selectionMadeRef.current = true;
-    shouldCenterRef.current = false;
     showToilet(toilet);
   };
 
@@ -183,6 +252,8 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
     const nextId = toilet?.id ?? null;
     navigationRef.current++;
     takeOverSelection(toilet);
+    // A newly tapped toilet: once the panel is up, nudge the map so it isn't hidden under it.
+    if (nextId !== null && nextId !== prevId) pendingRevealRef.current = "inside";
     // Unchanged (a revalidated copy, or a second close before Back has landed): the address
     // bar is, or is on its way to being, right already.
     if (prevId === nextId) return;
@@ -211,18 +282,19 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
       if (outcome.kind === "ignore") return;
       if (outcome.kind === "reset") {
         // The toilet couldn't be loaded: don't leave the address bar on a page we don't show.
-        shouldCenterRef.current = false;
         history.replaceState(history.state, "", outcome.url);
         return;
       }
       const { toilet } = outcome;
       showToilet(toilet);
       if (toilet.location && map.current) {
+        // Jump there now; once the panel is up, centre it in the part of the map left free.
         map.current.setView(
           [toilet.location.lat, toilet.location.lng],
-          Math.max(map.current.getZoom(), 15),
+          Math.max(map.current.getZoom(), SELECTED_MIN_ZOOM),
           { animate: false },
         );
+        pendingRevealRef.current = "centre";
       }
     });
   }, [apiUrl, initialToiletId]);
@@ -232,9 +304,8 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
   useEffect(() => {
     const panTo = (detail: LooDetail) => {
       const m = map.current;
-      if (detail.location && m && !m.getBounds().contains(detail.location)) {
-        m.setView([detail.location.lat, detail.location.lng], Math.max(m.getZoom(), 15));
-      }
+      if (!detail.location || !m) return;
+      pendingRevealRef.current = m.getBounds().contains(detail.location) ? "inside" : "centre";
     };
     const onPopState = () => {
       const navigation = ++navigationRef.current;
@@ -298,105 +369,243 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
 
   const notice = freshnessNotice(mapData.status, mapData.lastSyncedAt);
 
-  // On the initial /loos/{id} load only, offset the map so the marker sits
-  // centred in the visible area above the details panel. Marker clicks skip
-  // this — the user already sees the marker, just open the panel.
+  /**
+   * How much of the map the panel covers: what it last reported, or (before its first
+   * report) a measurement of its box.
+   */
+  const panelOccludes = (containerRect: DOMRect) => {
+    if (panelLayoutRef.current) return panelLayoutRef.current.occludes;
+    const panel = panelRef.current?.firstElementChild ?? null;
+    return panel ? insetsForRect(panel.getBoundingClientRect(), containerRect) : NO_INSETS;
+  };
+
+  /**
+   * Keeps the selected toilet's marker in the part of the map the user can see: clear of the
+   * details panel and of the floating controls (anything marked `data-map-control`), with a
+   * 16px margin. With reduced motion the map jumps rather than glides.
+   */
+  const revealSelected = (reveal: Reveal) => {
+    const m = map.current;
+    const root = rootRef.current;
+    const location = selectedRef.current?.location;
+    if (!m || !root || !mapContainer.current || !location) return;
+    const containerRect = mapContainer.current.getBoundingClientRect();
+    const size = { width: containerRect.width, height: containerRect.height };
+    if (size.width <= 0 || size.height <= 0) return;
+    const controls = controlsInsets(
+      Array.from(root.querySelectorAll("[data-map-control]"), (el) => el.getBoundingClientRect()),
+      containerRect,
+    );
+    const padding = panPadding(size, panelOccludes(containerRect), controls);
+    const latlng: [number, number] = [location.lat, location.lng];
+    if (reveal === "centre") {
+      m.setView(latlng, Math.max(m.getZoom(), SELECTED_MIN_ZOOM), { animate: false });
+      const [dx, dy] = centreOffset(size, padding);
+      if (dx !== 0 || dy !== 0) m.panBy([dx, dy], { animate: false });
+    } else {
+      m.panInside(latlng, { ...padding, animate: !prefersReducedMotion() });
+    }
+  };
+
+  /** Shared contract P1: the panel reports its size and position whenever they change. */
+  const handlePanelLayout = (layout: PanelLayout) => {
+    if (shownIdRef.current === null) return;
+    const prev = panelLayoutRef.current;
+    panelLayoutRef.current = layout;
+    const pending = pendingRevealRef.current;
+    pendingRevealRef.current = null;
+    // Expanding (or switching to the card) can cover the marker: keep it in view.
+    if (pending || layoutChanged(prev, layout)) revealSelected(pending ?? "inside");
+  };
+
+  // Once the panel for a new selection has rendered, bring its marker into view (unless the
+  // panel's first layout report already did).
   useEffect(() => {
-    if (!selectedToilet || !map.current || !panelRef.current) return;
-    if (!shouldCenterRef.current) return;
-    shouldCenterRef.current = false;
+    if (!selectedToilet || !pendingRevealRef.current) return;
     const frame = requestAnimationFrame(() => {
-      if (!map.current || !panelRef.current) return;
-      const h = panelRef.current.clientHeight;
-      if (h > 0) map.current.panBy([0, h / 2], { animate: false });
+      const pending = pendingRevealRef.current;
+      pendingRevealRef.current = null;
+      if (pending) revealSelected(pending);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedToilet]);
+
+  // When the panel closes, put keyboard focus back on the marker that opened it (or the map),
+  // unless the user has already moved focus somewhere else.
+  useEffect(() => {
+    if (selectedToilet || !closedIdRef.current) return;
+    const id = closedIdRef.current;
+    const frame = requestAnimationFrame(() => {
+      if (closedIdRef.current !== id) return;
+      closedIdRef.current = null;
+      // The panel hands focus to the map (returnFocusTo) as it closes; from there, or from
+      // nowhere (its marker was redrawn plain), move it on to the toilet's own marker.
+      const active = document.activeElement;
+      const lost = !active || active === document.body || !active.isConnected;
+      if (!lost && active !== mapContainer.current) return;
+      if (!focusMarkerRef.current?.(id)) mapContainer.current?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
   }, [selectedToilet]);
 
   // Close the details panel when the user presses Escape. Listening for the map's whole
   // lifetime (not from an effect per open panel, which only runs after the next paint)
-  // means Escape works as soon as the panel is on screen.
+  // means Escape works as soon as the panel is on screen. Only Escape on the map itself (or
+  // with nothing focused) counts: Escape in the page header's menu closes that menu, and
+  // Escape inside the search bar or a dialog belongs to them (closing suggestions, the
+  // settings sheet), not the panel.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && shownIdRef.current !== null) selectToilet(null);
+      if (e.key !== "Escape" || e.defaultPrevented || shownIdRef.current === null) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const unfocused = !target || target === document.body || target === document.documentElement;
+      if (!unfocused && !rootRef.current?.contains(target)) return;
+      if (target?.closest('[data-owns-escape], [role="dialog"], [aria-modal="true"]')) return;
+      selectToilet(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Keep the desktop card below the search bar as the bar grows (filters, suggestions).
+  useEffect(() => {
+    const chrome = chromeTopRef.current;
+    const container = mapContainer.current;
+    if (!chrome || !container) return;
+    const measure = () => {
+      const top = cardTopBelow(chrome.getBoundingClientRect(), container.getBoundingClientRect());
+      setCardTop((prev) => (prev === top ? prev : top));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(chrome);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  /** "Find a toilet near me": start tracking the viewer, and centre on their first fix. */
+  const handleFindNearMe = () => {
+    userLocation.locate((fix) => {
+      map.current?.setView([fix.lat, fix.lng], Math.max(map.current.getZoom(), NEAR_ME_ZOOM), {
+        animate: !prefersReducedMotion(),
+      });
+    });
+  };
+
+  const zoomBy = (delta: 1 | -1) => {
+    const m = map.current;
+    if (!m) return;
+    const options = { animate: !prefersReducedMotion() };
+    if (delta > 0) m.zoomIn(1, options);
+    else m.zoomOut(1, options);
+  };
+
   return (
-    <div className="loo-map-container">
-      <MapControlsPanel
-        mapRef={map}
-        activeFilters={activeFilters}
-        onFilterChange={handleFilterChange}
-        onResetFilters={handleResetFilters}
-      />
+    <div className="loo-map-container" ref={rootRef}>
+      {/* One flex row of floating controls: they can never overlap each other. */}
+      <div className="map-chrome-top" ref={chromeTopRef}>
+        <MapControlsPanel
+          mapRef={map}
+          activeFilters={activeFilters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={handleResetFilters}
+          onFindNearMe={handleFindNearMe}
+          locationError={userLocation.error}
+        />
+        {showDevControls && (
+          <div className="map-chrome-utilities" data-map-control>
+            {/* Both buttons appear together, once the developer tools have loaded. */}
+            <Suspense fallback={null}>
+              <IconButton
+                icon="gear"
+                aria-label="Open settings"
+                variant="filled"
+                class="settings-btn"
+                onClick={() => setIsSettingsOpen(true)}
+              />
+              <DevToolsButton class="dev-tools-btn" onClick={() => setIsDevToolsOpen(true)} />
+            </Suspense>
+          </div>
+        )}
+      </div>
 
-      <IconButton
-        icon="gear"
-        aria-label="Open settings"
-        variant="filled"
-        class="settings-btn"
-        onClick={() => setIsSettingsOpen(true)}
-      />
-
-      {isDev && <DevToolsButton class="dev-tools-btn" onClick={() => setIsDevToolsOpen(true)} />}
-
-      <SettingsPanel
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onOpenDevTools={() => {
-          setIsSettingsOpen(false);
-          setIsDevToolsOpen(true);
-        }}
-      />
-
-      <DevTools
-        isOpen={isDevToolsOpen}
-        onClose={() => setIsDevToolsOpen(false)}
-        mapInstance={map.current}
-      />
+      {showDevControls && (
+        <Suspense fallback={null}>
+          <SettingsPanel
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            onOpenDevTools={() => {
+              setIsSettingsOpen(false);
+              setIsDevToolsOpen(true);
+            }}
+          />
+          <DevTools
+            isOpen={isDevToolsOpen}
+            onClose={() => setIsDevToolsOpen(false)}
+            mapInstance={map.current}
+          />
+        </Suspense>
+      )}
 
       <div id="map" ref={mapContainer} style={{ height: "100%", width: "100%" }} />
       <MapMarkers
-        map={map.current}
+        map={mapInstance}
         data={data}
         activeFilters={activeFilters}
         apiUrl={apiUrl}
         selectedToiletId={selectedToilet?.id ?? null}
         onToiletSelect={selectToilet}
+        focusMarkerRef={focusMarkerRef}
       />
+      <UserLocationMarker map={mapInstance} location={userLocation.location} />
 
-      <div className="add-toilet-here">
-        <Button htmlElement="a" variant="primary" href={addHref}>
-          Add a toilet here
-        </Button>
+      <div className="map-chrome-bottom-right">
+        {/* Desktop only (CSS): phones pinch to zoom. */}
+        <div className="map-zoom-controls" data-map-control>
+          <IconButton
+            icon="plus"
+            aria-label="Zoom in"
+            variant="ghost"
+            class="map-zoom-btn"
+            onClick={() => zoomBy(1)}
+          />
+          <IconButton
+            icon="minus"
+            aria-label="Zoom out"
+            variant="ghost"
+            class="map-zoom-btn"
+            onClick={() => zoomBy(-1)}
+          />
+        </div>
+        <div className="add-toilet-here" data-map-control>
+          <Button htmlElement="a" variant="primary" href={addHref}>
+            Add a toilet here
+          </Button>
+        </div>
       </div>
 
+      {/*
+       * The live region stays here for screen readers; while a toilet is open the notice is
+       * shown in its panel instead (which would otherwise cover it), so this copy is hidden.
+       * Only the shown notice covers the map (the hidden one is a 1px box).
+       */}
       <div
         role="status"
-        className="map-freshness-notice"
-        style={{
-          position: "absolute",
-          left: "var(--space-s)",
-          bottom: "var(--space-l)",
-          zIndex: 1000,
-          maxWidth: "calc(100% - 2 * var(--space-s))",
-          padding: notice ? "var(--space-3xs, 4px) var(--space-xs, 8px)" : 0,
-          borderRadius: "var(--space-2xs, 6px)",
-          background: notice ? "var(--color-base-white)" : "transparent",
-          color: "var(--color-primary-navy)",
-          boxShadow: notice ? "0 1px 6px rgba(10, 22, 94, 0.2)" : "none",
-          fontSize: "0.875rem",
-          pointerEvents: "none",
-        }}
+        className={`map-freshness-notice${
+          !notice
+            ? ""
+            : selectedToilet
+              ? " map-freshness-notice--in-panel"
+              : " map-freshness-notice--shown"
+        }`}
+        data-map-control={notice && !selectedToilet ? "" : undefined}
       >
         {notice}
       </div>
 
       {selectedToilet && (
-        <div className="toilet-panel" ref={panelRef}>
+        <div className="toilet-panel-layer" ref={panelRef}>
           <ToiletDetailsPanel
             key={selectedToilet.id}
             toilet={selectedToilet}
@@ -405,6 +614,11 @@ export default function LooMap({ apiUrl, initialToiletId, canWriteDirectly = fal
             saved={savedId === selectedToilet.id}
             onDismissSaved={() => setSavedId(null)}
             canWriteDirectly={canWriteDirectly}
+            onLayoutChange={handlePanelLayout}
+            notice={notice ? <span aria-hidden="true">{notice}</span> : undefined}
+            returnFocusTo={mapContainer.current}
+            cardTop={cardTop}
+            userLocation={userLocation.location ?? undefined}
           />
         </div>
       )}

@@ -1,6 +1,8 @@
 .header {
   background: var(--color-white);
-  padding-block: var(--space-xs);
+  /* viewport-fit=cover: keep the logo and menu clear of notches. */
+  padding-block: calc(var(--space-xs) + var(--safe-top)) var(--space-xs);
+  padding-inline: var(--safe-left) var(--safe-right);
 }
 
 .header__stack {
@@ -29,7 +31,31 @@
 .header__nav-wrapper {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  gap: var(--space-l);
+}
+
+.header__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  color: inherit;
+}
+
+/* The footer's links, in the drawer on pages that hide the footer. */
+.header__nav--secondary {
+  border-top: 1px solid var(--color-light-grey);
+  font-size: var(--text--1);
+  font-weight: 400;
+  gap: var(--space-xs);
+  padding-top: var(--space-m);
+}
+
+@media (pointer: coarse) {
+  .header__link {
+    min-height: var(--tap-min);
+    min-width: var(--tap-min);
+  }
 }
 
 .header__smaller-devices {
@@ -59,5 +85,6 @@
 
   .header__nav-wrapper {
     flex-direction: row;
+    gap: var(--space-m);
   }
 }

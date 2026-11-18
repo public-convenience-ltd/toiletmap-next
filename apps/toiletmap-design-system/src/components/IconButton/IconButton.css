@@ -33,3 +33,17 @@
   background: var(--color-blue);
   color: var(--color-turquoise);
 }
+
+/* Big enough to hit with a finger (--tap-min is 44px on touch screens). */
+@media (pointer: coarse) {
+  .icon-button {
+    min-height: var(--tap-min);
+    min-width: var(--tap-min);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-button {
+    transition: none;
+  }
+}
