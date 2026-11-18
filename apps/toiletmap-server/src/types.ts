@@ -62,6 +62,13 @@ export interface Env {
    */
   GRAPHQL_SUNSET?: string;
 
+  /**
+   * R2 bucket (`toiletmap-exports`) the daily dataset export writes to.
+   * Bound in `env.production` only; absent in local dev, tests and preview
+   * workers, where the export skips and the admin page says so.
+   */
+  EXPORTS?: R2Bucket;
+
   // Cloudflare Rate Limiting API bindings
   RATE_LIMIT_READ: RateLimiter;
   RATE_LIMIT_WRITE: RateLimiter;

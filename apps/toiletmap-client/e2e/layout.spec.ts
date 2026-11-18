@@ -283,6 +283,21 @@ test.describe("page shell", () => {
       ).toBeGreaterThan(0);
     }
   });
+
+  test("the dataset page scrolls the document (no export bucket in dev)", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 480 });
+    await page.goto("/dataset");
+    await expect(page.getByRole("heading", { level: 1, name: "Toilet Data" })).toBeVisible();
+    await expect(
+      page.getByText("Data downloads are only available on the live site"),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Licence Information" })).toBeVisible();
+    const shell = await pageShell(page);
+    expect(shell.bodyOverflowY).toBe("visible");
+    expect(shell.documentHeight).toBeGreaterThan(shell.viewportHeight);
+    await page.evaluate(() => window.scrollTo(0, 100));
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  });
 });
 
 /**

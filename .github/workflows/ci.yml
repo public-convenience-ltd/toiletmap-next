@@ -304,10 +304,15 @@ jobs:
           pnpm prisma:generate
           pnpm build:client
           pnpm exec wrangler deploy --dry-run
+          # Production carries config the default env lacks (EXPORTS bucket, cron).
+          pnpm exec wrangler deploy --dry-run --env production
 
       - name: Build & Dry-Run Deploy (Client)
         working-directory: apps/toiletmap-client
         run: |
           pnpm build
           pnpm exec wrangler deploy --dry-run
+          # The production build adds the API service and EXPORTS bucket bindings.
+          pnpm build:production
+          pnpm exec wrangler deploy --dry-run --env production
 

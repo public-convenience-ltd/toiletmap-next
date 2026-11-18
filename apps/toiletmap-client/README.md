@@ -77,6 +77,8 @@ fetches in `.astro` pages use `fetchApi(env, Astro.url, path)` from
 - `/loos/:id` - map with a toilet selected
 - `/loos/:id/edit`, `/loos/add` - edit / add forms
 - `/loo/*` - legacy aliases, 301-redirected to `/loos/*` (query string preserved)
+- `/dataset` - the open dataset page: downloads, fields, CC BY 4.0 licence
+- `/dataset/latest/*`, `/dataset/archive/YYYY-MM-DD/*` - the export files (`toilets.json`, `toilets.csv`, `manifest.json`), streamed from the `EXPORTS` R2 bucket with ETag/304 and caching headers. The bucket is bound in `env.production` only: in dev and preview the page says downloads are live-site only and the files answer 503. See [the server's dataset export doc](../toiletmap-server/docs/operations/dataset-export.md).
 
 ### Caching Strategy
 
@@ -201,7 +203,15 @@ pnpm run deploy:preview
 `--env` passed to wrangler must match the build's environment: wrangler refuses
 to deploy `--env preview` from a production build (and vice versa). Validate
 without deploying via `pnpm build:production && pnpm exec wrangler deploy --env production --dry-run`
-and check the output lists `env.API (toiletmap-server)`.
+and check the output lists `env.API (toiletmap-server)` and `env.EXPORTS (toiletmap-exports)`.
+
+> **Create the R2 bucket before the first production deploy.** The production
+> build binds the `EXPORTS` R2 bucket (`toiletmap-exports`, the dataset
+> downloads). Cloudflare rejects a deploy whose bucket does not exist, so until
+> the owner has run `pnpm exec wrangler r2 bucket create toiletmap-exports`
+> once, `pnpm run deploy` fails here, and so does the server's production
+> deploy. Dry-runs and preview deploys do not need it. See
+> [the dataset export runbook](../toiletmap-server/docs/operations/dataset-export.md#owner-setup-once).
 
 Per-branch previews (`.github/workflows/deploy-preview.yml`) use a plain
 `pnpm build` and `wrangler deploy --env preview --name <branch>-toiletmap-client`

@@ -41,6 +41,40 @@ import {
 
 type DbClient = PrismaClientInstance | Prisma.TransactionClient;
 
+/**
+ * The columns the public dataset export may publish, in the legacy export's
+ * order. An allowlist on purpose: see {@link LooService.getAllForExport}.
+ */
+const exportSourceSelect = {
+  id: true,
+  created_at: true,
+  accessible: true,
+  active: true,
+  attended: true,
+  automatic: true,
+  baby_change: true,
+  men: true,
+  name: true,
+  no_payment: true,
+  notes: true,
+  payment_details: true,
+  radar: true,
+  women: true,
+  updated_at: true,
+  urinal_only: true,
+  all_gender: true,
+  children: true,
+  geohash: true,
+  verified_at: true,
+  area_id: true,
+  opening_times: true,
+  location: true,
+  areas: { select: { name: true, id: true } },
+} as const satisfies Prisma.toiletsSelect;
+
+/** One row of {@link LooService.getAllForExport}. */
+export type ExportSourceRow = Prisma.toiletsGetPayload<{ select: typeof exportSourceSelect }>;
+
 /** How far the sync cursor trails the database clock. See {@link LooService.getSyncCursor}. */
 const SYNC_CURSOR_OVERLAP_SECONDS = 120;
 const SYNC_CURSOR_OVERLAP = Prisma.raw(`interval '${SYNC_CURSOR_OVERLAP_SECONDS} seconds'`);
@@ -459,6 +493,40 @@ export class LooService {
     });
 
     return rows.map(mapLoo);
+  }
+
+  /**
+   * Every active loo as a raw `toilets` row, for the public dataset export
+   * (`services/export`). Ordered by id.
+   *
+   * Unlike {@link getAll}, this keeps the database column names and values
+   * the legacy export published (`area_id`, the GeoJSON `location`, the raw
+   * `opening_times`, the area's `id`), and does not drop loos without a
+   * location. Columns are an allowlist: `contributors`, `removal_reason` and
+   * any column added later stay out unless they are added here.
+   *
+   * Read in pages of `batchSize` by id (as legacy did, 4000 at a time), so the
+   * driver never holds the whole result set in its buffers at once.
+   */
+  async getAllForExport({
+    batchSize = 4000,
+  }: {
+    batchSize?: number;
+  } = {}): Promise<ExportSourceRow[]> {
+    const rows: ExportSourceRow[] = [];
+    let afterId: string | undefined;
+    for (;;) {
+      const page = await this.prisma.toilets.findMany({
+        where: afterId === undefined ? { active: true } : { active: true, id: { gt: afterId } },
+        select: exportSourceSelect,
+        orderBy: { id: "asc" },
+        take: batchSize,
+      });
+      for (const row of page) rows.push(row);
+      const last = page.at(-1);
+      if (page.length < batchSize || !last) return rows;
+      afterId = last.id;
+    }
   }
 
   /**

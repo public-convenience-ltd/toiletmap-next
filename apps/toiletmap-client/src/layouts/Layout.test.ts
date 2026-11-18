@@ -20,6 +20,9 @@ const formPages = {
   "/loos/[id]/edit": read("../pages/loos/[id]/edit.astro"),
   "/loos/[id]/remove": read("../pages/loos/[id]/remove.astro"),
 };
+const contentPages = {
+  "/dataset": read("../pages/dataset.astro"),
+};
 
 describe("Layout.astro", () => {
   it("lets the page reach under notches and stay unzoomed", () => {
@@ -36,6 +39,12 @@ describe("Layout.astro", () => {
 
   it("does not load Font Awesome (icons come from the design system's sprite)", () => {
     expect(layout).not.toMatch(/font-awesome/i);
+  });
+
+  it("takes the document title from a prop, defaulting to Toilet Map", () => {
+    expect(layout).toContain('title = "Toilet Map"');
+    expect(layout).toContain("<title>{title}</title>");
+    expect(contentPages["/dataset"]).toContain('<Layout title="Toilet Map: Our Data">');
   });
 
   it("puts each page's body class on <body>", () => {
@@ -63,8 +72,11 @@ describe.each(Object.entries(mapPages))("map page %s", (_path, source) => {
   });
 });
 
-describe.each(Object.entries(formPages))("content page %s", (_path, source) => {
-  it("scrolls (no map-page body class)", () => {
-    expect(source).not.toContain("map-page");
-  });
-});
+describe.each(Object.entries({ ...formPages, ...contentPages }))(
+  "content page %s",
+  (_path, source) => {
+    it("scrolls (no map-page body class)", () => {
+      expect(source).not.toContain("map-page");
+    });
+  },
+);

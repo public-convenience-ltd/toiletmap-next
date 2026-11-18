@@ -27,7 +27,7 @@
 ```
 src/
 ├── app.ts                     # Hono app setup, route registration
-├── index.ts                   # Cloudflare Worker entry point
+├── index.ts                   # Cloudflare Worker entry point (fetch + scheduled)
 ├── types.ts                   # Shared TypeScript types
 ├── prisma.ts                  # Prisma client factory (runtime-aware)
 ├── routes/                    # HTTP route handlers (thin layer)
@@ -44,6 +44,7 @@ src/
 │   │   ├── mutation.ts        # Mutation field mapping
 │   │   ├── persistence.ts     # Low-level insert/update
 │   │   └── types.ts           # Domain types & Zod schemas
+│   ├── export/                # Daily dataset export to R2 (cron + admin button)
 │   └── area.service.ts        # Area domain service
 ├── middleware/                # Additional middleware
 │   └── require-admin-role.ts  # Role-based access control
@@ -243,7 +244,10 @@ Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteD
 - **GET /admin/users/statistics** (alias `/admin/users`) - Contributor analytics / user statistics dashboard
 - **GET /admin/users/admin** - Auth0-backed user administration (view + edit permissions)
 - **POST /admin/users/admin/permissions** - Toggle `access:admin` via Auth0 Management API
+- **POST /admin/dataset/regenerate** - Run the dataset export now (button on `/admin/loos`; refused within 5 minutes of another run)
 - **GET /admin/logout** - Clear session and redirect to login
+
+**Dataset export:** `src/services/export/` publishes active toilets daily (production cron `17 0 * * *`, `scheduled()` in `src/index.ts`) to the `EXPORTS` R2 bucket, in the legacy export's exact columns (pinned by `test/fixtures/dataset-export/`); the client serves them at `/dataset/*`. Columns are an allowlist in `LooService.getAllForExport`: never add private ones (`contributors`, `removal_reason`, pending-change data). The bucket and cron exist in `env.production` only, in both workers: the `toiletmap-exports` bucket must exist before either worker is deployed to production, or the deploy fails. See `docs/operations/dataset-export.md`.
 
 ## Development Workflows
 

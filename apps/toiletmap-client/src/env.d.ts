@@ -4,6 +4,8 @@ interface Env {
   PUBLIC_API_URL: string;
   /** toiletmap-server service binding (production only; absent in dev/preview). */
   API?: Fetcher;
+  /** Dataset export bucket written by toiletmap-server (production only; absent in dev/preview). */
+  EXPORTS?: R2Bucket;
   ENVIRONMENT?: string;
   AUTH0_ISSUER_BASE_URL: string;
   AUTH0_CLIENT_ID: string;

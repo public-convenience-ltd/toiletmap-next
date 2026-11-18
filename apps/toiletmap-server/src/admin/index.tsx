@@ -5,6 +5,7 @@ import { rateLimiters } from "../middleware/cloudflare-rate-limit";
 import { requireAdminRole } from "../middleware/require-admin-role";
 import type { AppVariables, Env } from "../types";
 import { callback, login, logout } from "./auth";
+import { datasetRegenerate } from "./pages/dataset";
 import { renderAccessDenied } from "./pages/errors/access-denied";
 import { looDetail, looEdit, loosCreate, loosList } from "./pages/loos";
 import { pendingApprove, pendingList, pendingReject } from "./pages/pending";
@@ -52,6 +53,7 @@ admin.get("/loos/:id", looDetail);
 admin.get("/pending", pendingList);
 admin.post("/pending/:id/approve", pendingApprove);
 admin.post("/pending/:id/reject", pendingReject);
+admin.post("/dataset/regenerate", datasetRegenerate);
 
 admin.get("/users", userStatistics);
 admin.get("/users/statistics", userStatistics);

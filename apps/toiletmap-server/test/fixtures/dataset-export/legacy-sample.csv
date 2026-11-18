@@ -1,0 +1,10 @@
+id,created_at,accessible,active,attended,automatic,baby_change,men,name,no_payment,notes,payment_details,radar,women,updated_at,urinal_only,all_gender,children,geohash,verified_at,area_id,opening_times,location,areas,longitude,latitude
+"000071659b92538075e11c01","2016-09-14T09:31:35.199Z","false","true","","","","","","true","","","","","2025-11-23T01:57:57.158Z","","","","u10mvj8x2ggb3c62ckcu","","5ef9eb2c52244558fd02f1f5","","{""type"":""Point"",""coordinates"":[0.572013,51.6672193]}","{""name"":""Chelmsford"",""id"":""5ef9eb2c52244558fd02f1f5""}","0.572013","51.6672193"
+"0008810c8a58ea5f7d41c04a","2016-09-14T08:29:33.237Z","false","true","true","","true","true","St George's hall","true","","","","true","2016-09-14T08:29:33.237Z","","","","gcmzu4tzrr80bnb50hbp","","5ef9eb2c52244558fd02f298","[[""09:00"",""17:00""],[""09:00"",""17:00""],[""09:00"",""17:00""],[""09:00"",""17:00""],[""09:00"",""17:00""],[],[]]","{""type"":""Point"",""coordinates"":[-2.98007369,53.408572537]}","{""name"":""Liverpool"",""id"":""5ef9eb2c52244558fd02f298""}","-2.98007369","53.408572537"
+"000b4c533fc82eff2d5e212f","2014-11-20T15:49:08.377Z","true","true","false","false","","true","Ross Band Stand","true","part of council community toilet scheme
+
+10am-8pm (summer only)
+
+Disabled access (all toilets for the disabled require a RADAR key for access)
+
+gates opening automatically so no current charge","","true","true","2019-01-11T09:29:37.456Z","","","","gcvwr1mwvfngd23rxhp3","","5ef9eb2c52244558fd02f2f2","","{""type"":""Point"",""coordinates"":[-3.2001988,55.9504193]}","{""name"":""City of Edinburgh"",""id"":""5ef9eb2c52244558fd02f2f2""}","-3.2001988","55.9504193"

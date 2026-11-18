@@ -138,6 +138,7 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 - [🚀 Deployment](docs/operations/deployment.md) - Production deployment guide
 - [📈 Monitoring](docs/operations/monitoring.md) - Logs, metrics, and alerts
+- [📦 Dataset export](docs/operations/dataset-export.md) - Daily JSON/CSV export to R2, the `/dataset` downloads, running it locally
 
 ## Project Structure
 
@@ -213,6 +214,7 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 | `/admin/loos/create` | GET/POST | Create loo form |
 | `/admin/loos/:id`    | GET/POST | Edit loo form   |
 | `/admin/users`       | GET      | User management |
+| `/admin/dataset/regenerate` | POST | Run the dataset export now (guarded: not within 5 min of another run) |
 | `/admin/login`       | GET      | Login page      |
 
 See [API Documentation](docs/openapi.json) for OpenAPI spec.
@@ -237,6 +239,10 @@ See [API Documentation](docs/openapi.json) for OpenAPI spec.
 - **Not covered: `POST /api/feedback`.** The Flutter app also posts feedback (form fields) to `www.toiletmap.org.uk/api/feedback` (`lib/model/user_agent_client.dart`). That route does not exist in this stack (the client worker answers `404`), so app feedback stops working at cutover. This is a cutover blocker outside Phase 6.2: port the route or ship an app update that drops it before switching DNS.
 - **Sunset plan.** About 12 months after cutover (date not fixed yet). Announce it by setting `GRAPHQL_SUNSET`, contact the known consumers, review usage per operation from the logs at 6 months, remove unused operations, then delete `src/routes/legacy-graphql/` and the client's `/api` route at sunset.
 - **Golden fixtures and contract tests.** `test/fixtures/legacy-graphql/` holds responses captured read-only from the live legacy API (see its README). `test/integration/legacy-graphql.contract.spec.ts` seeds the fixture toilets and audit rows into the local test DB and replays every fixture; its header comment lists exactly which fields are normalised and why. `legacy-graphql.http.spec.ts` covers the Flutter request, limits, headers, CORS and mutation rejection. To recapture (only while the legacy API is still live, and only with the owner's go-ahead): `node test/fixtures/legacy-graphql/capture.mjs --dry-run`, then without `--dry-run` (read-only, at most 1 request per second).
+
+### Dataset export
+
+A production-only cron (`17 0 * * *`) publishes every active toilet as JSON and CSV, in the legacy export's exact format, to the `toiletmap-exports` R2 bucket (`EXPORTS` binding): `latest/`, a dated `archive/`, and `latest/manifest.json` (sizes, SHA-256, row count) written last. It refuses to publish an empty dataset or a drop of more than 20% in rows. Admins can run it from the dataset explorer. Preview and dev workers have no bucket or cron. Details, local runs (`wrangler dev --env production --test-scheduled`, then `curl /__scheduled`) and owner setup: [docs/operations/dataset-export.md](docs/operations/dataset-export.md).
 
 ## Rate Limiting
 
@@ -304,6 +310,7 @@ Deployment checklist:
 - [ ] Configure Cloudflare Rate Limiting bindings
 - [ ] Configure `HYPERDRIVE` binding to point to production database (Supabase)
 - [ ] Verify custom domain and SSL
+- [ ] Create the dataset export bucket once, before the first production deploy of **either** worker (both bind it; the deploy fails without it): `pnpm exec wrangler r2 bucket create toiletmap-exports` (see [Dataset export](docs/operations/dataset-export.md))
 
 ### Environment Variables
 
