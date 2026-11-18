@@ -75,8 +75,35 @@
   border: 1px solid var(--color-light-grey);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-2);
-  z-index: 1100;
+  /*
+   * Above the map (its overlays stay inside .mapWrap's own stacking context) but below the
+   * form's sticky Save bar (z-index 20), which a long list would otherwise cover on a phone.
+   */
+  z-index: 19;
   overflow: hidden;
+}
+
+/* Long lists scroll inside the dropdown, keeping the attribution under them in view. */
+.suggestionList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(16rem, 40vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* OpenStreetMap's credit under place results from Nominatim (never below 14px). */
+.searchAttribution {
+  margin: 0;
+  padding: var(--space-3xs) var(--space-xs);
+  border-top: 1px solid var(--color-light-grey);
+  font-size: max(0.875rem, var(--text--1));
+  color: var(--color-text-muted);
+}
+
+.searchAttribution a {
+  color: inherit;
 }
 
 .suggestion {

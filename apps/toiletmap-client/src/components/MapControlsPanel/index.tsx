@@ -3,8 +3,9 @@ import type { RefObject } from "preact";
 import { useId, useRef, useState } from "preact/hooks";
 import type { IconName } from "toiletmap-design-system";
 import { Icon, IconButton, InputField, Notice, Tag } from "toiletmap-design-system";
-import { useNominatimSearch } from "../../hooks/useNominatimSearch";
+import { usePlaceSearch } from "../../hooks/usePlaceSearch";
 import type { ActiveFilters, FilterKey } from "../../types/filters";
+import PlaceSearchAttribution from "../PlaceSearchAttribution";
 import styles from "./MapControlsPanel.module.css";
 
 interface MapControlsPanelProps {
@@ -29,6 +30,25 @@ const FILTER_OPTIONS: Array<{ key: FilterKey; label: string; icon: IconName }> =
   { key: "RADAR", label: "Radar Key", icon: "key" },
 ];
 
+/** What the search box is doing, for the status line under it (empty when nothing to say). */
+export function searchStatusText({
+  isSearching,
+  noResults,
+  failed,
+  awaitingSubmit,
+}: {
+  isSearching: boolean;
+  noResults: boolean;
+  failed: boolean;
+  awaitingSubmit: boolean;
+}): string {
+  if (isSearching) return "Searching…";
+  if (failed) return "Place search isn't working right now. Try again in a moment.";
+  if (noResults) return "No places found. Try a postcode or street name.";
+  if (awaitingSubmit) return "Press Enter to search for places.";
+  return "";
+}
+
 export default function MapControlsPanel({
   mapRef,
   activeFilters,
@@ -37,12 +57,25 @@ export default function MapControlsPanel({
   onFindNearMe,
   locationError = null,
 }: MapControlsPanelProps) {
-  const { query, isSearching, suggestions, handleSearchInput, handleSuggestionSelect, dismiss } =
-    useNominatimSearch({ mapRef });
+  const {
+    query,
+    isSearching,
+    noResults,
+    failed,
+    awaitingSubmit,
+    suggestions,
+    attribution,
+    handleSearchInput,
+    handleSuggestionSelect,
+    searchNow,
+    dismiss,
+  } = usePlaceSearch({ mapRef });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterPanelId = useId();
+  const searchStatusId = useId();
+  const searchStatus = searchStatusText({ isSearching, noResults, failed, awaitingSubmit });
   const searchBoxRef = useRef<HTMLDivElement>(null);
-  const suggestionsRef = useRef<HTMLUListElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const activeCount = Object.values(activeFilters).filter(Boolean).length;
 
@@ -75,6 +108,17 @@ export default function MapControlsPanel({
             class={styles.searchInput}
             value={query}
             onInput={(e) => handleSearchInput((e.target as HTMLInputElement).value)}
+            // Enter (the keyboard's Search key) picks the first result when there are some, as
+            // in the add/edit form's search, or searches for places now.
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const first = suggestions[0];
+                if (first) handleSuggestionSelect(first);
+                else searchNow();
+              }
+            }}
+            aria-describedby={searchStatusId}
             // Short enough to show whole beside the buttons on a 360px phone.
             placeholder="Search places…"
             autoComplete="off"
@@ -119,22 +163,30 @@ export default function MapControlsPanel({
         </div>
       </div>
 
+      {/* "Searching…", "No places found…": empty (and zero height) the rest of the time. */}
+      <p id={searchStatusId} className={styles.searchStatus} role="status" aria-live="polite">
+        {searchStatus}
+      </p>
+
       {/* Autocomplete suggestions */}
       {suggestions.length > 0 && (
-        <ul className={styles.suggestions} ref={suggestionsRef} aria-label="Location suggestions">
-          {suggestions.map((s) => (
-            <li key={s.place_id} className={styles.suggestionItem}>
-              <button
-                type="button"
-                className={styles.suggestion}
-                onClick={() => handleSuggestionSelect(s)}
-              >
-                <Icon icon="map-location-dot" size="medium" aria-hidden="true" />
-                <span>{s.display_name}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div ref={suggestionsRef}>
+          <ul className={styles.suggestions} aria-label="Location suggestions">
+            {suggestions.map((s) => (
+              <li key={`${s.label}@${s.lat},${s.lng}`} className={styles.suggestionItem}>
+                <button
+                  type="button"
+                  className={styles.suggestion}
+                  onClick={() => handleSuggestionSelect(s)}
+                >
+                  <Icon icon="map-location-dot" size="medium" aria-hidden="true" />
+                  <span className={styles.suggestionLabel}>{s.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <PlaceSearchAttribution attribution={attribution} class={styles.attribution} />
+        </div>
       )}
 
       {/* Filter chips */}

@@ -14,6 +14,7 @@ import {
   reportLoo,
   restoreLoo,
 } from "../../api/reports";
+import { currentPath, loginHref } from "../../utils/returnTo";
 import { compassDirection } from "../ReviewChanges/describeChanges";
 import styles from "./ReportProblem.module.css";
 
@@ -94,12 +95,8 @@ interface Errors {
 
 type UndoState = { status: "idle" | "sending" } | { status: "done"; outcome: ChangeOutcome };
 
-const signInHref = (path: string) => `/auth/login?returnTo=${encodeURIComponent(path)}`;
-
-const currentPath = () =>
-  typeof window === "undefined"
-    ? "/"
-    : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+/** Sign in, then come back to this page (a same-origin path only: see safeReturnTo). */
+const signInHref = () => loginHref(currentPath("/"));
 
 /** Focus an element once it is on screen (after the render that mounts it). */
 function useFocusOnChange(key: unknown) {
@@ -387,7 +384,7 @@ export default function ReportProblem({
             </div>
             {!isAuthenticated && (
               <p className={styles.signInPrompt}>
-                <a href={signInHref(currentPath())}>Sign in</a> to keep track of your contributions.
+                <a href={signInHref()}>Sign in</a> to keep track of your contributions.
               </p>
             )}
           </>
@@ -532,8 +529,7 @@ export default function ReportProblem({
     if (error.kind === "auth") {
       return (
         <>
-          Your sign-in has expired. <a href={signInHref(currentPath())}>Sign in again</a> to send
-          your report.
+          Your sign-in has expired. <a href={signInHref()}>Sign in again</a> to send your report.
         </>
       );
     }

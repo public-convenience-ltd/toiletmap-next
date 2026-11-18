@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   addFormView,
   addToiletHref,
+  DEFAULT_MAP_VIEW,
+  initialMapView,
   MAP_VIEW_STORAGE_KEY,
   mapViewFromSearch,
   readMapView,
   toMapView,
+  withoutMapViewParams,
   writeMapView,
 } from "./mapView";
 
@@ -104,6 +107,43 @@ describe("mapViewFromSearch", () => {
     expect(mapViewFromSearch("")).toBeNull();
     expect(mapViewFromSearch("?lat=52.2")).toBeNull();
     expect(mapViewFromSearch("?lat=abc&lng=0")).toBeNull();
+  });
+});
+
+describe("initialMapView", () => {
+  it("opens at a ?lat&lng(&zoom) link first (legacy /map/:lng/:lat redirects land here)", () => {
+    const storage = memoryStorage();
+    writeMapView({ lat: 52, lng: 1, zoom: 12 }, storage);
+    expect(initialMapView("?lat=53.4&lng=-2.2&zoom=16", storage)).toEqual({
+      lat: 53.4,
+      lng: -2.2,
+      zoom: 16,
+    });
+  });
+
+  it("falls back to the remembered view, then the default", () => {
+    const storage = memoryStorage();
+    expect(initialMapView("", storage)).toEqual(DEFAULT_MAP_VIEW);
+    expect(initialMapView("?lat=999&lng=0", storage)).toEqual(DEFAULT_MAP_VIEW);
+    writeMapView({ lat: 52, lng: 1, zoom: 12 }, storage);
+    expect(initialMapView(null, storage)).toEqual({ lat: 52, lng: 1, zoom: 12 });
+    expect(initialMapView("?utm_source=x", storage)).toEqual({ lat: 52, lng: 1, zoom: 12 });
+  });
+});
+
+describe("withoutMapViewParams", () => {
+  it("drops a usable ?lat&lng&zoom view, keeping other parameters and the hash", () => {
+    expect(withoutMapViewParams("https://x.example/?lat=51.5&lng=-0.1&zoom=16")).toBe("/");
+    expect(
+      withoutMapViewParams("https://x.example/?lat=51.5&utm_source=a&lng=-0.1&zoom=16#top"),
+    ).toBe("/?utm_source=a#top");
+  });
+
+  it("leaves URLs without a usable view alone", () => {
+    expect(withoutMapViewParams("https://x.example/")).toBeNull();
+    expect(withoutMapViewParams("https://x.example/?utm_source=a")).toBeNull();
+    expect(withoutMapViewParams("https://x.example/?lat=999&lng=0")).toBeNull();
+    expect(withoutMapViewParams("not a url")).toBeNull();
   });
 });
 

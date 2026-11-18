@@ -784,6 +784,23 @@ describe("LooMap view memory and 'Add a toilet here'", () => {
     expect(addLink()).toHaveAttribute("href", "/loos/add?lat=53.48&lng=-2.24&zoom=15");
   });
 
+  it("opens at a ?lat&lng&zoom link (a legacy /map URL), then drops it from the address bar", () => {
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ lat: 53.48, lng: -2.24, zoom: 15 }));
+    window.history.replaceState(null, "", "/?lat=51.539&lng=-0.1426&zoom=16&utm_source=x#top");
+    render(<LooMap apiUrl="" />);
+    expect(fakeMap.setView).toHaveBeenCalledWith([51.539, -0.1426], 16);
+    expect(addLink()).toHaveAttribute("href", "/loos/add?lat=51.539&lng=-0.1426&zoom=16");
+    // A reload (or the shared address) follows the map: the link's view is remembered for it.
+    expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+      "/?utm_source=x#top",
+    );
+    expect(JSON.parse(localStorage.getItem(VIEW_KEY) ?? "null")).toEqual({
+      lat: 51.539,
+      lng: -0.1426,
+      zoom: 16,
+    });
+  });
+
   it("ignores the remembered view for a /loos/:id deep link", () => {
     localStorage.setItem(VIEW_KEY, JSON.stringify({ lat: 53.48, lng: -2.24, zoom: 15 }));
     window.history.replaceState(null, "", "/loos/aaa");
