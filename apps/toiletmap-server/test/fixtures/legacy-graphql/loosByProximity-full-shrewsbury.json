@@ -1,0 +1,381 @@
+{
+  "name": "loosByProximity-full-shrewsbury",
+  "description": "Full LooFragment fields, ProximityInput variable, maxDistance 500.",
+  "capturedAt": "2026-11-18T00:35:00.384Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query loosNearbyFull($from: ProximityInput!) {\n  loosByProximity(from: $from) {\n    ...LooFragment\n  }\n}\nfragment LooFragment on Loo {\n  id\n  createdAt\n  updatedAt\n  verifiedAt\n  active\n  location {\n    lat\n    lng\n  }\n  name\n  openingTimes\n  accessible\n  men\n  women\n  allGender\n  babyChange\n  children\n  urinalOnly\n  radar\n  automatic\n  noPayment\n  paymentDetails\n  notes\n  removalReason\n  attended\n  geohash\n  area {\n    name\n    type\n  }\n}",
+  "variables": {
+    "from": {
+      "lat": 52.7077,
+      "lng": -2.754,
+      "maxDistance": 500
+    }
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByProximity": [
+        {
+          "id": "d438f44779c07f9c8288bdc8",
+          "createdAt": "2014-11-20T10:50:13.238Z",
+          "updatedAt": "2016-09-14T21:36:40.226Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.710606463,
+            "lng": -2.752547264
+          },
+          "name": "Shrewsbury Bus Station Toilets",
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ]
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": false,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": false,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": null,
+          "removalReason": null,
+          "attended": false,
+          "geohash": "gcq5c7ett10p0hbhbj2j",
+          "area": [
+            {
+              "name": "Shropshire",
+              "type": "Local Authority"
+            }
+          ]
+        },
+        {
+          "id": "8d846ff1154a5b79ed3f72f6",
+          "createdAt": "2016-09-14T11:17:57.230Z",
+          "updatedAt": "2017-07-20T14:16:30.616Z",
+          "verifiedAt": "2026-06-22T12:42:25.521Z",
+          "active": true,
+          "location": {
+            "lat": 52.707681378,
+            "lng": -2.759724855
+          },
+          "name": null,
+          "openingTimes": null,
+          "accessible": false,
+          "men": null,
+          "women": null,
+          "allGender": null,
+          "babyChange": null,
+          "children": null,
+          "urinalOnly": null,
+          "radar": null,
+          "automatic": null,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": null,
+          "removalReason": null,
+          "attended": null,
+          "geohash": "gcq5c5nkmzbn24bpbp21",
+          "area": [
+            {
+              "name": "Shropshire",
+              "type": "Local Authority"
+            }
+          ]
+        },
+        {
+          "id": "b29fb7508c04bc2ade91f29a",
+          "createdAt": "2024-01-19T11:15:19.871Z",
+          "updatedAt": "2024-01-19T11:15:19.871Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.707637855,
+            "lng": -2.756575942
+          },
+          "name": "Shrewsbury Indoor Market",
+          "openingTimes": [
+            [],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            [
+              "08:00",
+              "16:00"
+            ],
+            []
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": null,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": "The toilets are located on the upper floor, lift access available.",
+          "removalReason": null,
+          "attended": null,
+          "geohash": "gcq5c70sppu48nbpbh21",
+          "area": [
+            {
+              "name": "Shropshire",
+              "type": "Local Authority"
+            }
+          ]
+        },
+        {
+          "id": "f94ec2960cfc221de9e1c4bb",
+          "createdAt": "2023-10-27T11:10:36.816Z",
+          "updatedAt": "2023-10-27T11:10:36.816Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.710748752,
+            "lng": -2.757723927
+          },
+          "name": "Theatre Severn ",
+          "openingTimes": null,
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": null,
+          "automatic": null,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": null,
+          "removalReason": null,
+          "attended": null,
+          "geohash": "gcq5c5xyk7spbn01200n",
+          "area": [
+            {
+              "name": "Shropshire",
+              "type": "Local Authority"
+            }
+          ]
+        },
+        {
+          "id": "8505c95f9356422865e0f9fe",
+          "createdAt": "2016-09-14T09:01:37.711Z",
+          "updatedAt": "2024-10-16T08:34:22.207Z",
+          "verifiedAt": "2025-05-17T12:02:07.664Z",
+          "active": true,
+          "location": {
+            "lat": 52.70869093,
+            "lng": -2.756064534
+          },
+          "name": "Barker St Car Park",
+          "openingTimes": null,
+          "accessible": false,
+          "men": null,
+          "women": null,
+          "allGender": null,
+          "babyChange": null,
+          "children": null,
+          "urinalOnly": null,
+          "radar": null,
+          "automatic": null,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": "Closed as at Oct 2024",
+          "removalReason": null,
+          "attended": null,
+          "geohash": "gcq5c7347h1kd9tmefrc",
+          "area": [
+            {
+              "name": "Shropshire",
+              "type": "Local Authority"
+            }
+          ]
+        },
+        {
+          "id": "23113ed968c5668a947de1b0",
+          "createdAt": "2015-01-08T23:46:12.949Z",
+          "updatedAt": "2025-05-24T16:00:53.683Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.7079333,
+            "lng": -2.7526333
+          },
+          "name": "Butcher Row",
+          "openingTimes": [
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "16:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ]
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": false,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": "Changing Places toilet locked due to \"vandalism\" council not allowing access.",
+          "removalReason": null,
+          "attended": false,
+          "geohash": "gcq5c75tfyzv55eq3uv8",
+          "area": [
+            {
+              "name": "Shropshire",
+              "type": "Local Authority"
+            }
+          ]
+        },
+        {
+          "id": "a62c554358606a7ca7e10f5f",
+          "createdAt": "2014-11-20T10:48:42.010Z",
+          "updatedAt": "2016-09-14T10:56:47.235Z",
+          "verifiedAt": "2025-10-23T09:50:48.747Z",
+          "active": true,
+          "location": {
+            "lat": 52.709507954,
+            "lng": -2.75277257
+          },
+          "name": "Darwin Shopping Centre",
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ]
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": false,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": null,
+          "removalReason": null,
+          "attended": true,
+          "geohash": "gcq5c77rpu2n212h048j",
+          "area": [
+            {
+              "name": "Shropshire",
+              "type": "Local Authority"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

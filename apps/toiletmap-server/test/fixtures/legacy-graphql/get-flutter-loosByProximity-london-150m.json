@@ -1,0 +1,192 @@
+{
+  "name": "get-flutter-loosByProximity-london-150m",
+  "description": "Flutter template (custom radius 150 m) near Watermark Place: includes a 24h loo, null-hours loos and removed loos (loosByProximity does not filter on active).",
+  "capturedAt": "2026-11-18T00:34:28.388Z",
+  "method": "GET",
+  "url": "/api?query=%7BloosByProximity(from%3A%20%7Blat%3A%2051.5094%2C%20lng%3A%20-0.0906%2C%20maxDistance%3A%20150%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures"
+  },
+  "query": "{loosByProximity(from: {lat: 51.5094, lng: -0.0906, maxDistance: 150}){ id name active location{lat lng} notes accessible allGender men women openingTimes babyChange noPayment urinalOnly radar attended}}",
+  "variables": null,
+  "operationName": null,
+  "redirects": [
+    {
+      "url": "/api/?query=%7BloosByProximity(from:%20%7Blat:%2051.5094,%20lng:%20-0.0906,%20maxDistance:%20150%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D",
+      "status": 308,
+      "headers": {
+        "content-type": "text/plain",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "location": "/api?query=%7BloosByProximity(from%3A%20%7Blat%3A%2051.5094%2C%20lng%3A%20-0.0906%2C%20maxDistance%3A%20150%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D"
+      }
+    }
+  ],
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByProximity": [
+        {
+          "id": "694c1fc2234c63776b1805a9",
+          "name": "Watermark Place (Automatic)",
+          "active": true,
+          "location": {
+            "lat": 51.509362482,
+            "lng": -0.090620106
+          },
+          "notes": "20p charge or RADAR key. Please note from time to time public conveniences may be closed for maintentance, repair or other reasons.",
+          "accessible": true,
+          "allGender": true,
+          "men": null,
+          "women": null,
+          "openingTimes": [
+            [
+              "00:00",
+              "00:00"
+            ],
+            [
+              "00:00",
+              "00:00"
+            ],
+            [
+              "00:00",
+              "00:00"
+            ],
+            [
+              "00:00",
+              "00:00"
+            ],
+            [
+              "00:00",
+              "00:00"
+            ],
+            [
+              "00:00",
+              "00:00"
+            ],
+            [
+              "00:00",
+              "00:00"
+            ]
+          ],
+          "babyChange": false,
+          "noPayment": false,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": false
+        },
+        {
+          "id": "ae6b3b386f16c3e80d28884d",
+          "name": "The Steelyard ",
+          "active": true,
+          "location": {
+            "lat": 51.51027765,
+            "lng": -0.090408339
+          },
+          "notes": "MONDAY 10.00 - 16.00;  TUESDAY - FRIDAY 10.00 - 22.00. Bank Holidays: Closed. Part of City of London Community Toilet Scheme.",
+          "accessible": true,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [],
+            []
+          ],
+          "babyChange": null,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": false,
+          "attended": null
+        },
+        {
+          "id": "1a13a3b64c579d1f9370f9b8",
+          "name": "The Banker",
+          "active": true,
+          "location": {
+            "lat": 51.50937929,
+            "lng": -0.091587876
+          },
+          "notes": "MONDAY - TUESDAY 11.00 - 22.00; WEDNESDAY - FRIDAY 11.00 - 23.00. Bank Holidays: Closed. Part of City of London Community Toilet Scheme.",
+          "accessible": true,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [],
+            []
+          ],
+          "babyChange": false,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": false,
+          "attended": null
+        },
+        {
+          "id": "a6d10496c544e0063694a50f",
+          "name": "London Cannon Street",
+          "active": true,
+          "location": {
+            "lat": 51.51058265,
+            "lng": -0.090609398
+          },
+          "notes": "Accessible toilet and Baby change are on the ground floor, to the left of the ticket office. Other toilets are down the stairs, to the left of the ticket office.",
+          "accessible": true,
+          "allGender": true,
+          "men": true,
+          "women": true,
+          "openingTimes": null,
+          "babyChange": true,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": null
+        }
+      ]
+    }
+  }
+}

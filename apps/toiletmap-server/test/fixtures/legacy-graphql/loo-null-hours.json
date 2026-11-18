@@ -1,0 +1,62 @@
+{
+  "name": "loo-null-hours",
+  "description": "loo(id) for a loo whose openingTimes is null (unknown hours).",
+  "capturedAt": "2026-11-18T00:34:41.549Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query findLooById($id: ID) {\n  loo(id: $id) {\n    ...LooFragment\n    reports {\n      id\n    }\n  }\n}\nfragment LooFragment on Loo {\n  id\n  createdAt\n  updatedAt\n  verifiedAt\n  active\n  location {\n    lat\n    lng\n  }\n  name\n  openingTimes\n  accessible\n  men\n  women\n  allGender\n  babyChange\n  children\n  urinalOnly\n  radar\n  automatic\n  noPayment\n  paymentDetails\n  notes\n  removalReason\n  attended\n  geohash\n  area {\n    name\n    type\n  }\n}",
+  "variables": {
+    "id": "66a0a7e5a9b1590a9d222297"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loo": {
+        "id": "66a0a7e5a9b1590a9d222297",
+        "createdAt": "2019-01-23T13:02:42.868Z",
+        "updatedAt": "2019-01-23T13:02:42.868Z",
+        "verifiedAt": "2024-04-14T14:49:28.146Z",
+        "active": true,
+        "location": {
+          "lat": 51.506455038,
+          "lng": -0.089274585
+        },
+        "name": "Cathedral cafe",
+        "openingTimes": null,
+        "accessible": false,
+        "men": null,
+        "women": null,
+        "allGender": null,
+        "babyChange": null,
+        "children": null,
+        "urinalOnly": null,
+        "radar": null,
+        "automatic": null,
+        "noPayment": false,
+        "paymentDetails": null,
+        "notes": "At river end of café downstairs",
+        "removalReason": null,
+        "attended": false,
+        "geohash": "gcpvjbqyzg0h17t82uwc",
+        "area": [
+          {
+            "name": "Southwark",
+            "type": "Local Authority"
+          }
+        ],
+        "reports": []
+      }
+    }
+  }
+}

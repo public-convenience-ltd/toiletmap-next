@@ -1,0 +1,86 @@
+{
+  "name": "get-flutter-loosByProximity-removed-25m",
+  "description": "Flutter template (radius 25 m) centred on a removed loo: does loosByProximity return active: false loos?",
+  "capturedAt": "2026-11-18T00:37:26.687Z",
+  "method": "GET",
+  "url": "/api?query=%7BloosByProximity(from%3A%20%7Blat%3A%2051.505445843%2C%20lng%3A%20-0.088849068%2C%20maxDistance%3A%2025%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures"
+  },
+  "query": "{loosByProximity(from: {lat: 51.505445843, lng: -0.088849068, maxDistance: 25}){ id name active location{lat lng} notes accessible allGender men women openingTimes babyChange noPayment urinalOnly radar attended}}",
+  "variables": null,
+  "operationName": null,
+  "redirects": [
+    {
+      "url": "/api/?query=%7BloosByProximity(from:%20%7Blat:%2051.505445843,%20lng:%20-0.088849068,%20maxDistance:%2025%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D",
+      "status": 308,
+      "headers": {
+        "content-type": "text/plain",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "location": "/api?query=%7BloosByProximity(from%3A%20%7Blat%3A%2051.505445843%2C%20lng%3A%20-0.088849068%2C%20maxDistance%3A%2025%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%20notes%20accessible%20allGender%20men%20women%20openingTimes%20babyChange%20noPayment%20urinalOnly%20radar%20attended%7D%7D"
+      }
+    }
+  ],
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByProximity": [
+        {
+          "id": "22c44a1e75743f30d729e6c1",
+          "name": "Pret",
+          "active": false,
+          "location": {
+            "lat": 51.505445843,
+            "lng": -0.088849068
+          },
+          "notes": null,
+          "accessible": false,
+          "allGender": null,
+          "men": true,
+          "women": true,
+          "openingTimes": [
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ],
+            [
+              "09:00",
+              "17:00"
+            ]
+          ],
+          "babyChange": true,
+          "noPayment": true,
+          "urinalOnly": null,
+          "radar": true,
+          "attended": false
+        }
+      ]
+    }
+  }
+}

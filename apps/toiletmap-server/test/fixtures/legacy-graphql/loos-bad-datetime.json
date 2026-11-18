@@ -1,0 +1,38 @@
+{
+  "name": "loos-bad-datetime",
+  "description": "Invalid DateTime variable -> variable coercion error format.",
+  "capturedAt": "2026-11-18T00:34:58.039Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query searchLoos(\n  $filters: LooFilter!\n  $pagination: PaginationInput = { limit: 10, page: 1 }\n  $sort: SortOrder = NEWEST_FIRST\n) {\n  loos(filters: $filters, pagination: $pagination, sort: $sort) {\n    loos {\n      id\n      name\n      area {\n        name\n        type\n      }\n      updatedAt\n    }\n    total\n    page\n    limit\n    pages\n  }\n}",
+  "variables": {
+    "filters": {
+      "fromDate": "not-a-date"
+    }
+  },
+  "operationName": null,
+  "status": 400,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Unexpected error.",
+        "locations": [
+          {
+            "line": 2,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}

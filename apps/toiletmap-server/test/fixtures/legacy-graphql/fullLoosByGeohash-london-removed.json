@@ -1,0 +1,37 @@
+{
+  "name": "fullLoosByGeohash-london-removed",
+  "description": "Full compressed loos with active: false.",
+  "capturedAt": "2026-11-18T00:35:09.071Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query fullLoosByGeohash($geohash: String!, $active: Boolean = true) {\n  fullLoosByGeohash(geohash: $geohash, active: $active)\n}",
+  "variables": {
+    "geohash": "gcpvjb",
+    "active": false
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "fullLoosByGeohash": [
+        "675a72216e6ae337cb232709|gcpvjbc87|337|eyJuIjoiR2xvYmUiLCJvIjoiMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAifQ",
+        "22c44a1e75743f30d729e6c1|gcpvjbr2c|369|eyJuIjoiUHJldCIsIm8iOiIwOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMCJ9",
+        "2513b6d81626b7799352f145|gcpvjbrqk|337|eyJuIjoiUGl6emEgRXhwcmVzcyIsInQiOiJBbnlvbmUgd2l0aCBiYWxscyBjb3VsZCB3YWxrIGluIGFuZCB1c2Ugd2l0aG91dCBiZWluZyBhIGN1c3RvbWVyISBKdXN0IGhhdmUgY29uZmlkZW5jZS4iLCJvIjoiMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAuMDkwMDE3MDAifQ",
+        "8a784c9b8e6c07d3b00e4609|gcpvjbs73|337|eyJuIjoiUHVibGljIEhvdXNlIiwibyI6IjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwIn0",
+        "95a3d59ae1030edb5c340588|gcpvjbt90|337|eyJuIjoiUHJldCIsIm8iOiIwOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMCJ9",
+        "db5bccce6efbb2b7be69e054|gcpvjbw08|353|eyJuIjoiQ2FmZSIsIm8iOiIwOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMC4wOTAwMTcwMCJ9",
+        "8af65bae77fbf4f5a035c0d9|gcpvjbw42|337|eyJuIjoiUHVibGljIEhvdXNlIiwibyI6IjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwIn0"
+      ]
+    }
+  }
+}

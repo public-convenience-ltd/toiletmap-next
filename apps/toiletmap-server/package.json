@@ -36,6 +36,7 @@
     "@toiletmap/auth": "workspace:*",
     "@toiletmap/opening-hours": "workspace:*",
     "@types/leaflet": "^1.9.22",
+    "graphql": "16.10.0",
     "hono": "^4.13.16",
     "leaflet": "^1.9.4",
     "openapi3-ts": "^4.6.2",

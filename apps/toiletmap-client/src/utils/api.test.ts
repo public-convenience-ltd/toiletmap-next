@@ -1,6 +1,15 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type ApiEnv, fetchApi, getUpstreamApiUrl, isAllowedApiPath, proxyApiRequest } from "./api";
+import {
+  type ApiEnv,
+  fetchApi,
+  getUpstreamApiUrl,
+  isAllowedApiPath,
+  isLegacyGraphqlPath,
+  LEGACY_GRAPHQL_MAX_BODY_BYTES,
+  proxyApiRequest,
+  proxyLegacyGraphqlRequest,
+} from "./api";
 
 const ORIGIN = "https://www.toiletmap.org.uk";
 
@@ -323,6 +332,245 @@ describe("proxyApiRequest", () => {
     });
     expect(res.status).toBe(502);
     errorSpy.mockRestore();
+  });
+});
+
+describe("isLegacyGraphqlPath", () => {
+  it("matches exactly /api and /api/", () => {
+    expect(isLegacyGraphqlPath("/api")).toBe(true);
+    expect(isLegacyGraphqlPath("/api/")).toBe(true);
+    for (const path of [
+      "/api/feedback",
+      "/api/graphql",
+      "/api//",
+      "/api/loos",
+      "/api%2f",
+      "/apis",
+      "/",
+    ]) {
+      expect(isLegacyGraphqlPath(path), path).toBe(false);
+    }
+  });
+});
+
+describe("proxyLegacyGraphqlRequest", () => {
+  /** The Flutter app's request: Dart only escapes spaces and braces. */
+  const FLUTTER_SEARCH =
+    "?query=%7BloosByProximity(from:%20%7Blat:%2052.7077,%20lng:%20-2.754,%20maxDistance:%202000%7D)%7B%20id%20name%20active%20location%7Blat%20lng%7D%7D%7D";
+
+  it("forwards the Flutter GET to /api/graphql with the query string untouched", async () => {
+    const { binding, calls } = makeBinding();
+    for (const path of ["/api/", "/api"]) {
+      await proxyLegacyGraphqlRequest({
+        request: new Request(`${ORIGIN}${path}${FLUTTER_SEARCH}`, {
+          headers: { "user-agent": "Dart/3.5 (dart:io)" },
+        }),
+        env: envWith(binding),
+        clientIp: "1.2.3.4",
+      });
+    }
+    expect(calls.map((call) => call.url)).toEqual([
+      `https://toiletmap-server.example.dev/api/graphql${FLUTTER_SEARCH}`,
+      `https://toiletmap-server.example.dev/api/graphql${FLUTTER_SEARCH}`,
+    ]);
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.headers.get("user-agent")).toBe("Dart/3.5 (dart:io)");
+  });
+
+  it("never forwards cookies or credentials, and preserves the client IP", async () => {
+    const { binding, calls } = makeBinding();
+    await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api/?query=%7B__typename%7D`, {
+        headers: {
+          cookie: "access_token=secret; user_info=abc",
+          authorization: "Bearer from-the-caller",
+          "x-forwarded-for": "6.6.6.6",
+        },
+      }),
+      env: envWith(binding),
+      clientIp: "1.2.3.4",
+    });
+    const upstream = calls[0];
+    expect(upstream?.headers.get("cookie")).toBeNull();
+    expect(upstream?.headers.get("authorization")).toBeNull();
+    expect(upstream?.headers.get("cf-connecting-ip")).toBe("1.2.3.4");
+    expect(upstream?.headers.get("x-forwarded-for")).toBe("1.2.3.4");
+  });
+
+  it("forwards cross-origin POSTs without the CSRF Origin check", async () => {
+    const { binding, calls } = makeBinding();
+    const body = JSON.stringify({ query: "{ areas { name } }" });
+    const res = await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api`, {
+        method: "POST",
+        headers: {
+          origin: "https://explorer.toiletmap.org.uk",
+          "content-type": "application/json",
+          accept: "application/graphql-response+json",
+          cookie: "access_token=secret",
+        },
+        body,
+      }),
+      env: envWith(binding),
+    });
+    expect(res.status).toBe(200);
+    const upstream = calls[0];
+    expect(upstream?.url).toBe("https://toiletmap-server.example.dev/api/graphql");
+    expect(upstream?.method).toBe("POST");
+    expect(upstream?.headers.get("origin")).toBe("https://explorer.toiletmap.org.uk");
+    expect(upstream?.headers.get("content-type")).toBe("application/json");
+    expect(upstream?.headers.get("accept")).toBe("application/graphql-response+json");
+    expect(upstream?.headers.get("cookie")).toBeNull();
+    expect(upstream?.headers.get("authorization")).toBeNull();
+    expect(await upstream?.text()).toBe(body);
+  });
+
+  it("passes preflights through and keeps upstream CORS headers, but not cookies", async () => {
+    const { binding, calls } = makeBinding(
+      () =>
+        new Response(null, {
+          status: 204,
+          headers: {
+            "access-control-allow-origin": "https://explorer.toiletmap.org.uk",
+            "access-control-allow-methods": "GET,HEAD,POST",
+            "access-control-allow-headers": "content-type",
+            vary: "Origin, Access-Control-Request-Headers",
+            "set-cookie": "x=y",
+          },
+        }),
+    );
+    const res = await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api`, {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://explorer.toiletmap.org.uk",
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "content-type",
+        },
+      }),
+      env: envWith(binding),
+    });
+    expect(calls[0]?.method).toBe("OPTIONS");
+    expect(calls[0]?.headers.get("access-control-request-method")).toBe("POST");
+    expect(calls[0]?.headers.get("access-control-request-headers")).toBe("content-type");
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(
+      "https://explorer.toiletmap.org.uk",
+    );
+    expect(res.headers.get("access-control-allow-methods")).toBe("GET,HEAD,POST");
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("relays upstream status, cache and deprecation headers", async () => {
+    const { binding } = makeBinding(
+      () =>
+        new Response('{"data":{"__typename":"Query"}}', {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "public, max-age=60",
+            "access-control-allow-origin": "*",
+            deprecation: "true",
+          },
+        }),
+    );
+    const res = await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api/?query=%7B__typename%7D`),
+      env: envWith(binding),
+    });
+    expect(await res.json()).toEqual({ data: { __typename: "Query" } });
+    expect(res.headers.get("cache-control")).toBe("public, max-age=60");
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("deprecation")).toBe("true");
+  });
+
+  it("refuses other methods and oversized bodies without contacting upstream", async () => {
+    const { binding } = makeBinding();
+    const put = await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api`, { method: "PUT", body: "{}" }),
+      env: envWith(binding),
+    });
+    expect(put.status).toBe(405);
+    expect(put.headers.get("allow")).toBe("GET, POST");
+
+    const big = await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "x".repeat(LEGACY_GRAPHQL_MAX_BODY_BYTES + 1),
+      }),
+      env: envWith(binding),
+    });
+    expect(big.status).toBe(413);
+    expect(big.headers.get("access-control-allow-origin")).toBe("*");
+    expect(put.headers.get("access-control-allow-origin")).toBe("*");
+    expect(binding.fetch).not.toHaveBeenCalled();
+  });
+
+  it("stops reading a chunked body without Content-Length once it passes the limit", async () => {
+    const { binding } = makeBinding();
+    const chunk = new Uint8Array(16 * 1024);
+    let pulled = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        // Far more than the limit if read to the end.
+        if (pulled > 1_000) controller.close();
+        else controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const request = new Request(`${ORIGIN}/api`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+    expect(request.headers.get("content-length")).toBeNull();
+
+    const res = await proxyLegacyGraphqlRequest({ request, env: envWith(binding) });
+    expect(res.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(pulled * chunk.byteLength).toBeLessThan(LEGACY_GRAPHQL_MAX_BODY_BYTES * 2);
+    expect(binding.fetch).not.toHaveBeenCalled();
+  });
+
+  it("forwards a chunked body within the limit unchanged", async () => {
+    const { binding, calls } = makeBinding();
+    const text = JSON.stringify({ query: "{ __typename }" });
+    const bytes = new TextEncoder().encode(text);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 5));
+        controller.enqueue(bytes.slice(5));
+        controller.close();
+      },
+    });
+    const res = await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: stream,
+        duplex: "half",
+      } as RequestInit),
+      env: envWith(binding),
+    });
+    expect(res.status).toBe(200);
+    expect(await calls[0]?.text()).toBe(text);
+  });
+
+  it("only handles the legacy paths; /api/feedback is not routed to GraphQL", async () => {
+    const { binding } = makeBinding();
+    const res = await proxyLegacyGraphqlRequest({
+      request: new Request(`${ORIGIN}/api/feedback`, { method: "POST", body: "{}" }),
+      env: envWith(binding),
+    });
+    expect(res.status).toBe(404);
+    expect(binding.fetch).not.toHaveBeenCalled();
   });
 });
 

@@ -1,0 +1,35 @@
+{
+  "name": "loosByGeohash-shrewsbury",
+  "description": "Compressed loos (id|geohash9|filterMask), precision-6 cell, active default.",
+  "capturedAt": "2026-11-18T00:35:03.567Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query loosByGeohash($geohash: String!, $active: Boolean = true) {\n  loosByGeohash(geohash: $geohash, active: $active)\n}",
+  "variables": {
+    "geohash": "gcq5c7"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByGeohash": [
+        "b29fb7508c04bc2ade91f29a|gcq5c70sp|57",
+        "8505c95f9356422865e0f9fe|gcq5c7347|1",
+        "23113ed968c5668a947de1b0|gcq5c75tf|57",
+        "a62c554358606a7ca7e10f5f|gcq5c77rp|57",
+        "d438f44779c07f9c8288bdc8|gcq5c7ett|41",
+        "06fb5f07d52e8493ea45f97a|gcq5c7y6n|49"
+      ]
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "fullLoosByGeohash-london",
+  "description": "Full compressed loos incl. 24h hours, null hours, '£' in meta.",
+  "capturedAt": "2026-11-18T00:35:07.977Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query fullLoosByGeohash($geohash: String!, $active: Boolean = true) {\n  fullLoosByGeohash(geohash: $geohash, active: $active)\n}",
+  "variables": {
+    "geohash": "gcpvjb"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "fullLoosByGeohash": [
+        "78b3f1ccdaa8a408270ed69b|gcpvjbms5|1|eyJuIjoiQm9yb3VnaCBtYXJrZXQgMSIsInQiOiJjb3JuZXIgb2YgZGVsaXZlcnkgeWFyZCAgV2luY2hlc3RlciBXYWxrIn0",
+        "094c6bc6737a6754a2bc51a3|gcpvjbnwf|8|eyJuIjoiQm9yb3VnaCBtYXJrZXQgMiIsInQiOiJJbnNpZGUgbWFya2V0IHNlYXRpbmcgIGFyZWEifQ",
+        "66a0a7e5a9b1590a9d222297|gcpvjbqyz|0|eyJuIjoiQ2F0aGVkcmFsIGNhZmUiLCJ0IjoiQXQgcml2ZXIgZW5kIG9mIGNhZsOpIGRvd25zdGFpcnMifQ",
+        "1a13a3b64c579d1f9370f9b8|gcpvjbvrc|329|eyJuIjoiVGhlIEJhbmtlciIsInQiOiJNT05EQVkgLSBUVUVTREFZIDExLjAwIC0gMjIuMDA7IFdFRE5FU0RBWSAtIEZSSURBWSAxMS4wMCAtIDIzLjAwLiBCYW5rIEhvbGlkYXlzOiBDbG9zZWQuIFBhcnQgb2YgQ2l0eSBvZiBMb25kb24gQ29tbXVuaXR5IFRvaWxldCBTY2hlbWUuIiwibyI6IjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLjA5MDAxNzAwLi4ifQ",
+        "694c1fc2234c63776b1805a9|gcpvjbypb|46|eyJuIjoiV2F0ZXJtYXJrIFBsYWNlIChBdXRvbWF0aWMpIiwicCI6IsKjMC4yMCIsInQiOiIyMHAgY2hhcmdlIG9yIFJBREFSIGtleS4gUGxlYXNlIG5vdGUgZnJvbSB0aW1lIHRvIHRpbWUgcHVibGljIGNvbnZlbmllbmNlcyBtYXkgYmUgY2xvc2VkIGZvciBtYWludGVudGFuY2UsIHJlcGFpciBvciBvdGhlciByZWFzb25zLiIsIm8iOiIwMDAwMDAwMC4wMDAwMDAwMC4wMDAwMDAwMC4wMDAwMDAwMC4wMDAwMDAwMC4wMDAwMDAwMC4wMDAwMDAwMCJ9"
+      ]
+    }
+  }
+}

@@ -56,6 +56,13 @@ export interface Env {
   MODERATION_SLACK_WEBHOOK?: string;
 
   /**
+   * Optional sunset date for the legacy GraphQL endpoint (`/api/graphql`), as
+   * an HTTP-date such as "Sat, 01 Jan 2028 00:00:00 GMT". When set (and
+   * valid), responses carry a `Sunset` header. Unset until a date is announced.
+   */
+  GRAPHQL_SUNSET?: string;
+
+  /**
    * Optional Cloudflare Turnstile secret. When set, `POST /api/feedback`
    * requires a valid Turnstile token. Unset (the default) disables the check.
    * Turning it on rejects the legacy Flutter app, which cannot send a token,

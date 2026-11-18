@@ -1,4 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
+import { isLegacyGraphqlPath } from "../routes/legacy-graphql/path";
 import type { AppVariables, Env } from "../types";
 import { logger } from "../utils/logger";
 
@@ -15,6 +16,8 @@ interface CloudflareRateLimitConfig {
   keyGenerator: (c: Context<{ Bindings: Env; Variables: AppVariables }>) => string;
   message?: string;
   name?: string;
+  /** Paths whose "Rate limit exceeded" log must not include the (IP-based) key. */
+  omitKeyFromLogs?: (path: string) => boolean;
   /**
    * Include the rate-limit key (which usually contains the client IP) in the
    * "Rate limit exceeded" log line. Default true; false (or a function
@@ -57,6 +60,7 @@ const cloudflareRateLimit = (
     keyGenerator,
     message = "Too many requests, please try again later",
     name = binding,
+    omitKeyFromLogs = () => false,
     logKey = true,
   } = config;
 
@@ -85,7 +89,9 @@ const cloudflareRateLimit = (
       if (!success) {
         logger.warn("Rate limit exceeded", {
           rateLimiter: name,
-          ...((typeof logKey === "function" ? logKey(c) : logKey) ? { key } : {}),
+          ...(!omitKeyFromLogs(c.req.path) && (typeof logKey === "function" ? logKey(c) : logKey)
+            ? { key }
+            : {}),
           path: c.req.path,
           method: c.req.method,
         });
@@ -159,6 +165,8 @@ export const rateLimiters = {
     keyGenerator: (c) => `read:${getClientIp(c)}`,
     message: "Too many requests, please try again later",
     name: "read",
+    // The legacy GraphQL endpoint logs no client IP.
+    omitKeyFromLogs: isLegacyGraphqlPath,
     logKey: (c) => !isFeedbackPath(c.req.path),
   }),
 

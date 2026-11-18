@@ -1,0 +1,28 @@
+{
+  "name": "options-preflight-explorer",
+  "description": "CORS preflight for a JSON POST from explorer.toiletmap.org.uk.",
+  "capturedAt": "2026-11-18T00:34:31.619Z",
+  "method": "OPTIONS",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "origin": "https://explorer.toiletmap.org.uk",
+    "access-control-request-method": "POST",
+    "access-control-request-headers": "content-type"
+  },
+  "query": null,
+  "variables": null,
+  "operationName": null,
+  "status": 204,
+  "headers": {
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin, Access-Control-Request-Headers",
+    "access-control-allow-origin": "https://explorer.toiletmap.org.uk",
+    "access-control-allow-methods": "GET,HEAD,POST",
+    "access-control-allow-headers": "content-type",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "_nonJsonText": ""
+  }
+}

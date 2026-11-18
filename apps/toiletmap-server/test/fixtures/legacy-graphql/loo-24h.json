@@ -1,0 +1,91 @@
+{
+  "name": "loo-24h",
+  "description": "loo(id) with LooFragment + reports for a loo open 24h (00:00-00:00 every day).",
+  "capturedAt": "2026-11-18T00:34:40.457Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query findLooById($id: ID) {\n  loo(id: $id) {\n    ...LooFragment\n    reports {\n      id\n    }\n  }\n}\nfragment LooFragment on Loo {\n  id\n  createdAt\n  updatedAt\n  verifiedAt\n  active\n  location {\n    lat\n    lng\n  }\n  name\n  openingTimes\n  accessible\n  men\n  women\n  allGender\n  babyChange\n  children\n  urinalOnly\n  radar\n  automatic\n  noPayment\n  paymentDetails\n  notes\n  removalReason\n  attended\n  geohash\n  area {\n    name\n    type\n  }\n}",
+  "variables": {
+    "id": "694c1fc2234c63776b1805a9"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loo": {
+        "id": "694c1fc2234c63776b1805a9",
+        "createdAt": "2016-09-14T08:35:47.237Z",
+        "updatedAt": "2016-09-14T08:35:47.239Z",
+        "verifiedAt": null,
+        "active": true,
+        "location": {
+          "lat": 51.509362482,
+          "lng": -0.090620106
+        },
+        "name": "Watermark Place (Automatic)",
+        "openingTimes": [
+          [
+            "00:00",
+            "00:00"
+          ],
+          [
+            "00:00",
+            "00:00"
+          ],
+          [
+            "00:00",
+            "00:00"
+          ],
+          [
+            "00:00",
+            "00:00"
+          ],
+          [
+            "00:00",
+            "00:00"
+          ],
+          [
+            "00:00",
+            "00:00"
+          ],
+          [
+            "00:00",
+            "00:00"
+          ]
+        ],
+        "accessible": true,
+        "men": null,
+        "women": null,
+        "allGender": true,
+        "babyChange": false,
+        "children": null,
+        "urinalOnly": null,
+        "radar": true,
+        "automatic": true,
+        "noPayment": false,
+        "paymentDetails": "£0.20",
+        "notes": "20p charge or RADAR key. Please note from time to time public conveniences may be closed for maintentance, repair or other reasons.",
+        "removalReason": null,
+        "attended": false,
+        "geohash": "gcpvjbypb3hg8n11gbje",
+        "area": [
+          {
+            "name": "City of London",
+            "type": "Local Authority"
+          }
+        ],
+        "reports": []
+      }
+    }
+  }
+}
