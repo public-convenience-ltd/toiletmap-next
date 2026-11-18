@@ -1,0 +1,199 @@
+/*
+ * Prose: long-form text (content pages, blog posts) written in Markdown or by the CMS, so
+ * it styles bare elements. Every rule is scoped to `.prose` and uses :where() for the
+ * element part, so a component placed inside prose (a Button, a Notice) keeps its own look.
+ *
+ * Vertical rhythm comes from one rule: every child after the first gets a top margin
+ * (`--prose-flow`), and headings get more above than below so they sit with what follows.
+ */
+.prose {
+  --prose-measure: 70ch;
+  --prose-flow: var(--space-s);
+
+  max-inline-size: var(--prose-measure);
+  color: var(--color-text);
+  font-size: var(--text-0);
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.prose > :where(*) {
+  margin-block: 0;
+}
+
+.prose > :where(* + *) {
+  margin-block-start: var(--prose-flow);
+}
+
+/* Headings: tighter lines, more space above than below. */
+.prose :where(h1, h2, h3, h4, h5, h6) {
+  line-height: 1.25;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.prose :where(h1) {
+  font-size: var(--text-4);
+}
+
+.prose :where(h2) {
+  font-size: var(--text-2);
+}
+
+.prose :where(h3) {
+  font-size: var(--text-1);
+}
+
+.prose :where(h4, h5, h6) {
+  font-size: var(--text-0);
+}
+
+.prose > :where(* + h2, * + h3) {
+  margin-block-start: var(--space-l);
+}
+
+.prose > :where(* + h4, * + h5, * + h6) {
+  margin-block-start: var(--space-m);
+}
+
+.prose > :where(h1, h2, h3, h4, h5, h6) + :where(*) {
+  margin-block-start: var(--space-2xs);
+}
+
+/* Links: underlined (prose links are inline, so colour alone would not mark them). */
+.prose :where(a:not(.button)) {
+  color: var(--color-link);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.prose :where(a:not(.button)):hover {
+  text-decoration-thickness: 2px;
+}
+
+.prose :where(a:not(.button)):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* Lists */
+.prose :where(ul, ol) {
+  padding-inline-start: 1.5em;
+}
+
+.prose :where(li + li) {
+  margin-block-start: var(--space-3xs);
+}
+
+.prose :where(li > ul, li > ol) {
+  margin-block-start: var(--space-3xs);
+}
+
+.prose :where(li)::marker {
+  color: var(--color-text-muted);
+}
+
+/* Quotes */
+.prose :where(blockquote) {
+  margin-inline: 0;
+  padding: var(--space-2xs) var(--space-s);
+  border-inline-start: 4px solid var(--color-accent-turquoise);
+  background-color: var(--color-light-grey);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.prose :where(blockquote) > :where(*) {
+  margin-block: 0;
+}
+
+.prose :where(blockquote) > :where(* + *) {
+  margin-block-start: var(--space-2xs);
+}
+
+/* Media: never wider than the column, rounded, with a caption beneath. */
+.prose :where(img, video, iframe) {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  border-radius: var(--radius-md);
+}
+
+.prose :where(figure) {
+  margin-inline: 0;
+}
+
+.prose :where(figcaption) {
+  margin-block-start: var(--space-3xs);
+  color: var(--color-text-muted);
+  font-size: var(--text--1);
+}
+
+/* Code */
+.prose :where(code, kbd, samp) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.prose :where(:not(pre) > code) {
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-light-grey);
+}
+
+.prose :where(pre) {
+  padding: var(--space-xs);
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  background-color: var(--color-light-grey);
+  line-height: 1.45;
+}
+
+/*
+ * Tables: a wide table scrolls sideways inside its own box instead of widening the page
+ * (display: block on the table itself, so Markdown needs no wrapper element).
+ */
+.prose :where(table) {
+  display: block;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: var(--text--1);
+}
+
+.prose :where(th, td) {
+  padding: var(--space-3xs) var(--space-2xs);
+  border-block-end: 1px solid var(--color-neutral-grey);
+  text-align: start;
+  vertical-align: top;
+}
+
+.prose :where(th) {
+  font-weight: 700;
+}
+
+.prose :where(thead th) {
+  border-block-end-width: 2px;
+}
+
+.prose :where(hr) {
+  border: 0;
+  border-block-start: 1px solid var(--color-neutral-grey);
+  margin-block: var(--space-l);
+}
+
+.prose :where(strong, b) {
+  font-weight: 700;
+}
+
+/* Phones: a little less space between blocks, and lists closer to the edge. */
+@media (max-width: 479.98px) {
+  .prose {
+    --prose-flow: var(--space-xs);
+  }
+
+  .prose :where(ul, ol) {
+    padding-inline-start: 1.25em;
+  }
+}
