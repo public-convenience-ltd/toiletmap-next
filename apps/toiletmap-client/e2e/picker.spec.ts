@@ -192,27 +192,53 @@ test.describe("location picker guard rails", () => {
     const pinBefore = await box(form.pin);
     const map = await box(picker.map);
     const at = { x: map.x + map.width * 0.3, y: map.y + map.height * 0.4 };
-    // Scroll back towards the top of the page. With the map at the top of the viewport
-    // the page can always scroll up, but it may already be at its bottom (how tall the
-    // form is depends on the platform's fonts, so CI's Linux page is shorter).
+    // Scroll back towards the top of the page: with the map at the top of the viewport
+    // there is always room to scroll up.
     expect(before).toBeGreaterThan(100);
 
     if (isMobile) {
-      // A real touch swipe down over the map (Chromium's synthetic gesture).
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send("Input.synthesizeScrollGesture", {
-        x: Math.round(at.x),
-        y: Math.round(at.y),
-        yDistance: 200,
-        gestureSourceType: "touch",
-        speed: 600,
-      });
+      // Chromium's synthetic touch-scroll gesture doesn't scroll anything on CI's Linux
+      // runners (it does on macOS), so check what decides whether a phone scrolls the
+      // page: every element under the finger lets vertical pans through, and nothing
+      // cancels the touch.
+      const touch = await page.evaluate(({ x, y }) => {
+        const target = document.elementFromPoint(x, y);
+        if (!target) return { found: false, blocked: [], cancelled: [] };
+        const blocked: string[] = [];
+        for (let el: Element | null = target; el; el = el.parentElement) {
+          const action = getComputedStyle(el).touchAction;
+          const allowsPanY =
+            action === "auto" || action === "manipulation" || /\bpan-y\b/.test(action);
+          if (!allowsPanY) blocked.push(`${el.tagName.toLowerCase()}.${el.className}: ${action}`);
+        }
+        const cancelled: string[] = [];
+        const point = (dy: number) =>
+          new Touch({ identifier: 1, target, clientX: x, clientY: y + dy });
+        for (const [type, dy] of [
+          ["touchstart", 0],
+          ["touchmove", 40],
+          ["touchmove", 120],
+          ["touchend", 120],
+        ] as const) {
+          const touches = type === "touchend" ? [] : [point(dy)];
+          const event = new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches,
+            targetTouches: touches,
+            changedTouches: [point(dy)],
+          });
+          if (!target.dispatchEvent(event)) cancelled.push(`${type} +${dy}`);
+        }
+        return { found: true, blocked, cancelled };
+      }, at);
+      expect(touch).toEqual({ found: true, blocked: [], cancelled: [] });
     } else {
       await page.mouse.move(at.x, at.y);
       await page.mouse.wheel(0, -300);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before - 50);
     }
 
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before - 50);
     await waitForMapToSettle(picker.map);
     // The map didn't move under the pin, and it is still locked.
     const pinAfter = await box(form.pin);
