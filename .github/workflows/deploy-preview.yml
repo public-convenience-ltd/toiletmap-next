@@ -72,8 +72,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: .
 
-      - name: Build client
-        run: pnpm build
+      # CLOUDFLARE_ENV=preview: prerendered pages (about, posts, privacy, ...) take ENVIRONMENT
+      # from the build, so a plain `pnpm build` would bake in the top-level "production" and
+      # leave them indexable. The --var flags below only reach server-rendered pages.
+      - name: Build client (preview)
+        run: pnpm build:preview
+
+      - name: Check prerendered pages are noindex
+        run: |
+          for page in dist/client/about.html dist/client/posts.html; do
+            if ! grep -q '<meta name="robots" content="noindex' "$page"; then
+              echo "::error::${page} has no noindex robots meta; was the preview built with CLOUDFLARE_ENV=preview?"
+              exit 1
+            fi
+          done
 
       - name: Deploy client preview
         run: |
