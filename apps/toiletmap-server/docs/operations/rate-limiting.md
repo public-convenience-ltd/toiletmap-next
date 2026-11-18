@@ -7,11 +7,17 @@ The application uses the **Cloudflare Rate Limiting API** for global, datacenter
 
 | Tier | Limit | Scope | Use Case |
 |------|-------|-------|----------|
-| **Read** | 400/min | IP | Public API reads |
+| **Read** | 400/min | IP | Public API reads (including every `GET /api/geocode`) |
 | **Write** | 20/min | User/IP | Creating/updating loos |
 | **Feedback** | 20/min | IP | `POST /api/feedback` (shares the write binding under a `feedback:` key; the key is never logged) |
+| **Geocode** | 20/min | IP | Explicit place searches (`GET /api/geocode` without `mode=suggest`, the ones that may reach Nominatim). Shares the write binding under a `geocode:` key, on top of the read limit; the key is never logged. Typing (`mode=suggest`) never reaches Nominatim and has only the read limit. |
 | **Admin** | 60/min | User/IP | Admin panel operations |
+| **Nominatim budget** | 60/min | Location | Every Nominatim request takes a token from the admin binding under the one constant key `nominatim`, so all isolates in a Cloudflare location share it (with 1 request/s per isolate, and at most one queued, on top). Out of tokens: 503 `geocoder_busy`. Workers rate limits are per location, so this bounds Nominatim per location, not worldwide. |
 | **Auth** | 5/min | IP | Login attempts |
+
+The geocode route's edge cache does nothing on `workers.dev` (there is no zone cache there),
+so until the custom-domain cutover only the in-isolate memory cache and these limits keep
+Nominatim traffic down.
 
 ## Configuration
 

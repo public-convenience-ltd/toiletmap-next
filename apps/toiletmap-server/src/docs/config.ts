@@ -9,6 +9,7 @@ export const openApiTags = [
   { name: "Areas", description: "Administrative area operations." },
   { name: "Loos", description: "Operations relating to loos." },
   { name: "Feedback", description: "Messages to the Toilet Map team." },
+  { name: "Geocoding", description: "Place and postcode search in Great Britain." },
 ];
 
 export const openApiServers = [
