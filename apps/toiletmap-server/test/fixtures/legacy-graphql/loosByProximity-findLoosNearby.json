@@ -1,0 +1,87 @@
+{
+  "name": "loosByProximity-findLoosNearby",
+  "description": "Legacy web client findLoosNearby operation over POST with variables.",
+  "capturedAt": "2026-11-18T00:34:59.232Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query findLoosNearby($lat: Float!, $lng: Float!, $radius: Int!) {\n  loosByProximity(from: { lat: $lat, lng: $lng, maxDistance: $radius }) {\n    id\n    name\n    location {\n      lat\n      lng\n    }\n    noPayment\n    allGender\n    automatic\n    accessible\n    babyChange\n    radar\n  }\n}",
+  "variables": {
+    "lat": 51.5094,
+    "lng": -0.0906,
+    "radius": 150
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByProximity": [
+        {
+          "id": "694c1fc2234c63776b1805a9",
+          "name": "Watermark Place (Automatic)",
+          "location": {
+            "lat": 51.509362482,
+            "lng": -0.090620106
+          },
+          "noPayment": false,
+          "allGender": true,
+          "automatic": true,
+          "accessible": true,
+          "babyChange": false,
+          "radar": true
+        },
+        {
+          "id": "ae6b3b386f16c3e80d28884d",
+          "name": "The Steelyard ",
+          "location": {
+            "lat": 51.51027765,
+            "lng": -0.090408339
+          },
+          "noPayment": true,
+          "allGender": null,
+          "automatic": false,
+          "accessible": true,
+          "babyChange": null,
+          "radar": false
+        },
+        {
+          "id": "1a13a3b64c579d1f9370f9b8",
+          "name": "The Banker",
+          "location": {
+            "lat": 51.50937929,
+            "lng": -0.091587876
+          },
+          "noPayment": true,
+          "allGender": null,
+          "automatic": false,
+          "accessible": true,
+          "babyChange": false,
+          "radar": false
+        },
+        {
+          "id": "a6d10496c544e0063694a50f",
+          "name": "London Cannon Street",
+          "location": {
+            "lat": 51.51058265,
+            "lng": -0.090609398
+          },
+          "noPayment": true,
+          "allGender": true,
+          "automatic": null,
+          "accessible": true,
+          "babyChange": true,
+          "radar": true
+        }
+      ]
+    }
+  }
+}

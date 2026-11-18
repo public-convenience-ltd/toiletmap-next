@@ -1,0 +1,37 @@
+{
+  "name": "loosByGeohash-london-removed",
+  "description": "Compressed loos with active: false.",
+  "capturedAt": "2026-11-18T00:35:04.667Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query loosByGeohash($geohash: String!, $active: Boolean = true) {\n  loosByGeohash(geohash: $geohash, active: $active)\n}",
+  "variables": {
+    "geohash": "gcpvjb",
+    "active": false
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loosByGeohash": [
+        "675a72216e6ae337cb232709|gcpvjbc87|17",
+        "22c44a1e75743f30d729e6c1|gcpvjbr2c|49",
+        "2513b6d81626b7799352f145|gcpvjbrqk|17",
+        "8a784c9b8e6c07d3b00e4609|gcpvjbs73|17",
+        "95a3d59ae1030edb5c340588|gcpvjbt90|17",
+        "db5bccce6efbb2b7be69e054|gcpvjbw08|33",
+        "8af65bae77fbf4f5a035c0d9|gcpvjbw42|17"
+      ]
+    }
+  }
+}

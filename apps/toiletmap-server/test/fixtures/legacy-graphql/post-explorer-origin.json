@@ -1,0 +1,32 @@
+{
+  "name": "post-explorer-origin",
+  "description": "POST JSON with an allow-listed Origin to record CORS headers on POST.",
+  "capturedAt": "2026-11-18T00:34:32.745Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "origin": "https://explorer.toiletmap.org.uk",
+    "content-type": "application/json"
+  },
+  "query": "{ loo(id: \"694c1fc2234c63776b1805a9\") { id name } }",
+  "variables": null,
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "access-control-allow-origin": "https://explorer.toiletmap.org.uk",
+    "access-control-allow-credentials": "true",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loo": {
+        "id": "694c1fc2234c63776b1805a9",
+        "name": "Watermark Place (Automatic)"
+      }
+    }
+  }
+}

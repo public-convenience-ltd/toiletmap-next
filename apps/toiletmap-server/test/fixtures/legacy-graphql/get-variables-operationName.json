@@ -1,0 +1,30 @@
+{
+  "name": "get-variables-operationName",
+  "description": "GET with query, variables (JSON) and operationName URL params.",
+  "capturedAt": "2026-11-18T00:34:33.838Z",
+  "method": "GET",
+  "url": "/api?query=query%20one($id:%20ID)%20%7B%20loo(id:%20$id)%20%7B%20id%20name%20%7D%20%7D%20query%20two%20%7B%20areas%20%7B%20name%20%7D%20%7D&variables=%7B%22id%22%3A%2266a0a7e5a9b1590a9d222297%22%7D&operationName=one",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures"
+  },
+  "query": "query one($id: ID) { loo(id: $id) { id name } } query two { areas { name } }",
+  "variables": {
+    "id": "66a0a7e5a9b1590a9d222297"
+  },
+  "operationName": "one",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loo": {
+        "id": "66a0a7e5a9b1590a9d222297",
+        "name": "Cathedral cafe"
+      }
+    }
+  }
+}

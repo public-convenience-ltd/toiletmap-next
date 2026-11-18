@@ -1,0 +1,28 @@
+{
+  "name": "get-no-query",
+  "description": "GET /api with no query param (what does a bare GET return?).",
+  "capturedAt": "2026-11-18T00:34:34.911Z",
+  "method": "GET",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures"
+  },
+  "query": null,
+  "variables": null,
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS",
+    "allow": "GET, POST"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Must provide query string."
+      }
+    ]
+  }
+}

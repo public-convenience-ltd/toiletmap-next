@@ -1,0 +1,76 @@
+{
+  "name": "loos-date-range",
+  "description": "fromDate/toDate filters (on updated_at), limit 3, OLDEST_FIRST.",
+  "capturedAt": "2026-11-18T00:34:51.473Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query searchLoos(\n  $filters: LooFilter!\n  $pagination: PaginationInput = { limit: 10, page: 1 }\n  $sort: SortOrder = NEWEST_FIRST\n) {\n  loos(filters: $filters, pagination: $pagination, sort: $sort) {\n    loos {\n      id\n      name\n      area {\n        name\n        type\n      }\n      updatedAt\n    }\n    total\n    page\n    limit\n    pages\n  }\n}",
+  "variables": {
+    "filters": {
+      "fromDate": "2024-01-01T00:00:00.000Z",
+      "toDate": "2024-01-31T23:59:59.999Z"
+    },
+    "pagination": {
+      "limit": 3,
+      "page": 1
+    },
+    "sort": "OLDEST_FIRST"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loos": {
+        "loos": [
+          {
+            "id": "9bf2c4f5fa6e78a72e5f1f93",
+            "name": "Friockheim Public Toilets",
+            "area": [
+              {
+                "name": "Angus",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2024-01-01T18:08:15.852Z"
+          },
+          {
+            "id": "9cfbe6af64ea6962b8988043",
+            "name": "Longshaw Estate National Trust Toilets",
+            "area": [
+              {
+                "name": "Derbyshire Dales",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2024-01-01T22:48:12.543Z"
+          },
+          {
+            "id": "0b23fd6a9578ce7e7b01515c",
+            "name": "High Barnet Underground Station",
+            "area": [
+              {
+                "name": "Barnet",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2024-01-01T22:55:23.218Z"
+          }
+        ],
+        "total": 72,
+        "page": 1,
+        "limit": 3,
+        "pages": 24
+      }
+    }
+  }
+}

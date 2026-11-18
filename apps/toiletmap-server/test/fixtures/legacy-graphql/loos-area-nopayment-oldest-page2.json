@@ -1,0 +1,265 @@
+{
+  "name": "loos-area-nopayment-oldest-page2",
+  "description": "Full fields; areaName + noPayment filters, limit 5 page 2, OLDEST_FIRST. areaName is taken from loo-24h.",
+  "capturedAt": "2026-11-18T00:34:48.221Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query searchLoosFull(\n  $filters: LooFilter!\n  $pagination: PaginationInput\n  $sort: SortOrder\n) {\n  loos(filters: $filters, pagination: $pagination, sort: $sort) {\n    loos {\n      ...LooFragment\n    }\n    total\n    page\n    limit\n    pages\n  }\n}\nfragment LooFragment on Loo {\n  id\n  createdAt\n  updatedAt\n  verifiedAt\n  active\n  location {\n    lat\n    lng\n  }\n  name\n  openingTimes\n  accessible\n  men\n  women\n  allGender\n  babyChange\n  children\n  urinalOnly\n  radar\n  automatic\n  noPayment\n  paymentDetails\n  notes\n  removalReason\n  attended\n  geohash\n  area {\n    name\n    type\n  }\n}",
+  "variables": {
+    "filters": {
+      "areaName": "City of London",
+      "noPayment": true
+    },
+    "pagination": {
+      "limit": 5,
+      "page": 2
+    },
+    "sort": "OLDEST_FIRST"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loos": {
+        "loos": [
+          {
+            "id": "f0c7f1a59499b49667bdcd7f",
+            "createdAt": "2016-09-13T23:24:45.808Z",
+            "updatedAt": "2016-09-13T23:24:45.809Z",
+            "verifiedAt": "2026-10-28T13:05:45.289Z",
+            "active": true,
+            "location": {
+              "lat": 51.5217065,
+              "lng": -0.096986304
+            },
+            "name": "The Shakespeare",
+            "openingTimes": null,
+            "accessible": false,
+            "men": true,
+            "women": true,
+            "allGender": null,
+            "babyChange": false,
+            "children": null,
+            "urinalOnly": null,
+            "radar": null,
+            "automatic": false,
+            "noPayment": true,
+            "paymentDetails": null,
+            "notes": "MONDAY TO FRIDAY: 10.00 - 23.00; SATURDAY: 17.00 - 23.00; SUNDAY: 12.00 - 22.30/ Part of City of London Community Toilet Scheme.",
+            "removalReason": null,
+            "attended": null,
+            "geohash": "gcpvjg1rsn1y8eux2h0h",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ]
+          },
+          {
+            "id": "14c5d443f3668362db3872c5",
+            "createdAt": "2016-09-13T23:34:00.121Z",
+            "updatedAt": "2016-09-13T23:34:00.122Z",
+            "verifiedAt": null,
+            "active": true,
+            "location": {
+              "lat": 51.515445286,
+              "lng": -0.075345295
+            },
+            "name": "Barcelona Tapas Bar & Restaurant",
+            "openingTimes": [
+              [
+                "09:00",
+                "17:00"
+              ],
+              [
+                "09:00",
+                "17:00"
+              ],
+              [
+                "09:00",
+                "17:00"
+              ],
+              [
+                "09:00",
+                "17:00"
+              ],
+              [
+                "09:00",
+                "17:00"
+              ],
+              [],
+              []
+            ],
+            "accessible": true,
+            "men": true,
+            "women": true,
+            "allGender": null,
+            "babyChange": false,
+            "children": null,
+            "urinalOnly": null,
+            "radar": false,
+            "automatic": false,
+            "noPayment": true,
+            "paymentDetails": null,
+            "notes": "MONDAY TO FRIDAY: 11.00 - 23.00.\r\n           Part of City of London Community Toilet Scheme.",
+            "removalReason": null,
+            "attended": null,
+            "geohash": "gcpvn615hr43p0zjs8s0",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ]
+          },
+          {
+            "id": "237ef73d21dd73cdfba3c8de",
+            "createdAt": "2016-09-13T23:34:47.826Z",
+            "updatedAt": "2016-09-13T23:34:47.828Z",
+            "verifiedAt": null,
+            "active": true,
+            "location": {
+              "lat": 51.512871879,
+              "lng": -0.093130245
+            },
+            "name": "Watling Street Urilift",
+            "openingTimes": [
+              [
+                "17:00",
+                "00:00"
+              ],
+              [
+                "17:00",
+                "00:00"
+              ],
+              [
+                "17:00",
+                "00:00"
+              ],
+              [
+                "17:00",
+                "00:00"
+              ],
+              [
+                "17:00",
+                "00:00"
+              ],
+              [
+                "17:00",
+                "00:00"
+              ],
+              [
+                "17:00",
+                "00:00"
+              ]
+            ],
+            "accessible": false,
+            "men": true,
+            "women": false,
+            "allGender": null,
+            "babyChange": false,
+            "children": null,
+            "urinalOnly": true,
+            "radar": false,
+            "automatic": false,
+            "noPayment": true,
+            "paymentDetails": null,
+            "notes": "Male ONLY Urinals. Mon-Thurs, Bank Hols: 21.00 - 03.30; Fri, Sat: 21.00 - 06.30; Sun: Closed. \r\nNOTES Only available to serve the night time economy",
+            "removalReason": null,
+            "attended": false,
+            "geohash": "gcpvjcshjzm41ccpv44u",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ]
+          },
+          {
+            "id": "106b51a2bae9cf65c575b358",
+            "createdAt": "2016-09-13T23:39:23.849Z",
+            "updatedAt": "2016-09-13T23:39:23.849Z",
+            "verifiedAt": null,
+            "active": true,
+            "location": {
+              "lat": 51.509837568,
+              "lng": -0.08605063
+            },
+            "name": "The Britannia",
+            "openingTimes": null,
+            "accessible": false,
+            "men": true,
+            "women": true,
+            "allGender": null,
+            "babyChange": false,
+            "children": null,
+            "urinalOnly": null,
+            "radar": false,
+            "automatic": false,
+            "noPayment": true,
+            "paymentDetails": null,
+            "notes": "Mon - Weds: 11:00 - 23:00; Thurs: 11:00 - 24:00; Fri: 11:00 - 01:00; Sat: 12:00 - 18:00. Closed Sundays/Bank Holidays.. Part of City of London Community Toilet Scheme.",
+            "removalReason": null,
+            "attended": null,
+            "geohash": "gcpvn116dcsj8n052p2n",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ]
+          },
+          {
+            "id": "ce7d97d0ab2ac5783a8677a0",
+            "createdAt": "2016-09-13T23:45:03.843Z",
+            "updatedAt": "2016-09-13T23:45:03.843Z",
+            "verifiedAt": null,
+            "active": true,
+            "location": {
+              "lat": 51.516960145,
+              "lng": -0.098769665
+            },
+            "name": "Barts Hospital",
+            "openingTimes": null,
+            "accessible": true,
+            "men": true,
+            "women": true,
+            "allGender": null,
+            "babyChange": true,
+            "children": null,
+            "urinalOnly": null,
+            "radar": null,
+            "automatic": null,
+            "noPayment": true,
+            "paymentDetails": null,
+            "notes": null,
+            "removalReason": null,
+            "attended": true,
+            "geohash": "gcpvjf2h492j802n2524",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ]
+          }
+        ],
+        "total": 76,
+        "page": 2,
+        "limit": 5,
+        "pages": 16
+      }
+    }
+  }
+}

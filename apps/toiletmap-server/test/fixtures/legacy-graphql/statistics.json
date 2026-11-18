@@ -1,0 +1,89 @@
+{
+  "name": "statistics",
+  "description": "statistics query (counts are live data; areaToiletCount trimmed).",
+  "capturedAt": "2026-11-18T00:34:38.385Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query statistics {\n  statistics {\n    total\n    active\n    removed\n    areaToiletCount {\n      name\n      active\n      removed\n    }\n  }\n}",
+  "variables": null,
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "statistics": {
+        "total": 19568,
+        "active": 16169,
+        "removed": 3399,
+        "areaToiletCount": [
+          {
+            "name": "Hartlepool",
+            "active": 13,
+            "removed": 3
+          },
+          {
+            "name": "Darlington",
+            "active": 5,
+            "removed": 0
+          },
+          {
+            "name": "Redcar and Cleveland",
+            "active": 26,
+            "removed": 4
+          },
+          {
+            "name": "Middlesbrough",
+            "active": 25,
+            "removed": 7
+          },
+          {
+            "name": "Stockton-on-Tees",
+            "active": 30,
+            "removed": 2
+          },
+          {
+            "name": "Derby",
+            "active": 37,
+            "removed": 9
+          },
+          {
+            "name": "Blackburn with Darwen",
+            "active": 13,
+            "removed": 3
+          },
+          {
+            "name": "Luton",
+            "active": 13,
+            "removed": 1
+          },
+          {
+            "name": "North Somerset",
+            "active": 66,
+            "removed": 9
+          },
+          {
+            "name": "Swindon",
+            "active": 20,
+            "removed": 2
+          }
+        ]
+      }
+    }
+  },
+  "trimmed": [
+    {
+      "path": "data.statistics.areaToiletCount",
+      "originalLength": 382,
+      "kept": 10
+    }
+  ]
+}

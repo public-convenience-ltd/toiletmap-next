@@ -1,0 +1,74 @@
+{
+  "name": "areas",
+  "description": "areas query (trimmed).",
+  "capturedAt": "2026-11-18T00:34:39.351Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query areas {\n  areas {\n    name\n    type\n  }\n}",
+  "variables": null,
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "areas": [
+        {
+          "name": "Hartlepool",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Darlington",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Redcar and Cleveland",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Middlesbrough",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Stockton-on-Tees",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Derby",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Blackburn with Darwen",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Luton",
+          "type": "Local Authority"
+        },
+        {
+          "name": "North Somerset",
+          "type": "Local Authority"
+        },
+        {
+          "name": "Swindon",
+          "type": "Local Authority"
+        }
+      ]
+    }
+  },
+  "trimmed": [
+    {
+      "path": "data.areas",
+      "originalLength": 382,
+      "kept": 10
+    }
+  ]
+}

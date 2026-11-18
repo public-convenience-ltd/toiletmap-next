@@ -1,0 +1,65 @@
+{
+  "name": "reportsForLoo-nested",
+  "description": "previous / loo / area on Report (no resolvers in legacy: always null).",
+  "capturedAt": "2026-11-18T00:35:12.665Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query looReportHistoryNested($id: ID!) {\n  reportsForLoo(id: $id) {\n    id\n    createdAt\n    contributor\n    isSystemReport\n    previous {\n      id\n    }\n    loo {\n      id\n    }\n    area {\n      name\n      type\n    }\n  }\n}",
+  "variables": {
+    "id": "66a0a7e5a9b1590a9d222297"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "reportsForLoo": [
+        {
+          "id": "101448",
+          "createdAt": "2019-01-23T13:02:42.868Z",
+          "contributor": "Anonymous",
+          "isSystemReport": false,
+          "previous": null,
+          "loo": null,
+          "area": null
+        },
+        {
+          "id": "13994",
+          "createdAt": "2019-01-23T13:02:42.868Z",
+          "contributor": "Anonymous",
+          "isSystemReport": false,
+          "previous": null,
+          "loo": null,
+          "area": null
+        },
+        {
+          "id": "91294",
+          "createdAt": "2019-01-23T13:02:42.868Z",
+          "contributor": "Anonymous",
+          "isSystemReport": false,
+          "previous": null,
+          "loo": null,
+          "area": null
+        },
+        {
+          "id": "91295",
+          "createdAt": "2019-01-23T13:02:42.868Z",
+          "contributor": "Anonymous",
+          "isSystemReport": true,
+          "previous": null,
+          "loo": null,
+          "area": null
+        }
+      ]
+    }
+  }
+}

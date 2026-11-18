@@ -1,0 +1,75 @@
+{
+  "name": "loos-inactive-area",
+  "description": "Removed loos in an area (active: false), limit 3.",
+  "capturedAt": "2026-11-18T00:34:50.392Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query searchLoos(\n  $filters: LooFilter!\n  $pagination: PaginationInput = { limit: 10, page: 1 }\n  $sort: SortOrder = NEWEST_FIRST\n) {\n  loos(filters: $filters, pagination: $pagination, sort: $sort) {\n    loos {\n      id\n      name\n      area {\n        name\n        type\n      }\n      updatedAt\n    }\n    total\n    page\n    limit\n    pages\n  }\n}",
+  "variables": {
+    "filters": {
+      "active": false,
+      "areaName": "City of London"
+    },
+    "pagination": {
+      "limit": 3,
+      "page": 1
+    }
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loos": {
+        "loos": [
+          {
+            "id": "dd90a98a4fe43a067c748e5f",
+            "name": "Charterhouse Street UriLift",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2025-10-12T11:46:19.474Z"
+          },
+          {
+            "id": "aaa30a77cb3e26070b7490e5",
+            "name": "Long Lane (Automatic)",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2025-10-12T11:45:43.668Z"
+          },
+          {
+            "id": "36c261076521dc4725720dd6",
+            "name": "The Fleetwood",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2025-10-12T11:45:11.081Z"
+          }
+        ],
+        "total": 47,
+        "page": 1,
+        "limit": 3,
+        "pages": 16
+      }
+    }
+  }
+}
