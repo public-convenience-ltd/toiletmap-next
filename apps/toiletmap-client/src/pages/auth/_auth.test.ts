@@ -6,12 +6,13 @@ import { RETURN_TO_COOKIE } from "../../utils/returnTo";
 import { GET as callback } from "./callback";
 import { GET as login } from "./login";
 
+// A name outside Latin-1: btoa() of it would throw.
 vi.mock("@toiletmap/auth", () => ({
   authenticateToken: vi.fn(async () => ({
     sub: "auth0|user",
-    email: "user@example.com",
-    name: "User",
-    nickname: "user",
+    email: "lukasz@example.com",
+    name: "Łukasz Ŵyn",
+    nickname: "łukasz",
     nonce: "nonce-123",
   })),
 }));
@@ -40,8 +41,7 @@ const redirect = (location: string) =>
 // biome-ignore lint/suspicious/noExplicitAny: a minimal stand-in for Astro's APIContext
 const call = (handler: typeof login, ctx: Record<string, unknown>) => handler(ctx as any);
 
-const base64Url = (value: string) =>
-  btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const base64Url = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 const jwt = (payload: unknown) =>
   `${base64Url(JSON.stringify({ alg: "RS256" }))}.${base64Url(JSON.stringify(payload))}.sig`;
 
@@ -142,16 +142,41 @@ describe("GET /auth/callback", () => {
 
   it("sets the session cookies' maxAge from the access token's exp", async () => {
     const { cookies } = await callbackWith({});
-    for (const name of ["access_token", "id_token", "user_info"]) {
+    for (const name of ["access_token", "id_token", "signed_in"]) {
       const opts = cookies.set.mock.calls.find(([n]) => n === name)?.[2];
       expect(opts, name).toMatchObject({ maxAge: 5400, secure: true, path: "/" });
     }
-    const userInfoOpts = cookies.set.mock.calls.find(([n]) => n === "user_info")?.[2];
-    expect(userInfoOpts).toMatchObject({ httpOnly: false });
+    const flagOpts = cookies.set.mock.calls.find(([n]) => n === "signed_in")?.[2];
+    expect(flagOpts).toMatchObject({ httpOnly: false });
     const tokenOpts = cookies.set.mock.calls.find(([n]) => n === "access_token")?.[2];
     expect(tokenOpts).toMatchObject({ httpOnly: true });
   });
+
+  it("signs in a user whose name is outside Latin-1 (Łukasz Ŵyn)", async () => {
+    const { res, cookies } = await callbackWith({});
+    expect(res.status).toBe(302);
+    expect(cookies.jar.has("access_token")).toBe(true);
+  });
+
+  it("keeps no profile in a readable cookie: the signed-in flag holds no data", async () => {
+    const { cookies } = await callbackWith({ user_info: "eyJzdWIiOiJvbGQifQ==" });
+    expect(cookies.jar.get("signed_in")).toBe("1");
+    // The legacy profile cookie is removed.
+    expect(cookies.jar.has("user_info")).toBe(false);
+    for (const [, value] of cookies.set.mock.calls) {
+      expect(value).not.toContain("ukasz");
+    }
+    expect(cookies.set.mock.calls.map(([name]) => name)).not.toContain("user_info");
+  });
 });
+
+/** No session cookie was written. */
+const expectNoSession = (cookies: ReturnType<typeof makeCookies>) => {
+  const written = cookies.set.mock.calls.map(([name]) => name);
+  for (const name of ["access_token", "id_token", "signed_in", "user_info"]) {
+    expect(written, name).not.toContain(name);
+  }
+};
 
 describe("GET /auth/callback errors: the friendly error page", () => {
   /** Calls the callback; any error comes back as the rewrite's target plus locals.authError. */
@@ -255,12 +280,26 @@ describe("GET /auth/callback errors: the friendly error page", () => {
 
   it("reports a nonce mismatch like a state mismatch", async () => {
     const accessToken = jwt({ exp: Date.now() / 1000 + 3600 });
-    const { error } = await failWith({
+    const { error, cookies } = await failWith({
       query: "code=abc&state=state-1",
       jar: { auth_state: "state-1", auth_nonce: "different-nonce" },
       token: new Response(JSON.stringify({ access_token: accessToken, id_token: "id.token.x" })),
     });
     expect(error).toMatchObject({ kind: "state" });
+    expectNoSession(cookies);
+  });
+
+  it("leaves no half-session when id_token verification throws", async () => {
+    const { authenticateToken } = await import("@toiletmap/auth");
+    vi.mocked(authenticateToken).mockRejectedValueOnce(new Error("bad signature"));
+    const accessToken = jwt({ exp: Date.now() / 1000 + 3600 });
+    const { error, cookies } = await failWith({
+      query: "code=abc&state=state-1",
+      jar: { auth_state: "state-1", auth_nonce: "nonce-123" },
+      token: new Response(JSON.stringify({ access_token: accessToken, id_token: "id.token.x" })),
+    });
+    expect(error).toMatchObject({ kind: "error" });
+    expectNoSession(cookies);
   });
 
   it("reports an exception as our error", async () => {

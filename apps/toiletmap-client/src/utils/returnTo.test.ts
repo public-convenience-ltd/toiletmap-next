@@ -8,8 +8,7 @@ import {
   sessionMaxAge,
 } from "./returnTo";
 
-const base64Url = (value: string) =>
-  btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const base64Url = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
 const jwt = (payload: unknown) =>
   `${base64Url(JSON.stringify({ alg: "RS256" }))}.${base64Url(JSON.stringify(payload))}.sig`;
@@ -148,6 +147,10 @@ describe("currentPath", () => {
 describe("jwtExpiry / sessionMaxAge", () => {
   it("reads exp without verifying the signature", () => {
     expect(jwtExpiry(jwt({ exp: 1_800_000_000 }))).toBe(1_800_000_000);
+  });
+
+  it("reads a token whose claims are outside Latin-1 (UTF-8)", () => {
+    expect(jwtExpiry(jwt({ name: "Łukasz Ŵyn", exp: 1_800_000_000 }))).toBe(1_800_000_000);
   });
 
   it("returns null for malformed tokens", () => {

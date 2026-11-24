@@ -12,11 +12,12 @@ import { loadLoo, notFoundResponse } from "../../../utils/looPage";
 import { looDisplayName } from "../../../utils/looSeo";
 import { sessionCanWriteDirectly } from "../../../utils/permissions";
 import { pageTitle } from "../../../utils/seo";
+import { hasSignedInFlag } from "../../../utils/session";
 
 const { id } = Astro.params;
 
 const apiUrl = BROWSER_API_URL;
-const isAuthenticated = !!Astro.cookies.get("user_info")?.value;
+const isAuthenticated = hasSignedInFlag(Astro.cookies);
 // Only for the copy ("goes live straight away" vs "a moderator will check"): the API decides.
 const canWriteDirectly = sessionCanWriteDirectly(Astro.cookies);
 

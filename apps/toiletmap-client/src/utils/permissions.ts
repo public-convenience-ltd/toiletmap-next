@@ -1,4 +1,5 @@
 import { jwtExpiry } from "./returnTo";
+import { type CookieReader, hasSignedInFlag } from "./session";
 
 /**
  * Whether an access token's holder can expect their changes to go live straight away: it is
@@ -21,16 +22,11 @@ export function canWriteDirectlyFromToken(
   return exp !== null && exp * 1000 > nowMs;
 }
 
-/** Reads the session cookies an Astro page sees. */
-interface CookieReader {
-  get(name: string): { value: string } | undefined;
-}
-
-/** For pages: signed in (the `user_info` cookie) with an access token that has not expired. */
+/** For pages: signed in (the `signed_in` flag) with an access token that has not expired. */
 export function sessionCanWriteDirectly(
   cookies: CookieReader,
   nowMs: number = Date.now(),
 ): boolean {
-  if (!cookies.get("user_info")?.value) return false;
+  if (!hasSignedInFlag(cookies)) return false;
   return canWriteDirectlyFromToken(cookies.get("access_token")?.value, nowMs);
 }

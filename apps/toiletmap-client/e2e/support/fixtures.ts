@@ -54,7 +54,7 @@ export async function blockMapTiles(context: BrowserContext): Promise<void> {
 /**
  * Signs in through the client's real flow: /auth/login → mock Auth0 login page
  * → "Continue as Test User" → /auth/callback (sets access_token, id_token and
- * user_info cookies) → /.
+ * the signed_in flag) → /.
  */
 export async function signInThroughMockAuth(page: Page): Promise<void> {
   await page.goto("/auth/login");
@@ -62,7 +62,7 @@ export async function signInThroughMockAuth(page: Page): Promise<void> {
   await page.waitForURL(`${CLIENT_URL}/`);
   const names = (await page.context().cookies(CLIENT_URL)).map((c) => c.name);
   expect(names, "callback should set the session cookies").toEqual(
-    expect.arrayContaining(["access_token", "id_token", "user_info"]),
+    expect.arrayContaining(["access_token", "id_token", "signed_in"]),
   );
 }
 
@@ -74,24 +74,13 @@ export async function signInThroughMockAuth(page: Page): Promise<void> {
  */
 export async function injectedSessionState(user?: MockUser): Promise<StorageState> {
   const accessToken = await issueAccessToken(user);
-  const claims = JSON.parse(
-    Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString("utf8"),
-  ) as Record<string, unknown>;
-  const userInfo = Buffer.from(
-    JSON.stringify({
-      sub: claims.sub,
-      email: claims.email,
-      name: claims.name,
-      nickname: claims.nickname,
-    }),
-  ).toString("base64");
   const { hostname } = new URL(CLIENT_URL);
   const expires = Math.floor(Date.now() / 1000) + 86_400;
   const cookie = { domain: hostname, path: "/", expires, secure: false, sameSite: "Lax" as const };
   return {
     cookies: [
       { ...cookie, name: "access_token", value: accessToken, httpOnly: true },
-      { ...cookie, name: "user_info", value: userInfo, httpOnly: false },
+      { ...cookie, name: "signed_in", value: "1", httpOnly: false },
     ],
     origins: [],
   };

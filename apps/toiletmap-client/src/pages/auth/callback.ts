@@ -9,6 +9,7 @@ import {
   cleanAuthErrorDescription,
 } from "../../utils/authError";
 import { RETURN_TO_COOKIE, safeReturnTo, sessionMaxAge } from "../../utils/returnTo";
+import { LEGACY_USER_INFO_COOKIE, SIGNED_IN_COOKIE, SIGNED_IN_VALUE } from "../../utils/session";
 
 const constantTimeEquals = (a: string, b: string): boolean => {
   if (a.length !== b.length) return false;
@@ -110,6 +111,8 @@ export const GET: APIRoute = async (context) => {
       return fail("state");
     }
 
+    // Every step that can fail is done: only now write the session, so a failure (which
+    // shows the error page) never leaves a half-session behind.
     // The session lasts as long as the access token: once it expires the API rejects it, so
     // keeping the cookies longer would only make the site look signed in when it isn't.
     const sessionCookieOpts = {
@@ -118,19 +121,9 @@ export const GET: APIRoute = async (context) => {
     };
     cookies.set("id_token", tokenData.id_token, sessionCookieOpts);
     cookies.set("access_token", tokenData.access_token, sessionCookieOpts);
-
-    const userInfo = btoa(
-      JSON.stringify({
-        sub: idTokenUser.sub,
-        email: idTokenUser.email,
-        name: idTokenUser.name,
-        nickname: idTokenUser.nickname,
-      }),
-    );
-    cookies.set("user_info", userInfo, {
-      ...sessionCookieOpts,
-      httpOnly: false,
-    });
+    // A value-less flag for "Sign out" in the header; the profile is never in a readable cookie.
+    cookies.set(SIGNED_IN_COOKIE, SIGNED_IN_VALUE, { ...sessionCookieOpts, httpOnly: false });
+    cookies.delete(LEGACY_USER_INFO_COOKIE, { path: "/" });
 
     return redirect(returnTo);
   } catch {

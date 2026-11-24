@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { hasSessionCookie, siteNavLinks } from "../../utils/siteNav";
 import SiteHeader from "./SiteHeader";
 
-/** Sets a cookie the way the browser would see the sign-in's non-httpOnly `user_info`. */
+/** Sets a cookie the way the browser would see the sign-in's non-httpOnly `signed_in` flag. */
 const setCookie = (value: string) => {
   // biome-ignore lint/suspicious/noDocumentCookie: the component reads document.cookie; tests set it
   document.cookie = value;
@@ -42,10 +42,12 @@ describe("siteNavLinks", () => {
 });
 
 describe("hasSessionCookie", () => {
-  it("looks for a non-empty user_info cookie", () => {
-    expect(hasSessionCookie("a=1; user_info=%7B%7D; b=2")).toBe(true);
-    expect(hasSessionCookie("user_info=")).toBe(false);
-    expect(hasSessionCookie("not_user_info=x")).toBe(false);
+  it("looks for a non-empty signed_in flag", () => {
+    expect(hasSessionCookie("a=1; signed_in=1; b=2")).toBe(true);
+    expect(hasSessionCookie("signed_in=")).toBe(false);
+    expect(hasSessionCookie("not_signed_in=1")).toBe(false);
+    // The old profile cookie no longer counts.
+    expect(hasSessionCookie("user_info=%7B%7D")).toBe(false);
     expect(hasSessionCookie("")).toBe(false);
     expect(hasSessionCookie(undefined)).toBe(false);
   });
@@ -53,7 +55,7 @@ describe("hasSessionCookie", () => {
 
 describe("SiteHeader", () => {
   it("uses the server's sign-in state when given", () => {
-    setCookie("user_info=%7B%7D; path=/");
+    setCookie("signed_in=1; path=/");
     render(
       <SiteHeader
         logoSrc="/logo.svg"
@@ -66,7 +68,7 @@ describe("SiteHeader", () => {
   });
 
   it("reads the session cookie itself on prerendered pages (no server state)", async () => {
-    setCookie("user_info=%7B%7D; path=/");
+    setCookie("signed_in=1; path=/");
     render(<SiteHeader logoSrc="/logo.svg" signInHref="/auth/login" />);
     expect(await screen.findAllByRole("link", { name: "Sign out" })).not.toHaveLength(0);
     expect(navHrefs()).toContain("/auth/logout");
