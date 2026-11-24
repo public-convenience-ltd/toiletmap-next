@@ -701,9 +701,9 @@ The audit trail is used for:
 4. **Server sets HTTP-only cookies:**
 
    ```typescript
+   // Only after both tokens verify; maxAge from each token's exp.
    setCookie(c, "access_token", access_token, { httpOnly: true });
-   setCookie(c, "id_token", id_token, { httpOnly: true });
-   setCookie(c, "user_info", base64(userInfo), { httpOnly: true });
+   setCookie(c, "id_token", id_token, { httpOnly: true }); // profile claims only
 
    return c.redirect("/admin");
    ```
@@ -712,7 +712,7 @@ The audit trail is used for:
    ```typescript
    // src/auth/auth-context.ts
    const auth = await authenticateRequest(c);
-   const user = auth?.user; // falls back to id_token if needed
+   const user = auth?.user; // by the access token only; profile from the verified id_token
    ```
 
 ### Contributor Extraction

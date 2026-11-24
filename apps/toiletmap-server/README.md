@@ -305,7 +305,7 @@ pnpm deploy
 Deployment checklist:
 
 - [ ] Set `ENVIRONMENT=production` in Cloudflare Workers environment
-- [ ] Configure `ALLOWED_ORIGINS` for CORS
+- [ ] Configure `ALLOWED_ORIGINS` for CORS (exact origins only; never with credentials, never on `/admin`)
 - [ ] Set up Auth0 production tenant
 - [ ] Configure Cloudflare Rate Limiting bindings
 - [ ] Configure `HYPERDRIVE` binding to point to production database (Supabase)
@@ -318,7 +318,7 @@ Required in Cloudflare Workers dashboard. The worker now derives the Auth0 redir
 
 ```bash
 ENVIRONMENT=production
-ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://admin.toiletmap.org.uk
+ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://toiletmap.org.uk
 AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=production_client_id

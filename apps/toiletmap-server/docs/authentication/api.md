@@ -14,9 +14,11 @@ Read endpoints such as `/api/loos/:id/reports` use `optionalAuth` so anonymous u
 
 Each middleware relies on `src/auth/auth-context.ts` which:
 
-1. Looks for an `Authorization: Bearer` header before falling back to `access_token`/`id_token` cookies.
-2. Verifies JWTs via the cached Auth0 JWKS client (`src/auth/verify.ts`).
-3. Fetches Auth0 `/userinfo` (or uses the `user_info` cookie) so fields such as `name`, `email`, and `nickname` are always present on `c.get('user')` and mirrored under `user.profile`.
+1. Looks for an `Authorization: Bearer` header before falling back to the `access_token` cookie (the `id_token` cookie is never a credential).
+2. Verifies JWTs via the cached Auth0 JWKS (`src/auth/verify.ts`). If the JWKS cannot be fetched, `optionalAuth` continues as anonymous.
+3. Takes `name`, `email` and `nickname` from the verified `id_token` cookie (same `sub`) or Auth0 `/userinfo`, so they are present on `c.get('user')` and mirrored under `user.profile`.
+
+Cookie-authenticated state-changing requests must be same-origin (see `src/middleware/csrf.ts`); send a Bearer token from scripts and other clients.
 
 ## Authentication Methods
 

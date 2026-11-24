@@ -209,6 +209,11 @@ Check the table against a deployment with curl:
     `?sent`; the 500 page and the error page itself have no return.
 - **The round trip:** `/auth/login` keeps `returnTo` in a 5-minute httpOnly cookie, next to
   the `state` and `nonce` cookies. `/auth/callback` checks it again before redirecting.
+- **Session cookies:** `/auth/callback` writes them only after every step that can fail, so a
+  failure shows the error page and leaves no half-session. `access_token` and `id_token` are
+  httpOnly; the only readable cookie is the value-less `signed_in=1` flag (src/utils/session.ts),
+  so page JavaScript never sees a name, email or sub. The pre-2026-11 `user_info` cookie is
+  deleted at sign-in and sign-out.
 - **`safeReturnTo` accepts only a same-origin path.** It rejects:
   - absolute and protocol-relative URLs (`//host`);
   - backslashes (`/\host`);
@@ -248,8 +253,9 @@ clients don't land on a 404.
 - Point DNS for www and the apex at the client worker, and redirect the apex to www.
 - Add `/auth/callback`, the logout return and the web origin for the real domain to the Auth0
   application.
-- Tighten the server's `ALLOWED_ORIGINS`, removing the `*.workers.dev` wildcard that allows
-  credentials.
+- The server's `ALLOWED_ORIGINS` no longer has the `*.workers.dev` wildcard (exact origins
+  only, never with credentials); add the real domain's origins there only if a third-party
+  page needs to read the API from a browser.
 - Give previews their own rate-limit namespaces, and move the preview secret to
   `wrangler secret`.
 - Update the GitHub OAuth app the CMS signs in with (or create a new one): its callback must be

@@ -153,21 +153,23 @@ All mutations to `toilets` records create audit entries tracking:
 
 2. **Session Cookie (Admin interface)**:
    - HTTP-only cookies set by OAuth2 flow
-   - `access_token`, `id_token`, `user_info` cookies
+   - `access_token` (the credential) and `id_token` (profile claims only, never a credential) cookies
    - Used for admin UI authentication
+   - Cookie-authenticated POST/PUT/DELETE under `/admin` and `/api` must be same-origin (`Origin`, or `Sec-Fetch-Site: same-origin`), else 403 (`src/middleware/csrf.ts`); bearer-token and cookie-less requests are not checked
 
 ### Middleware Flow
 
 **`optionalAuth`, `requireAuth`, `requireAdminAuth`** (`src/auth/middleware.ts`):
 1. Attempt to authenticate via `Authorization: Bearer` header.
-2. Fall back to session cookies (`access_token` → `id_token`).
-3. Enrich `c.user` with Auth0 userinfo (cookie payload or `/userinfo` call) so `name`, `email`, etc. are always present on the request user (and mirrored under `user.profile`).
-4. `optionalAuth` skips auth if no credentials are provided, `requireAuth` returns `401`, and `requireAdminAuth` redirects to `/admin/login`.
+2. Fall back to the `access_token` cookie (a session whose access token fails is cleared; the `id_token` is never accepted as a credential).
+3. Enrich `c.user` with `name`, `nickname`, `email` from the verified `id_token` (same `sub`) or Auth0 `/userinfo` (mirrored under `user.profile`). No browser-editable cookie feeds the profile.
+4. `optionalAuth` skips auth if no credentials are provided (and treats the caller as anonymous when Auth0's JWKS cannot be fetched), `requireAuth` returns `401`, and `requireAdminAuth` redirects to `/admin/login`.
+5. Tokens must have `exp`, the configured issuer and an `aud` that is exactly the expected audience (or contains it, as an array); an empty expected audience rejects every token. JWKS is cached for 10 min.
 
 **`requireAdminRole` middleware** (`src/middleware/require-admin-role.ts`):
-- Checks for `access:admin` permission in JWT claims
-- Used to reveal contributor info in audit reports
-- Protects admin-only routes
+- Requires `access:admin` in the token and confirmed by the Auth0 Management API (60s cache; 5 min grace from the last good answer during an outage), and that the user is not blocked
+- Outside `ENVIRONMENT=development`, missing Management credentials or a failed lookup deny admin access (a confirmed revocation or block also clears the session)
+- Protects admin-only routes (`hasAdminRole`, claims only, reveals contributor info in audit reports)
 
 ### OAuth2 Flow (Admin Interface)
 
@@ -175,7 +177,7 @@ Flow implemented in `src/admin/auth.ts`:
 1. **GET /admin/login** → Redirect to Auth0 authorize endpoint
 2. User authenticates on Auth0
 3. **GET /admin/callback** → Exchange authorization code for tokens
-4. Set HTTP-only cookies (`id_token`, `access_token`, `user_info`)
+4. Verify both tokens, then set HTTP-only cookies (`id_token`, `access_token`), each lasting no longer than its token
 5. Redirect to `/admin`
 6. **GET /admin/logout** → Clear all cookies
 
@@ -218,6 +220,8 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 Public routes still accept optional authentication so admin tokens can unlock extra data (e.g., contributor names in reports).
 
+**CORS**: `ALLOWED_ORIGINS` is a list of exact origins (wildcards and `*` are ignored), never with credentials, and `/admin/*` sends no CORS headers. Unset, it is the localhost dev origins in development and nothing elsewhere. No first-party page needs CORS (the client proxies `/api` over the service binding; the admin is same-origin); the legacy GraphQL endpoint has its own policy.
+
 - **GET/POST /api/graphql** - Legacy GraphQL compatibility endpoint (deprecated, read-only, frozen; `src/routes/legacy-graphql/`). The client worker proxies exactly `/api` and `/api/` here with no cookies or token. Do not add fields: new features go to REST. Its output is pinned byte for byte to the golden fixtures in `test/fixtures/legacy-graphql/` (contract tests: `test/integration/legacy-graphql.*.spec.ts`); see the server README.
 
 ### Protected API Endpoints (JWT or Session Required)
@@ -225,7 +229,7 @@ Public routes still accept optional authentication so admin tokens can unlock ex
 - **POST /api/loos** - Create new loo (requires contributor info in JWT)
 - **PUT /api/loos/:id** - Upsert (create or update) loo (requires contributor info in JWT)
 
-Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). Sessions authenticated only by their `id_token` (the access token failed verification) are queued too, and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked in local dev and tests, but in production (`ENVIRONMENT=production`) missing credentials queue every signed-in change. To stop someone editing, block the user in the Auth0 dashboard (for an admin, also remove `access:admin`: blocking does not end an existing session or admin access). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
+Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). A session whose access token fails verification is anonymous (the `id_token` is never a credential), and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked only in local dev and tests (`ENVIRONMENT=development`; the integration env defaults to it); every other environment, previews included and `ENVIRONMENT` unset, queues every signed-in change when credentials are missing. To stop someone editing, block the user in the Auth0 dashboard (for an admin, also remove `access:admin`: blocking does not end an existing session or admin access). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
 
 ### Report, restore and verify (anyone; signed-in, unblocked callers apply directly)
 

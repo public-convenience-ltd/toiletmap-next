@@ -18,10 +18,11 @@ Cloudflare Workers handle zero-downtime deployments automatically. New versions 
   - Production: `"ENVIRONMENT": "production"`
   - Preview: `"ENVIRONMENT": "preview"`
   - This controls error sanitization and security features
-- [ ] Configure `ALLOWED_ORIGINS` with production domains (comma-separated):
+- [ ] Configure `ALLOWED_ORIGINS` with exact origins (comma-separated; wildcards and `*` are ignored, credentials are never allowed, `/admin` never sends CORS headers). Only third-party browser callers need it: the client uses its same-origin proxy and the admin is same-origin.
   ```bash
-  ALLOWED_ORIGINS=https://www.toiletmap.org,https://toiletmap.org
+  ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://toiletmap.org.uk
   ```
+- [ ] Set the Auth0 Management credentials (`AUTH0_MANAGEMENT_CLIENT_ID` / `_SECRET`). Outside `ENVIRONMENT=development`, without them every signed-in write is queued and admin access is denied.
 - [ ] Verify all Auth0 environment variables:
   - `AUTH0_ISSUER_BASE_URL`
   - `AUTH0_AUDIENCE`
@@ -43,7 +44,7 @@ See [Hyperdrive architecture docs](../architecture/hyperdrive.md) for details on
 ### Security
 
 - [ ] Rotate database password from default development password
-- [ ] Verify CORS origins are properly whitelisted (not using `*`)
+- [ ] Verify CORS origins are exact (no `*` or `*.workers.dev` entries; they are ignored anyway)
 - [ ] Confirm rate limiting is enabled
 - [ ] Verify SSL/TLS certificates are valid
 - [ ] Configure Auth0 production tenant with MFA enabled
@@ -264,7 +265,7 @@ Set in `wrangler.jsonc` under `env.production.vars`:
 
 ```bash
 ENVIRONMENT=production  # Controls error sanitization and security features
-ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://admin.toiletmap.org.uk
+ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://toiletmap.org.uk  # exact origins only
 AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=production_client_id
@@ -425,10 +426,9 @@ Access to fetch at 'https://worker.dev/api/loos' from origin
 ```
 
 **Solutions**:
-1. Add origin to `ALLOWED_ORIGINS` environment variable:
+1. Add the exact origin to `ALLOWED_ORIGINS` in `wrangler.jsonc` (wildcards are ignored; CORS never carries credentials, so such callers must use public reads or a Bearer token):
    ```bash
-   wrangler secret put ALLOWED_ORIGINS
-   # Enter: https://yoursite.com,https://www.yoursite.com
+   ALLOWED_ORIGINS=https://yoursite.com,https://www.yoursite.com
    ```
 2. Redeploy worker
 3. Clear browser cache
