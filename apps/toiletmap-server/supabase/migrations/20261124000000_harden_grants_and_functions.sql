@@ -80,3 +80,104 @@ ALTER FUNCTION audit.insert_update_delete_trigger()
   SET search_path = pg_catalog, public, extensions, pg_temp;
 ALTER FUNCTION public.determine_area_loo_is_within_on_upsert()
   SET search_path = pg_catalog, public, extensions, pg_temp;
+
+-- 4. Fail the migration unless the end state holds. A REVOKE by a role that
+--    neither owns the object nor granted the privilege only raises a WARNING
+--    ("no privileges could be revoked") and succeeds, so an ownership mismatch
+--    on a remote database would otherwise leave the old grants in place
+--    silently. The search_path checks prove that the pinned path still finds
+--    uuid_generate_v5 (audit.to_record_id, run by every toilets write) and
+--    PostGIS (area trigger) before any app write depends on it.
+DO $verify$
+DECLARE
+  fn text;
+  tbl text;
+  role_name text;
+  priv text;
+  failures text[] := array[]::text[];
+  pinned constant text := 'search_path=pg_catalog, public, extensions, pg_temp';
+BEGIN
+  FOREACH fn IN ARRAY array[
+    'audit.enable_tracking(regclass)',
+    'audit.disable_tracking(regclass)',
+    'audit.primary_key_columns(oid)',
+    'audit.to_record_id(oid, text[], jsonb)',
+    'audit.insert_update_delete_trigger()',
+    'audit.truncate_trigger()'
+  ] LOOP
+    FOREACH role_name IN ARRAY array['public', 'anon', 'authenticated', 'toiletmap_web'] LOOP
+      IF has_function_privilege(role_name, fn, 'EXECUTE') THEN
+        failures := failures || format('%s can still EXECUTE %s', role_name, fn);
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  FOREACH tbl IN ARRAY array[
+    'public.toilets', 'public.areas', 'public.feedback', 'public.pending_change',
+    'audit.record_version'
+  ] LOOP
+    FOREACH role_name IN ARRAY array['anon', 'authenticated'] LOOP
+      FOREACH priv IN ARRAY array[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ] LOOP
+        IF has_table_privilege(role_name, tbl, priv) THEN
+          failures := failures || format('%s still has %s on %s', role_name, priv, tbl);
+        END IF;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+
+  FOREACH role_name IN ARRAY array['anon', 'authenticated'] LOOP
+    FOREACH priv IN ARRAY array['USAGE', 'SELECT', 'UPDATE'] LOOP
+      IF has_sequence_privilege(role_name, 'public.feedback_id_seq', priv) THEN
+        failures := failures || format('%s still has %s on public.feedback_id_seq', role_name, priv);
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  FOREACH priv IN ARRAY array['REFERENCES', 'TRIGGER'] LOOP
+    IF has_table_privilege('toiletmap_web', 'public.toilets', priv) THEN
+      failures := failures || format('toiletmap_web still has %s on public.toilets', priv);
+    END IF;
+  END LOOP;
+
+  FOREACH fn IN ARRAY array[
+    'audit.primary_key_columns(oid)',
+    'audit.to_record_id(oid, text[], jsonb)',
+    'audit.insert_update_delete_trigger()',
+    'public.determine_area_loo_is_within_on_upsert()'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_proc WHERE oid = fn::regprocedure AND proconfig = array[pinned]
+    ) THEN
+      failures := failures || format('%s does not have %s', fn, pinned);
+    END IF;
+  END LOOP;
+
+  -- The functions the pinned path must resolve, in the schemas it searches.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    WHERE p.proname = 'uuid_generate_v5'
+      AND p.pronamespace IN ('public'::regnamespace, 'extensions'::regnamespace)
+  ) THEN
+    failures := failures || 'uuid_generate_v5 (uuid-ossp) is not in public or extensions';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    WHERE p.proname = 'st_within'
+      AND p.pronamespace IN ('public'::regnamespace, 'extensions'::regnamespace)
+  ) THEN
+    failures := failures || 'st_within (PostGIS) is not in public or extensions';
+  END IF;
+
+  IF cardinality(failures) > 0 THEN
+    RAISE EXCEPTION 'harden_grants_and_functions did not reach its end state: %',
+      array_to_string(failures, '; ');
+  END IF;
+
+  -- Run the audit id function on its pinned path, as the audit trigger does.
+  IF audit.to_record_id('public.toilets'::regclass, array['id'], '{"id": "probe"}'::jsonb) IS NULL THEN
+    RAISE EXCEPTION 'audit.to_record_id returned NULL on its pinned search_path';
+  END IF;
+END
+$verify$;

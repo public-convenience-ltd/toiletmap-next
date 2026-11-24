@@ -10,6 +10,7 @@
  *   search_path is.
  */
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPrismaClient, type PrismaClientInstance } from "../../src/prisma";
 import { getPrismaClient } from "./setup";
@@ -75,15 +76,25 @@ afterAll(async () => {
   }
 });
 
-/** A point inside a seeded area, and that area's id. */
+/**
+ * A point inside exactly one seeded area, and that area's id. The area trigger
+ * takes the first matching area with no ORDER BY, so a point that also lies in
+ * an overlapping area (a county around a district) could resolve to either.
+ */
 const pointInArea = async (offset = 0) => {
   const [row] = await getPrismaClient().$queryRaw<{ id: string; lng: number; lat: number }[]>`
-    SELECT id,
-           ST_X(ST_PointOnSurface(geometry::geometry)) AS lng,
-           ST_Y(ST_PointOnSurface(geometry::geometry)) AS lat
-    FROM public.areas
-    WHERE geometry IS NOT NULL
-    ORDER BY id
+    SELECT a.id,
+           ST_X(ST_PointOnSurface(a.geometry::geometry)) AS lng,
+           ST_Y(ST_PointOnSurface(a.geometry::geometry)) AS lat
+    FROM public.areas a
+    WHERE a.geometry IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.areas b
+        WHERE b.id <> a.id
+          AND b.geometry IS NOT NULL
+          AND ST_Within(ST_PointOnSurface(a.geometry::geometry), b.geometry::geometry)
+      )
+    ORDER BY a.id
     OFFSET ${offset}
     LIMIT 1
   `;
@@ -261,6 +272,48 @@ describe("as toiletmap_web", () => {
     ]);
   });
 
+  it("can still lock toilets, review pending changes and delete feedback", async () => {
+    // The worker's own toiletmap_web paths: report/restore row locks, admin
+    // approve/reject, admin feedback delete. Rolled back, so nothing persists.
+    const id = looId();
+    const area = await pointInArea(0);
+    await getPrismaClient().$executeRaw`
+      INSERT INTO public.toilets (id, name, geography)
+      VALUES (${id}, 'db-grants lock loo',
+              ST_GeomFromGeoJSON(${JSON.stringify({ type: "Point", coordinates: [area.lng, area.lat] })}))
+    `;
+    const rollback = new Error("rollback");
+    await expect(
+      web.$transaction(async (tx) => {
+        const locked = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM toilets WHERE id = ${id} FOR UPDATE
+        `;
+        expect(locked).toEqual([{ id }]);
+        await tx.$queryRaw`SELECT id FROM toilets WHERE id = ${id} FOR SHARE`;
+
+        const change = await tx.pending_change.create({
+          data: { type: "update", loo_id: id, payload: { name: "db-grants" } },
+        });
+        await tx.pending_change.update({
+          where: { id: change.id },
+          data: { status: "approved", reviewed_by: "db-grants", reviewed_at: new Date() },
+        });
+        const { count: rejected } = await tx.pending_change.updateMany({
+          where: { id: change.id },
+          data: { status: "rejected" },
+        });
+        expect(rejected).toBe(1);
+
+        const feedback = await tx.feedback.create({
+          data: { feedback_text: "db-grants delete probe", route: "/db-grants" },
+        });
+        const { count: deleted } = await tx.feedback.deleteMany({ where: { id: feedback.id } });
+        expect(deleted).toBe(1);
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
+  });
+
   it("can still insert feedback (with RETURNING, as Prisma create does)", async () => {
     const row = await web.feedback.create({
       data: { feedback_text: "db-grants probe", route: "/db-grants" },
@@ -307,5 +360,50 @@ describe("function search_path", () => {
       return row?.area_id;
     });
     expect(areaId).toBe(area.id);
+  });
+});
+
+describe("migration end-state check", () => {
+  // The DO block at the end of the migration fails it when a REVOKE silently did
+  // nothing (a non-owner REVOKE only warns) or the pinned path misses an extension.
+  const migration = readFileSync(
+    new URL(
+      "../../supabase/migrations/20261124000000_harden_grants_and_functions.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const verify = migration.slice(migration.indexOf("DO $verify$"));
+
+  const runInRolledBackTx = (before: string | null) =>
+    getPrismaClient().$transaction(async (tx) => {
+      if (before) await tx.$executeRawUnsafe(before);
+      await tx.$executeRawUnsafe(verify);
+      throw new Error("verified");
+    });
+
+  it("passes on the migrated database", async () => {
+    expect(verify).toMatch(/^DO \$verify\$[\s\S]*\$verify\$;\s*$/);
+    await expect(runInRolledBackTx(null)).rejects.toThrow(/^verified$/);
+  });
+
+  it.each([
+    [
+      "an audit function still executable by PUBLIC",
+      "GRANT EXECUTE ON FUNCTION audit.disable_tracking(regclass) TO PUBLIC",
+      /public can still EXECUTE audit\.disable_tracking/,
+    ],
+    [
+      "TRUNCATE left on a table for anon",
+      "GRANT TRUNCATE ON public.feedback TO anon",
+      /anon still has TRUNCATE on public\.feedback/,
+    ],
+    [
+      "a trigger function without its pinned search_path",
+      "ALTER FUNCTION public.determine_area_loo_is_within_on_upsert() RESET search_path",
+      /determine_area_loo_is_within_on_upsert\(\) does not have search_path/,
+    ],
+  ])("fails the migration with %s", async (_label, weaken, message) => {
+    await expect(runInRolledBackTx(weaken)).rejects.toThrow(message);
   });
 });
