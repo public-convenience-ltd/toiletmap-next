@@ -680,7 +680,10 @@ loosRouter.post(
  * POST /loos/:id/verify
  *
  * "Yes, it's still here": anyone may confirm a toilet, which only sets
- * `verified_at` to now. Anonymous callers share the anonymous write limiter.
+ * `verified_at` to now. It goes through the same block check as other
+ * writes: anonymous callers, blocked users and users whose block status
+ * cannot be confirmed still verify, but share the queued-write limiter
+ * (1/min, per user when signed in), as for their other changes.
  */
 loosRouter.post(
   "/:id/verify",
@@ -691,7 +694,7 @@ loosRouter.post(
   (c) =>
     handleRoute(c, "loos.verify", async () => {
       const { id } = c.req.valid("param");
-      if (!c.get("user")) {
+      if (!(await canWriteDirectly(c, c.get("user")))) {
         const limited = await queuedWriteRateLimitExceeded(c);
         if (limited) return limited;
       }

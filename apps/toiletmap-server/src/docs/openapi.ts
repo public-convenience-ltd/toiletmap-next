@@ -1418,7 +1418,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Confirm a loo is still there",
         description:
-          "Anyone may verify; anonymous callers are rate limited. Sets `verifiedAt` to now and changes nothing else (`updatedAt` is unchanged). No request body.",
+          "Anyone may verify. Anonymous callers, and signed-in callers who are blocked or whose block status cannot be confirmed, share the 1/min queued-write limit. Sets `verifiedAt` to now and changes nothing else (`updatedAt` is unchanged). No request body.",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         responses: {

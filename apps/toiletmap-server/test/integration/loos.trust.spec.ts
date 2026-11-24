@@ -3,7 +3,8 @@
  * signed in writes directly unless Auth0 reports them blocked. Anonymous and
  * blocked callers, and anyone whose block status cannot be confirmed, are
  * queued for moderation. Without Auth0 Management config (local dev) nobody
- * counts as blocked. Verification is never moderated.
+ * counts as blocked. Verification is never moderated, but callers who cannot
+ * write directly verify under the queued-write limit.
  *
  * Kept apart from loos.report.spec.ts because every request opens its own
  * database pool: one file with all of these exhausts local Postgres slots.
@@ -159,6 +160,22 @@ describe("direct writes: anyone signed in, unless blocked in Auth0", () => {
       const response = await callApi(`/api/loos/${loo.id}/verify`, { method: "POST", headers });
       expect(response.status).toBe(200);
     }
+  });
+
+  it("puts a blocked or unconfirmed user's verify through the queued-write limit", async () => {
+    const limiter = { limit: vi.fn(async () => ({ success: false })) };
+    const env = { RATE_LIMIT_ANON_WRITE: limiter };
+    const loo = await fixtures.loos.create();
+    const verify = (headers: Record<string, string>) =>
+      callApi(`/api/loos/${loo.id}/verify`, { method: "POST", headers }, { env });
+
+    expect((await verify(blockedHeaders())).status).toBe(429);
+    expect(limiter.limit).toHaveBeenCalledWith({ key: `anon-write:user:${BLOCKED_SUB}` });
+    expect((await verify(lookupFailsHeaders())).status).toBe(429);
+    expect(limiter.limit).toHaveBeenCalledWith({ key: `anon-write:user:${LOOKUP_FAILS_SUB}` });
+    // A signed-in user who is not blocked is not held to it.
+    expect((await verify(signedInHeaders())).status).toBe(200);
+    expect(limiter.limit).toHaveBeenCalledTimes(2);
   });
 
   it("asks Auth0 about a user at most once a minute", async () => {

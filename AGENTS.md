@@ -237,7 +237,7 @@ Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteD
 
 - **POST /api/loos/:id/report** - `{reason: permanently_closed|does_not_exist|not_public|duplicate|other, details?, duplicateOf?, baseUpdatedAt?}`. Trusted: `active=false`, `removal_category`, `removal_reason`, `duplicate_of`; 200 with the loo and `compressed: null`. Others: 202, pending type `remove`. 409 `already_removed` / stale `conflict`; `details` required for `other`, `duplicateOf` required for (and only allowed with) `duplicate`.
 - **POST /api/loos/:id/restore** - `{details?, baseUpdatedAt?}`. Trusted: `active=true`, clears category and duplicate link; 200 with `compressed`. Others: 202, pending type `restore`. 409 `not_removed`.
-- **POST /api/loos/:id/verify** - no body; anyone (anonymous rate-limited). Sets only `verified_at`; 200 `{id, verifiedAt}`. 409 `removed` for an inactive loo.
+- **POST /api/loos/:id/verify** - no body; anyone. Callers who cannot write directly (anonymous, blocked, block status unknown) use the 1/min queued-write limiter. Sets only `verified_at`; 200 `{id, verifiedAt}`. 409 `removed` for an inactive loo.
 
 `LooResponse` includes `removalCategory` and `duplicateOf`. Optional secret `MODERATION_SLACK_WEBHOOK` (off when unset) posts a counts-only "N changes awaiting review" message when something is queued.
 
