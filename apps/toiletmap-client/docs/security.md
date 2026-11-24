@@ -250,8 +250,11 @@ clients don't land on a 404.
   application.
 - Tighten the server's `ALLOWED_ORIGINS`, removing the `*.workers.dev` wildcard that allows
   credentials.
-- Give previews their own rate-limit namespaces, and move the preview secret to
-  `wrangler secret`.
+- Turn off `workers_dev` on both production workers (`env.production` in each
+  `wrangler.jsonc`) once the smoke check's URL variables point at the real domain and
+  Flutter testing no longer needs `*.workers.dev`. (Previews already have their own
+  rate-limit namespaces, production has `preview_urls: false`, and the preview Auth0
+  secret is set with `wrangler secret put`.)
 - Update the GitHub OAuth app the CMS signs in with (or create a new one): its callback must be
   `https://www.toiletmap.org.uk/api/cms-oauth/callback`, because the legacy
   `/api/decap-oauth/*` URLs now redirect there and GitHub refuses any other `redirect_uri`.

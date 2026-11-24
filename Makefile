@@ -1,4 +1,4 @@
-.PHONY: help dev-server dev-client build-server build-client build-app deploy-server deploy-client deploy-server-preview deploy-client-preview test-server-e2e test-app db-start db-stop db-reset prisma-generate lint lint-fix lint-app format format-fix check-style fix-style
+.PHONY: help dev-server dev-client build-server build-client build-app deploy-server deploy-client test-server-e2e test-app db-start db-stop db-reset prisma-generate lint lint-fix lint-app format format-fix check-style fix-style
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -30,12 +30,6 @@ deploy-server: ## Deploy the server to production
 
 deploy-client: ## Deploy the client to production
 	pnpm --filter toiletmap-client run deploy
-
-deploy-server-preview: ## Deploy the server to preview environment
-	pnpm --filter toiletmap-server run deploy:preview
-
-deploy-client-preview: ## Deploy the client to preview environment
-	pnpm --filter toiletmap-client run deploy:preview
 
 test-server-e2e: ## Run end-to-end tests for the server
 	pnpm --filter toiletmap-server test:e2e

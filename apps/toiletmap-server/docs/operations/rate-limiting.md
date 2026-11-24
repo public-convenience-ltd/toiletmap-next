@@ -21,15 +21,31 @@ Nominatim traffic down.
 
 ## Configuration
 
-Limits are defined in `wrangler.jsonc`:
+Limits are defined per environment in `wrangler.jsonc` (`env.production.ratelimits`,
+`env.preview.ratelimits`):
 
 ```jsonc
-[[env.production.unsafe.bindings]]
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 400, period = 60 }
-name = "RATE_LIMIT_READ"
+"ratelimits": [
+  {
+    "name": "RATE_LIMIT_READ",
+    "namespace_id": "1000",
+    "simple": { "limit": 400, "period": 60 }
+  }
+]
 ```
+
+| Binding | Production namespace | Preview namespace |
+|---------|----------------------|-------------------|
+| `RATE_LIMIT_READ` | 1000 | 2000 |
+| `RATE_LIMIT_WRITE` | 1001 | 2001 |
+| `RATE_LIMIT_ADMIN` (and the Nominatim budget) | 1002 | 2002 |
+| `RATE_LIMIT_AUTH` | 1003 | 2003 |
+| `RATE_LIMIT_ANON_WRITE` | 1004 | 2004 |
+
+Counters are shared by every worker bound to the same namespace id, so previews have their own
+ids: a preview's traffic never uses up production's limits or its Nominatim budget. All
+previews share the preview namespaces. Never reuse a production id in another environment;
+`test/unit/wrangler-config.test.ts` checks this.
 
 ## Troubleshooting
 
