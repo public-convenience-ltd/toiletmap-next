@@ -134,15 +134,12 @@ const isFeedbackPath = (path: string): boolean =>
   path === "/api/feedback" || path.startsWith("/api/feedback/");
 
 /**
- * Get client IP from Cloudflare headers
+ * The client IP for rate-limit keys: `cf-connecting-ip`, which Cloudflare
+ * sets on every request from the internet and the client worker's proxy sets
+ * over the service binding. `X-Forwarded-For` is never used: the caller
+ * controls it, so it would let anyone pick their own limiter key.
  */
-const getClientIp = (c: Context): string => {
-  return (
-    c.req.header("cf-connecting-ip") ||
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown"
-  );
-};
+export const getClientIp = (c: Context): string => c.req.header("cf-connecting-ip") || "unknown";
 
 /**
  * Get user ID from context, or fall back to IP

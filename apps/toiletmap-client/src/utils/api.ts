@@ -17,17 +17,22 @@ export interface ApiEnv {
 }
 
 /**
+ * A preview deployment of the client: `<branch or version>-toiletmap-client`
+ * on the project's workers.dev subdomain, matched as the whole host.
+ */
+const PREVIEW_CLIENT_HOST =
+  /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)-toiletmap-client\.gbtoiletmap\.workers\.dev$/;
+
+/**
  * Returns the absolute base URL of the upstream API. If it's a preview
  * deployment of the client, it points to the matching preview deployment of
- * the server.
+ * the server. Only an exact preview host counts: any other host, including
+ * one that merely contains `-toiletmap-client`, uses `PUBLIC_API_URL`.
  */
 export function getUpstreamApiUrl(env: Pick<ApiEnv, "PUBLIC_API_URL">, requestUrl: URL): string {
-  const host = requestUrl.host;
-
-  // Cloudflare preview deployments have the format `<branch>-<worker_name>...`
-  // so if the host contains `-toiletmap-client`, point at `-toiletmap-server` on the same branch.
-  if (host.includes("-toiletmap-client")) {
-    return `https://${host.replace("-toiletmap-client", "-toiletmap-server")}`;
+  const preview = requestUrl.protocol === "https:" && PREVIEW_CLIENT_HOST.exec(requestUrl.host);
+  if (preview) {
+    return `https://${preview[1]}-toiletmap-server.gbtoiletmap.workers.dev`;
   }
 
   // For production or local development, use the configured environment variable

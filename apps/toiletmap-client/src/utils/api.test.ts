@@ -50,6 +50,28 @@ describe("getUpstreamApiUrl", () => {
         new URL("https://feat-x-toiletmap-client.gbtoiletmap.workers.dev/"),
       ),
     ).toBe("https://feat-x-toiletmap-server.gbtoiletmap.workers.dev");
+    expect(
+      getUpstreamApiUrl(
+        envWith(),
+        new URL("https://a1b2c3d4-toiletmap-client.gbtoiletmap.workers.dev/"),
+      ),
+    ).toBe("https://a1b2c3d4-toiletmap-server.gbtoiletmap.workers.dev");
+  });
+
+  it("matches the whole preview host, never a substring", () => {
+    for (const host of [
+      "https://evil-toiletmap-client.attacker.example/",
+      "https://feat-x-toiletmap-client.gbtoiletmap.workers.dev.attacker.example/",
+      "https://x-toiletmap-client.other.workers.dev/",
+      "https://www.feat-x-toiletmap-client.gbtoiletmap.workers.dev/",
+      "http://feat-x-toiletmap-client.gbtoiletmap.workers.dev/",
+      "https://feat-x-toiletmap-client.gbtoiletmap.workers.dev:8443/",
+      "https://-toiletmap-client.gbtoiletmap.workers.dev/",
+    ]) {
+      expect(getUpstreamApiUrl(envWith(), new URL(host)), host).toBe(
+        "https://toiletmap-server.example.dev",
+      );
+    }
   });
 });
 

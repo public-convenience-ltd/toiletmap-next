@@ -439,7 +439,7 @@ describe("POST /api/feedback: logging", () => {
         new Response(JSON.stringify({ success: false }), { status: 200 }),
     });
     const { ctx, settle } = createCapturingExecutionContext();
-    const headers = { "x-forwarded-for": IP, "user-agent": "Dart/3.5 (dart:io)" };
+    const headers = { "cf-connecting-ip": IP, "user-agent": "Dart/3.5 (dart:io)" };
 
     const ok = await postJson(
       { text: marker(), email: EMAIL },
