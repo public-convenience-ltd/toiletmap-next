@@ -136,6 +136,7 @@ investigated.
 | `mobile-chromium` | Pixel 7 | `map`, `edit`, `layout`, `freshness`, `picker`, `report`, `panel` |
 | `mobile-webkit` | iPhone 13 | `map`, `edit`, `layout`, `freshness`, `picker`, `report`, `panel` |
 | `mobile-landscape` | Pixel 7 landscape (863×360) | `panel`, `layout` |
+| `mobile-landscape-webkit` | iPhone 13 landscape (750×342) | `panel`, `layout` |
 
 ## How the tests work
 

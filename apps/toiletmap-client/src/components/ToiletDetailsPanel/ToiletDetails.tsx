@@ -1,6 +1,5 @@
 import { DAYS, formatRange, SHORT_DAYS, summariseOpeningTimes } from "@toiletmap/opening-hours";
-import type { ComponentChildren } from "preact";
-import { Button, Icon } from "toiletmap-design-system";
+import { Button, Icon, Notice } from "toiletmap-design-system";
 import type { LooDetail } from "../../api/loos";
 import { freshnessLine, isUniformWeek, paymentText, splitFacilities } from "./format";
 import styles from "./ToiletDetailsPanel.module.css";
@@ -24,8 +23,6 @@ export interface ToiletDetailsProps {
   onVerify: () => void;
   /** The verified date to show (a fresh verification in this panel wins). */
   verifiedAt: string | null | undefined;
-  /** The restore prompt, for a removed toilet (when open). */
-  restorePrompt?: ComponentChildren;
 }
 
 function OpeningHours({
@@ -113,7 +110,11 @@ function Facilities({ toilet, editHref }: { toilet: LooDetail; editHref: string 
   );
 }
 
-/** Everything below the summary: hours, facilities, payment, notes, freshness and actions. */
+/**
+ * Everything below the summary: hours, facilities, payment, notes, freshness and actions. A
+ * removed toilet shows only its notes and when it was last updated: its hours and facilities
+ * (often "not known") no longer help anyone find a toilet.
+ */
 export default function ToiletDetails({
   id,
   toilet,
@@ -122,7 +123,6 @@ export default function ToiletDetails({
   verify,
   onVerify,
   verifiedAt,
-  restorePrompt,
 }: ToiletDetailsProps) {
   const looHref = `/loos/${encodeURIComponent(toilet.id)}`;
   const hours = toilet.openingTimes;
@@ -130,24 +130,26 @@ export default function ToiletDetails({
 
   return (
     <div id={id} className={styles.details}>
-      {restorePrompt}
+      {!isRemoved && (
+        <section className={styles.section} aria-labelledby={`${id}-hours`}>
+          <h3 id={`${id}-hours`} className={styles.sectionHeading}>
+            Opening hours
+          </h3>
+          <OpeningHours hours={hours} today={today} />
+          {hours !== null && hours !== undefined && (
+            <p className={styles.smallNote}>Hours may vary on bank holidays.</p>
+          )}
+        </section>
+      )}
 
-      <section className={styles.section} aria-labelledby={`${id}-hours`}>
-        <h3 id={`${id}-hours`} className={styles.sectionHeading}>
-          Opening hours
-        </h3>
-        <OpeningHours hours={hours} today={today} />
-        {!isRemoved && hours !== null && hours !== undefined && (
-          <p className={styles.smallNote}>Hours may vary on bank holidays.</p>
-        )}
-      </section>
-
-      <section className={styles.section} aria-labelledby={`${id}-facilities`}>
-        <h3 id={`${id}-facilities`} className={styles.sectionHeading}>
-          Facilities
-        </h3>
-        <Facilities toilet={toilet} editHref={isRemoved ? null : `${looHref}/edit`} />
-      </section>
+      {!isRemoved && (
+        <section className={styles.section} aria-labelledby={`${id}-facilities`}>
+          <h3 id={`${id}-facilities`} className={styles.sectionHeading}>
+            Facilities
+          </h3>
+          <Facilities toilet={toilet} editHref={`${looHref}/edit`} />
+        </section>
+      )}
 
       {notes && (
         <section className={styles.section} aria-labelledby={`${id}-notes`}>
@@ -180,17 +182,19 @@ export default function ToiletDetails({
                   </Button>
                 </>
               )}
-              <span role="status" className={styles.verifyStatus}>
+              {/* The live region stays on the page; the result is a compact DS Notice in it. */}
+              <div role="status" className={styles.verifyStatus}>
                 {verify.status === "done" && (
-                  <span className={styles.verifyThanks}>
-                    <Icon icon="check" size="small" />
+                  <Notice tone="success" size="compact" announce="off">
                     {VERIFIED_MESSAGE}
-                  </span>
+                  </Notice>
                 )}
                 {verify.status === "error" && (
-                  <span className={styles.verifyError}>{verify.message}</span>
+                  <Notice tone="error" size="compact" announce="off">
+                    {verify.message}
+                  </Notice>
                 )}
-              </span>
+              </div>
             </div>
             <div className={styles.secondaryActions}>
               <a className={styles.textAction} href={`${looHref}/edit`}>

@@ -208,16 +208,62 @@ export function prefersReducedMotion(
   }
 }
 
+// ── Toasts ──────────────────────────────────────────────────────────────────
+
+/** Where the map page's toasts sit (see toastLayout). */
+export interface ToastLayout {
+  /** px from the top of the viewport the toasts start below (plus the region's own gap). */
+  offset: number;
+  /** px from the viewport's left edge the toasts start at (right of the desktop card); null: the default. */
+  left: number | null;
+  /** px from the viewport's right edge the toasts end at (left of the right-hand controls); null: the default. */
+  right: number | null;
+}
+
+export interface ToastLayoutInput {
+  /** The panel's mode for this viewport ("card" from 768px), whether or not a panel is open. */
+  mode: "sheet" | "card";
+  /** The map container, in viewport coordinates. */
+  container: RectLike;
+  /** What the open panel covers of the container; null when none is open. */
+  occludes: Insets | null;
+  /** Bottom edge of the top row of floating controls (the search bar), in viewport px. */
+  searchBottom: number | null;
+  /**
+   * Left edge of the right-hand column of floating buttons (zoom, the developer buttons), in
+   * viewport px; null when none is showing.
+   */
+  rightControlsLeft?: number | null;
+  /** The viewport's width (the toast region is fixed to the viewport). */
+  viewportWidth?: number;
+}
+
 /**
- * Whether the Settings gear and DevTools are shown: local development builds, and deployed
- * `development`/`preview` environments (the worker's ENVIRONMENT var, passed in by the page).
- * Production — and anything unknown — hides them.
+ * Keeps toasts clear of the details panel, the selected marker, the floating controls and the
+ * safe areas (the header has padded the top one):
+ * - from 768px (the card): just below the search bar, between an open card and the right-hand
+ *   column of buttons (zoom, developer tools), which on a short landscape screen reach up to
+ *   the toasts' row;
+ * - on a phone with no panel open: just below the search bar, which stays usable;
+ * - on a phone with the sheet open: at the very top of the map, over the search bar. The
+ *   expanded sheet leaves only the search bar and the marker room above it (10rem), so a toast
+ *   below the bar would cover the toilet it is about; the bar can wait a few seconds.
  */
-export function showDeveloperControls(
-  environment: string | null | undefined,
-  isDevBuild: boolean,
-): boolean {
-  if (isDevBuild) return true;
-  const env = (environment ?? "").trim().toLowerCase();
-  return env === "development" || env === "preview" || env === "local";
+export function toastLayout(input: ToastLayoutInput): ToastLayout {
+  const { mode, container, occludes, searchBottom } = input;
+  if (mode === "sheet") {
+    const offset = occludes === null ? (searchBottom ?? container.top) : container.top;
+    return { offset: clampPx(offset), left: null, right: null };
+  }
+  const left = occludes && occludes.left > 0 ? clampPx(container.left + occludes.left) : null;
+  const { rightControlsLeft, viewportWidth } = input;
+  const right =
+    rightControlsLeft != null && viewportWidth != null && rightControlsLeft < viewportWidth
+      ? clampPx(viewportWidth - rightControlsLeft)
+      : null;
+  return { offset: clampPx(searchBottom ?? container.top), left, right };
+}
+
+export function toastLayoutEqual(a: ToastLayout, b: ToastLayout): boolean {
+  return a.offset === b.offset && a.left === b.left && a.right === b.right;
 }

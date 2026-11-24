@@ -21,7 +21,7 @@ export function locationPicker(page: Page) {
      */
     chip: page.getByText(/^Moved [\d.]+ k?m [a-z-]+$/),
     /** The line under the map saying what the pin is doing ("Pin placed…", "Locked again."). */
-    strip: page.locator("p[id$='-strip']"),
+    strip: page.locator("[id$='-strip']"),
     bigMoveWarning: page.getByText("That's a big move — are you sure this is the same toilet?"),
     addInstead: page.getByRole("link", { name: "Add as a new toilet instead" }),
     /** The duplicate prompt ("There's already a toilet 8 m away: …"). */
@@ -51,7 +51,8 @@ export function looForm(page: Page) {
   const form = page.locator("form").filter({ has: page.getByRole("heading", { level: 1 }) });
   const review = page.getByRole("dialog", { name: /^Check (your changes|the new toilet)$/ });
   const save = form.locator("button[type=submit]");
-  const confirm = review.getByRole("button", { name: "Confirm and save" });
+  // "Confirm and save" when it goes live; "Send for review" when a moderator checks it first.
+  const confirm = review.getByRole("button", { name: /^(Confirm and save|Send for review)$/ });
   return {
     heading: page.getByRole("heading", { level: 1 }),
     name: page.getByRole("textbox", { name: "What's it called?", exact: true }),
@@ -66,7 +67,7 @@ export function looForm(page: Page) {
      */
     facility: (label: string, option: "Yes" | "No" | "Don't know") =>
       page.getByRole("group", { name: label, exact: true }).getByText(option, { exact: true }),
-    /** The review sheet every save goes through. */
+    /** The review sheet every save goes through (a DS ConfirmDialog, role="dialog"). */
     review,
     reviewItems: review.getByRole("listitem"),
     confirm,
@@ -117,20 +118,29 @@ export function nextSave(page: Page, method: "PUT" | "POST"): Promise<Request> {
 export const jsonBody = (req: Request): Record<string, unknown> =>
   JSON.parse(req.postData() ?? "{}") as Record<string, unknown>;
 
-/** Banner LooMap shows on `/loos/:id?saved=1` (ToiletDetailsPanel SAVED_MESSAGE). */
+/** The toast LooMap shows on `/loos/:id?saved=1` (LooMap/messages.ts SAVED_MESSAGE). */
 export const SAVED_BANNER_TEXT = "Thanks — your changes are live.";
+/** The toast after adding a toilet, `/loos/:id?saved=added` (ADDED_MESSAGE). */
+export const ADDED_BANNER_TEXT = "Thanks — the toilet is now on the map.";
+
+/** The map page's toasts (the DS ToastRegion: a polite live list). */
+export const toasts = (page: Page) => page.getByRole("list", { name: "Notifications" });
 
 /**
- * Waits for the redirect a successful signed-in save makes, `/loos/<id>?saved=1`,
- * and for the map to consume the param: the "changes are live" banner shows and
- * `?saved=1` is stripped from the address bar. Returns the toilet id (useful
- * after adding a toilet, when the id is not known in advance).
+ * Waits for the redirect a successful signed-in save makes, `/loos/<id>?saved=1` (an edit)
+ * or `?saved=added` (a new toilet), and for the map to consume the param: the "changes are
+ * live" (or "now on the map") toast shows and the param is stripped from the address bar.
+ * Returns the toilet id (useful after adding a toilet, when the id is not known in advance).
  */
 export async function waitForSaved(page: Page, id?: string): Promise<string> {
   const idPattern = id ? id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "[0-9a-f]{24}";
   // Either form: by the time this runs the param may already have been stripped.
-  await page.waitForURL(new RegExp(`/loos/(${idPattern})(\\?saved=1)?$`));
-  await expect(page.getByText(SAVED_BANNER_TEXT)).toBeVisible();
+  await page.waitForURL(new RegExp(`/loos/(${idPattern})(\\?saved=(1|added))?$`));
+  // An edit (a known id) says its changes are live; a new toilet that it's on the map.
+  const message = id
+    ? SAVED_BANNER_TEXT
+    : new RegExp(`^(${SAVED_BANNER_TEXT}|${ADDED_BANNER_TEXT})$`);
+  await expect(toasts(page).getByText(message)).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/loos/${idPattern}$`));
   return new URL(page.url()).pathname.split("/").pop() ?? "";
 }

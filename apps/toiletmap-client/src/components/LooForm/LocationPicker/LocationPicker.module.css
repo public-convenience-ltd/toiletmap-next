@@ -21,13 +21,13 @@
 
 .hint {
   font-size: var(--text--1);
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
   margin: 0;
 }
 
 .error {
   font-size: var(--text--1);
-  color: var(--color-accent-pink);
+  color: var(--color-text-error);
   font-weight: 600;
   margin: 0;
 }
@@ -46,10 +46,16 @@
   flex: 1 1 16rem;
 }
 
+/* "Use my location" lines up with the search field beside it: the same height (46px). */
+.toolbar > :global(.button) {
+  min-height: 2.875rem;
+  border-radius: var(--radius-pill);
+}
+
 /* "Searching…" / "No places found": empty (and zero height) the rest of the time. */
 .searchStatus {
   font-size: var(--text--1);
-  color: var(--color-neutral-grey);
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -67,8 +73,8 @@
   padding: 0;
   background: var(--color-base-white);
   border: 1px solid var(--color-light-grey);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(10, 22, 94, 0.1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
   z-index: 1100;
   overflow: hidden;
 }
@@ -101,14 +107,19 @@
 
 /* ── Map ──────────────────────────────────────────────────── */
 
+/*
+ * Its own stacking context: the overlays' z-indexes (Locked badge, chip, Move pin, all 1000+)
+ * stay inside the map, so the form's sticky Save bar (z-index 20) scrolls over them.
+ */
 .mapWrap {
   position: relative;
+  isolation: isolate;
 }
 
 .map {
   height: clamp(260px, 45vh, 380px);
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   z-index: 1;
 }
 
@@ -170,6 +181,28 @@
   z-index: 1001;
 }
 
+/*
+ * Everything that floats on the picker's map (the move chip, the Locked badge, the "locked"
+ * message) shares one overlay style: white, navy text, --shadow-2, a pill (the message, which
+ * can run to two lines, is rounded instead). Only the big-move chip changes, to the warning tone.
+ */
+.chip,
+.badge,
+.lockedMessage {
+  border: 1px solid var(--color-light-grey);
+  background: var(--color-base-white);
+  color: var(--color-primary-navy);
+  font-size: var(--text--1);
+  font-weight: 600;
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.chip,
+.badge {
+  border-radius: var(--radius-pill);
+}
+
 .chip {
   position: absolute;
   top: var(--space-xs);
@@ -177,13 +210,6 @@
   z-index: 1000;
   max-width: calc(100% - 2 * var(--space-xs) - 40px);
   padding: var(--space-3xs, 4px) var(--space-xs);
-  border-radius: 999px;
-  background: var(--color-base-white);
-  color: var(--color-primary-navy);
-  font-size: var(--text--1);
-  font-weight: 600;
-  box-shadow: 0 1px 6px rgba(10, 22, 94, 0.2);
-  pointer-events: none;
   /* The grey pin can still show through if the chip ends up over it on a narrow map. */
   opacity: 0.92;
 }
@@ -195,8 +221,10 @@
   bottom: var(--space-xs);
 }
 
+/* A big move: the DS warning tone, as the warning under the map. */
 .chipWarning {
-  background: #fff4d6;
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
 }
 
 /* ── On the locked map: badge, Move pin, the "locked" message ── */
@@ -209,13 +237,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px var(--space-xs);
-  border-radius: 999px;
-  background: var(--color-primary-navy);
-  color: var(--color-base-white);
-  font-size: var(--text--1);
-  font-weight: 700;
-  pointer-events: none;
+  padding: var(--space-3xs, 4px) var(--space-xs);
 }
 
 /* Above the OpenStreetMap attribution, which runs under it on a phone-width map. */
@@ -229,7 +251,7 @@
 .movePin {
   min-height: 44px;
   min-width: 44px;
-  box-shadow: 0 2px 8px rgba(10, 22, 94, 0.3);
+  box-shadow: var(--shadow-2);
 }
 
 .lockedMessage {
@@ -241,22 +263,13 @@
   margin: 0;
   padding: var(--space-xs) var(--space-s);
   transform: translate(-50%, -50%);
-  border-radius: 8px;
-  background: rgba(10, 22, 94, 0.92);
-  color: var(--color-base-white);
-  font-size: var(--text--1);
-  font-weight: 600;
+  border-radius: var(--radius-lg);
   text-align: center;
-  pointer-events: none;
 }
 
 /* ── One-time intro ───────────────────────────────────────── */
 
-.intro :global(.banner) {
-  margin: 0;
-}
-
-.introText {
+.intro {
   margin: 0;
 }
 
@@ -275,75 +288,28 @@
   gap: var(--space-xs);
 }
 
-/* What the pin is doing: placed, locked, moved 23 m, zoom in… */
+/* What the pin is doing (placed, locked, moved 23 m, zoom in…): a compact DS Notice, whose
+   tone (success, warning, info) the picker sets; this wrapper carries its id and state. */
 .strip {
   margin: 0;
-  padding: var(--space-2xs, 6px) var(--space-xs);
-  border-left: 4px solid var(--color-light-grey);
-  border-radius: 4px;
-  background: var(--color-base-white);
-  font-size: var(--text--1);
-  font-weight: 600;
-  color: var(--color-primary-navy);
 }
 
-.strip[data-placed="true"] {
-  border-left-color: var(--color-accent-turquoise);
-}
-
-/* Something must be answered first (a big move, a jump, a duplicate question): not "OK". */
-.strip[data-blocked="true"],
-.strip[data-too-far="true"] {
-  border-left-color: #e5a000;
-}
-
-.warning {
-  padding: var(--space-xs) var(--space-s);
-  border-left: 4px solid #e5a000;
-  border-radius: 4px;
-  background: #fff4d6;
-  font-size: var(--text--1);
-}
-
-.warning p {
-  margin: 0 0 var(--space-3xs, 4px);
-  font-weight: 600;
-}
-
-.warning a {
-  color: var(--color-primary-navy);
-  font-weight: 600;
-}
-
-.warning p.warningHint {
-  font-weight: 400;
-}
-
-/* A fieldset (the question is its legend). The floated legend sits inside the border. */
+/* The duplicate question: a DS Notice in a group named by it, focused when it appears. */
 .prompt {
-  margin: 0;
   min-width: 0;
-  padding: var(--space-s);
-  border: 2px solid var(--color-primary-navy);
-  border-radius: 8px;
-  background: var(--color-base-white);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.prompt:focus {
+  outline: none;
 }
 
 .prompt:focus-visible {
-  outline: 3px solid var(--color-accent-turquoise);
+  outline: 3px solid var(--color-primary-navy);
   outline-offset: 2px;
-}
-
-.promptText {
-  float: left;
-  width: 100%;
-  margin: 0 0 var(--space-xs);
-  padding: 0;
-  font-size: var(--text-0);
-}
-
-.prompt > .actions {
-  clear: both;
 }
 
 .linkButton {
@@ -358,8 +324,15 @@
   cursor: pointer;
 }
 
-.linkButton:hover {
-  text-decoration: none;
+/*
+ * Hover only where there is a real hover: on a touch screen :hover sticks to whatever was last
+ * tapped, or appears under the finger (Reset shows up where "Show on map" was just tapped),
+ * and the link would lose its underline there.
+ */
+@media (hover: hover) {
+  .linkButton:hover {
+    text-decoration: none;
+  }
 }
 
 .linkButton:focus-visible,
@@ -400,21 +373,50 @@
   margin-top: 0;
 }
 
+/*
+ * Leaflet's +/- on the picker, styled like the main map's zoom stack: 36px buttons in one
+ * white, rounded, raised group (44px on touch, below).
+ */
+.map :global(.leaflet-control-zoom) {
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+}
+
+.map :global(.leaflet-control-zoom a) {
+  width: 36px;
+  height: 36px;
+  line-height: 36px;
+  color: var(--color-primary-navy);
+}
+
 /* ── Touch: 44px targets ──────────────────────────────────── */
 
 @media (pointer: coarse) {
   .actions :global(.button),
   .toolbar :global(.button),
   .coordsRow :global(.button),
-  .linkButton,
-  .coordsSummary {
+  .prompt :global(.button) {
     min-height: 44px;
   }
 
-  .linkButton,
+  /*
+   * 44px tall, still looking like what they are: a block (not flex) box keeps the link's
+   * underline, and the summary stays a list item, so it keeps its disclosure triangle.
+   */
+  .linkButton {
+    display: inline-block;
+    min-height: 44px;
+    line-height: 44px;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
   .coordsSummary {
-    display: inline-flex;
-    align-items: center;
+    display: list-item;
+    min-height: 44px;
+    line-height: 44px;
   }
 
   /* Leaflet's +/- (for looking around the locked map) get the same 44px target as Move pin. */
