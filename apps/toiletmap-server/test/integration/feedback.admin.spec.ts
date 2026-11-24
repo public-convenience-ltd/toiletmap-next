@@ -8,29 +8,27 @@ import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { __adminRoleTestUtils } from "../../src/middleware/require-admin-role";
 import { createPrismaClient } from "../../src/prisma";
-import { getPrismaClient, getTestContext } from "./setup";
+import { getPrismaClient } from "./setup";
 import { cleanupManager } from "./utils/cleanup";
 import { getTestDatabaseUrl } from "./utils/env";
+import { sessionHeaders } from "./utils/session";
 import { callApi } from "./utils/test-client";
 
-const sessionCookie = (permissions: string[]) => {
-  const { issueToken } = getTestContext();
-  const sub = permissions.length ? "auth0|feedback-admin" : "auth0|feedback-member";
-  const accessToken = issueToken({ sub, permissions });
-  const idToken = issueToken({ sub, aud: process.env.AUTH0_CLIENT_ID });
-  const user = { sub, email: "someone@example.com", name: "Test User" };
-  const encodedUser = Buffer.from(JSON.stringify(user)).toString("base64");
-  return `id_token=${idToken}; access_token=${accessToken}; user_info=${encodedUser}`;
-};
+const feedbackSessionHeaders = (permissions: string[]) =>
+  sessionHeaders({
+    sub: permissions.length ? "auth0|feedback-admin" : "auth0|feedback-member",
+    permissions,
+    profile: { email: "someone@example.com", name: "Test User" },
+  });
 
 const adminHeaders = () => {
   __adminRoleTestUtils.clearPermissionCache();
-  return { Cookie: sessionCookie(["access:admin"]) };
+  return feedbackSessionHeaders(["access:admin"]);
 };
 
 const memberHeaders = () => {
   __adminRoleTestUtils.clearPermissionCache();
-  return { Cookie: sessionCookie([]) };
+  return feedbackSessionHeaders([]);
 };
 
 /** Far-future timestamps keep seeded rows at the top of the newest-first list. */

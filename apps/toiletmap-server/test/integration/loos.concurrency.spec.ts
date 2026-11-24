@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { toilets } from "../../src/prisma";
 import { generateLooId, LooService } from "../../src/services/loo";
 import type { LooResponse } from "../../src/services/loo/types";
-import { getPrismaClient, getTestContext } from "./setup";
+import { getPrismaClient } from "./setup";
 import { createFixtureFactory } from "./utils/fixtures";
+import { sessionHeaders } from "./utils/session";
 import { callApi, jsonRequest } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
@@ -21,16 +22,13 @@ const countAuditRows = (id: string) =>
 
 const minuteBefore = (iso: string | null) => new Date(Date.parse(iso ?? "") - 60_000).toISOString();
 
-/** The cookie session the admin edit page sends with its same-origin PUT. */
-const adminSessionCookie = () => {
-  const { issueToken } = getTestContext();
-  const sub = "auth0|concurrency-admin";
-  const accessToken = issueToken({ sub, permissions: ["access:admin"] });
-  const idToken = issueToken({ sub, aud: process.env.AUTH0_CLIENT_ID });
-  const user = { sub, email: "admin@example.com", name: "Concurrency Admin" };
-  const encodedUser = Buffer.from(JSON.stringify(user)).toString("base64");
-  return `id_token=${idToken}; access_token=${accessToken}; user_info=${encodedUser}`;
-};
+/** The cookie session (and same-origin Origin) the admin edit page sends with its PUT. */
+const adminSessionHeaders = () =>
+  sessionHeaders({
+    sub: "auth0|concurrency-admin",
+    permissions: ["access:admin"],
+    profile: { email: "admin@example.com", name: "Concurrency Admin" },
+  });
 
 describe("PUT /api/loos/:id from an admin session", () => {
   it("returns 409 and writes nothing when baseUpdatedAt is stale", async () => {
@@ -42,7 +40,7 @@ describe("PUT /api/loos/:id from an admin session", () => {
       jsonRequest(
         "PUT",
         { notes: "Saved from a stale edit page", baseUpdatedAt: minuteBefore(loo.updatedAt) },
-        { Cookie: adminSessionCookie() },
+        adminSessionHeaders(),
       ),
     );
 
@@ -61,7 +59,7 @@ describe("PUT /api/loos/:id from an admin session", () => {
       jsonRequest(
         "PUT",
         { notes: "Saved from a fresh edit page", baseUpdatedAt: loo.updatedAt },
-        { Cookie: adminSessionCookie() },
+        adminSessionHeaders(),
       ),
     );
 

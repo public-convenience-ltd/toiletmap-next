@@ -14,11 +14,17 @@ const sessionHeaders = (env: Env, permissions: string[] = [ADMIN_ROLE_ID]) => {
   const { issueToken } = getTestContext();
   const claims = { sub: ADMIN_SUB, permissions };
   const accessToken = issueToken(claims);
-  const idToken = issueToken({ ...claims, aud: env.AUTH0_CLIENT_ID });
-  const userInfo = Buffer.from(
-    JSON.stringify({ sub: ADMIN_SUB, name: "Export Admin", email: "export-admin@example.com" }),
-  ).toString("base64");
-  return { Cookie: `id_token=${idToken}; access_token=${accessToken}; user_info=${userInfo}` };
+  const idToken = issueToken({
+    ...claims,
+    aud: env.AUTH0_CLIENT_ID,
+    name: "Export Admin",
+    email: "export-admin@example.com",
+  });
+  // Same-origin, as the admin's own form post sends.
+  return {
+    Cookie: `id_token=${idToken}; access_token=${accessToken}`,
+    Origin: "https://admin.test",
+  };
 };
 
 const exportRows = (count: number): ExportSourceRecord[] =>

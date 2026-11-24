@@ -231,16 +231,20 @@ describe("canWriteDirectly", () => {
     expect(await check({ sub: "misconfigured" }, managementEnv)).toBe(false);
   });
 
-  it("treats users as not blocked when the Management API is not configured", async () => {
+  it("treats users as not blocked in development when the Management API is not configured", async () => {
     const fromEnv = vi.spyOn(Auth0ManagementClient, "fromEnv");
-    expect(await check({ sub: "local", permissions: [] })).toBe(true);
+    expect(await check({ sub: "local", permissions: [] }, { ENVIRONMENT: "development" })).toBe(
+      true,
+    );
     expect(fromEnv).not.toHaveBeenCalled();
   });
 
-  it("queues signed-in users in production when the Management API is not configured", async () => {
+  it("queues signed-in users outside development when the Management API is not configured", async () => {
     const fromEnv = vi.spyOn(Auth0ManagementClient, "fromEnv");
     expect(await check({ sub: "prod-user" }, { ENVIRONMENT: "production" })).toBe(false);
-    expect(await check({ sub: "preview-user" }, { ENVIRONMENT: "preview" })).toBe(true);
+    // Previews too, until they get their own Management app.
+    expect(await check({ sub: "preview-user" }, { ENVIRONMENT: "preview" })).toBe(false);
+    expect(await check({ sub: "unset-user" }, { ENVIRONMENT: undefined })).toBe(false);
     expect(fromEnv).not.toHaveBeenCalled();
   });
 });

@@ -46,9 +46,14 @@ type EnvironmentName = (typeof ENVIRONMENTS)[number];
 const isEnvironmentName = (value: string | undefined): value is EnvironmentName =>
   ENVIRONMENTS.some((name) => name === value);
 
-const readEnvironment = (): EnvironmentName | undefined => {
+/**
+ * `ENVIRONMENT` for the worker under test: the process value when it names an
+ * environment, else "development" (the suite stands in for local dev; outside
+ * development the worker fails closed without Auth0 Management credentials).
+ */
+const readEnvironment = (): EnvironmentName => {
   const value = testProcessEnv.ENVIRONMENT;
-  return isEnvironmentName(value) ? value : undefined;
+  return isEnvironmentName(value) ? value : "development";
 };
 
 /** Rate limiter binding that always allows the request, like a missing binding would. */

@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 import type { AppVariables, AuthSource, Env, RequestUser } from "../types";
 import { logger } from "../utils/logger";
-import { clearSessionCookies, getSession, type SessionData, type SessionUser } from "./session";
+import { clearSessionCookies, getSession, type SessionData } from "./session";
 import { fetchUserInfo as fetchAuth0UserInfo } from "./userinfo";
-import { authenticateToken } from "./verify";
+import { authenticateToken, JwksUnavailableError } from "./verify";
 
 type AuthenticatedContext = Context<{ Bindings: Env; Variables: AppVariables }>;
 
@@ -30,7 +30,11 @@ const extractBearerToken = (headerValue: string | null) => {
   return token || null;
 };
 
-type ProfileSource = SessionUser | Record<string, unknown> | null | undefined;
+/** Whether the request sends `Authorization: Bearer <token>`. */
+export const hasBearerToken = (c: AuthenticatedContext): boolean =>
+  extractBearerToken(getAuthorizationHeader(c)) !== null;
+
+type ProfileSource = Record<string, unknown> | null | undefined;
 
 const mergeProfile = (user: RequestUser, profile?: ProfileSource): RequestUser => {
   if (!profile) {
@@ -59,19 +63,60 @@ const mergeProfile = (user: RequestUser, profile?: ProfileSource): RequestUser =
   };
 };
 
+/** The profile claims taken from a verified id_token. */
+const ID_TOKEN_PROFILE_CLAIMS = ["name", "nickname", "email"] as const;
+
 const shouldFetchUserInfo = (options?: AuthOptions) => options?.fetchUserInfo !== false;
+
+const errorDetails = (error: unknown) =>
+  error instanceof Error
+    ? { errorName: error.name, errorMessage: error.message }
+    : { errorMessage: String(error) };
+
+/**
+ * The profile claims (name, nickname, email) of the session's id_token, once
+ * verified (signature, issuer, audience = AUTH0_CLIENT_ID, expiry) and only
+ * when it belongs to the same user as the access token. `null` otherwise.
+ */
+const profileFromIdToken = async (
+  c: AuthenticatedContext,
+  idToken: string | undefined,
+  sub: string,
+): Promise<Record<string, string> | null> => {
+  if (!idToken) return null;
+  try {
+    const claims = await authenticateToken(idToken, c.env, c.env.AUTH0_CLIENT_ID);
+    if (claims.sub !== sub) {
+      logger.warn("Session id_token belongs to a different user; ignoring its profile");
+      return null;
+    }
+    const profile: Record<string, string> = {};
+    for (const key of ID_TOKEN_PROFILE_CLAIMS) {
+      const value = claims[key];
+      if (typeof value === "string" && value) profile[key] = value;
+    }
+    return profile;
+  } catch (error) {
+    logger.warn(
+      "Session id_token could not be verified; ignoring its profile",
+      errorDetails(error),
+    );
+    return null;
+  }
+};
 
 const enrichUser = async (
   c: AuthenticatedContext,
   user: RequestUser,
   params: {
     accessToken?: string | null;
-    sessionProfile?: SessionUser | null;
+    idToken?: string;
     options?: AuthOptions;
   },
 ): Promise<RequestUser> => {
-  if (params.sessionProfile) {
-    return mergeProfile(user, params.sessionProfile);
+  const idTokenProfile = await profileFromIdToken(c, params.idToken, user.sub);
+  if (idTokenProfile) {
+    return mergeProfile(user, idTokenProfile);
   }
 
   if (!shouldFetchUserInfo(params.options)) {
@@ -102,74 +147,41 @@ const authenticateBearer = async (
   };
 };
 
+/**
+ * Authenticates a cookie session by its access token alone. The id_token is
+ * never a credential: it only supplies profile claims. A session whose access
+ * token does not verify is cleared, except when the signing keys could not be
+ * fetched (an Auth0 outage says nothing about the session).
+ */
 const authenticateWithSession = async (
   c: AuthenticatedContext,
   session: SessionData,
   options?: AuthOptions,
 ): Promise<AuthResult | null> => {
-  if (session.accessToken) {
-    try {
-      const user = await authenticateToken(
-        session.accessToken,
-        c.env,
-        options?.audience ?? c.env.AUTH0_AUDIENCE,
-      );
-      return {
-        user: await enrichUser(c, user, {
-          accessToken: session.accessToken,
-          sessionProfile: session.user,
-          options,
-        }),
-        token: session.accessToken,
-        source: "session-access-token",
-        session,
-      };
-    } catch (error) {
-      if (!session.idToken) {
-        throw error;
-      }
-      if (error instanceof Error) {
-        logger.warn("Session access token verification failed, falling back to id_token", {
-          errorName: error.name,
-          errorMessage: error.message,
-        });
-      } else {
-        logger.warn("Session access token verification failed, falling back to id_token", {
-          errorMessage: String(error),
-        });
-      }
-    }
+  let user: RequestUser;
+  try {
+    user = await authenticateToken(
+      session.accessToken,
+      c.env,
+      options?.audience ?? c.env.AUTH0_AUDIENCE,
+    );
+  } catch (error) {
+    if (error instanceof JwksUnavailableError) throw error;
+    logger.warn("Session access token verification failed, clearing session", errorDetails(error));
+    clearSessionCookies(c);
+    return null;
   }
 
-  if (session.idToken) {
-    try {
-      const user = await authenticateToken(session.idToken, c.env, c.env.AUTH0_CLIENT_ID);
-      return {
-        user: await enrichUser(c, user, {
-          sessionProfile: session.user,
-          options,
-        }),
-        token: session.idToken,
-        source: "session-id-token",
-        session,
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        logger.warn("Session id token verification failed, clearing session", {
-          errorName: error.name,
-          errorMessage: error.message,
-        });
-      } else {
-        logger.warn("Session id token verification failed, clearing session", {
-          errorMessage: String(error),
-        });
-      }
-      clearSessionCookies(c);
-      return null;
-    }
-  }
-
-  return null;
+  return {
+    user: await enrichUser(c, user, {
+      accessToken: session.accessToken,
+      idToken: session.idToken,
+      options,
+    }),
+    token: session.accessToken,
+    source: "session-access-token",
+    session,
+  };
 };
 
 export const authenticateRequest = (

@@ -21,6 +21,7 @@ import {
 import { cleanupManager } from "./utils/cleanup";
 import { createFixtureFactory } from "./utils/fixtures";
 import type { QueuedBody, SavedLooBody } from "./utils/response-types";
+import { TEST_ORIGIN } from "./utils/session";
 import { callApi, jsonRequest, readJson } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
@@ -142,7 +143,7 @@ describe("direct writes: anyone signed in, unless blocked in Auth0", () => {
   );
 
   it.each(writes)(
-    "$name: without Auth0 Management config, signed-in users write directly",
+    "$name: in local development without Auth0 Management config, signed-in users write directly",
     async (write) => {
       await expectDirect(
         await write.send(blockedHeaders(), { env: WITHOUT_MANAGEMENT_ENV }),
@@ -280,25 +281,37 @@ describe("direct-write edge cases", () => {
     expect(isUserBlocked()).toHaveBeenCalledTimes(1);
   });
 
-  it("queues signed-in writes in production when the Management API is not configured", async () => {
-    await expectQueuedEdit(
-      await editRequest(signedInHeaders(), {
-        env: { ...WITHOUT_MANAGEMENT_ENV, ENVIRONMENT: "production" },
-      }),
-    );
-    expect(isUserBlocked()).not.toHaveBeenCalled();
-  });
+  it.each(["production", "preview", undefined] as const)(
+    "queues signed-in writes (ENVIRONMENT=%s) when the Management API is not configured",
+    async (ENVIRONMENT) => {
+      await expectQueuedEdit(
+        await editRequest(signedInHeaders(), {
+          env: { ...WITHOUT_MANAGEMENT_ENV, ENVIRONMENT },
+        }),
+      );
+      expect(isUserBlocked()).not.toHaveBeenCalled();
+    },
+  );
 
-  it("queues a session authenticated only by its id_token", async () => {
+  it("does not accept an id_token as a credential: the change is anonymous and queued", async () => {
     const { issueToken } = getTestContext();
     const sub = "auth0|id-token-only";
-    const user = Buffer.from(JSON.stringify({ sub, name: "Id Token" })).toString("base64");
     const cookie = [
       `id_token=${issueToken({ sub, aud: process.env.AUTH0_CLIENT_ID })}`,
       "access_token=not-a-valid-token",
-      `user_info=${user}`,
     ].join("; ");
-    await expectQueuedEdit(await editRequest({ Cookie: cookie }));
+    const loo = await fixtures.loos.create({ notes: "Original" });
+    const response = await callApi(
+      `/api/loos/${loo.id}`,
+      jsonRequest("PUT", { notes: "Changed" }, { Cookie: cookie, Origin: TEST_ORIGIN }),
+    );
+    // The broken session is cleared.
+    expect(response.headers.get("set-cookie")).toContain("access_token=;");
+    await expectQueuedEdit(response);
+    const queued = await getPrismaClient().pending_change.findFirst({
+      where: { loo_id: loo.id },
+    });
+    expect(queued?.submitted_by).toBeNull();
     expect(isUserBlocked()).not.toHaveBeenCalled();
   });
 

@@ -4,9 +4,10 @@ import { admin } from "./admin";
 import { optionalAuth } from "./auth/middleware";
 import { openApiDocument } from "./docs/openapi";
 import { rateLimiters } from "./middleware/cloudflare-rate-limit";
+import { requireSameOriginForCookieAuth } from "./middleware/csrf";
 import { requestLogger } from "./middleware/request-logger";
 import { hasAdminRole } from "./middleware/require-admin-role";
-import { securityHeaders } from "./middleware/security-headers";
+import { parseAllowedOrigins, securityHeaders } from "./middleware/security-headers";
 import { services } from "./middleware/services";
 import { areasRouter } from "./routes/areas";
 import { feedbackRouter } from "./routes/feedback";
@@ -33,12 +34,13 @@ export const createApp = (env: Env) => {
   // Create logger for error handling
   const logger = createLogger(environment);
 
-  // Configure allowed CORS origins
-  const allowedOrigins = env.ALLOWED_ORIGINS
-    ? env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-    : isPublic
-      ? [] // No origins allowed by default in public environments (must be configured)
-      : ["*"]; // Allow all in development
+  // CORS: exact origins only, never with credentials. No first-party page
+  // needs it (the client reaches the API through its same-origin proxy and
+  // the admin is same-origin); it only lets listed sites read public data.
+  const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS, {
+    isPublic,
+    warn: (message, details) => logger.warn(message, details),
+  });
 
   // Apply request logging globally (except for health checks)
   // The legacy GraphQL endpoint logs no IP or user agent (see its README section).
@@ -59,23 +61,29 @@ export const createApp = (env: Env) => {
   // routes/legacy-graphql). It runs first so it also answers preflights.
   app.use(LEGACY_GRAPHQL_PATH, legacyGraphqlCors);
 
-  // Apply security headers globally (without the site CORS policy on the
-  // legacy GraphQL path)
+  // Apply security headers globally. The site CORS policy is left off the
+  // legacy GraphQL path (it has its own) and off the admin, which is
+  // same-origin only and sends no CORS headers at all.
   const siteSecurityHeaders = securityHeaders({
     corsOrigins: allowedOrigins,
-    corsCredentials: true,
+    corsCredentials: false,
     enableHSTS: isPublic,
   });
-  const legacyGraphqlSecurityHeaders = securityHeaders({
+  const noCorsSecurityHeaders = securityHeaders({
     corsOrigins: [],
     corsCredentials: false,
     enableHSTS: isPublic,
   });
+  const isAdminPath = (path: string) => path === "/admin" || path.startsWith("/admin/");
   app.use("*", (c, next) =>
-    isLegacyGraphqlPath(c.req.path)
-      ? legacyGraphqlSecurityHeaders(c, next)
+    isLegacyGraphqlPath(c.req.path) || isAdminPath(c.req.path)
+      ? noCorsSecurityHeaders(c, next)
       : siteSecurityHeaders(c, next),
   );
+
+  // CSRF: cookie-authenticated changes under /admin and /api must come from
+  // this origin (bearer-token and anonymous requests are not affected).
+  app.use("*", requireSameOriginForCookieAuth);
 
   // Apply rate limiting to admin routes
   app.use("/admin/*", rateLimiters.admin);

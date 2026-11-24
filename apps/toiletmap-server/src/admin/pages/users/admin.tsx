@@ -14,6 +14,7 @@ import {
 } from "../../../services/auth0/management";
 import type { AppVariables, Env } from "../../../types";
 import { logger } from "../../../utils/logger";
+import { safeAdminRedirect } from "../../../utils/safe-redirect";
 import { Badge, Button, CollapsibleCard } from "../../components/DesignSystem";
 import { Layout } from "../../components/Layout";
 
@@ -62,16 +63,15 @@ const summarizeUser = (user: Auth0ManagementUser | null): string => {
   return user.name || user.nickname || user.email || user.user_id || "user";
 };
 
+/**
+ * Where to go after a permission change: `input` when it is a safe path under
+ * `/admin` (see `safeAdminRedirect`), else this page for `fallbackUser`.
+ * Only the path and query of the result are used.
+ */
 const buildRedirectUrl = (input: string | null, fallbackUser?: string) => {
-  try {
-    if (input) {
-      const candidate = new URL(input, "http://localhost");
-      if (candidate.origin === "http://localhost") {
-        return candidate;
-      }
-    }
-  } catch {
-    // Ignore invalid redirect target
+  const safe = safeAdminRedirect(input);
+  if (safe) {
+    return safe;
   }
   const fallback = new URL("/admin/users/admin", "http://localhost");
   if (fallbackUser) {
