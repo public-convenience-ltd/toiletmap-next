@@ -44,8 +44,7 @@ The pages were ported word for word, apart from these (recorded so nobody hunts 
   into curly ones (`"App"` becomes “App”), and `/app/privacy`'s "Last updated" line is a
   normal first paragraph rather than a subtitle. Set `markdown.smartypants: false` in
   astro.config if a byte-exact copy is ever needed (it also affects posts).
-- **Footer:** links to `/dataset`, which Phase 6 adds. Until that branch is merged the link is
-  a 404, so merge Phase 6 before this goes live.
+- **Footer:** links to `/dataset`, the dataset page Phase 6 adds.
 
 ## The CMS
 

@@ -6,6 +6,7 @@ declare namespace Cloudflare {
 		mainModule: typeof import("./src/index");
 	}
 	interface ProductionEnv {
+		EXPORTS: R2Bucket;
 		HYPERDRIVE: Hyperdrive;
 		RATE_LIMIT_READ: RateLimit;
 		RATE_LIMIT_WRITE: RateLimit;
@@ -40,6 +41,7 @@ declare namespace Cloudflare {
 		ALLOWED_ORIGINS: "https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev";
 	}
 	interface Env {
+		EXPORTS?: R2Bucket;
 		HYPERDRIVE?: Hyperdrive;
 		RATE_LIMIT_READ?: RateLimit;
 		RATE_LIMIT_WRITE?: RateLimit;

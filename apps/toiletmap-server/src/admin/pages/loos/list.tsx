@@ -3,6 +3,7 @@ import { RECENT_WINDOW_DAYS } from "../../../common/constants";
 import type { Env } from "../../../types";
 import { Button } from "../../components/DesignSystem";
 import { Layout } from "../../components/Layout";
+import { DatasetExportPanel, datasetExportStyles, loadDatasetExportStatus } from "../dataset";
 import {
   AREA_COLORS,
   CURRENT_PATH,
@@ -118,7 +119,7 @@ const buildSortUrl = (
   return buildUrl(state, { sortBy: "", sortOrder: "", page: "1" });
 };
 
-export const loosList = (c: Context<{ Bindings: Env }>) => {
+export const loosList = async (c: Context<{ Bindings: Env }>) => {
   const url = new URL(c.req.url);
   const searchQuery = (url.searchParams.get("search") ?? "").trim();
   const requestedPage = Number.parseInt(url.searchParams.get("page") ?? "1", 10);
@@ -203,6 +204,7 @@ export const loosList = (c: Context<{ Bindings: Env }>) => {
   };
 
   const serializedConfig = serializeConfig(pageConfig);
+  const exportStatus = await loadDatasetExportStatus(c.env);
 
   return c.html(
     <Layout title="Loos">
@@ -222,6 +224,12 @@ export const loosList = (c: Context<{ Bindings: Env }>) => {
         </div>
         <Button href="/admin/loos/create">Add New Loo</Button>
       </div>
+
+      <DatasetExportPanel
+        status={exportStatus}
+        notice={url.searchParams.get("export") ?? undefined}
+      />
+      <style dangerouslySetInnerHTML={{ __html: datasetExportStyles }} />
 
       <section class="stats-panel stats-panel--collapsed" data-loos-metrics>
         <div class="stats-panel__header">

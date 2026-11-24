@@ -31,9 +31,12 @@ Every response gets these headers:
 
 There are two delivery paths because static assets never run the worker:
 
-- **Worker responses** (the map, toilets, forms, `/feedback`, the API proxy, redirects): the
-  middleware adds the headers. It never reads the body: `script-src` lists the hashes of the
-  inline scripts the site ships, whatever the page contains.
+- **Worker responses** (the map, toilets, forms, `/feedback`, `/dataset` and its `/dataset/*`
+  downloads, the API proxy, redirects): the middleware adds the headers. It never reads the
+  body: `script-src` lists the hashes of the inline scripts the site ships, whatever the page
+  contains. It only adds headers a response lacks, so the downloads keep their own
+  `Content-Disposition`, caching headers and `Access-Control-Allow-Origin: *`
+  (`src/utils/dataset.ts`). They are not static assets, so `_headers` doesn't apply to them.
 - **Static assets** (`/about`, `/posts/*`, `/app/privacy`, `/cms`, `/_astro/*`, images): the
   build appends `_headers` rules. A catch-all `/*` rule goes first, with the same hashes. The
   `/cms` and `/cms/*` rules go last. The build fails if a prerendered page has an inline
@@ -173,8 +176,8 @@ lead to a session. The others are `public, max-age=3600`.
 - the PDFs and `/images/uploads/*`;
 - `/api/feedback` (POST, as before) and the GraphQL `/api` (Phase 6.2).
 
-`/dataset` and `/api` come from Phases 6 and 6.2, on other branches: until both are merged,
-every `/explorer*` redirect and the footer's Dataset link land on a 404.
+With Phases 6 and 6.2 merged, every `/explorer*` redirect and the footer's Dataset link land
+on the real `/dataset` page.
 
 **Not redirected (404):**
 

@@ -63,6 +63,13 @@ export interface Env {
   GRAPHQL_SUNSET?: string;
 
   /**
+   * R2 bucket (`toiletmap-exports`) the daily dataset export writes to.
+   * Bound in `env.production` only; absent in local dev, tests and preview
+   * workers, where the export skips and the admin page says so.
+   */
+  EXPORTS?: R2Bucket;
+
+  /**
    * Optional Cloudflare Turnstile secret. When set, `POST /api/feedback`
    * requires a valid Turnstile token. Unset (the default) disables the check.
    * Turning it on rejects the legacy Flutter app, which cannot send a token,

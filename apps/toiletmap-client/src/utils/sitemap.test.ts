@@ -48,6 +48,7 @@ describe("sitemapEntries", () => {
       `${SITE}/`,
       `${SITE}/posts`,
       `${SITE}/feedback`,
+      `${SITE}/dataset`,
       `${SITE}/about`,
       `${SITE}/app/privacy`,
       `${SITE}/privacy`,
