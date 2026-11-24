@@ -204,21 +204,23 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 ### Public Endpoints (No Auth Required)
 
-- **GET /** - Health check
+- **GET /** - Health check (database status from the same cached check as `/health/ready`: at most one `SELECT 1` per isolate every 10 s, `src/services/health/readiness.ts`)
 - **GET /api/docs** - Swagger UI
 - **GET /api/docs/openapi.json** - OpenAPI spec
 - **GET /admin/login** - Initiate OAuth2 flow
 - **GET /admin/callback** - OAuth2 callback handler
 - **GET /api/areas** - List administrative areas (name and type only)
 - **GET /api/loos/:id** - Fetch single loo by ID
-- **GET /api/loos?ids=** - Batch fetch loos (comma-separated or repeated `?ids=` params)
-- **GET /api/loos/geohash/:geohash** - Search by geohash prefix (optional `?active=true/false/any`)
+- **GET /api/loos?ids=** - Batch fetch loos (comma-separated or repeated `?ids=` params; de-duplicated, at most 100, each 24 characters)
+- **GET /api/loos/geohash/:geohash** - Search by geohash prefix: 4-12 base32 geohash characters (lower-cased; anything else, LIKE wildcards included, is a 400). Optional `?active=true/false/any`
 - **GET /api/loos/proximity** - Find nearby loos, nearest first (`lat`, `lng` required; optional `radius`, `includeInactive=true|false` (default false: active only) and `exclude=<id>`). Each item carries `active` and `distance` (metres).
-- **GET /api/loos/search** - Advanced search with filters, sorting, pagination
+- **GET /api/loos/search** - Advanced search with filters, sorting, pagination (`page` at most 1000, `limit` at most 200)
 - **GET /api/loos/metrics** - Aggregate metrics for filtered results
 - **GET /api/loos/:id/reports** - Audit history (contributors redacted unless caller has `access:admin`)
 
 Public routes still accept optional authentication so admin tokens can unlock extra data (e.g., contributor names in reports).
+
+**Input limits and caching**: every `/api/loos` query and body schema and the `/api/feedback` body are `.strict()` (an unknown parameter or field is a 400). Edge-cache keys are built from the validated, normalised parameters (`normalisedCacheKey` in `src/middleware/cache.ts`; GraphQL GETs from the re-printed operation and its declared variables, `src/routes/legacy-graphql/request-shape.ts`), never the raw URL. Heavy public reads take a stricter per-IP limit (`rateLimiters.heavyRead`, see `apps/toiletmap-server/docs/operations/rate-limiting.md`). Loo write routes refuse bodies over 64 KiB with 413 before parsing; the client proxy refuses bodies over 128 KiB while reading them.
 
 **CORS**: `ALLOWED_ORIGINS` is a list of exact origins (wildcards and `*` are ignored), never with credentials, and `/admin/*` sends no CORS headers. Unset, it is the localhost dev origins in development and nothing elsewhere. No first-party page needs CORS (the client proxies `/api` over the service binding; the admin is same-origin); the legacy GraphQL endpoint has its own policy.
 
@@ -241,7 +243,7 @@ Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteD
 
 ### Feedback (public, unauthenticated)
 
-- **POST /api/feedback** - `{text, email?, route?}` as JSON or a URL-encoded form (`src/routes/feedback/index.ts`). Stored in `public.feedback`; 200 `{ok: true, message}` (200, not 201: the Flutter app treats only 200 as success). Legacy-compatible: the Flutter app posts a form with `email: ""` and no Origin header; the legacy website posted the same fields as JSON. 400 for empty/over-5000-character text or an invalid email; `route` is truncated to 255. Rate limited per IP on the write binding (`feedback:<ip>`). When `MODERATION_SLACK_WEBHOOK` is set, an escaped 500-character excerpt plus the route goes to Slack via `waitUntil`; the email and IP are never sent to Slack or logged. Optional secret `TURNSTILE_SECRET_KEY` (off when unset) requires a `turnstileToken`/`cf-turnstile-response`; enabling it rejects the legacy Flutter app, which cannot send one, and the website's own /feedback form, which has no Turnstile widget yet (add one, with a public site key, before setting the secret). The client worker proxies it (`PUBLIC_POST_PATHS` in `apps/toiletmap-client/src/utils/api.ts`), allowing a missing Origin and never attaching the access token.
+- **POST /api/feedback** - `{text, email?, route?}` as JSON or a URL-encoded form (`src/routes/feedback/index.ts`). Stored in `public.feedback`; 200 `{ok: true, message}` (200, not 201: the Flutter app treats only 200 as success). Legacy-compatible: the Flutter app posts a form with `email: ""` and no Origin header; the legacy website posted the same fields as JSON. 400 for empty/over-5000-character text or an invalid email; `route` is truncated to 255. Rate limited per IP on the write binding (`feedback:<ip>`). Unknown fields are a 400 (none of the callers sends any). When `MODERATION_SLACK_WEBHOOK` is set, a counts-only "N feedback messages in the last 24 hours" message goes to Slack via `waitUntil`, throttled like the moderation alert (when the count reaches 1, 5, 10, 25, ..., else at most once per isolate every 10 minutes); the text, route, email and IP are never sent to Slack, and the email and IP are never logged. Optional secret `TURNSTILE_SECRET_KEY` (off when unset) requires a `turnstileToken`/`cf-turnstile-response`; enabling it rejects the legacy Flutter app, which cannot send one, and the website's own /feedback form, which has no Turnstile widget yet (add one, with a public site key, before setting the secret). The client worker proxies it (`PUBLIC_POST_PATHS` in `apps/toiletmap-client/src/utils/api.ts`), allowing a missing Origin and never attaching the access token.
 - **GET /admin/feedback** (newest first, 25 a page), **GET /admin/feedback/:id/delete** (confirmation), **POST /admin/feedback/:id/delete** (needs `confirm=delete`). Deleting needs migration `20261118001500_feedback_admin_delete.sql` (DELETE grant and policy for `toiletmap_web`).
 
 ### Geocoding (public, unauthenticated)
@@ -661,7 +663,7 @@ const contributor = contributorPath.split('.').reduce(
 
 1. **Database Migrations**: Use Supabase migrations (NOT `prisma migrate`) - Prisma doesn't fully support this project's PostgreSQL/PostGIS features
 2. **Opening Hours Format**: `["00:00", "00:00"]` is valid and means "24 hours" (not a validation error)
-3. **Geohash Queries**: Prefix matching is case-sensitive and uses `LIKE 'prefix%'` pattern
+3. **Geohash Queries**: Prefix matching uses `LIKE 'prefix%'`. The REST route lower-cases and only accepts 4-12 base32 characters; the service returns `[]` for any non-base32 prefix, so a wildcard never reaches the `LIKE`
 4. **Auth Profile Key**: If using nested Auth0 profile fields, set `AUTH0_PROFILE_KEY` to the namespaced claim URL or path (e.g., `app_metadata.contributor_name`)
 5. **Prisma Client Location**: Always import from `src/generated/prisma/client` in app code, `test/integration/generated/client` in tests
 6. **Test Database**: The test suite never starts Supabase; run `pnpm supabase:start` first. A reused stack may need `pnpm exec supabase migration up --local` (non-destructive) after new migrations land
