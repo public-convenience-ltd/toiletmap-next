@@ -646,8 +646,84 @@ describe("Admin Routes", () => {
     );
 
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toContain("permissionError=Unsupported");
+    expect(res.headers.get("location")).toContain("permissionError=unsupported_permission");
     expect(addPermissions).not.toHaveBeenCalled();
+  });
+
+  describe("permission notices never reflect URL text", () => {
+    it("ignores an error message or permission name supplied in the query", async () => {
+      const res = await app.request(
+        `/admin/users/admin?${new URLSearchParams({
+          permissionError: "Your session expired, call 0800 FAKE",
+          permission: "Call 0800 FAKE",
+          permissionStatus: "grant",
+        })}`,
+        { headers: authenticatedHeaders() },
+        env,
+      );
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      expect(text).not.toContain("0800 FAKE");
+      expect(text).not.toContain("Permission update failed");
+      // An unknown permission is named only generically.
+      expect(text).toContain("Permission granted for");
+    });
+
+    it("maps a known code to its fixed message", async () => {
+      const res = await app.request(
+        "/admin/users/admin?permissionError=unsupported_action&permission=access%3Aadmin",
+        { headers: authenticatedHeaders() },
+        env,
+      );
+      const text = await res.text();
+      expect(text).toContain("Permission update failed");
+      expect(text).toContain("Unable to update Admin access: Unsupported action.");
+    });
+
+    it("redirects with a code, not Auth0's error text, when the change fails", async () => {
+      vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue(
+        managementClientMock({
+          addPermissions: vi.fn().mockRejectedValue(new Error("Auth0 says: secret detail")),
+          removePermissions: vi.fn(),
+        }),
+      );
+      const res = await app.request(
+        "/admin/users/admin/permissions",
+        {
+          method: "POST",
+          headers: {
+            ...authenticatedHeaders(),
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            user_id: "auth0|user123",
+            permission: "access:admin",
+            intent: "grant",
+          }).toString(),
+        },
+        env,
+      );
+      expect(res.status).toBe(303);
+      const location = res.headers.get("location") ?? "";
+      expect(location).toContain("permissionError=update_failed");
+      expect(location).not.toContain("secret");
+    });
+
+    it("shows a fixed message when the Auth0 search fails", async () => {
+      vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue(
+        managementClientMock({
+          searchUsers: vi.fn().mockRejectedValue(new Error("Bad query near 'evil text'")),
+        }),
+      );
+      const res = await app.request(
+        "/admin/users/admin?search=evil%20text",
+        { headers: authenticatedHeaders() },
+        env,
+      );
+      const text = await res.text();
+      expect(text).toContain("Unable to search Auth0 users.");
+      expect(text).not.toContain("Bad query");
+    });
   });
 
   const ADMIN_HINT = "Blocking does not remove Admin access, so remove that below too.";
