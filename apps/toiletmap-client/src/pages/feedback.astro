@@ -115,6 +115,10 @@ const failed = hasErrors(initial.errors ?? {}) || !!initial.submitError;
 // Only the plain page is for search engines; the sent page, error pages and the per-toilet
 // versions point their canonical at it.
 const noindex = Astro.request.method === "POST" || !!initial.sent || !!looId;
+// "Sign in" comes back to this form (about the same toilet), not to its "sent" state.
+const signInUrl = new URL(Astro.url);
+signInUrl.searchParams.delete("sent");
+const signInReturnTo = `${signInUrl.pathname}${signInUrl.search}`;
 const title = initial.sent
   ? FEEDBACK_TITLES.sent
   : failed
@@ -128,7 +132,7 @@ const title = initial.sent
   heading="Send us feedback"
   canonical={FEEDBACK_PATH}
   noindex={noindex}
-  signInReturnTo={null}
+  signInReturnTo={signInReturnTo}
 >
   {
     !initial.sent && (

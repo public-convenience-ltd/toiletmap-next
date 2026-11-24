@@ -1,0 +1,35 @@
+{
+  "name": "error-unknown-field-graphql-response-accept",
+  "description": "Validation error with Accept: application/graphql-response+json (status code differs per spec).",
+  "capturedAt": "2026-11-18T00:35:17.868Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "accept": "application/graphql-response+json, application/json;q=0.9",
+    "content-type": "application/json"
+  },
+  "query": "{ statistics { total nope } }",
+  "variables": null,
+  "operationName": null,
+  "status": 400,
+  "headers": {
+    "content-type": "application/graphql-response+json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Cannot query field \"nope\" on type \"Statistics\".",
+        "locations": [
+          {
+            "line": 1,
+            "column": 22
+          }
+        ]
+      }
+    ]
+  }
+}

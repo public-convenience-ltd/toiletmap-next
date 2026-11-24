@@ -20,8 +20,9 @@ interface Props {
    */
   map?: boolean;
   /**
-   * Where "Sign in" returns to: a same-origin path, or null for none. Defaults to none on
-   * server-rendered pages and to the page itself on prerendered ones.
+   * Where "Sign in" returns to: a same-origin path, or null for none (the error page).
+   * Defaults to the page itself, kept up to date in the browser (the map changes its URL
+   * without reloading; see SiteHeader's signInFollowsPage).
    */
   signInReturnTo?: string | null;
 }
@@ -30,8 +31,12 @@ const { map = false, signInReturnTo } = Astro.props;
 
 // Prerendered pages have no visitor cookies: the header reads them in the browser instead.
 const isAuthenticated = Astro.isPrerendered ? undefined : !!Astro.cookies.get("user_info")?.value;
-const returnTo =
-  signInReturnTo !== undefined ? signInReturnTo : Astro.isPrerendered ? Astro.url.pathname : null;
+const followsPage = signInReturnTo === undefined;
+const returnTo = followsPage
+  ? Astro.isPrerendered
+    ? Astro.url.pathname
+    : `${Astro.url.pathname}${Astro.url.search}`
+  : signInReturnTo;
 const signInHref = loginHref(returnTo);
 ---
 
@@ -40,6 +45,7 @@ const signInHref = loginHref(returnTo);
   logoSrc={logo}
   isAuthenticated={isAuthenticated}
   signInHref={signInHref}
+  signInFollowsPage={followsPage}
   drawerLinks={map ? defaultFooterLinks : undefined}
 />
 <slot />

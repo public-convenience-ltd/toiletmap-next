@@ -20,6 +20,20 @@ const jsonContent = (schemaName: string): Record<string, MediaTypeObject> => ({
   },
 });
 
+const legacyGraphqlDescription =
+  "Compatibility endpoint for clients of the old www.toiletmap.org.uk/api GraphQL API (the Flutter app, the GraphQL explorer, third parties); the site proxies `/api` and `/api/` here. The schema is frozen and read-only: any mutation is rejected with `This API is read-only; use the REST API.` Responses carry `Deprecation: true`, a `Link` to these docs and, once a date is set, `Sunset`. Use the REST endpoints for anything new. Limits: depth 8, 250 fields, 15 aliases, a cost budget per request, `loos` pages of at most 100, `looNamesByIds` of at most 100 ids, `maxDistance` up to 50,000 m, 32 KiB request bodies.";
+
+const legacyGraphqlResponses = {
+  200: {
+    description:
+      "A GraphQL response (`data` and/or `errors`). Validation and resolver errors also use 200, as the legacy API did.",
+    content: { "application/json": { schema: { type: "object" as const } } },
+  },
+  400: { description: "Malformed request, or variables that do not match their types." },
+  413: { description: "Query or request body too large." },
+  429: { description: "Rate limited (shared with the other public reads)." },
+};
+
 const syncCursorSchema: SchemaObject = {
   type: "string",
   format: "date-time",
@@ -980,6 +994,92 @@ export const openApiDocument: OpenAPIObject = {
         },
       },
     },
+    "/api/geocode": {
+      get: {
+        tags: ["Geocoding"],
+        summary: "Search for a place or postcode in Great Britain",
+        description:
+          "Public and unauthenticated; rate limited with the other reads, and explicit searches also per IP (20 a minute). Anything shaped like a UK postcode or outcode is looked up on postcodes.io first; everything else (and unknown postcodes) is searched on OpenStreetMap's Nominatim, limited to Great Britain. `mode=suggest` is for search-as-you-type: it only looks postcodes and outcodes up and never asks Nominatim, whose usage policy forbids autocomplete. Results are cached for 24 hours, keyed on the mode and the normalised query. Nominatim results carry OpenStreetMap's attribution, which must be shown with them.",
+        parameters: [
+          {
+            name: "q",
+            in: "query",
+            required: true,
+            description:
+              "The place, address or postcode. Whitespace is collapsed and case ignored.",
+            schema: { type: "string", minLength: 2, maxLength: 200, example: "SW1A 1AA" },
+          },
+          {
+            name: "mode",
+            in: "query",
+            required: false,
+            description:
+              "`search` (the default: an explicit search, which may use Nominatim) or `suggest` (typing: postcodes and outcodes only, an empty list for anything else).",
+            schema: { type: "string", enum: ["search", "suggest"], default: "search" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Up to five results, best first. An empty list means nothing matched.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["results", "attribution"],
+                  properties: {
+                    results: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        required: ["label", "lat", "lng", "kind"],
+                        properties: {
+                          label: { type: "string", example: "SW1A 1AA, Westminster" },
+                          lat: { type: "number", example: 51.501009 },
+                          lng: { type: "number", example: -0.141588 },
+                          bbox: {
+                            type: "array",
+                            description: "The result's extent as [west, south, east, north].",
+                            items: { type: "number" },
+                            minItems: 4,
+                            maxItems: 4,
+                          },
+                          kind: { type: "string", enum: ["postcode", "place"] },
+                        },
+                      },
+                    },
+                    attribution: {
+                      type: ["string", "null"],
+                      description:
+                        "Attribution to show with the results, or null when none is needed.",
+                      example:
+                        "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: "Missing, too short or too long `q`, or an unknown `mode`.",
+            content: jsonContent("ErrorResponse"),
+          },
+          429: {
+            description:
+              "Too many requests (the read limit, or the per-IP limit on explicit searches).",
+            content: jsonContent("ErrorResponse"),
+          },
+          502: {
+            description: "The upstream geocoder failed or timed out.",
+            content: jsonContent("ErrorResponse"),
+          },
+          503: {
+            description:
+              "Place search is busy (Nominatim's one request a second is used up); retry after `Retry-After` seconds.",
+            content: jsonContent("ErrorResponse"),
+          },
+        },
+      },
+    },
     "/api/areas": {
       get: {
         tags: ["Areas"],
@@ -990,6 +1090,60 @@ export const openApiDocument: OpenAPIObject = {
             content: jsonContent("AreaListResponse"),
           },
         },
+      },
+    },
+    "/api/graphql": {
+      get: {
+        tags: ["Legacy GraphQL"],
+        deprecated: true,
+        summary: "Legacy GraphQL API (read-only, frozen)",
+        description: legacyGraphqlDescription,
+        parameters: [
+          {
+            name: "query",
+            in: "query" as const,
+            required: true,
+            description: "GraphQL query document (at most 10,000 characters).",
+            schema: { type: "string" },
+          },
+          {
+            name: "variables",
+            in: "query" as const,
+            required: false,
+            description: "JSON-encoded variables object.",
+            schema: { type: "string" },
+          },
+          {
+            name: "operationName",
+            in: "query" as const,
+            required: false,
+            schema: { type: "string" },
+          },
+        ],
+        responses: legacyGraphqlResponses,
+      },
+      post: {
+        tags: ["Legacy GraphQL"],
+        deprecated: true,
+        summary: "Legacy GraphQL API (read-only, frozen)",
+        description: legacyGraphqlDescription,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string" },
+                  variables: { type: "object", additionalProperties: true },
+                  operationName: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: legacyGraphqlResponses,
       },
     },
     "/api/loos": {

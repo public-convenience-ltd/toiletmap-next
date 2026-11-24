@@ -1,0 +1,316 @@
+{
+  "name": "reportsForLoo-shrewsbury",
+  "description": "Report history (legacy LooReportFragment) for Butcher Row.",
+  "capturedAt": "2026-11-18T00:35:11.581Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query looReportHistory($id: ID!) {\n  reportsForLoo(id: $id) {\n    ...LooReportFragment\n  }\n}\nfragment LooReportFragment on Report {\n  id\n  createdAt\n  verifiedAt\n  active\n  location {\n    lat\n    lng\n  }\n  name\n  openingTimes\n  accessible\n  men\n  women\n  allGender\n  babyChange\n  children\n  urinalOnly\n  radar\n  automatic\n  noPayment\n  paymentDetails\n  notes\n  removalReason\n  attended\n  geohash\n  isSystemReport\n  contributor\n}",
+  "variables": {
+    "id": "23113ed968c5668a947de1b0"
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "reportsForLoo": [
+        {
+          "id": "48852",
+          "createdAt": "2015-01-08T23:46:12.949Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": null,
+          "name": null,
+          "openingTimes": null,
+          "accessible": false,
+          "men": null,
+          "women": null,
+          "allGender": null,
+          "babyChange": null,
+          "children": null,
+          "urinalOnly": null,
+          "radar": null,
+          "automatic": null,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": null,
+          "removalReason": null,
+          "attended": null,
+          "geohash": null,
+          "isSystemReport": false,
+          "contributor": "Anonymous"
+        },
+        {
+          "id": "48853",
+          "createdAt": "2015-01-08T23:46:12.949Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.7079333,
+            "lng": -2.7526333
+          },
+          "name": null,
+          "openingTimes": null,
+          "accessible": false,
+          "men": null,
+          "women": null,
+          "allGender": null,
+          "babyChange": null,
+          "children": null,
+          "urinalOnly": null,
+          "radar": null,
+          "automatic": null,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": null,
+          "removalReason": null,
+          "attended": null,
+          "geohash": "gcq5c75tfyzv55eq3uv9",
+          "isSystemReport": true,
+          "contributor": "Anonymous"
+        },
+        {
+          "id": "523",
+          "createdAt": "2016-09-14T21:06:08.63Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.7079333,
+            "lng": -2.7526333
+          },
+          "name": "Butcher Row",
+          "openingTimes": [
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ]
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": false,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": "Changing Places toilet locked due to \"vandalism\" council not allowing access.",
+          "removalReason": null,
+          "attended": false,
+          "geohash": "gcq5c75tfyzv55eq3uv9",
+          "isSystemReport": false,
+          "contributor": "Anonymous"
+        },
+        {
+          "id": "48854",
+          "createdAt": "2016-09-14T21:06:08.63Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.7079333,
+            "lng": -2.7526333
+          },
+          "name": "Butcher Row",
+          "openingTimes": [
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ]
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": false,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": "Changing Places toilet locked due to \"vandalism\" council not allowing access.",
+          "removalReason": null,
+          "attended": false,
+          "geohash": "gcq5c75tfyzv55eq3uv9",
+          "isSystemReport": false,
+          "contributor": "Anonymous"
+        },
+        {
+          "id": "107491",
+          "createdAt": "2025-05-24T16:00:53.683Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.7079333,
+            "lng": -2.7526333
+          },
+          "name": "Butcher Row",
+          "openingTimes": [
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "16:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ]
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": false,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": "Changing Places toilet locked due to \"vandalism\" council not allowing access.",
+          "removalReason": null,
+          "attended": false,
+          "geohash": "gcq5c75tfyzv55eq3uv9",
+          "isSystemReport": false,
+          "contributor": "Anonymous"
+        },
+        {
+          "id": "107492",
+          "createdAt": "2025-05-24T16:00:53.683Z",
+          "verifiedAt": null,
+          "active": true,
+          "location": {
+            "lat": 52.7079333,
+            "lng": -2.7526333
+          },
+          "name": "Butcher Row",
+          "openingTimes": [
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ],
+            [
+              "09:00",
+              "16:00"
+            ],
+            [
+              "09:00",
+              "18:00"
+            ]
+          ],
+          "accessible": true,
+          "men": true,
+          "women": true,
+          "allGender": null,
+          "babyChange": true,
+          "children": null,
+          "urinalOnly": null,
+          "radar": true,
+          "automatic": false,
+          "noPayment": true,
+          "paymentDetails": null,
+          "notes": "Changing Places toilet locked due to \"vandalism\" council not allowing access.",
+          "removalReason": null,
+          "attended": false,
+          "geohash": "gcq5c75tfyzv55eq3uv8",
+          "isSystemReport": true,
+          "contributor": "Anonymous"
+        }
+      ]
+    }
+  }
+}

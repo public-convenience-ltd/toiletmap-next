@@ -1,0 +1,46 @@
+{
+  "name": "looNamesByIds",
+  "description": "Known ids (out of order) plus one unknown id.",
+  "capturedAt": "2026-11-18T00:35:02.459Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query looNamesByIds($idList: [ID]) {\n  looNamesByIds(idList: $idList) {\n    id\n    name\n  }\n}",
+  "variables": {
+    "idList": [
+      "23113ed968c5668a947de1b0",
+      "000000000000000000000000",
+      "694c1fc2234c63776b1805a9",
+      "8d846ff1154a5b79ed3f72f6"
+    ]
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "looNamesByIds": [
+        {
+          "id": "23113ed968c5668a947de1b0",
+          "name": "Butcher Row"
+        },
+        {
+          "id": "694c1fc2234c63776b1805a9",
+          "name": "Watermark Place (Automatic)"
+        },
+        {
+          "id": "8d846ff1154a5b79ed3f72f6",
+          "name": null
+        }
+      ]
+    }
+  }
+}

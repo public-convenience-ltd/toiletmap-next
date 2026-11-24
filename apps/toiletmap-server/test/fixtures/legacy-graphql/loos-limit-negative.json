@@ -1,0 +1,44 @@
+{
+  "name": "loos-limit-negative",
+  "description": "pagination.limit -1 -> error.",
+  "capturedAt": "2026-11-18T00:34:55.871Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query searchLoos(\n  $filters: LooFilter!\n  $pagination: PaginationInput = { limit: 10, page: 1 }\n  $sort: SortOrder = NEWEST_FIRST\n) {\n  loos(filters: $filters, pagination: $pagination, sort: $sort) {\n    loos {\n      id\n      name\n      area {\n        name\n        type\n      }\n      updatedAt\n    }\n    total\n    page\n    limit\n    pages\n  }\n}",
+  "variables": {
+    "filters": {},
+    "pagination": {
+      "limit": -1,
+      "page": 1
+    }
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Unexpected error.",
+        "locations": [
+          {
+            "line": 6,
+            "column": 3
+          }
+        ],
+        "path": [
+          "loos"
+        ]
+      }
+    ],
+    "data": null
+  }
+}

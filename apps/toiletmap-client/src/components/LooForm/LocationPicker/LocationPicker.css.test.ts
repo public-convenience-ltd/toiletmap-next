@@ -43,3 +43,22 @@ describe("LocationPicker.module.css on the map", () => {
     });
   });
 });
+
+describe("LocationPicker.module.css search results", () => {
+  const formRules = parseCss(
+    readFileSync(join(import.meta.dirname, "../LooForm.module.css"), "utf8"),
+  );
+
+  it("sits under the form's sticky Save bar, so a long list can't cover Cancel on a phone", () => {
+    const actionBar = Number(declarationsFor(formRules, ".actionBar")["z-index"]);
+    const dropdown = Number(rule(".suggestions")["z-index"]);
+    expect(dropdown).toBeGreaterThan(0);
+    expect(dropdown).toBeLessThan(actionBar);
+  });
+
+  it("scrolls a long list inside the dropdown, keeping it a few results tall", () => {
+    const list = rule(".suggestionList");
+    expect(list["max-height"]).toBe("min(16rem, 40vh)");
+    expect(list["overflow-y"]).toBe("auto");
+  });
+});

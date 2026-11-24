@@ -10,7 +10,14 @@ import { securityHeaders } from "./middleware/security-headers";
 import { services } from "./middleware/services";
 import { areasRouter } from "./routes/areas";
 import { feedbackRouter } from "./routes/feedback";
+import { geocodeRouter } from "./routes/geocode";
 import { healthRouter } from "./routes/health";
+import {
+  isLegacyGraphqlPath,
+  LEGACY_GRAPHQL_PATH,
+  legacyGraphqlCors,
+  legacyGraphqlRouter,
+} from "./routes/legacy-graphql";
 import { loosRouter } from "./routes/loos";
 import type { AppVariables, Env } from "./types";
 import { isPublicEnvironment } from "./utils/environment";
@@ -34,7 +41,10 @@ export const createApp = (env: Env) => {
       : ["*"]; // Allow all in development
 
   // Apply request logging globally (except for health checks)
-  const requestLoggingMiddleware = requestLogger(environment);
+  // The legacy GraphQL endpoint logs no IP or user agent (see its README section).
+  const requestLoggingMiddleware = requestLogger(environment, {
+    omitClientDetails: isLegacyGraphqlPath,
+  });
   app.use("*", (c, next) => {
     if (c.req.path.startsWith("/health")) {
       return next();
@@ -45,14 +55,26 @@ export const createApp = (env: Env) => {
   // Inject services
   app.use("*", services);
 
-  // Apply security headers globally
-  app.use(
-    "*",
-    securityHeaders({
-      corsOrigins: allowedOrigins,
-      corsCredentials: true,
-      enableHSTS: isPublic,
-    }),
+  // The legacy GraphQL endpoint has its own CORS policy (no credentials; see
+  // routes/legacy-graphql). It runs first so it also answers preflights.
+  app.use(LEGACY_GRAPHQL_PATH, legacyGraphqlCors);
+
+  // Apply security headers globally (without the site CORS policy on the
+  // legacy GraphQL path)
+  const siteSecurityHeaders = securityHeaders({
+    corsOrigins: allowedOrigins,
+    corsCredentials: true,
+    enableHSTS: isPublic,
+  });
+  const legacyGraphqlSecurityHeaders = securityHeaders({
+    corsOrigins: [],
+    corsCredentials: false,
+    enableHSTS: isPublic,
+  });
+  app.use("*", (c, next) =>
+    isLegacyGraphqlPath(c.req.path)
+      ? legacyGraphqlSecurityHeaders(c, next)
+      : siteSecurityHeaders(c, next),
   );
 
   // Apply rate limiting to admin routes
@@ -117,6 +139,10 @@ export const createApp = (env: Env) => {
   // Apply rate limiting to API routes
   app.use("/api/*", rateLimiters.read);
 
+  // Legacy GraphQL (read-only, frozen). Mounted before optionalAuth: it never
+  // looks at the caller, so its responses can be cached publicly.
+  app.route(LEGACY_GRAPHQL_PATH, legacyGraphqlRouter);
+
   // Provide optional auth context for API routes (writes still enforce auth per-route)
   app.use("/api/*", optionalAuth);
 
@@ -124,6 +150,8 @@ export const createApp = (env: Env) => {
   app.route("/api/areas", areasRouter);
   // Public, unauthenticated feedback (also the legacy Flutter app endpoint).
   app.route("/api/feedback", feedbackRouter);
+  // Public GB place/postcode search for the website (postcodes.io, then Nominatim).
+  app.route("/api/geocode", geocodeRouter);
 
   app.notFound((c) =>
     c.json(

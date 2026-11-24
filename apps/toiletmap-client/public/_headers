@@ -1,12 +1,7 @@
 # Response headers for static assets (Cloudflare Workers static assets). The build adds a
-# long-lived Cache-Control rule for /_astro/* to this file.
-
-# The CMS (public/cms/) is for editors: keep it out of search results and other sites' frames.
-/cms
-  X-Robots-Tag: noindex, nofollow
-  X-Frame-Options: DENY
-  Referrer-Policy: same-origin
-/cms/*
-  X-Robots-Tag: noindex, nofollow
-  X-Frame-Options: DENY
-  Referrer-Policy: same-origin
+# long-lived Cache-Control rule for /_astro/* to this file, and the security headers: a
+# catch-all /* rule first and the /cms and /cms/* rules last (CSP, COOP, X-Robots-Tag and
+# Referrer-Policy for the CMS), generated from src/utils/staticSecurityHeaders.ts by
+# src/integrations/securityHeaders.ts. Cloudflare keys rules by path (a second rule for a
+# path replaces the first), so don't add rules for /*, /cms or /cms/* here: the build fails
+# if you do. See docs/security.md.

@@ -1,0 +1,31 @@
+{
+  "name": "get-disallowed-origin",
+  "description": "GET ?query= with an Origin that is not on the legacy CORS allow-list.",
+  "capturedAt": "2026-11-18T00:34:30.545Z",
+  "method": "GET",
+  "url": "/api?query=%7B%20loo(id:%20%22694c1fc2234c63776b1805a9%22)%20%7B%20id%20name%20%7D%20%7D",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "origin": "https://example.com"
+  },
+  "query": "{ loo(id: \"694c1fc2234c63776b1805a9\") { id name } }",
+  "variables": null,
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "access-control-allow-origin": "https://example.com",
+    "access-control-allow-credentials": "true",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loo": {
+        "id": "694c1fc2234c63776b1805a9",
+        "name": "Watermark Place (Automatic)"
+      }
+    }
+  }
+}

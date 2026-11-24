@@ -1,0 +1,145 @@
+{
+  "name": "loos-default",
+  "description": "searchLoos with empty filters and default pagination/sort (live data).",
+  "capturedAt": "2026-11-18T00:34:47.097Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query searchLoos(\n  $filters: LooFilter!\n  $pagination: PaginationInput = { limit: 10, page: 1 }\n  $sort: SortOrder = NEWEST_FIRST\n) {\n  loos(filters: $filters, pagination: $pagination, sort: $sort) {\n    loos {\n      id\n      name\n      area {\n        name\n        type\n      }\n      updatedAt\n    }\n    total\n    page\n    limit\n    pages\n  }\n}",
+  "variables": {
+    "filters": {}
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loos": {
+        "loos": [
+          {
+            "id": "0706273779f5f605dd5fb7a4",
+            "name": "Starbucks",
+            "area": [
+              {
+                "name": "Islington",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-17T22:39:50.013Z"
+          },
+          {
+            "id": "62633645a409a17820850907",
+            "name": "Blaby Town Centre  Public Conveniences currently not working ",
+            "area": [
+              {
+                "name": "Blaby",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-17T09:45:18.270Z"
+          },
+          {
+            "id": "a12e6e62ac68034f7c44f311",
+            "name": "Victoria Embankment Gardens.",
+            "area": [
+              {
+                "name": "Westminster",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-16T22:31:33.260Z"
+          },
+          {
+            "id": "afadfb992687ad2968b9a09a",
+            "name": "Lower place, Newhaven ",
+            "area": [
+              {
+                "name": "Lewes",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-16T19:37:59.721Z"
+          },
+          {
+            "id": "04074e310b15d01a07db8dd6",
+            "name": "Local public toilet ",
+            "area": [
+              {
+                "name": "North Kesteven",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-16T19:35:18.238Z"
+          },
+          {
+            "id": "4395686bbac7bc2dc17c3c94",
+            "name": "Ruskington ",
+            "area": [
+              {
+                "name": "North Kesteven",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-16T19:32:05.442Z"
+          },
+          {
+            "id": "a9be7a1089f6fa804165cd62",
+            "name": "Barton Waterside Park",
+            "area": [
+              {
+                "name": "North Lincolnshire",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-16T17:59:48.075Z"
+          },
+          {
+            "id": "dfbc907822613f1eb6bc9fa5",
+            "name": "Wetherspoons",
+            "area": [
+              {
+                "name": "North East Lincolnshire",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-16T17:58:14.071Z"
+          },
+          {
+            "id": "18fe04575b35da51beee47e7",
+            "name": "Ecoloo",
+            "area": [
+              {
+                "name": "South Somerset",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-16T11:50:29.733Z"
+          },
+          {
+            "id": "77c76516912e78bc7f324e7c",
+            "name": "Tesco Uckfield",
+            "area": [
+              {
+                "name": "Wealden",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2026-11-15T22:50:13.639Z"
+          }
+        ],
+        "total": 16169,
+        "page": 1,
+        "limit": 10,
+        "pages": 1617
+      }
+    }
+  }
+}

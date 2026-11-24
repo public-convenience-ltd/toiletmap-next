@@ -8,7 +8,12 @@ export const openApiTags = [
   { name: "Meta", description: "General service endpoints." },
   { name: "Areas", description: "Administrative area operations." },
   { name: "Loos", description: "Operations relating to loos." },
+  {
+    name: "Legacy GraphQL",
+    description: "Deprecated read-only compatibility endpoint for the old GraphQL API.",
+  },
   { name: "Feedback", description: "Messages to the Toilet Map team." },
+  { name: "Geocoding", description: "Place and postcode search in Great Britain." },
 ];
 
 export const openApiServers = [

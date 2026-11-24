@@ -1,0 +1,52 @@
+{
+  "name": "loos-text",
+  "description": "Text filter (case-insensitive contains on name).",
+  "capturedAt": "2026-11-18T00:34:49.351Z",
+  "method": "POST",
+  "url": "/api",
+  "requestHeaders": {
+    "user-agent": "toiletmap-next-compat-fixtures",
+    "content-type": "application/json"
+  },
+  "query": "query searchLoos(\n  $filters: LooFilter!\n  $pagination: PaginationInput = { limit: 10, page: 1 }\n  $sort: SortOrder = NEWEST_FIRST\n) {\n  loos(filters: $filters, pagination: $pagination, sort: $sort) {\n    loos {\n      id\n      name\n      area {\n        name\n        type\n      }\n      updatedAt\n    }\n    total\n    page\n    limit\n    pages\n  }\n}",
+  "variables": {
+    "filters": {
+      "text": "WATERMARK"
+    },
+    "pagination": {
+      "limit": 5,
+      "page": 1
+    }
+  },
+  "operationName": null,
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vary": "Origin",
+    "x-vercel-cache": "MISS"
+  },
+  "body": {
+    "data": {
+      "loos": {
+        "loos": [
+          {
+            "id": "694c1fc2234c63776b1805a9",
+            "name": "Watermark Place (Automatic)",
+            "area": [
+              {
+                "name": "City of London",
+                "type": "Local Authority"
+              }
+            ],
+            "updatedAt": "2016-09-14T08:35:47.239Z"
+          }
+        ],
+        "total": 1,
+        "page": 1,
+        "limit": 5,
+        "pages": 1
+      }
+    }
+  }
+}

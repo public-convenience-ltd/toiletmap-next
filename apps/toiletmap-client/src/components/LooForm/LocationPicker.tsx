@@ -2,7 +2,7 @@ import L from "leaflet";
 import type { RefObject } from "preact";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { Button, InputField, Notice } from "toiletmap-design-system";
-import { useNominatimSearch } from "../../hooks/useNominatimSearch";
+import { usePlaceSearch } from "../../hooks/usePlaceSearch";
 import { BRAND_PINK, getIconString, makeIcon, PIN_PATH } from "../LooMap/looIcon";
 import {
   addFormView,
@@ -14,6 +14,7 @@ import {
   readMapView,
   toMapView,
 } from "../LooMap/mapView";
+import PlaceSearchAttribution from "../PlaceSearchAttribution";
 import { distanceMeters, isValidLatLng, type LatLng } from "./geometry";
 import { formatCoordinates, isInUk, parseCoordinates } from "./LocationPicker/coordinates";
 import styles from "./LocationPicker/LocationPicker.module.css";
@@ -486,7 +487,7 @@ export default function LocationPicker({
   /** True while the coordinate box holds text the user typed and hasn't used yet. */
   const coordDirtyRef = useRef(false);
 
-  const search = useNominatimSearch({
+  const search = usePlaceSearch({
     mapRef,
     selectZoom: FOCUS_ZOOM,
     fitResultBounds: true,
@@ -1322,11 +1323,11 @@ export default function LocationPicker({
   };
 
   const selectSuggestion = (s: (typeof search.suggestions)[number]) => {
-    setAnnouncement(`Map moved to ${s.display_name}.`);
+    setAnnouncement(`Map moved to ${s.label}.`);
     moveMap("search", () => search.handleSuggestionSelect(s));
     pendingFocusRef.current = "map";
     if (!originalNow() && placedByRef.current === "search") {
-      setAnnouncement(`Pin placed at ${s.display_name}.`);
+      setAnnouncement(`Pin placed at ${s.label}.`);
     }
   };
 
@@ -1660,22 +1661,32 @@ export default function LocationPicker({
                 ? "Searching…"
                 : search.noResults
                   ? "No places found. Try a postcode or street name."
-                  : ""}
+                  : search.failed
+                    ? "Place search isn't working right now. Try again in a moment."
+                    : search.awaitingSubmit
+                      ? "Press Enter to search for places."
+                      : ""}
             </p>
             {searchOpen && (
-              <ul class={styles.suggestions} aria-label="Search results">
-                {search.suggestions.map((s) => (
-                  <li key={s.place_id}>
-                    <button
-                      type="button"
-                      class={styles.suggestion}
-                      onClick={() => selectSuggestion(s)}
-                    >
-                      {s.display_name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div class={styles.suggestions}>
+                <ul class={styles.suggestionList} aria-label="Search results">
+                  {search.suggestions.map((s) => (
+                    <li key={`${s.label}@${s.lat},${s.lng}`}>
+                      <button
+                        type="button"
+                        class={styles.suggestion}
+                        onClick={() => selectSuggestion(s)}
+                      >
+                        {s.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <PlaceSearchAttribution
+                  attribution={search.attribution}
+                  class={styles.searchAttribution}
+                />
+              </div>
             )}
           </div>
           {geolocation && (

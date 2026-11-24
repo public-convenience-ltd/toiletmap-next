@@ -85,11 +85,11 @@ const FORWARDED_REQUEST_HEADERS = [
  * belong to the upstream origin, CORS headers are meaningless same-origin,
  * and encoding/length/hop-by-hop headers no longer describe the re-streamed body.
  */
-const isStrippedResponseHeader = (name: string): boolean => {
+const isStrippedResponseHeader = (name: string, keepCors = false): boolean => {
   const lower = name.toLowerCase();
   return (
     lower === "set-cookie" ||
-    lower.startsWith("access-control-") ||
+    (!keepCors && lower.startsWith("access-control-")) ||
     lower === "content-security-policy" ||
     lower === "content-security-policy-report-only" ||
     lower === "content-encoding" ||
@@ -145,6 +145,13 @@ const ALLOWED_API_PREFIXES = ["/api/loos"];
 const PUBLIC_POST_PATHS = new Set(["/api/feedback"]);
 
 /**
+ * Exact paths of public read-only endpoints: GET and HEAD only, anything else
+ * gets a 405 without contacting upstream. `/api/geocode` is the place search
+ * (postcodes.io, then Nominatim, run server-side).
+ */
+const PUBLIC_GET_PATHS = new Set(["/api/geocode"]);
+
+/**
  * Returns true when `pathname` (a URL pathname, still percent-encoded) may be
  * proxied upstream. Rejects anything that could be reinterpreted as a
  * different path upstream: dot segments (raw or encoded), encoded slashes or
@@ -164,7 +171,7 @@ export function isAllowedApiPath(pathname: string): boolean {
     return false;
   }
 
-  if (PUBLIC_POST_PATHS.has(pathname)) return true;
+  if (PUBLIC_POST_PATHS.has(pathname) || PUBLIC_GET_PATHS.has(pathname)) return true;
 
   return ALLOWED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -204,6 +211,8 @@ export interface ProxyOptions {
  * - State-changing methods require `Origin` to equal the client's own origin
  *   (CSRF protection) and get `Authorization: Bearer <access_token>` attached
  *   server-side from the httpOnly cookie, so the token never reaches page JS.
+ *   Public read-only paths (`PUBLIC_GET_PATHS`, e.g. `/api/geocode`) accept
+ *   only GET and HEAD.
  *   Public POST endpoints (`PUBLIC_POST_PATHS`, e.g. `/api/feedback`) also
  *   accept a missing `Origin` (native apps) and never get the token.
  * - Returns upstream status/body/headers (cache headers included) minus
@@ -223,6 +232,12 @@ export async function proxyApiRequest({
 
   const method = request.method.toUpperCase();
   const isSafe = SAFE_METHODS.has(method);
+
+  if (PUBLIC_GET_PATHS.has(url.pathname) && method !== "GET" && method !== "HEAD") {
+    const response = jsonResponse(405, { message: "Method Not Allowed" });
+    response.headers.set("allow", "GET, HEAD");
+    return response;
+  }
 
   if (!isSafe && !passesOriginCheck(request, url, method)) {
     return jsonResponse(403, { message: "Forbidden" });
@@ -246,9 +261,34 @@ export async function proxyApiRequest({
   const hasBody = method !== "GET" && method !== "HEAD";
   const body = hasBody ? await request.arrayBuffer() : undefined;
 
+  return forwardUpstream({ env, url, upstreamPath: url.pathname, method, headers, body });
+}
+
+/**
+ * Sends the prepared request upstream and relays the response: status, body
+ * and headers minus {@link isStrippedResponseHeader}, plus the proxy's
+ * lock-down headers. Upstream failures become a 502.
+ */
+async function forwardUpstream({
+  env,
+  url,
+  upstreamPath,
+  method,
+  headers,
+  body,
+  keepCors = false,
+}: {
+  env: ApiEnv;
+  url: URL;
+  upstreamPath: string;
+  method: string;
+  headers: Headers;
+  body: ArrayBuffer | undefined;
+  keepCors?: boolean;
+}): Promise<Response> {
   let upstream: Response;
   try {
-    upstream = await fetchApi(env, url, `${url.pathname}${url.search}`, {
+    upstream = await fetchApi(env, url, `${upstreamPath}${url.search}`, {
       method,
       headers,
       body: body && body.byteLength > 0 ? body : undefined,
@@ -261,7 +301,7 @@ export async function proxyApiRequest({
 
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, name) => {
-    if (!isStrippedResponseHeader(name)) responseHeaders.append(name, value);
+    if (!isStrippedResponseHeader(name, keepCors)) responseHeaders.append(name, value);
   });
   applySecurityHeaders(responseHeaders);
 
@@ -270,5 +310,147 @@ export async function proxyApiRequest({
     status: upstream.status,
     statusText: upstream.statusText,
     headers: responseHeaders,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Legacy GraphQL compatibility route
+// ---------------------------------------------------------------------------
+
+/**
+ * The legacy GraphQL API lived at `www.toiletmap.org.uk/api` (the Flutter app
+ * calls `GET /api/?query=`; other clients POST to `/api`). Exactly these two
+ * paths are proxied to toiletmap-server's read-only `/api/graphql`. Nothing
+ * else under `/api` matches (`/api/feedback` included).
+ */
+export function isLegacyGraphqlPath(pathname: string): boolean {
+  return pathname === "/api" || pathname === "/api/";
+}
+
+const LEGACY_GRAPHQL_UPSTREAM_PATH = "/api/graphql";
+
+const LEGACY_GRAPHQL_METHODS = new Set(["GET", "HEAD", "POST", "OPTIONS"]);
+
+/**
+ * Headers the legacy endpoint needs: content negotiation, plus `Origin` and
+ * the preflight headers because upstream answers CORS for cross-origin
+ * callers (the GraphQL explorer, third-party sites). No cookies, no tokens.
+ */
+const LEGACY_GRAPHQL_REQUEST_HEADERS = [
+  "accept",
+  "content-type",
+  "user-agent",
+  "origin",
+  "access-control-request-method",
+  "access-control-request-headers",
+];
+
+/** Bodies above this are refused here, while reading (upstream allows 32 KiB). */
+export const LEGACY_GRAPHQL_MAX_BODY_BYTES = 64 * 1024;
+
+/**
+ * The proxy's own legacy GraphQL errors. Like upstream's, any origin may read
+ * them (`Access-Control-Allow-Origin: *`, never credentials).
+ */
+const legacyGraphqlError = (status: number, message: string): Response => {
+  const response = jsonResponse(status, { errors: [{ message }] });
+  response.headers.set("access-control-allow-origin", "*");
+  return response;
+};
+
+/**
+ * Reads a request body, giving up (and cancelling the stream) as soon as it
+ * passes `maxBytes`, so a chunked body without `Content-Length` is never
+ * buffered beyond the limit. Returns null when the body is too large.
+ */
+export async function readBodyWithLimit(
+  request: Request,
+  maxBytes: number,
+): Promise<ArrayBuffer | null> {
+  if (!request.body) return new ArrayBuffer(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {
+        // Already errored or closed: nothing left to release.
+      });
+      return null;
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body.buffer;
+}
+
+/**
+ * Proxies `/api` and `/api/` to the read-only legacy GraphQL endpoint.
+ *
+ * A deliberate exception to {@link proxyApiRequest}'s rules: these requests
+ * come from apps and other origins, never from this site's pages, and the
+ * endpoint rejects every mutation, so
+ * - there is no CSRF `Origin` check on POST;
+ * - no cookie is forwarded and no access token is attached, ever;
+ * - upstream `Access-Control-*` headers are passed through (CORS is
+ *   upstream's decision).
+ * The client IP is forwarded like every other proxied route, so upstream
+ * rate limiting still applies per caller.
+ */
+export async function proxyLegacyGraphqlRequest({
+  request,
+  env,
+  clientIp,
+}: Omit<ProxyOptions, "accessToken">): Promise<Response> {
+  const url = new URL(request.url);
+  if (!isLegacyGraphqlPath(url.pathname)) {
+    return jsonResponse(404, { message: "Not Found" });
+  }
+
+  const method = request.method.toUpperCase();
+  if (!LEGACY_GRAPHQL_METHODS.has(method)) {
+    const response = legacyGraphqlError(405, `Method ${method} is not allowed.`);
+    response.headers.set("allow", "GET, POST");
+    return response;
+  }
+
+  const headers = new Headers();
+  for (const name of LEGACY_GRAPHQL_REQUEST_HEADERS) {
+    const value = request.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  if (clientIp) {
+    headers.set("cf-connecting-ip", clientIp);
+    // Do not trust any incoming X-Forwarded-For: the caller controls it.
+    headers.set("x-forwarded-for", clientIp);
+  }
+
+  let body: ArrayBuffer | undefined;
+  if (method === "POST") {
+    const tooLarge = () => legacyGraphqlError(413, "Request body is too large.");
+    const declared = Number(request.headers.get("content-length") ?? 0);
+    if (declared > LEGACY_GRAPHQL_MAX_BODY_BYTES) return tooLarge();
+    // Content-Length may be missing (chunked) or wrong: count while reading.
+    const read = await readBodyWithLimit(request, LEGACY_GRAPHQL_MAX_BODY_BYTES);
+    if (!read) return tooLarge();
+    body = read;
+  }
+
+  return forwardUpstream({
+    env,
+    url,
+    upstreamPath: LEGACY_GRAPHQL_UPSTREAM_PATH,
+    method,
+    headers,
+    body,
+    keepCors: true,
   });
 }

@@ -1,6 +1,7 @@
 import cloudflare from "@astrojs/cloudflare";
 import preact from "@astrojs/preact";
 import { defineConfig } from "astro/config";
+import securityHeaders from "./src/integrations/securityHeaders";
 
 // https://astro.build/config
 export default defineConfig({
@@ -13,7 +14,8 @@ export default defineConfig({
   // with no redirect to a trailing slash (the app store links /app/privacy).
   build: { format: "file" },
   adapter: cloudflare(),
-  integrations: [preact()],
+  // securityHeaders: CSP and security headers for static assets in _headers (docs/security.md).
+  integrations: [preact(), securityHeaders()],
   // The dev toolbar floats over the bottom of the page, where the map's details sheet sits.
   // The Playwright run (playwright.config.ts) turns it off so it can't take the sheet's taps.
   devToolbar: { enabled: process.env.ASTRO_DEV_TOOLBAR !== "off" },

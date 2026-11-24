@@ -1,0 +1,2599 @@
+{
+  "description": "Full legacy Loo records (LooFragment, as returned by the live legacy API) for every toilet id that appears in these fixtures, for seeding an equivalent local test DB. appearsIn lists the fixture files that reference each id.",
+  "capturedAt": "2026-11-18T00:35:20.186Z",
+  "count": 46,
+  "toilets": [
+    {
+      "id": "0220bb6e020eba5484124139",
+      "createdAt": "2015-01-08T23:43:17.681Z",
+      "updatedAt": "2016-09-14T08:49:49.226Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 52.706590922,
+        "lng": -2.744575739
+      },
+      "name": "Abbey Foregate",
+      "openingTimes": [
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Accessible facilities 24/7 (RADAR Key)\r\nOther facilities daylight only",
+      "removalReason": null,
+      "attended": true,
+      "geohash": "gcq5cdcqnu8j808025bp",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "loosByProximity-default-distance"
+      ]
+    },
+    {
+      "id": "04074e310b15d01a07db8dd6",
+      "createdAt": "2026-11-16T19:35:18.238Z",
+      "updatedAt": "2026-11-16T19:35:18.238Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 53.140046832,
+        "lng": -0.403381884
+      },
+      "name": "Local public toilet ",
+      "openingTimes": [
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": false,
+      "children": false,
+      "urinalOnly": false,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Small local toilet by local council - often closed on Sundays ",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcrwqcf70w8wtrd8vkfx",
+      "area": [
+        {
+          "name": "North Kesteven",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "06fb5f07d52e8493ea45f97a",
+      "createdAt": "2014-11-20T13:44:24.407Z",
+      "updatedAt": "2016-09-13T23:16:23.887Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 52.7114008,
+        "lng": -2.7487182
+      },
+      "name": "Shrewsbury Railway Station",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Behind ticket barriers.\r\nAsk nicely and will be allowed through with a free platform ticket.",
+      "removalReason": null,
+      "attended": true,
+      "geohash": "gcq5c7y6njr1t1buhzkf",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "get-loosByGeohash",
+        "loosByProximity-default-distance",
+        "loosByGeohash-shrewsbury",
+        "fullLoosByGeohash-shrewsbury"
+      ]
+    },
+    {
+      "id": "0706273779f5f605dd5fb7a4",
+      "createdAt": "2016-09-14T21:18:30.211Z",
+      "updatedAt": "2026-11-17T22:39:50.013Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.565328,
+        "lng": -0.134314
+      },
+      "name": "Starbucks",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Ask member of staff",
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvkgnjy3b5p0k48tgj",
+      "area": [
+        {
+          "name": "Islington",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "094c6bc6737a6754a2bc51a3",
+      "createdAt": "2019-01-23T13:06:05.510Z",
+      "updatedAt": "2019-01-23T13:06:05.510Z",
+      "verifiedAt": "2026-06-30T15:26:45.944Z",
+      "active": true,
+      "location": {
+        "lat": 51.505082981,
+        "lng": -0.089828451
+      },
+      "name": "Borough market 2",
+      "openingTimes": null,
+      "accessible": true,
+      "men": null,
+      "women": null,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": false,
+      "paymentDetails": null,
+      "notes": "Inside market seating  area",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvjbnwfg753xjnjwnd",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "fullLoosByGeohash-london"
+      ]
+    },
+    {
+      "id": "0b23fd6a9578ce7e7b01515c",
+      "createdAt": "2021-12-21T09:28:58.874Z",
+      "updatedAt": "2024-01-01T22:55:23.218Z",
+      "verifiedAt": "2026-07-11T11:40:49.744Z",
+      "active": true,
+      "location": {
+        "lat": 51.650189321,
+        "lng": -0.192958117
+      },
+      "name": "High Barnet Underground Station",
+      "openingTimes": [
+        [
+          "05:25",
+          "00:00"
+        ],
+        [
+          "05:25",
+          "00:00"
+        ],
+        [
+          "05:25",
+          "00:00"
+        ],
+        [
+          "05:25",
+          "00:00"
+        ],
+        [
+          "05:25",
+          "00:00"
+        ],
+        [
+          "05:25",
+          "00:00"
+        ],
+        [
+          "05:25",
+          "00:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": false,
+      "children": false,
+      "urinalOnly": false,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "On Platform 1. You need a tube ticket, or a validated contactless card, Oyster card or concessionary pass to be able to access the platform via ticket gates.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvgdekptpuxbr8ks9t",
+      "area": [
+        {
+          "name": "Barnet",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-date-range"
+      ]
+    },
+    {
+      "id": "106b51a2bae9cf65c575b358",
+      "createdAt": "2016-09-13T23:39:23.849Z",
+      "updatedAt": "2016-09-13T23:39:23.849Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.509837568,
+        "lng": -0.08605063
+      },
+      "name": "The Britannia",
+      "openingTimes": null,
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Mon - Weds: 11:00 - 23:00; Thurs: 11:00 - 24:00; Fri: 11:00 - 01:00; Sat: 12:00 - 18:00. Closed Sundays/Bank Holidays.. Part of City of London Community Toilet Scheme.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvn116dcsj8n052p2n",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-area-nopayment-oldest-page2"
+      ]
+    },
+    {
+      "id": "14c5d443f3668362db3872c5",
+      "createdAt": "2016-09-13T23:34:00.121Z",
+      "updatedAt": "2016-09-13T23:34:00.122Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.515445286,
+        "lng": -0.075345295
+      },
+      "name": "Barcelona Tapas Bar & Restaurant",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [],
+        []
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "MONDAY TO FRIDAY: 11.00 - 23.00.\r\n           Part of City of London Community Toilet Scheme.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvn615hr43p0zjs8s0",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-area-nopayment-oldest-page2"
+      ]
+    },
+    {
+      "id": "18fe04575b35da51beee47e7",
+      "createdAt": "2026-11-16T11:50:29.733Z",
+      "updatedAt": "2026-11-16T11:50:29.733Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 50.879653801,
+        "lng": -2.944236696
+      },
+      "name": "Ecoloo",
+      "openingTimes": null,
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Open during public events and with Radar key at all other times.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcjcmn256qfj05008n81",
+      "area": [
+        {
+          "name": "South Somerset",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "1a13a3b64c579d1f9370f9b8",
+      "createdAt": "2016-09-14T17:08:19.832Z",
+      "updatedAt": "2016-09-14T17:08:19.842Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.50937929,
+        "lng": -0.091587876
+      },
+      "name": "The Banker",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [],
+        []
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "MONDAY - TUESDAY 11.00 - 22.00; WEDNESDAY - FRIDAY 11.00 - 23.00. Bank Holidays: Closed. Part of City of London Community Toilet Scheme.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvjbvrcu5punsgt5ju",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-london-150m",
+        "loosByProximity-findLoosNearby",
+        "fullLoosByGeohash-london"
+      ]
+    },
+    {
+      "id": "22c44a1e75743f30d729e6c1",
+      "createdAt": "2018-08-07T05:28:19.172Z",
+      "updatedAt": "2018-08-18T09:25:13.732Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.505445843,
+        "lng": -0.088849068
+      },
+      "name": "Pret",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbr2cxj248vkcypu",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loo-removed",
+        "loosByGeohash-london-removed",
+        "fullLoosByGeohash-london-removed",
+        "get-flutter-loosByProximity-removed-25m"
+      ]
+    },
+    {
+      "id": "23113ed968c5668a947de1b0",
+      "createdAt": "2015-01-08T23:46:12.949Z",
+      "updatedAt": "2025-05-24T16:00:53.683Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 52.7079333,
+        "lng": -2.7526333
+      },
+      "name": "Butcher Row",
+      "openingTimes": [
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ],
+        [
+          "09:00",
+          "16:00"
+        ],
+        [
+          "09:00",
+          "18:00"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Changing Places toilet locked due to \"vandalism\" council not allowing access.",
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcq5c75tfyzv55eq3uv8",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "get-loosByGeohash",
+        "loosByProximity-full-shrewsbury",
+        "loosByProximity-default-distance",
+        "looNamesByIds",
+        "loosByGeohash-shrewsbury",
+        "fullLoosByGeohash-shrewsbury"
+      ]
+    },
+    {
+      "id": "237ef73d21dd73cdfba3c8de",
+      "createdAt": "2016-09-13T23:34:47.826Z",
+      "updatedAt": "2016-09-13T23:34:47.828Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.512871879,
+        "lng": -0.093130245
+      },
+      "name": "Watling Street Urilift",
+      "openingTimes": [
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": false,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": true,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Male ONLY Urinals. Mon-Thurs, Bank Hols: 21.00 - 03.30; Fri, Sat: 21.00 - 06.30; Sun: Closed. \r\nNOTES Only available to serve the night time economy",
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjcshjzm41ccpv44u",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-area-nopayment-oldest-page2"
+      ]
+    },
+    {
+      "id": "2513b6d81626b7799352f145",
+      "createdAt": "2018-08-07T05:26:23.725Z",
+      "updatedAt": "2018-08-18T09:25:06.233Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.506358502,
+        "lng": -0.088723898
+      },
+      "name": "Pizza Express",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Anyone with balls could walk in and use without being a customer! Just have confidence.",
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbrqk94sm249m7pv",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loosByGeohash-london-removed",
+        "fullLoosByGeohash-london-removed"
+      ]
+    },
+    {
+      "id": "36c261076521dc4725720dd6",
+      "createdAt": "2016-09-14T20:53:56.402Z",
+      "updatedAt": "2025-10-12T11:45:11.081Z",
+      "verifiedAt": "2024-12-17T08:27:14.361Z",
+      "active": false,
+      "location": {
+        "lat": 51.519776019,
+        "lng": -0.08528831
+      },
+      "name": "The Fleetwood",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [],
+        []
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "MONDAY TO FRIDAY: 08.00 - 23.00\r\n              SATURDAY: Closed\r\n              SUNDAY: Closed. Part of City of London Community Toilet Scheme.",
+      "removalReason": "closed ",
+      "attended": null,
+      "geohash": "gcpvn4cukwk6vekxkvnm",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-inactive-area"
+      ]
+    },
+    {
+      "id": "4395686bbac7bc2dc17c3c94",
+      "createdAt": "2026-11-16T19:32:05.442Z",
+      "updatedAt": "2026-11-16T19:32:05.442Z",
+      "verifiedAt": "2026-11-16T19:32:19.893Z",
+      "active": true,
+      "location": {
+        "lat": 53.044938169,
+        "lng": -0.385772288
+      },
+      "name": "Ruskington ",
+      "openingTimes": [
+        [
+          "09:30",
+          "17:30"
+        ],
+        [
+          "09:30",
+          "17:30"
+        ],
+        [
+          "09:30",
+          "17:30"
+        ],
+        [
+          "09:30",
+          "17:30"
+        ],
+        [
+          "09:30",
+          "17:30"
+        ],
+        [
+          "09:30",
+          "17:30"
+        ],
+        [
+          "09:30",
+          "17:30"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": null,
+      "children": false,
+      "urinalOnly": false,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Small local toilet facility operated by local council.  It’s often left unlocked for days at a time ",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcrtz0x14v5m6wvkf9m2",
+      "area": [
+        {
+          "name": "North Kesteven",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "62633645a409a17820850907",
+      "createdAt": "2016-09-14T21:20:58.257Z",
+      "updatedAt": "2026-11-17T09:45:18.270Z",
+      "verifiedAt": "2026-10-12T07:49:22.582Z",
+      "active": true,
+      "location": {
+        "lat": 52.575190274,
+        "lng": -1.164013242
+      },
+      "name": "Blaby Town Centre  Public Conveniences currently not working ",
+      "openingTimes": null,
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": null,
+      "noPayment": false,
+      "paymentDetails": "20",
+      "notes": "Door broken ",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcr5je02stbf45y4q0nz",
+      "area": [
+        {
+          "name": "Blaby",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "66a0a7e5a9b1590a9d222297",
+      "createdAt": "2019-01-23T13:02:42.868Z",
+      "updatedAt": "2019-01-23T13:02:42.868Z",
+      "verifiedAt": "2024-04-14T14:49:28.146Z",
+      "active": true,
+      "location": {
+        "lat": 51.506455038,
+        "lng": -0.089274585
+      },
+      "name": "Cathedral cafe",
+      "openingTimes": null,
+      "accessible": false,
+      "men": null,
+      "women": null,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": false,
+      "paymentDetails": null,
+      "notes": "At river end of café downstairs",
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbqyzg0h17t82uwc",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-variables-operationName",
+        "loo-null-hours",
+        "fullLoosByGeohash-london"
+      ]
+    },
+    {
+      "id": "675a72216e6ae337cb232709",
+      "createdAt": "2018-08-07T05:21:50.555Z",
+      "updatedAt": "2018-08-18T09:25:48.686Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.508089165,
+        "lng": -0.096675754
+      },
+      "name": "Globe",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbc877c249v4vyzz",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loosByGeohash-london-removed",
+        "fullLoosByGeohash-london-removed"
+      ]
+    },
+    {
+      "id": "694c1fc2234c63776b1805a9",
+      "createdAt": "2016-09-14T08:35:47.237Z",
+      "updatedAt": "2016-09-14T08:35:47.239Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.509362482,
+        "lng": -0.090620106
+      },
+      "name": "Watermark Place (Automatic)",
+      "openingTimes": [
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ]
+      ],
+      "accessible": true,
+      "men": null,
+      "women": null,
+      "allGender": true,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": true,
+      "noPayment": false,
+      "paymentDetails": "£0.20",
+      "notes": "20p charge or RADAR key. Please note from time to time public conveniences may be closed for maintentance, repair or other reasons.",
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbypb3hg8n11gbje",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-london-150m",
+        "get-explorer-origin",
+        "get-disallowed-origin",
+        "post-explorer-origin",
+        "loo-24h",
+        "loos-text",
+        "loos-contributors-ignored",
+        "loosByProximity-findLoosNearby",
+        "looNamesByIds",
+        "fullLoosByGeohash-london"
+      ]
+    },
+    {
+      "id": "77c76516912e78bc7f324e7c",
+      "createdAt": "2026-11-15T22:50:13.639Z",
+      "updatedAt": "2026-11-15T22:50:13.639Z",
+      "verifiedAt": "2026-11-15T22:50:27.102Z",
+      "active": true,
+      "location": {
+        "lat": 50.970575985,
+        "lng": 0.094450956
+      },
+      "name": "Tesco Uckfield",
+      "openingTimes": [
+        [
+          "06:00",
+          "00:00"
+        ],
+        [
+          "06:00",
+          "00:00"
+        ],
+        [
+          "06:00",
+          "00:00"
+        ],
+        [
+          "06:00",
+          "00:00"
+        ],
+        [
+          "06:00",
+          "00:00"
+        ],
+        [
+          "06:00",
+          "00:00"
+        ],
+        [
+          "10:00",
+          "16:00"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": null,
+      "geohash": "u101fnuv0u59p96xrqr7",
+      "area": [
+        {
+          "name": "Wealden",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "78b3f1ccdaa8a408270ed69b",
+      "createdAt": "2016-09-14T17:04:33.484Z",
+      "updatedAt": "2019-01-23T13:08:39.536Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.5059788,
+        "lng": -0.0911556
+      },
+      "name": "Borough market 1",
+      "openingTimes": null,
+      "accessible": false,
+      "men": null,
+      "women": null,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "corner of delivery yard  Winchester Walk",
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbms5fm7nxv0ju71",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "fullLoosByGeohash-london"
+      ]
+    },
+    {
+      "id": "8505c95f9356422865e0f9fe",
+      "createdAt": "2016-09-14T09:01:37.711Z",
+      "updatedAt": "2024-10-16T08:34:22.207Z",
+      "verifiedAt": "2025-05-17T12:02:07.664Z",
+      "active": true,
+      "location": {
+        "lat": 52.70869093,
+        "lng": -2.756064534
+      },
+      "name": "Barker St Car Park",
+      "openingTimes": null,
+      "accessible": false,
+      "men": null,
+      "women": null,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Closed as at Oct 2024",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcq5c7347h1kd9tmefrc",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "get-loosByGeohash",
+        "loosByProximity-full-shrewsbury",
+        "loosByProximity-default-distance",
+        "loosByGeohash-shrewsbury",
+        "fullLoosByGeohash-shrewsbury"
+      ]
+    },
+    {
+      "id": "8a784c9b8e6c07d3b00e4609",
+      "createdAt": "2018-08-07T05:22:59.588Z",
+      "updatedAt": "2018-08-18T09:25:40.496Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.507244431,
+        "lng": -0.092995763
+      },
+      "name": "Public House",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbs73n3348v7d7ru",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loosByGeohash-london-removed",
+        "fullLoosByGeohash-london-removed"
+      ]
+    },
+    {
+      "id": "8af65bae77fbf4f5a035c0d9",
+      "createdAt": "2018-08-07T05:24:03.262Z",
+      "updatedAt": "2018-08-18T09:25:29.039Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.507080825,
+        "lng": -0.090621114
+      },
+      "name": "Public House",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbw42rgcpfryxvpb",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loosByGeohash-london-removed",
+        "fullLoosByGeohash-london-removed"
+      ]
+    },
+    {
+      "id": "8d846ff1154a5b79ed3f72f6",
+      "createdAt": "2016-09-14T11:17:57.230Z",
+      "updatedAt": "2017-07-20T14:16:30.616Z",
+      "verifiedAt": "2026-06-22T12:42:25.521Z",
+      "active": true,
+      "location": {
+        "lat": 52.707681378,
+        "lng": -2.759724855
+      },
+      "name": null,
+      "openingTimes": null,
+      "accessible": false,
+      "men": null,
+      "women": null,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcq5c5nkmzbn24bpbp21",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "loo-no-name",
+        "loosByProximity-full-shrewsbury",
+        "loosByProximity-default-distance",
+        "looNamesByIds"
+      ]
+    },
+    {
+      "id": "95a3d59ae1030edb5c340588",
+      "createdAt": "2018-08-07T05:44:05.375Z",
+      "updatedAt": "2018-08-18T09:25:34.993Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.506843762,
+        "lng": -0.091311335
+      },
+      "name": "Pret",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbt90796fwj6njbj",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loosByGeohash-london-removed",
+        "fullLoosByGeohash-london-removed"
+      ]
+    },
+    {
+      "id": "9bf2c4f5fa6e78a72e5f1f93",
+      "createdAt": "2020-12-14T21:06:19.923Z",
+      "updatedAt": "2024-01-01T18:08:15.852Z",
+      "verifiedAt": "2025-06-30T12:42:16.733Z",
+      "active": true,
+      "location": {
+        "lat": 56.637479734,
+        "lng": -2.656320333
+      },
+      "name": "Friockheim Public Toilets",
+      "openingTimes": [
+        [
+          "07:30",
+          "16:30"
+        ],
+        [
+          "07:30",
+          "16:30"
+        ],
+        [
+          "07:30",
+          "16:30"
+        ],
+        [
+          "07:30",
+          "16:30"
+        ],
+        [
+          "07:30",
+          "16:00"
+        ],
+        [
+          "09:00",
+          "16:00"
+        ],
+        [
+          "10:00",
+          "15:30"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": false,
+      "children": false,
+      "urinalOnly": false,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Friockheim Public Toilet Block - Owned By Angus Council & Maintained Friockheim Park Community Volunteers Community Group. \n\nMale & Female Toilet Facilities, Award Winning, Community Maintained, Clean & Safe. \n\n​We are pleased to be able to provide Free Period Products in the ladies toilets in partnership with HeyGirls & Free Period Angus.\n\nFarnell Road, Friockheim, Arbroath, DD11 4XB\nUpdated: Januray 2023 ",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gfn45w99pr2n8h8mgsxc",
+      "area": [
+        {
+          "name": "Angus",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-date-range"
+      ]
+    },
+    {
+      "id": "9cfbe6af64ea6962b8988043",
+      "createdAt": "2016-09-14T21:01:40.504Z",
+      "updatedAt": "2024-01-01T22:48:12.543Z",
+      "verifiedAt": "2026-08-09T14:31:55.313Z",
+      "active": true,
+      "location": {
+        "lat": 53.3154678,
+        "lng": -1.6046412
+      },
+      "name": "Longshaw Estate National Trust Toilets",
+      "openingTimes": null,
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": true,
+      "children": false,
+      "urinalOnly": false,
+      "radar": null,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Located in an external passageway behind the cafe.\nWinter (roughly November to March) 10.00-16.00\nSummer (roughly April to October) 09.30-17.00\nCheck NT website for specific dates https://www.nationaltrust.org.uk/visit/peak-district-derbyshire/longshaw-burbage-and-the-eastern-moors",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcqz73z915sc9d69beyk",
+      "area": [
+        {
+          "name": "Derbyshire Dales",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-date-range"
+      ]
+    },
+    {
+      "id": "a12e6e62ac68034f7c44f311",
+      "createdAt": "2016-09-14T21:12:24.274Z",
+      "updatedAt": "2026-11-16T22:31:33.260Z",
+      "verifiedAt": "2026-10-25T14:20:29.160Z",
+      "active": true,
+      "location": {
+        "lat": 51.507488611,
+        "lng": -0.121756196
+      },
+      "name": "Victoria Embankment Gardens.",
+      "openingTimes": [
+        [
+          "07:30",
+          "20:30"
+        ],
+        [
+          "07:30",
+          "20:30"
+        ],
+        [
+          "07:30",
+          "20:30"
+        ],
+        [
+          "07:30",
+          "20:30"
+        ],
+        [
+          "07:30",
+          "20:30"
+        ],
+        [
+          "07:30",
+          "20:30"
+        ],
+        [
+          "07:30",
+          "20:30"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": true,
+      "babyChange": true,
+      "children": true,
+      "urinalOnly": false,
+      "radar": true,
+      "automatic": false,
+      "noPayment": false,
+      "paymentDetails": "£1",
+      "notes": "There is a baby change facility in both the men's and women's toilets.\n\nThere is also a family toilet, changing places and is accessible.",
+      "removalReason": null,
+      "attended": true,
+      "geohash": "gcpvj0xkfgu1858n88c1",
+      "area": [
+        {
+          "name": "Westminster",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "a62c554358606a7ca7e10f5f",
+      "createdAt": "2014-11-20T10:48:42.010Z",
+      "updatedAt": "2016-09-14T10:56:47.235Z",
+      "verifiedAt": "2025-10-23T09:50:48.747Z",
+      "active": true,
+      "location": {
+        "lat": 52.709507954,
+        "lng": -2.75277257
+      },
+      "name": "Darwin Shopping Centre",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": true,
+      "geohash": "gcq5c77rpu2n212h048j",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "get-loosByGeohash",
+        "loosByProximity-full-shrewsbury",
+        "loosByProximity-default-distance",
+        "loosByGeohash-shrewsbury",
+        "fullLoosByGeohash-shrewsbury"
+      ]
+    },
+    {
+      "id": "a6d10496c544e0063694a50f",
+      "createdAt": "2016-09-14T21:28:34.312Z",
+      "updatedAt": "2024-07-30T12:17:26.140Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.51058265,
+        "lng": -0.090609398
+      },
+      "name": "London Cannon Street",
+      "openingTimes": null,
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": true,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Accessible toilet and Baby change are on the ground floor, to the left of the ticket office. Other toilets are down the stairs, to the left of the ticket office.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvjcnnbssdr8cefw88",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-london-150m",
+        "loosByProximity-findLoosNearby"
+      ]
+    },
+    {
+      "id": "a9be7a1089f6fa804165cd62",
+      "createdAt": "2016-09-14T00:04:31.839Z",
+      "updatedAt": "2026-11-16T17:59:48.075Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 53.69685156,
+        "lng": -0.44487456
+      },
+      "name": "Barton Waterside Park",
+      "openingTimes": null,
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": null,
+      "children": false,
+      "urinalOnly": false,
+      "radar": null,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Free car parking. Closed during day on passing Nov 26 so probably open seasonal",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcx9mzhncdtkrd0sy9hn",
+      "area": [
+        {
+          "name": "North Lincolnshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "aaa30a77cb3e26070b7490e5",
+      "createdAt": "2016-09-13T23:20:57.833Z",
+      "updatedAt": "2025-10-12T11:45:43.668Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.519870066,
+        "lng": -0.097712198
+      },
+      "name": "Long Lane (Automatic)",
+      "openingTimes": [
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ],
+        [
+          "00:00",
+          "00:00"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": true,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": true,
+      "noPayment": false,
+      "paymentDetails": "£0.20",
+      "notes": "Please note from time to time public conveniences may be closed for maintentance, repair or other reasons.",
+      "removalReason": "closed ",
+      "attended": false,
+      "geohash": "gcpvjfbugpueb5uw05jm",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-inactive-area"
+      ]
+    },
+    {
+      "id": "ae6b3b386f16c3e80d28884d",
+      "createdAt": "2016-09-13T22:59:57.959Z",
+      "updatedAt": "2025-10-12T11:36:13.897Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.51027765,
+        "lng": -0.090408339
+      },
+      "name": "The Steelyard ",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [],
+        []
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "MONDAY 10.00 - 16.00;  TUESDAY - FRIDAY 10.00 - 22.00. Bank Holidays: Closed. Part of City of London Community Toilet Scheme.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvjcnjj7dwvh0ns49n",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-london-150m",
+        "loosByProximity-findLoosNearby"
+      ]
+    },
+    {
+      "id": "afadfb992687ad2968b9a09a",
+      "createdAt": "2026-11-16T19:37:59.721Z",
+      "updatedAt": "2026-11-16T19:37:59.721Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 50.794964081,
+        "lng": 0.048057139
+      },
+      "name": "Lower place, Newhaven ",
+      "openingTimes": [
+        [
+          "00:00",
+          "23:59"
+        ],
+        [
+          "00:00",
+          "23:59"
+        ],
+        [
+          "00:00",
+          "23:59"
+        ],
+        [
+          "00:00",
+          "23:59"
+        ],
+        [
+          "00:00",
+          "23:59"
+        ],
+        [
+          "00:00",
+          "23:59"
+        ],
+        [
+          "00:00",
+          "23:59"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": true,
+      "children": false,
+      "urinalOnly": false,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Public toilet by local council open 24/7",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "u100cnfypgd50p2p8jb1",
+      "area": [
+        {
+          "name": "Lewes",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "b29fb7508c04bc2ade91f29a",
+      "createdAt": "2024-01-19T11:15:19.871Z",
+      "updatedAt": "2024-01-19T11:15:19.871Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 52.707637855,
+        "lng": -2.756575942
+      },
+      "name": "Shrewsbury Indoor Market",
+      "openingTimes": [
+        [],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        [
+          "08:00",
+          "16:00"
+        ],
+        []
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "The toilets are located on the upper floor, lift access available.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcq5c70sppu48nbpbh21",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "get-loosByGeohash",
+        "loosByProximity-full-shrewsbury",
+        "loosByProximity-default-distance",
+        "loosByGeohash-shrewsbury",
+        "fullLoosByGeohash-shrewsbury"
+      ]
+    },
+    {
+      "id": "c16827ebe7c9fc0b4a2789b2",
+      "createdAt": "2016-09-14T15:31:55.333Z",
+      "updatedAt": "2024-10-16T08:35:29.457Z",
+      "verifiedAt": "2025-10-23T09:51:39.344Z",
+      "active": true,
+      "location": {
+        "lat": 52.708848185,
+        "lng": -2.761779428
+      },
+      "name": "The Quarry",
+      "openingTimes": null,
+      "accessible": null,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcq5c5kgmc7yxgz8h3r6",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "loosByProximity-default-distance"
+      ]
+    },
+    {
+      "id": "ce7d97d0ab2ac5783a8677a0",
+      "createdAt": "2016-09-13T23:45:03.843Z",
+      "updatedAt": "2016-09-13T23:45:03.843Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 51.516960145,
+        "lng": -0.098769665
+      },
+      "name": "Barts Hospital",
+      "openingTimes": null,
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": true,
+      "geohash": "gcpvjf2h492j802n2524",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-area-nopayment-oldest-page2"
+      ]
+    },
+    {
+      "id": "d438f44779c07f9c8288bdc8",
+      "createdAt": "2014-11-20T10:50:13.238Z",
+      "updatedAt": "2016-09-14T21:36:40.226Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 52.710606463,
+        "lng": -2.752547264
+      },
+      "name": "Shrewsbury Bus Station Toilets",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcq5c7ett10p0hbhbj2j",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "get-loosByGeohash",
+        "loosByProximity-full-shrewsbury",
+        "loosByProximity-default-distance",
+        "loosByGeohash-shrewsbury",
+        "fullLoosByGeohash-shrewsbury"
+      ]
+    },
+    {
+      "id": "db5bccce6efbb2b7be69e054",
+      "createdAt": "2018-08-07T05:43:21.285Z",
+      "updatedAt": "2018-08-18T09:25:23.455Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.506746933,
+        "lng": -0.090605021
+      },
+      "name": "Cafe",
+      "openingTimes": [
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ],
+        [
+          "09:00",
+          "17:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": true,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": false,
+      "geohash": "gcpvjbw08c81248hb105",
+      "area": [
+        {
+          "name": "Southwark",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loosByGeohash-london-removed",
+        "fullLoosByGeohash-london-removed"
+      ]
+    },
+    {
+      "id": "dc7013119dfaa49934a9b331",
+      "createdAt": "2024-06-21T20:10:51.518Z",
+      "updatedAt": "2025-05-19T13:25:12.519Z",
+      "verifiedAt": "2024-06-21T20:11:50.613Z",
+      "active": true,
+      "location": {
+        "lat": 52.713330703,
+        "lng": -2.74056673
+      },
+      "name": "Sydney Avenue, Shrewsbury",
+      "openingTimes": [
+        [],
+        [],
+        [],
+        [],
+        [
+          "10:00",
+          "16:00"
+        ],
+        [
+          "10:00",
+          "16:00"
+        ],
+        [
+          "10:00",
+          "16:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": null,
+      "children": null,
+      "urinalOnly": false,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "This toilet has ramps to the doors of both the male and female facilities. This toilet is also open 7 days a week from Easter until winter (possibly the end of October) from 10 AM to 4 PM. There is no baby changing facility in the male toilet anyway. Council website says open 7 days from Easter - am here on a Monday in Mayand I have found them locked. Perhaps relates to cafe opening hours.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcq5cshmkjj3fsj2zyru",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury"
+      ]
+    },
+    {
+      "id": "dd90a98a4fe43a067c748e5f",
+      "createdAt": "2016-09-14T11:42:07.314Z",
+      "updatedAt": "2025-10-12T11:46:19.474Z",
+      "verifiedAt": null,
+      "active": false,
+      "location": {
+        "lat": 51.519148273,
+        "lng": -0.103157759
+      },
+      "name": "Charterhouse Street UriLift",
+      "openingTimes": [
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ],
+        [
+          "17:00",
+          "00:00"
+        ]
+      ],
+      "accessible": false,
+      "men": true,
+      "women": false,
+      "allGender": false,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": true,
+      "radar": false,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Friday, Saturday: 1900 - 04:00.",
+      "removalReason": "closed ",
+      "attended": false,
+      "geohash": "gcpvjdubu3240n8h850p",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-inactive-area"
+      ]
+    },
+    {
+      "id": "dfbc907822613f1eb6bc9fa5",
+      "createdAt": "2025-06-18T00:26:20.144Z",
+      "updatedAt": "2026-11-16T17:58:14.071Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 53.560895853,
+        "lng": -0.031177998
+      },
+      "name": "Wetherspoons",
+      "openingTimes": null,
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": false,
+      "babyChange": null,
+      "children": false,
+      "urinalOnly": false,
+      "radar": null,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "Disabled on ground floor. Other toilets upstairs. Opening hours as per Wetherspoons opening hours.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcxbxq3qc6xuzvztmcqs",
+      "area": [
+        {
+          "name": "North East Lincolnshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-default"
+      ]
+    },
+    {
+      "id": "f0c7f1a59499b49667bdcd7f",
+      "createdAt": "2016-09-13T23:24:45.808Z",
+      "updatedAt": "2016-09-13T23:24:45.809Z",
+      "verifiedAt": "2026-10-28T13:05:45.289Z",
+      "active": true,
+      "location": {
+        "lat": 51.5217065,
+        "lng": -0.096986304
+      },
+      "name": "The Shakespeare",
+      "openingTimes": null,
+      "accessible": false,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": false,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": false,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": "MONDAY TO FRIDAY: 10.00 - 23.00; SATURDAY: 17.00 - 23.00; SUNDAY: 12.00 - 22.30/ Part of City of London Community Toilet Scheme.",
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcpvjg1rsn1y8eux2h0h",
+      "area": [
+        {
+          "name": "City of London",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "loos-area-nopayment-oldest-page2"
+      ]
+    },
+    {
+      "id": "f94ec2960cfc221de9e1c4bb",
+      "createdAt": "2023-10-27T11:10:36.816Z",
+      "updatedAt": "2023-10-27T11:10:36.816Z",
+      "verifiedAt": null,
+      "active": true,
+      "location": {
+        "lat": 52.710748752,
+        "lng": -2.757723927
+      },
+      "name": "Theatre Severn ",
+      "openingTimes": null,
+      "accessible": true,
+      "men": true,
+      "women": true,
+      "allGender": null,
+      "babyChange": true,
+      "children": null,
+      "urinalOnly": null,
+      "radar": null,
+      "automatic": null,
+      "noPayment": true,
+      "paymentDetails": null,
+      "notes": null,
+      "removalReason": null,
+      "attended": null,
+      "geohash": "gcq5c5xyk7spbn01200n",
+      "area": [
+        {
+          "name": "Shropshire",
+          "type": "Local Authority"
+        }
+      ],
+      "appearsIn": [
+        "get-flutter-loosByProximity-shrewsbury",
+        "loosByProximity-full-shrewsbury",
+        "loosByProximity-default-distance"
+      ]
+    }
+  ]
+}
