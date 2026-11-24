@@ -496,6 +496,34 @@ describe("legacy GraphQL: headers", () => {
     expect(second.headers.get("cache-control")).toBe("public, max-age=60");
   });
 
+  it("keys the edge cache by the parsed request, not the raw URL", async () => {
+    const loo = await fixtures.loos.create({ name: "Cache key loo" });
+    const query = `query One($id: ID!) { loo(id: $id) { id name } }`;
+    const variables = encodeURIComponent(JSON.stringify({ id: loo.id }));
+    const first = await callApi(
+      `/api/graphql?query=${encodeURIComponent(query)}&variables=${variables}`,
+    );
+    expect(first.status).toBe(200);
+    await getPrismaClient().toilets.delete({ where: { id: loo.id } });
+
+    // Extra URL parameters, reformatting and undeclared variables cannot bust
+    // the cache: each of these is served the cached body of the deleted loo.
+    const reformatted = encodeURIComponent(
+      `# comment\nquery One($id: ID!) {\n  loo(id: $id) { id, name }\n}`,
+    );
+    const junkVariables = encodeURIComponent(JSON.stringify({ junk: 1, id: loo.id }));
+    for (const path of [
+      `/api/graphql?query=${encodeURIComponent(query)}&variables=${variables}&cachebust=1`,
+      `/api/graphql?variables=${variables}&query=${encodeURIComponent(query)}`,
+      `/api/graphql?query=${reformatted}&variables=${junkVariables}`,
+    ]) {
+      const response = await callApi(path);
+      expect(await response.json(), path).toEqual({
+        data: { loo: { id: loo.id, name: "Cache key loo" } },
+      });
+    }
+  });
+
   it("sends Vary: Accept, since the content type depends on it", async () => {
     const plain = await get("{ __typename }");
     expect(plain.headers.get("cache-control")).toBe("public, max-age=60");
@@ -634,6 +662,35 @@ describe("legacy GraphQL: rate limiting, auth and logging", () => {
     expect(introspection.status).toBe(429);
     expect(introspection.headers.get("access-control-allow-origin")).toBe("*");
     expect((await get("{ __typename }", {}, env)).status).toBe(429);
+  });
+
+  it("applies the stricter heavy-read limit to wide queries only", async () => {
+    const limit = vi.fn(async (_options: { key: string }) => ({ success: false }));
+    const env = { RATE_LIMIT_WRITE: { limit } };
+    const headers = { "cf-connecting-ip": "198.51.100.23" };
+    const logged: string[] = [];
+    vi.spyOn(logger, "warn").mockImplementation((message, details) => {
+      logged.push(`${message} ${JSON.stringify(details ?? {})}`);
+    });
+
+    for (const query of [
+      "{ statistics { total } }",
+      '{ loosByGeohash(geohash: "gc") }',
+      "{ loosByProximity(from: {lat: 51.5, lng: -0.12, maxDistance: 20000}) { id } }",
+    ]) {
+      const response = await get(query, headers, env);
+      expect(response.status, query).toBe(429);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(await firstErrorOf(response)).toMatch(/too many large requests/i);
+    }
+    expect(limit).toHaveBeenCalledWith({ key: "heavy:198.51.100.23" });
+    expect(logged.join("\n")).not.toContain("198.51.100.23");
+
+    // The Flutter app's request (at most 5000 m) never takes the heavy limit.
+    limit.mockClear();
+    const flutter = await get(flutterQuery(51.5, -0.12, 5000), headers, env);
+    expect(flutter.status).toBe(200);
+    expect(limit).not.toHaveBeenCalled();
   });
 
   it("ignores credentials: a bad bearer token is not rejected", async () => {

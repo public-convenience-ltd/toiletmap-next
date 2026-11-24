@@ -364,7 +364,7 @@ describe("Loo read endpoints", () => {
         ),
       );
       const loo = loos[0];
-      const shortPrefix = loo.geohash?.slice(0, 3);
+      const shortPrefix = loo.geohash?.slice(0, 4);
       if (!shortPrefix) throw new Error("Fixture geohash was not generated");
 
       const response = await callApi(`/api/loos/geohash/${shortPrefix}`, {
@@ -372,6 +372,19 @@ describe("Loo read endpoints", () => {
       });
       expect(response.status).toBe(200);
       expect(response.headers.get("Cache-Control")).toContain("public, max-age=3600");
+    });
+
+    it("refuses LIKE wildcards, non-base32 characters, short prefixes and unknown parameters", async () => {
+      for (const path of [
+        "/api/loos/geohash/gcp%25",
+        "/api/loos/geohash/gcp_",
+        "/api/loos/geohash/%25%25%25%25",
+        "/api/loos/geohash/gcp",
+        "/api/loos/geohash/gcpa",
+        "/api/loos/geohash/gcpv?cachebust=1",
+      ]) {
+        expect((await callApi(path)).status, path).toBe(400);
+      }
     });
 
     it("does not cache responses with few results", async () => {

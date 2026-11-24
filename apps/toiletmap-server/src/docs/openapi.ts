@@ -796,6 +796,7 @@ const limitParamSchema = {
 const pageParamSchema = {
   type: "integer",
   minimum: 1,
+  maximum: 1000,
   default: 1,
 } satisfies SchemaObject;
 
@@ -1155,7 +1156,8 @@ export const openApiDocument: OpenAPIObject = {
             name: "ids",
             in: "query",
             required: true,
-            description: "Comma separated IDs (?ids=a,b) or repeat the parameter (?ids=a&ids=b).",
+            description:
+              "Comma separated IDs (?ids=a,b) or repeat the parameter (?ids=a&ids=b). Duplicates are ignored; at most 100 distinct ids, each 24 characters.",
             schema: {
               oneOf: [
                 {
@@ -1514,8 +1516,15 @@ export const openApiDocument: OpenAPIObject = {
             name: "geohash",
             in: "path",
             required: true,
-            description: "Geohash prefix to match.",
-            schema: { type: "string", minLength: 1, example: "gcpvj" },
+            description:
+              "Geohash prefix to match: 4-12 geohash (base32) characters, case-insensitive. Prefixes of exactly 4 characters take the stricter heavy-read rate limit.",
+            schema: {
+              type: "string",
+              minLength: 4,
+              maxLength: 12,
+              pattern: "^[0-9bcdefghjkmnpqrstuvwxyzBCDEFGHJKMNPQRSTUVWXYZ]{4,12}$",
+              example: "gcpvj",
+            },
           },
           {
             name: "active",

@@ -215,6 +215,22 @@ export const rateLimiters = {
     logKey: false,
   }),
 
+  /**
+   * Heavy public reads (`/api/loos/dump?rich=true`, `/search`, `/metrics`,
+   * wide proximity searches, 4-character geohash prefixes and wide legacy
+   * GraphQL queries): the write binding (20 req/min) under its own per-IP
+   * key, on top of the read limiter. Cache hits count too. Admins skip it on
+   * the REST routes (the dataset explorer pages through `/search`); the
+   * legacy GraphQL endpoint never looks at the caller and never logs the key.
+   */
+  heavyRead: cloudflareRateLimit({
+    binding: "RATE_LIMIT_WRITE",
+    keyGenerator: (c) => `heavy:${getClientIp(c)}`,
+    message: "Too many large requests, please try again in a minute",
+    name: "heavy-read",
+    omitKeyFromLogs: isLegacyGraphqlPath,
+  }),
+
   /** Admin operations (60 req/min, user or IP-based) */
   admin: cloudflareRateLimit({
     binding: "RATE_LIMIT_ADMIN",
