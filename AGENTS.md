@@ -371,6 +371,7 @@ The project uses **Supabase migration tooling** (NOT Prisma migrations) because 
    - Test locally before deploying to production
    - Keep migrations small and focused on one change
    - Always run integration tests after applying migrations
+   - Grant new tables to `toiletmap_web` explicitly (only what the worker needs). Since `20261124000000_harden_grants_and_functions.sql`, `anon` and `authenticated` (unused Data API roles) get nothing by default, and only `postgres` can run the `audit` schema functions. Give new functions an explicit `SET search_path = pg_catalog, public, extensions, pg_temp` (PostGIS lives in `extensions`; never `''`). `test/integration/db-grants.spec.ts` checks these grants
 
 **Production Deployment**:
 Production migrations are applied by the `migrate` job of `.github/workflows/deploy-production.yml` on every push to `main`, before either worker deploys (see `docs/deployment.md`). Coordinate timing with the team for migrations that may impact performance (e.g., creating indexes on large tables).
