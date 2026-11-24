@@ -20,6 +20,21 @@ const jobBlock = (workflow: string, job: string): string => {
   return lines.slice(start, end === -1 ? undefined : end).join("\n");
 };
 
+/**
+ * The job-level `if:` (4-space key) of a job block, with a folded `>-` scalar's
+ * continuation lines; comments and step-level `if:`s are not part of it.
+ */
+const jobIf = (block: string): string => {
+  const lines = block.split("\n");
+  const start = lines.findIndex((line) => line.startsWith("    if:"));
+  if (start === -1) return "";
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => !/^ {6,}\S/.test(line));
+  return [lines[start], ...rest.slice(0, end === -1 ? undefined : end)]
+    .map((line) => line.trim())
+    .join(" ");
+};
+
 const MAIN_ONLY = "github.ref == 'refs/heads/main'";
 
 describe("deploy-production.yml", () => {
@@ -29,14 +44,15 @@ describe("deploy-production.yml", () => {
     "%s runs only from main (workflow_dispatch from a branch deploys nothing)",
     (job) => {
       const block = jobBlock(workflow, job);
-      expect(block).toContain("environment: production");
-      expect(block).toContain(MAIN_ONLY);
+      expect(block).toMatch(/^ {4}environment: production$/m);
+      expect(jobIf(block)).toContain(MAIN_ONLY);
     },
   );
 
   it("smoke is outside the production environment and checks the API through the client", () => {
     const smoke = jobBlock(workflow, "smoke");
     expect(smoke).not.toMatch(/^ {4}environment:/m);
+    expect(smoke).toMatch(/^ {4}permissions: \{\}$/m);
     expect(smoke).not.toMatch(/\$\{\{\s*secrets\./);
     expect(smoke).toContain("/api/loos/proximity?lat=51.5072&lng=-0.1276");
     expect(smoke).toContain(
@@ -48,6 +64,13 @@ describe("deploy-production.yml", () => {
 
 describe("deploy-preview.yml", () => {
   const workflow = readWorkflow("deploy-preview.yml");
+
+  it("never deploys dependency-update branches (their install shares a job with the token)", () => {
+    const start = workflow.indexOf("branches-ignore:");
+    const ignored = workflow.slice(start, workflow.indexOf("\n\n", start));
+    expect(ignored).toContain('- "renovate/**"');
+    expect(ignored).toContain('- "dependabot/**"');
+  });
 
   it("never passes the Auth0 credentials as plain-text --var bindings", () => {
     expect(workflow).not.toMatch(/--var\s+"?AUTH0_CLIENT_(ID|SECRET)/);
@@ -96,6 +119,28 @@ describe("teardown-preview.yml", () => {
   it("fails on errors other than a worker that is already gone", () => {
     expect(workflow).not.toMatch(/\|\| echo/);
     expect(workflow).toContain('exit "$failed"');
+  });
+
+  it("counts only wrangler's worker-missing errors as already gone", () => {
+    const pattern = workflow.match(/elif printf .*\| grep -Eq '([^']+)'; then/)?.[1];
+    expect(pattern).toBeDefined();
+    const alreadyGone = new RegExp(pattern ?? "");
+    expect(pattern).not.toMatch(/not found|404/i);
+    expect(alreadyGone.test("This Worker does not exist on your account. [code: 10007]")).toBe(
+      true,
+    );
+    expect(alreadyGone.test("workers.api.error.service_not_found [code: 10090]")).toBe(true);
+    for (const unrelated of [
+      "npm error 404 Not Found - GET https://registry.npmjs.org/wrangler",
+      "sh: npx: command not found",
+      "Authentication error [code: 10000]",
+    ]) {
+      expect(alreadyGone.test(unrelated), unrelated).toBe(false);
+    }
+  });
+
+  it("reports a delete only when wrangler says it deleted the worker", () => {
+    expect(workflow).toMatch(/&& printf '%s\\n' "\$out" \| grep -q 'Successfully deleted'; then/);
   });
 });
 

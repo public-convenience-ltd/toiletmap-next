@@ -53,10 +53,13 @@ jobs:
           echo "Tearing down preview workers for branch: ${BRANCH}"
           failed=0
           for worker in "${BRANCH}-toiletmap-server" "${BRANCH}-toiletmap-client"; do
-            if out="$(npx -y wrangler@4.156.1 delete --name "$worker" 2>&1)"; then
+            # Only wrangler's own worker-missing signals (API codes 10007/10090) count as
+            # "already gone"; a generic "not found" or 404 (npm, a broken runner) fails.
+            if out="$(npx -y wrangler@4.156.1 delete --name "$worker" 2>&1)" \
+              && printf '%s\n' "$out" | grep -q 'Successfully deleted'; then
               printf '%s\n' "$out"
               echo "Deleted ${worker}"
-            elif printf '%s\n' "$out" | grep -Eqi 'code: 10007|does not exist|script_not_found|not found|\b404\b'; then
+            elif printf '%s\n' "$out" | grep -Eq '\[code: (10007|10090)\]|This Worker does not exist on your account|workers\.api\.error\.(script|service)_not_found'; then
               echo "${worker} not found (already deleted, or never deployed); nothing to do"
             else
               printf '%s\n' "$out"

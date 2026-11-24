@@ -201,7 +201,7 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 These `.env` values will override the test auth server defaults in `wrangler.jsonc`.
 
-The worker now inspects the current request origin (e.g., preview URLs like `https://743a6af5-toiletmap-server...`) to build the Auth0 redirect URI dynamically. Keeping the fallback value configured ensures Auth0 still recognises the callback, but you no longer need to edit environment variables for each deployment URL.
+The worker now inspects the current request origin (e.g., a branch preview like `https://feat-x-toiletmap-server.gbtoiletmap.workers.dev`; production sets `preview_urls: false`, so it has no per-version preview URLs) to build the Auth0 redirect URI dynamically. Keeping the fallback value configured ensures Auth0 still recognises the callback, but you no longer need to edit environment variables for each deployment URL.
 
 When running against real Auth0, start the worker without the bundled auth server:
 

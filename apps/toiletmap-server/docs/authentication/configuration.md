@@ -50,7 +50,7 @@ Production uses real Auth0 credentials configured via environment variables:
 - `AUTH0_SCOPE`: OAuth scopes requested.
 - `AUTH0_PROFILE_KEY`: Path to extract contributor name from JWT claims (optional).
 
-ℹ️ The `/admin/login` handler now inspects each incoming request and builds the redirect URI dynamically (e.g., `https://743a6af5-toiletmap-server.../admin/callback`). Keeping a fallback value configured ensures Auth0 continues to accept the callback while freeing you from manually updating the URL for preview or alias deployments.
+ℹ️ The `/admin/login` handler now inspects each incoming request and builds the redirect URI dynamically (e.g., a branch preview at `https://feat-x-toiletmap-server.gbtoiletmap.workers.dev/admin/callback`; production sets `preview_urls: false`, so it has no per-version preview URLs). Keeping a fallback value configured ensures Auth0 continues to accept the callback while freeing you from manually updating the URL for preview or alias deployments.
 
 ## Testing Against Production Auth0 Locally
 

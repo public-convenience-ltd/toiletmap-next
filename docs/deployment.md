@@ -153,12 +153,17 @@ are in the deploy steps only, and only the comment job can write to pull request
 serialised per branch (`concurrency: preview-<branch>`, a newer push cancels the older run).
 
 The preview server uses its own rate-limit namespaces (2000-2004, production uses 1000-1004),
-so previews never spend production's limits or its Nominatim budget. All previews share them.
+so previews never spend production's limits or its Nominatim budget. All previews share them,
+and per-IP limits on a preview are not per visitor: preview clients call the preview server
+over `PUBLIC_API_URL` (no service binding), so every visitor arrives from the client worker.
+Branches named `renovate/**` or `dependabot/**` get CI but no preview.
 
 `teardown-preview.yml` deletes both preview workers when a pull request from this repository
 closes (merged or not, into any base) and when a branch is deleted. It is in the same
 concurrency group as the branch's deploys, so it waits for one already running. A worker that
-is already gone counts as success; any other `wrangler delete` error fails the run. Workers
+is already gone (wrangler's `[code: 10007]` / `[code: 10090]`) counts as success; any other
+error, or an exit without `Successfully deleted`, fails the run. Previews are only deployed on
+push, so reopening a closed PR does not bring its preview back: push a commit. Workers
 left from before this ran on every close (orphans) have to be deleted by hand:
 `pnpm exec wrangler delete --name <branch>-toiletmap-server` (and `-client`).
 
@@ -169,8 +174,9 @@ uploaded to the production worker names. Production sets `preview_urls: false`; 
 ## Checking the workflows
 
 Every third-party action is pinned to a full commit SHA with its version in a comment
-(`uses: actions/checkout@<sha> # v4.4.0`); Renovate keeps the pins and comments up to date
-(`pinDigests: true`). CI is read-only (`contents: read`); the other workflows default to no
+(`uses: actions/checkout@<sha> # v4.4.0`); Renovate keeps those `uses:` pins and comments up
+to date (`pinDigests: true`). The actionlint and zizmor images in the `Workflow Lint` job are
+pinned by digest inside `run:` lines, which Renovate does not track: bump them by hand. CI is read-only (`contents: read`); the other workflows default to no
 permissions and each job asks for what it needs. The `Workflow Lint` CI job runs both linters; locally:
 
 ```bash

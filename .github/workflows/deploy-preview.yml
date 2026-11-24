@@ -2,9 +2,13 @@ name: Deploy Preview
 
 on:
   push:
+    # Dependency-update branches get CI but no preview: the deploy job installs their
+    # packages (lifecycle scripts) in the same job that holds the Cloudflare token.
     branches-ignore:
       - main
       - postgres-staging
+      - "renovate/**"
+      - "dependabot/**"
 
 # Read-only by default; each job asks for what it needs.
 permissions: {}
