@@ -20,6 +20,7 @@ import {
   legacyGraphqlRouter,
 } from "./routes/legacy-graphql";
 import { loosRouter } from "./routes/loos";
+import { getDatabaseReadiness } from "./services/health/readiness";
 import type { AppVariables, Env } from "./types";
 import { isPublicEnvironment } from "./utils/environment";
 import { createLogger } from "./utils/logger";
@@ -54,8 +55,8 @@ export const createApp = (env: Env) => {
     return requestLoggingMiddleware(c, next);
   });
 
-  // Inject services
-  app.use("*", services);
+  // Inject services (not for /health, which needs none and must stay cheap)
+  app.use("*", (c, next) => (c.req.path.startsWith("/health") ? next() : services(c, next)));
 
   // The legacy GraphQL endpoint has its own CORS policy (no credentials; see
   // routes/legacy-graphql). It runs first so it also answers preflights.
@@ -96,14 +97,12 @@ export const createApp = (env: Env) => {
     const user = c.get("user");
     const isAdmin = hasAdminRole(user);
 
-    // Check database health to determine overall status
-    let dbHealthy = true;
-    try {
-      const looService = c.get("looService");
-      // Quick health check - just verify the service can access the database
-      await looService.healthCheck();
-    } catch (error) {
-      dbHealthy = false;
+    // Overall status from the same cached database check as /health/ready
+    // (at most one query per isolate every few seconds, not one per request).
+    const database = await getDatabaseReadiness(c.env);
+    const dbHealthy = database.ok;
+    if (!database.ok) {
+      const { error } = database;
       logger.warn("Database health check failed on root endpoint", {
         error:
           error instanceof Error

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createPrismaClient } from "../prisma";
+import { getDatabaseReadiness } from "../services/health/readiness";
 import type { AppVariables, Env } from "../types";
 import { sanitizeHealthCheckError } from "../utils/error-sanitizer";
 
@@ -36,6 +36,8 @@ healthRouter.get("/live", (c) => {
  * Indicates whether the application is ready to accept traffic.
  * Checks critical dependencies like database connectivity.
  * Used by load balancers to determine if the instance should receive traffic.
+ * The database result is reused for up to READINESS_CACHE_MS (10 s) per
+ * isolate, so polling this endpoint does not put a query on every request.
  */
 healthRouter.get("/ready", async (c) => {
   const checks: {
@@ -45,28 +47,17 @@ healthRouter.get("/ready", async (c) => {
     responseTime?: number;
   }[] = [];
 
-  // Check database connectivity
-  const dbCheckStart = Date.now();
-  try {
-    const connectionString =
-      c.env.HYPERDRIVE?.connectionString ?? c.env.TEST_HYPERDRIVE?.connectionString;
-    if (!connectionString) {
-      throw new Error("No database connection string available");
-    }
-    const db = createPrismaClient(connectionString);
-
-    // Simple query to verify database connectivity
-    await db.$queryRaw`SELECT 1 as health_check`;
-
-    checks.push({
-      name: "database",
-      status: "ok",
-      responseTime: Date.now() - dbCheckStart,
-    });
-  } catch (error) {
+  const database = await getDatabaseReadiness(c.env);
+  if (database.ok) {
+    checks.push({ name: "database", status: "ok", responseTime: database.responseTime });
+  } else {
     // Sanitize error for client response
-    const sanitized = sanitizeHealthCheckError(c.env, "database", error, Date.now() - dbCheckStart);
-
+    const sanitized = sanitizeHealthCheckError(
+      c.env,
+      "database",
+      database.error,
+      database.responseTime,
+    );
     checks.push({
       name: "database",
       status: "error",
@@ -87,6 +78,7 @@ healthRouter.get("/ready", async (c) => {
       checks,
     },
     statusCode,
+    { "Cache-Control": "no-store" },
   );
 });
 
