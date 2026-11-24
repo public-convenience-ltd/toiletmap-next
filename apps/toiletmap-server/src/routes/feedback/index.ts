@@ -9,10 +9,12 @@
  *   HTTP 200 as success.
  * - The legacy website (`toiletmap/src/pages/api/feedback`) posted the same
  *   three fields as JSON.
- * Both shapes are accepted, unknown fields are ignored, and success is 200.
+ * Both shapes are accepted and success is 200. Unknown fields are refused
+ * (400); none of those callers sends any.
  *
- * Privacy: the email address and the client IP are never logged and never
- * sent to Slack. The IP is only used as the rate-limit key.
+ * Privacy: the email address and the client IP are never logged, and Slack
+ * only ever gets a count of recent messages. The IP is only used as the
+ * rate-limit key.
  */
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -35,38 +37,45 @@ const TEXT_REQUIRED = "Feedback text is required";
 
 const emailFormat = z.email();
 
-const feedbackBodySchema = z.object({
-  text: z
-    .string({ error: TEXT_REQUIRED })
-    .trim()
-    .min(1, TEXT_REQUIRED)
-    .max(
-      FEEDBACK_TEXT_MAX_LENGTH,
-      `Feedback must be ${FEEDBACK_TEXT_MAX_LENGTH} characters or fewer`,
-    ),
-  /** Optional; "" (what the Flutter app sends when the field is empty) means none. */
-  email: z
-    .string()
-    .trim()
-    .max(FEEDBACK_EMAIL_MAX_LENGTH, "Email address is too long")
-    .nullish()
-    .transform((value) => (value ? value : null))
-    .refine((value) => value === null || emailFormat.safeParse(value).success, {
-      message: "Enter a valid email address, or leave it blank",
-    }),
-  /** Page path or app/version string. Metadata, so it is trimmed to fit rather than rejected. */
-  route: z
-    .string()
-    .nullish()
-    .transform((value) =>
-      Array.from((value ?? "").trim())
-        .slice(0, FEEDBACK_ROUTE_MAX_LENGTH)
-        .join(""),
-    ),
-  turnstileToken: z.string().max(TURNSTILE_TOKEN_MAX_LENGTH).optional(),
-  /** The field name Turnstile's widget adds to a plain HTML form. */
-  "cf-turnstile-response": z.string().max(TURNSTILE_TOKEN_MAX_LENGTH).optional(),
-});
+/**
+ * Strict: exactly the fields the Flutter app, the legacy website and this
+ * site's form send (text, email, route) plus the Turnstile token. Anything
+ * else is a 400.
+ */
+const feedbackBodySchema = z
+  .object({
+    text: z
+      .string({ error: TEXT_REQUIRED })
+      .trim()
+      .min(1, TEXT_REQUIRED)
+      .max(
+        FEEDBACK_TEXT_MAX_LENGTH,
+        `Feedback must be ${FEEDBACK_TEXT_MAX_LENGTH} characters or fewer`,
+      ),
+    /** Optional; "" (what the Flutter app sends when the field is empty) means none. */
+    email: z
+      .string()
+      .trim()
+      .max(FEEDBACK_EMAIL_MAX_LENGTH, "Email address is too long")
+      .nullish()
+      .transform((value) => (value ? value : null))
+      .refine((value) => value === null || emailFormat.safeParse(value).success, {
+        message: "Enter a valid email address, or leave it blank",
+      }),
+    /** Page path or app/version string. Metadata, so it is trimmed to fit rather than rejected. */
+    route: z
+      .string()
+      .nullish()
+      .transform((value) =>
+        Array.from((value ?? "").trim())
+          .slice(0, FEEDBACK_ROUTE_MAX_LENGTH)
+          .join(""),
+      ),
+    turnstileToken: z.string().max(TURNSTILE_TOKEN_MAX_LENGTH).optional(),
+    /** The field name Turnstile's widget adds to a plain HTML form. */
+    "cf-turnstile-response": z.string().max(TURNSTILE_TOKEN_MAX_LENGTH).optional(),
+  })
+  .strict();
 
 type BodyResult = { ok: true; value: unknown } | { ok: false; status: 400 | 415; message: string };
 
@@ -156,7 +165,8 @@ feedbackRouter.post(
       return c.json({ message: "Could not save your feedback. Please try again." }, 500);
     }
 
-    scheduleFeedbackNotification(c, { text, route });
+    // Counts only (never the text), throttled: see services/feedback/notify.ts.
+    scheduleFeedbackNotification(c);
 
     // 200, not 201: the Flutter app treats only 200 as success.
     return c.json({ ok: true, message: "Thank you for your feedback." }, 200);
