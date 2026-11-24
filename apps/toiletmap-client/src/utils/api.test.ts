@@ -7,6 +7,7 @@ import {
   isAllowedApiPath,
   isLegacyGraphqlPath,
   LEGACY_GRAPHQL_MAX_BODY_BYTES,
+  PROXY_MAX_BODY_BYTES,
   proxyApiRequest,
   proxyLegacyGraphqlRequest,
 } from "./api";
@@ -244,6 +245,52 @@ describe("proxyApiRequest", () => {
     expect(upstream?.headers.get("content-type")).toBe("application/json");
     expect(upstream?.headers.get("if-match")).toBe("W/1");
     expect(await upstream?.text()).toBe(body);
+  });
+
+  it("refuses an oversized body with 413 without contacting upstream", async () => {
+    const { binding } = makeBinding();
+    const res = await proxyApiRequest({
+      request: new Request(`${ORIGIN}/api/loos`, {
+        method: "POST",
+        headers: { origin: ORIGIN, "content-type": "application/json" },
+        body: "x".repeat(PROXY_MAX_BODY_BYTES + 1),
+      }),
+      env: envWith(binding),
+      accessToken: "secret",
+    });
+    expect(res.status).toBe(413);
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(binding.fetch).not.toHaveBeenCalled();
+  });
+
+  it("stops reading a chunked mutation body once it passes the limit", async () => {
+    const { binding } = makeBinding();
+    const chunk = new Uint8Array(16 * 1024);
+    let pulled = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 1_000) controller.close();
+        else controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const request = new Request(`${ORIGIN}/api/feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+    expect(request.headers.get("content-length")).toBeNull();
+
+    const res = await proxyApiRequest({ request, env: envWith(binding) });
+    expect(res.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(pulled * chunk.byteLength).toBeLessThan(PROXY_MAX_BODY_BYTES * 2);
+    expect(binding.fetch).not.toHaveBeenCalled();
   });
 
   it("forwards anonymous mutations without an Authorization header", async () => {

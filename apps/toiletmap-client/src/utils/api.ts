@@ -191,6 +191,13 @@ const passesOriginCheck = (request: Request, url: URL, method: string): boolean 
   return fetchSite === null || fetchSite === "same-origin" || fetchSite === "none";
 };
 
+/**
+ * Largest body the `/api/*` proxy reads (refused with 413 while reading, so
+ * nothing bigger is ever buffered). Upstream allows 128 KiB for feedback and
+ * 64 KiB for loo writes and enforces those itself.
+ */
+export const PROXY_MAX_BODY_BYTES = 128 * 1024;
+
 export interface ProxyOptions {
   /** Browser request hitting `/api/*` on the client worker. */
   request: Request;
@@ -207,6 +214,7 @@ export interface ProxyOptions {
  * - Only allow-listed paths (see `isAllowedApiPath`) are forwarded; anything
  *   else gets a 404 JSON response without contacting upstream.
  * - Forwards method, body, query string and a small allow-list of headers.
+ *   Bodies over {@link PROXY_MAX_BODY_BYTES} get a 413 while being read.
  * - Never forwards the browser's Cookie header.
  * - State-changing methods require `Origin` to equal the client's own origin
  *   (CSRF protection) and get `Authorization: Bearer <access_token>` attached
@@ -259,7 +267,16 @@ export async function proxyApiRequest({
   }
 
   const hasBody = method !== "GET" && method !== "HEAD";
-  const body = hasBody ? await request.arrayBuffer() : undefined;
+  let body: ArrayBuffer | undefined;
+  if (hasBody) {
+    const tooLarge = () => jsonResponse(413, { message: "Request body is too large" });
+    const declared = Number(request.headers.get("content-length") ?? 0);
+    if (declared > PROXY_MAX_BODY_BYTES) return tooLarge();
+    // Content-Length may be missing (chunked) or wrong: count while reading.
+    const read = await readBodyWithLimit(request, PROXY_MAX_BODY_BYTES);
+    if (!read) return tooLarge();
+    body = read;
+  }
 
   return forwardUpstream({ env, url, upstreamPath: url.pathname, method, headers, body });
 }

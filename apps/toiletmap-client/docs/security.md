@@ -114,7 +114,10 @@ report-uri /api/csp-report; report-to csp
 
 Both policies ship as `Content-Security-Policy-Report-Only`. Browsers report violations to
 `/api/csp-report`, and each report becomes one `[csp] …` line in the worker logs (no query
-strings; nothing stored). These things block enforcement:
+strings; nothing stored). Bodies over 16 KiB are dropped while being read, and lines go
+through a per-isolate budget (`createCspLogBudget`: duplicates skipped, sampled after the
+first 20 a minute, at most 50 a minute, plus a count of what was skipped), since this worker
+has no rate-limit binding. These things block enforcement:
 
 1. **Only `astro dev` in Chromium so far.** `e2e/csp.spec.ts` passes with zero violations on
    desktop Chromium against `astro dev`. It covers the map, a toilet, the add, edit and report

@@ -1,7 +1,17 @@
 import type { APIContext } from "astro";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ALL, POST } from "../pages/api/csp-report";
-import { formatCspViolation, MAX_REPORTS_PER_REQUEST, parseCspReports } from "./cspReport";
+import {
+  CSP_LOG_FULL_PER_WINDOW,
+  CSP_LOG_MAX_PER_WINDOW,
+  CSP_LOG_SAMPLE_EVERY,
+  CSP_LOG_WINDOW_MS,
+  createCspLogBudget,
+  formatCspViolation,
+  MAX_CSP_REPORT_BYTES,
+  MAX_REPORTS_PER_REQUEST,
+  parseCspReports,
+} from "./cspReport";
 
 describe("parseCspReports", () => {
   it("reads report-uri reports (Firefox, Safari), dropping query strings", () => {
@@ -81,6 +91,40 @@ describe("parseCspReports", () => {
   });
 });
 
+describe("createCspLogBudget", () => {
+  it("logs a repeated line once per window", () => {
+    let clock = 0;
+    const budget = createCspLogBudget(() => clock);
+    expect(budget.take("a")).toEqual(["a"]);
+    expect(budget.take("a")).toEqual([]);
+    expect(budget.take("b")).toEqual(["b"]);
+    clock += CSP_LOG_WINDOW_MS;
+    expect(budget.take("a")).toEqual([
+      "[csp] 1 more reports were not logged in the previous minute",
+      "a",
+    ]);
+  });
+
+  it("logs the first lines in full, then samples, then stops at the cap", () => {
+    let clock = 0;
+    const budget = createCspLogBudget(() => clock);
+    const logged = Array.from({ length: 2_000 }, (_, n) => budget.take(`line ${n}`)).flat();
+    expect(logged.slice(0, CSP_LOG_FULL_PER_WINDOW)).toEqual(
+      Array.from({ length: CSP_LOG_FULL_PER_WINDOW }, (_, n) => `line ${n}`),
+    );
+    expect(logged[CSP_LOG_FULL_PER_WINDOW]).toBe(
+      `line ${CSP_LOG_FULL_PER_WINDOW + CSP_LOG_SAMPLE_EVERY - 1}`,
+    );
+    expect(logged).toHaveLength(CSP_LOG_MAX_PER_WINDOW);
+
+    clock += CSP_LOG_WINDOW_MS;
+    expect(budget.take("next")).toEqual([
+      `[csp] ${2_000 - CSP_LOG_MAX_PER_WINDOW} more reports were not logged in the previous minute`,
+      "next",
+    ]);
+  });
+});
+
 describe("POST /api/csp-report", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -111,6 +155,47 @@ describe("POST /api/csp-report", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     expect((await post("not json")).status).toBe(204);
     expect((await post("x".repeat(20_000))).status).toBe(204);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("logs a flood of identical reports once", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = JSON.stringify({
+      "csp-report": {
+        "blocked-uri": "https://flood.example/x.js",
+        "violated-directive": "script-src",
+      },
+    });
+    for (let n = 0; n < 50; n += 1) expect((await post(body)).status).toBe(204);
+    expect(warn.mock.calls.filter(([line]) => String(line).includes("flood.example"))).toHaveLength(
+      1,
+    );
+  });
+
+  it("stops reading a chunked body without Content-Length once it passes the cap", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let pulled = 0;
+    let cancelled = false;
+    const chunk = new Uint8Array(4 * 1024).fill(32);
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 1_000) controller.close();
+        else controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const request = new Request("https://x/api/csp-report", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit);
+    const res = (await POST({ request } as unknown as APIContext)) as Response;
+    expect(res.status).toBe(204);
+    expect(cancelled).toBe(true);
+    expect(pulled * chunk.byteLength).toBeLessThan(MAX_CSP_REPORT_BYTES * 2);
     expect(warn).not.toHaveBeenCalled();
   });
 

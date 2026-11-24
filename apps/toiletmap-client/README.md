@@ -43,6 +43,8 @@ same-origin requests to `/api/*` on this worker, handled by the proxy in
   equal to the site origin (CSRF protection, otherwise 403) and get
   `Authorization: Bearer <access_token>` attached from the httpOnly cookie.
   The access token is never rendered into HTML or exposed to page JS.
+- Request bodies are capped at 128 KiB (`PROXY_MAX_BODY_BYTES`) while they are read,
+  chunked bodies included; a bigger one gets a 413 without contacting upstream.
 - Client IP is forwarded as `cf-connecting-ip` / `x-forwarded-for` for rate limiting.
 - Upstream status, body and cache headers are returned; `set-cookie`,
   `access-control-*` and upstream `content-security-policy` are stripped. Every
