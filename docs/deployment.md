@@ -14,10 +14,10 @@ migrate ─┴─> deploy-server ─> deploy-client ─> smoke
 | Job | What it does | When it runs |
 | --- | --- | --- |
 | `changes` | Compares the pushed commit with the commit of the last **successful** run of this workflow on `main` (looked up with the Actions API) to decide which workers changed. | Always. |
-| `migrate` | `supabase db push` against the production Supabase project (the commands the old `supabase-migrations-prod.yml` ran). A no-op when no migration is pending. | Always, first. This is the **only** place production migrations run. |
+| `migrate` | `supabase db push` against the production Supabase project (the commands the old `supabase-migrations-prod.yml` ran). A no-op when no migration is pending. | Always, first, but only from `main`. This is the **only** place production migrations run. |
 | `deploy-server` | `pnpm prisma:generate`, `pnpm build:client` (admin UI), then `pnpm run deploy` (`wrangler deploy --env production`) in `apps/toiletmap-server`. | After `migrate` succeeds, when server code changed. |
 | `deploy-client` | `pnpm build:production` (`CLOUDFLARE_ENV=production astro build`), the built-asset check, then `wrangler deploy --env production` in `apps/toiletmap-client`. | After `migrate` succeeds and the server deploy succeeded or was skipped, when client code changed. |
-| `smoke` | `curl`s the client home page and the server's `/health/ready`, retrying for about a minute; fails unless both return 200. | After either worker was deployed. |
+| `smoke` | `curl`s the client home page, the server's `/health/ready`, the proximity API through the client (`/api/loos/proximity?lat=51.5072&lng=-0.1276`) and the Flutter app's legacy GraphQL URL through the client (`/api/?query={loosByProximity(...)}`), retrying for about a minute. Fails unless each returns 200, the two API bodies have the expected shape, and the GraphQL response has no `errors`. Not in the `production` environment (it uses no secrets). | After either worker was deployed. |
 
 "Server code changed" means anything under `apps/toiletmap-server/`; "client code changed"
 anything under `apps/toiletmap-client/` (blog posts and other Markdown content under its
@@ -27,6 +27,10 @@ Docs (`docs/`, `apps/*/docs/`), other Markdown, e2e/integration tests and `*.tes
 deploy nothing (the migrate job still runs). A manual run, a re-run, or a push that can't be
 compared (no earlier successful run, or a force-push that dropped its commit) deploys both
 workers.
+
+`migrate`, `deploy-server` and `deploy-client` also check `github.ref == 'refs/heads/main'`, so
+"Run workflow" started from another branch deploys nothing. The `production` environment's
+main-only deployment branch rule is the hard control; the job conditions are a second one.
 
 Comparing with the last successful run rather than the previous push matters when a run
 deployed nothing: one that failed (say the server deploy), or one GitHub cancelled while it
@@ -68,12 +72,13 @@ GitHub (Settings, Secrets and variables, Actions), used only by the steps that n
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | the two `wrangler deploy` steps (also the preview workflows) |
 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PRODUCTION_DB_PASSWORD` | the `migrate` step |
 
-They are repository secrets today. Every production job declares `environment: production`,
-so they can be moved into a protected **production** environment (Settings, Environments)
-without editing the workflow: create the environment, add the four secrets there, delete the
-repository copies (the preview workflows still need the Cloudflare ones at repository level),
-and restrict the environment's deployment branches to `main`. If you add required reviewers,
-note that GitHub asks for approval once per job (migrate, deploy-server, deploy-client, smoke).
+They are repository secrets today. Every job that uses them (migrate, deploy-server,
+deploy-client) declares `environment: production`, so they can be moved into a protected
+**production** environment (Settings, Environments) without editing the workflow: create the
+environment, add the four secrets there, delete the repository copies (the preview workflows
+still need the Cloudflare ones at repository level), and restrict the environment's deployment
+branches to `main`. If you add required reviewers, note that GitHub asks for approval once per
+job (migrate, deploy-server, deploy-client). `smoke` has no environment.
 
 Worker secrets (`AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and the server's Auth0 management
 secrets) live on the workers in Cloudflare (`wrangler secret put`). Deploys don't touch them.
@@ -86,7 +91,8 @@ deploy-client fail until the owner has created it once:
 `pnpm exec wrangler r2 bucket create toiletmap-exports`
 (see [the dataset export runbook](../apps/toiletmap-server/docs/operations/dataset-export.md#owner-setup-once)).
 
-Optional repository variables: `PRODUCTION_CLIENT_URL` and `PRODUCTION_SERVER_URL` override
+Optional **repository** variables (not environment variables: `smoke` has no environment):
+`PRODUCTION_CLIENT_URL` and `PRODUCTION_SERVER_URL` override
 the smoke check's URLs (defaults: `https://toiletmap-client.gbtoiletmap.workers.dev` and
 `https://toiletmap-server.gbtoiletmap.workers.dev`), e.g. once the site moves to its own
 domain.
@@ -137,8 +143,37 @@ To keep automatic deploys but gate them on CI instead, replace the `push:` trigg
 would then also accept `workflow_run` events and diff the last successful deploy against
 `github.event.workflow_run.head_sha` instead of `GITHUB_SHA`.
 
-## Checking the workflow
+## Previews
+
+`deploy-preview.yml` deploys every pushed branch (except `main` and `postgres-staging`) as
+`<branch>-toiletmap-server` and `<branch>-toiletmap-client` (`wrangler deploy --env preview
+--name ...`), sets each worker's `AUTH0_CLIENT_ID` and `AUTH0_CLIENT_SECRET` with
+`wrangler secret put` (stdin, never `--var`), and comments the URLs on the branch's PR. Secrets
+are in the deploy steps only, and only the comment job can write to pull requests. Runs are
+serialised per branch (`concurrency: preview-<branch>`, a newer push cancels the older run).
+
+The preview server uses its own rate-limit namespaces (2000-2004, production uses 1000-1004),
+so previews never spend production's limits or its Nominatim budget. All previews share them.
+
+`teardown-preview.yml` deletes both preview workers when a pull request from this repository
+closes (merged or not, into any base) and when a branch is deleted. It is in the same
+concurrency group as the branch's deploys, so it waits for one already running. A worker that
+is already gone counts as success; any other `wrangler delete` error fails the run. Workers
+left from before this ran on every close (orphans) have to be deleted by hand:
+`pnpm exec wrangler delete --name <branch>-toiletmap-server` (and `-client`).
+
+There is no `deploy:preview` script: `wrangler versions upload --env preview` would have
+uploaded to the production worker names. Production sets `preview_urls: false`; its
+`workers.dev` URLs stay on until the custom-domain cutover.
+
+## Checking the workflows
+
+Every third-party action is pinned to a full commit SHA with its version in a comment
+(`uses: actions/checkout@<sha> # v4.4.0`); Renovate keeps the pins and comments up to date
+(`pinDigests: true`). CI is read-only (`contents: read`); the other workflows default to no
+permissions and each job asks for what it needs. The `Workflow Lint` CI job runs both linters; locally:
 
 ```bash
 docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12
+docker run --rm -v "$PWD:/repo:ro" --workdir /repo ghcr.io/zizmorcore/zizmor:1.32.0 --offline .github/workflows
 ```

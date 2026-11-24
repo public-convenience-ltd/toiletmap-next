@@ -1,31 +1,67 @@
 name: Teardown Preview
 
+# Deletes a branch's preview workers (<branch>-toiletmap-server and -client, made by
+# deploy-preview.yml) when its pull request closes (merged or not, whatever the base) and
+# when the branch itself is deleted, so a branch pushed without a PR is cleaned up too.
+# Either event alone is enough; when both fire, the second finds nothing to delete.
 on:
   pull_request:
     types: [closed]
-    branches:
-      - main
+  delete:
 
-permissions:
-  contents: read
+permissions: {}
+
+# Same group as deploy-preview.yml for this branch: a teardown waits for a deploy of the
+# branch that is already running instead of deleting workers it is still writing.
+concurrency:
+  group: preview-${{ github.event.pull_request.head.ref || github.event.ref }}
+  cancel-in-progress: false
 
 jobs:
   teardown:
     name: Delete Preview Workers
+    # Branch deletes only (not tags). Pull requests from forks never had a preview (it is
+    # deployed on push to this repository) and get no secrets, so skip them; their branch
+    # name could also match one of ours.
+    if: >-
+      ${{ (github.event_name == 'delete' && github.event.ref_type == 'branch')
+      || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    timeout-minutes: 10
+    permissions: {}
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
 
       - name: Delete preview workers
         env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # The branch name, from whichever event fired. Passed through env, never
+          # interpolated into the script.
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          DELETED_REF: ${{ github.event.ref }}
         run: |
-          BRANCH=$(echo "${HEAD_REF}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+          set -uo pipefail
+          ref="${PR_HEAD_REF:-$DELETED_REF}"
+          if [ -z "$ref" ]; then
+            echo "::error::No branch name in the event"
+            exit 1
+          fi
+          BRANCH=$(printf '%s' "$ref" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
           echo "Tearing down preview workers for branch: ${BRANCH}"
-          npx -y wrangler@4.156.1 delete --name "${BRANCH}-toiletmap-server" || echo "Server worker not found, skipping"
-          npx -y wrangler@4.156.1 delete --name "${BRANCH}-toiletmap-client" || echo "Client worker not found, skipping"
+          failed=0
+          for worker in "${BRANCH}-toiletmap-server" "${BRANCH}-toiletmap-client"; do
+            if out="$(npx -y wrangler@4.156.1 delete --name "$worker" 2>&1)"; then
+              printf '%s\n' "$out"
+              echo "Deleted ${worker}"
+            elif printf '%s\n' "$out" | grep -Eqi 'code: 10007|does not exist|script_not_found|not found|\b404\b'; then
+              echo "${worker} not found (already deleted, or never deployed); nothing to do"
+            else
+              printf '%s\n' "$out"
+              echo "::error::Could not delete ${worker}"
+              failed=1
+            fi
+          done
+          exit "$failed"
