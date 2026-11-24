@@ -159,8 +159,8 @@ const REPORT_FIELD_TO_COLUMN: Record<string, string> = {
 
 /**
  * Inserts one audit row per fixture report, rebuilding the toilets snapshot
- * the legacy resolver read it from. System location rows get a last
- * contributor ending in `-location`. Rows are inserted system rows first, so
+ * the legacy resolver read it from. System location rows end their
+ * contributors the way legacy `setLooLocation` does: `[x, "x-location"]`. Rows are inserted system rows first, so
  * the endpoint's own ordering (time, then user before system) is exercised.
  */
 export const seedLegacyReports = async (

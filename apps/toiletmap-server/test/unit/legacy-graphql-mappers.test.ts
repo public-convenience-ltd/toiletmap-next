@@ -238,6 +238,21 @@ describe("toLegacyReports", () => {
     ]);
   });
 
+  it("marks only the exact legacy location row as a system report", () => {
+    const reports = toLegacyReports([
+      snapshot("1", "2016-09-14T08:35:47.239+00:00", ["a", "eve-location"]),
+      snapshot("2", "2016-09-15T08:35:47.239+00:00", [
+        "a",
+        "eve-location",
+        "eve-location-location",
+      ]),
+    ]);
+    expect(reports.map((report) => [report.id, report.isSystemReport])).toEqual([
+      ["1", false],
+      ["2", true],
+    ]);
+  });
+
   it("maps a snapshot the way the legacy resolver did", () => {
     const [report] = toLegacyReports([
       snapshot("7", "2016-09-14T21:06:08.63+00:00", ["someone"], {

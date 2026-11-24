@@ -1,6 +1,7 @@
 import { MAX_SEARCH_LIMIT, MIN_SEARCH_LIMIT, RECENT_WINDOW_DAYS } from "../../common/constants";
 import { Prisma, type PrismaClientInstance } from "../../prisma";
 import { isStaleBase, type LooDiffBase } from "./diff";
+import { isLegacyLocationSnapshot } from "./legacy-location-report";
 import {
   areaSelection,
   buildAreaFromJoin,
@@ -666,12 +667,12 @@ export class LooService {
       orderBy: { ts: "asc" },
     });
 
-    // We filter out system location updates as they are not user-contributed
-    // and are left over from our old system where we recorded a separate
-    // location report for each loo.
+    // Legacy system location rows are not user-contributed: the legacy app
+    // records each location change as a separate row (see
+    // isLegacyLocationSnapshot for the exact marker).
     const mapped = reportRecords
-      .map((entry: Parameters<typeof mapAuditRecordToReport>[0]) => mapAuditRecordToReport(entry))
-      .filter((report: ReportResponse) => !report.contributor?.endsWith("-location"));
+      .filter((entry: { record: unknown }) => !isLegacyLocationSnapshot(entry.record))
+      .map((entry: Parameters<typeof mapAuditRecordToReport>[0]) => mapAuditRecordToReport(entry));
 
     const sortedReports = [...mapped].sort((a, b) => {
       const timeA = Date.parse(a.createdAt);

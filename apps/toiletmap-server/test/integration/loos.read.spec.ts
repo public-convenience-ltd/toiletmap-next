@@ -264,6 +264,32 @@ describe("Loo read endpoints", () => {
       });
     });
 
+    it("hides only the exact legacy location marker, not any handle ending in -location", async () => {
+      const { prisma } = getTestContext();
+      const loo = await fixtures.loos.create({ notes: "Baseline" });
+      // An ordinary edit by someone whose handle ends in "-location" stays visible.
+      await fixtures.loos.upsert(loo.id, { notes: "Moved it" }, "eve-location");
+      await fixtures.loos.upsert(loo.id, { notes: "Real edit" }, "alice");
+      // The legacy app's setLooLocation: a separate row whose last contributor
+      // is the previous one plus "-location".
+      await prisma.$executeRaw`
+        UPDATE toilets SET
+          geography = ST_SetSRID(ST_MakePoint(-0.1, 51.5), 4326)::geography,
+          contributors = array_append(contributors, concat(contributors[array_upper(contributors, 1)], '-location'))
+        WHERE id = ${loo.id}
+      `;
+
+      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
+        headers: adminHeaders(),
+      });
+      expect(response.status).toBe(200);
+      const body = await readJson<ListBody<ReportResponse>>(response);
+      const contributors = body.data.map((report) => report.contributor);
+      expect(contributors).toContain("eve-location");
+      expect(contributors).toContain("alice");
+      expect(contributors).not.toContain("alice-location");
+    });
+
     it("ensures summary reports also don't include isSystemReport", async () => {
       const loo = await fixtures.loos.create({ notes: "Test" });
       await fixtures.loos.upsert(loo.id, { radar: true }, "test-user");
