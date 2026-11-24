@@ -55,6 +55,15 @@ export interface Env {
    */
   MODERATION_SLACK_WEBHOOK?: string;
 
+  /**
+   * Optional Cloudflare Turnstile secret. When set, `POST /api/feedback`
+   * requires a valid Turnstile token. Unset (the default) disables the check.
+   * Turning it on rejects the legacy Flutter app, which cannot send a token,
+   * and the website's /feedback form, which has no Turnstile widget yet (it
+   * would need one, with a public site key, before this is set).
+   */
+  TURNSTILE_SECRET_KEY?: string;
+
   // Cloudflare Rate Limiting API bindings
   RATE_LIMIT_READ: RateLimiter;
   RATE_LIMIT_WRITE: RateLimiter;
@@ -70,6 +79,7 @@ interface RateLimiter {
   }>;
 }
 
+import type { FeedbackService } from "./services/feedback/feedback.service";
 import type { LooService } from "./services/loo";
 import type { PendingChangeService } from "./services/pending-change/pending-change.service";
 
@@ -82,6 +92,7 @@ export type AppVariables = {
   authSource?: AuthSource;
   looService: LooService;
   pendingChangeService: PendingChangeService;
+  feedbackService: FeedbackService;
   resultCount?: number;
   /** Admin pages only: pending-change count for the nav badge. */
   pendingCount?: number;

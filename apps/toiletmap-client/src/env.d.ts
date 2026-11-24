@@ -12,6 +12,15 @@ interface Env {
   AUTH0_AUDIENCE: string;
 }
 
+// Worker secrets that `wrangler types` can't see (they aren't in wrangler.jsonc).
+declare namespace Cloudflare {
+  interface Env {
+    /** GitHub OAuth app for CMS sign-in (/cms). Unset: /api/cms-oauth/* answer 503. See docs/cms.md. */
+    GITHUB_OAUTH_CLIENT_ID?: string;
+    GITHUB_OAUTH_CLIENT_SECRET?: string;
+  }
+}
+
 type Runtime = import("@astrojs/cloudflare").Runtime<Env>;
 
 declare namespace App {

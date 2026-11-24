@@ -1,0 +1,40 @@
+---
+/**
+ * Text pages from the `pages` collection (src/content/pages/*.md): /about, /privacy,
+ * /contact, /app and /app/privacy (the app's privacy policy, linked from its store
+ * listing, so its URL must not change).
+ *
+ * Prerendered: they only change with a deploy (the CMS commits to git). The header reads the
+ * sign-in state in the browser, so no visitor's state is baked in. Any other path falls
+ * through to the server routes and, failing those, the 404 page (Astro skips a prerendered
+ * dynamic route for paths it did not build).
+ */
+import { getCollection, render } from "astro:content";
+import type { InferGetStaticPropsType } from "astro";
+import ContentLayout from "../layouts/ContentLayout.astro";
+import { pagePath } from "../utils/content";
+import { pageTitle } from "../utils/seo";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const pages = await getCollection("pages");
+  return pages.map((page) => ({ params: { slug: page.id }, props: { page } }));
+}
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
+const { page } = Astro.props as Props;
+const { Content } = await render(page);
+const path = pagePath(page.id);
+---
+
+<ContentLayout
+  title={pageTitle(page.data.title)}
+  description={page.data.description}
+  heading={page.data.heading ?? page.data.title}
+  canonical={path}
+  signInReturnTo={path}
+>
+  <Content />
+</ContentLayout>

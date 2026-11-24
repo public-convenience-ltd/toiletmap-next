@@ -1,0 +1,100 @@
+---
+/**
+ * One page of the blog index: each post's title (linking to it), byline, date and summary,
+ * newest first, then links to newer and older pages when there are more than fit on one.
+ * Used by /posts and /posts/page/<n>.
+ */
+import type { PostLike, PostsPage } from "../../utils/content";
+import { formatPostDate, postAuthorNames, postPath, postSummary } from "../../utils/content";
+
+interface Props {
+  page: PostsPage<PostLike>;
+}
+
+const { page } = Astro.props;
+---
+
+{
+  page.items.length === 0 ? (
+    <p>Our blog is currently out of paper. Check back soon!</p>
+  ) : (
+    <ol class="post-list">
+      {page.items.map((post) => {
+        const authors = postAuthorNames(post);
+        const summary = postSummary(post, 200);
+        return (
+          <li class="post-list__item">
+            <h2 class="post-list__title">
+              <a href={postPath(post.id)}>{post.data.title}</a>
+            </h2>
+            <p class="post-list__meta">
+              {authors && <>{authors} · </>}
+              <time datetime={post.data.date.toISOString()}>{formatPostDate(post.data.date)}</time>
+            </p>
+            {summary && <p class="post-list__summary">{summary}</p>}
+          </li>
+        );
+      })}
+    </ol>
+  )
+}
+{
+  page.pageCount > 1 && (
+    <nav class="post-list__pages" aria-label="Blog pages">
+      {page.prevPath && (
+        <a href={page.prevPath} rel="prev">
+          Newer posts
+        </a>
+      )}
+      <span>
+        Page {page.page} of {page.pageCount}
+      </span>
+      {page.nextPath && (
+        <a href={page.nextPath} rel="next">
+          Older posts
+        </a>
+      )}
+    </nav>
+  )
+}
+
+<style>
+  /* Clear of the page's <h1> above: prose gives a heading's next sibling only --space-2xs. */
+  .post-list {
+    padding: 0;
+    margin-block: var(--space-m) 0;
+    margin-inline: 0;
+    list-style: none;
+  }
+
+  .post-list__item {
+    padding-block: var(--space-m);
+    margin: 0;
+    border-block-end: 1px solid var(--color-light-grey);
+  }
+
+  .post-list__item:first-child {
+    padding-block-start: 0;
+  }
+
+  .post-list__title {
+    margin: 0;
+  }
+
+  .post-list__meta {
+    margin-block: var(--space-2xs) 0;
+    color: var(--color-text-muted);
+  }
+
+  .post-list__summary {
+    margin-block: var(--space-xs) 0;
+  }
+
+  .post-list__pages {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-s);
+    margin-block-start: var(--space-l);
+  }
+</style>

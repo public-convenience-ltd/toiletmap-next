@@ -1157,6 +1157,7 @@ export const Layout = (props: { title: string; children: unknown }) => {
                 <ul class="header__nav">
                   <li><a href="/admin">Loos</a></li>
                   <li>${PendingNavLink()}</li>
+                  <li><a href="/admin/feedback">Feedback</a></li>
                   <li><a href="/admin/users/admin">User admin</a></li>
                   <li><a href="/admin/users/statistics">User stats</a></li>
                   <li><a href="/admin/logout">Logout</a></li>

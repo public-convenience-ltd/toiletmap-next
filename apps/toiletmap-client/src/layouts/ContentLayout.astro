@@ -1,0 +1,62 @@
+---
+/**
+ * Text pages (about, privacy, blog posts, 404/500): the site header and footer around one
+ * readable column, styled by the design system's Prose (`.prose`: headings, lists, links,
+ * quotes, tables, images and code; about 70 characters wide). The page scrolls.
+ *
+ * Slots: default (the content, inside .prose), "before" / "after" (inside the column,
+ * outside .prose: e.g. a post's date line, or related links), "head" (extra <head> tags).
+ */
+import SiteChrome from "../components/SiteChrome/SiteChrome.astro";
+import BaseLayout, { type Props as BaseProps } from "./BaseLayout.astro";
+
+interface Props extends Omit<BaseProps, "bodyClass"> {
+  /** The page's <h1>, rendered at the top of the prose. Leave out if the content has one. */
+  heading?: string;
+  /** See SiteChrome. Defaults to this page on prerendered pages. */
+  signInReturnTo?: string | null;
+}
+
+const { heading, signInReturnTo, ...meta } = Astro.props;
+---
+
+<BaseLayout {...meta}>
+	<slot name="head" slot="head" />
+	<SiteChrome signInReturnTo={signInReturnTo}>
+		<main class="content-page">
+			<div class="content-page__column">
+				<slot name="before" />
+				<div class="prose">
+					{heading && <h1>{heading}</h1>}
+					<slot />
+				</div>
+				<slot name="after" />
+			</div>
+		</main>
+	</SiteChrome>
+</BaseLayout>
+
+<style>
+	.content-page {
+		color: var(--color-text);
+	}
+
+	/*
+	 * One column, as wide as the prose measure (ch at the prose font size), centred, clear of
+	 * notches on landscape phones.
+	 */
+	.content-page__column {
+		box-sizing: content-box;
+		max-inline-size: 70ch;
+		margin-inline: auto;
+		padding-block: var(--space-l) var(--space-xl);
+		padding-inline: max(var(--space-s), var(--safe-left)) max(var(--space-s), var(--safe-right));
+		font-size: var(--text-0);
+	}
+
+	@media (min-width: 768px) {
+		.content-page__column {
+			padding-inline: var(--space-m);
+		}
+	}
+</style>

@@ -58,6 +58,7 @@ describe("developer-only pages", () => {
   );
 
   it.each(Object.entries(pages))("%s is kept out of search engines", (_, source) => {
-    expect(source).toMatch(/<meta slot="head" name="robots" content="noindex, nofollow" \/>/);
+    // BaseLayout turns these props into <meta name="robots" content="noindex, nofollow">.
+    expect(source).toMatch(/<BaseLayout[^>]*\bnoindex nofollow\b/s);
   });
 });

@@ -9,6 +9,7 @@ import { hasAdminRole } from "./middleware/require-admin-role";
 import { securityHeaders } from "./middleware/security-headers";
 import { services } from "./middleware/services";
 import { areasRouter } from "./routes/areas";
+import { feedbackRouter } from "./routes/feedback";
 import { healthRouter } from "./routes/health";
 import { loosRouter } from "./routes/loos";
 import type { AppVariables, Env } from "./types";
@@ -121,6 +122,8 @@ export const createApp = (env: Env) => {
 
   app.route("/api/loos", loosRouter);
   app.route("/api/areas", areasRouter);
+  // Public, unauthenticated feedback (also the legacy Flutter app endpoint).
+  app.route("/api/feedback", feedbackRouter);
 
   app.notFound((c) =>
     c.json(

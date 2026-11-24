@@ -15,6 +15,13 @@ interface CloudflareRateLimitConfig {
   keyGenerator: (c: Context<{ Bindings: Env; Variables: AppVariables }>) => string;
   message?: string;
   name?: string;
+  /**
+   * Include the rate-limit key (which usually contains the client IP) in the
+   * "Rate limit exceeded" log line. Default true; false (or a function
+   * returning false for the request) for endpoints that promise never to log
+   * the IP (feedback).
+   */
+  logKey?: boolean | ((c: Context<{ Bindings: Env; Variables: AppVariables }>) => boolean);
 }
 
 const missingBindingsLogged = new Set<CloudflareRateLimitConfig["binding"]>();
@@ -50,6 +57,7 @@ const cloudflareRateLimit = (
     keyGenerator,
     message = "Too many requests, please try again later",
     name = binding,
+    logKey = true,
   } = config;
 
   return async (c, next) => {
@@ -77,7 +85,7 @@ const cloudflareRateLimit = (
       if (!success) {
         logger.warn("Rate limit exceeded", {
           rateLimiter: name,
-          key,
+          ...((typeof logKey === "function" ? logKey(c) : logKey) ? { key } : {}),
           path: c.req.path,
           method: c.req.method,
         });
@@ -113,6 +121,13 @@ const cloudflareRateLimit = (
 };
 
 /**
+ * `POST /api/feedback` promises never to log the client IP, so the global
+ * read limiter (which also runs for it) leaves its key out there too.
+ */
+const isFeedbackPath = (path: string): boolean =>
+  path === "/api/feedback" || path.startsWith("/api/feedback/");
+
+/**
  * Get client IP from Cloudflare headers
  */
 const getClientIp = (c: Context): string => {
@@ -144,6 +159,7 @@ export const rateLimiters = {
     keyGenerator: (c) => `read:${getClientIp(c)}`,
     message: "Too many requests, please try again later",
     name: "read",
+    logKey: (c) => !isFeedbackPath(c.req.path),
   }),
 
   /** Write operations (20 req/min, user or IP-based) */
@@ -163,6 +179,19 @@ export const rateLimiters = {
     keyGenerator: (c) => `write-ip:${getClientIp(c)}`,
     message: "Too many requests, please slow down",
     name: "write-ip",
+  }),
+
+  /**
+   * Public feedback (`POST /api/feedback`): the write binding (20 req/min)
+   * under its own per-IP key, so feedback does not eat into a caller's edit
+   * budget. The key is never logged.
+   */
+  feedback: cloudflareRateLimit({
+    binding: "RATE_LIMIT_WRITE",
+    keyGenerator: (c) => `feedback:${getClientIp(c)}`,
+    message: "Too many messages, please try again in a minute",
+    name: "feedback",
+    logKey: false,
   }),
 
   /** Admin operations (60 req/min, user or IP-based) */

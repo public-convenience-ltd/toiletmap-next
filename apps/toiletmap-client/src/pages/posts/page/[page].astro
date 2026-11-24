@@ -1,0 +1,38 @@
+---
+/**
+ * Later pages of the blog index: /posts/page/2, /posts/page/3, ... (page 1 is /posts).
+ * Only built once there are more posts than fit on one page.
+ */
+import { getCollection } from "astro:content";
+import type { InferGetStaticPropsType } from "astro";
+import PostList from "../../../components/PostList/PostList.astro";
+import ContentLayout from "../../../layouts/ContentLayout.astro";
+import { paginatePosts, postsIndexPath, publishedPosts } from "../../../utils/content";
+import { pageTitle } from "../../../utils/seo";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const posts = publishedPosts(await getCollection("posts"));
+  const { pageCount } = paginatePosts(posts, 1);
+  return Array.from({ length: pageCount - 1 }, (_, index) => {
+    const number = index + 2;
+    return { params: { page: String(number) }, props: { page: paginatePosts(posts, number) } };
+  });
+}
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
+const { page } = Astro.props as Props;
+const path = postsIndexPath(page.page);
+---
+
+<ContentLayout
+  title={pageTitle(`Blog, page ${page.page}`)}
+  description={`Older posts from the Toilet Map blog, page ${page.page} of ${page.pageCount}.`}
+  heading="Toilet Map Blog"
+  canonical={path}
+  signInReturnTo={path}
+>
+  <PostList page={page} />
+</ContentLayout>

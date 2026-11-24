@@ -8,6 +8,7 @@ export const openApiTags = [
   { name: "Meta", description: "General service endpoints." },
   { name: "Areas", description: "Administrative area operations." },
   { name: "Loos", description: "Operations relating to loos." },
+  { name: "Feedback", description: "Messages to the Toilet Map team." },
 ];
 
 export const openApiServers = [
