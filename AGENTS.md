@@ -205,7 +205,7 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 ### Public Endpoints (No Auth Required)
 
 - **GET /** - Health check (database status from the same cached check as `/health/ready`: at most one `SELECT 1` per isolate every 10 s, `src/services/health/readiness.ts`)
-- **GET /api/docs** - Swagger UI
+- **GET /api/docs** - Swagger UI (jsDelivr assets pinned to an exact version with SRI hashes in `src/docs/swagger-ui.ts`)
 - **GET /api/docs/openapi.json** - OpenAPI spec
 - **GET /admin/login** - Initiate OAuth2 flow
 - **GET /admin/callback** - OAuth2 callback handler

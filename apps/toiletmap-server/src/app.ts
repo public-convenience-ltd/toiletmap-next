@@ -1,8 +1,8 @@
-import { swaggerUI } from "@hono/swagger-ui";
 import { Hono } from "hono";
 import { admin } from "./admin";
 import { optionalAuth } from "./auth/middleware";
 import { openApiDocument } from "./docs/openapi";
+import { swaggerUiPage } from "./docs/swagger-ui";
 import { rateLimiters } from "./middleware/cloudflare-rate-limit";
 import { requireSameOriginForCookieAuth } from "./middleware/csrf";
 import { requestLogger } from "./middleware/request-logger";
@@ -141,7 +141,7 @@ export const createApp = (env: Env) => {
 
   // Documentation - Public
   app.get("/api/docs/openapi.json", (c) => c.json(openApiDocument));
-  app.get("/api/docs", swaggerUI({ url: "/api/docs/openapi.json" }));
+  app.get("/api/docs", swaggerUiPage("/api/docs/openapi.json"));
 
   // Apply rate limiting to API routes
   app.use("/api/*", rateLimiters.read);
