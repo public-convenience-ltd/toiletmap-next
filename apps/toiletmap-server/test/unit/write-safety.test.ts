@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isMove } from "../../src/routes/loos/write-guards";
+import { LooService } from "../../src/services/loo/loo.service";
 import { dailyCapAlertText, removalAlertText } from "../../src/services/moderation-alert";
-import { DEFAULT_ACCOUNT_DAILY_CAP, parseAccountDailyCap } from "../../src/services/write-caps";
+import {
+  DEFAULT_ACCOUNT_DAILY_CAP,
+  parseAccountDailyCap,
+  runUnderDailyCap,
+} from "../../src/services/write-caps";
 import {
   __writeModeTestUtils,
   getWriteMode,
   parseWriteMode,
   WRITE_MODE_CACHE_MS,
 } from "../../src/services/write-mode";
+import type { RequestUser } from "../../src/types";
 
 const store = (value: string | null) => {
   const get = vi.fn(async () => value);
@@ -118,5 +124,60 @@ describe("alert texts", () => {
     expect(dailyCapAlertText(10, link)).toBe(
       `An account reached its daily limit of 10 removals and moves; its change to ${link} was queued for review (see /admin/pending).`,
     );
+  });
+});
+
+describe("runUnderDailyCap", () => {
+  const user = { sub: "auth0|capped" } as RequestUser;
+
+  /** A LooService over a fake Prisma whose transaction runs `tx` as given. */
+  const contextWith = (tx: Record<string, unknown>, env: Record<string, string> = {}) => {
+    const prisma = { $transaction: async (fn: (t: unknown) => unknown) => fn(tx) };
+    const looService = new LooService(prisma as never);
+    return { env, get: () => looService } as never;
+  };
+
+  it("queues the change, without writing, when the count cannot be read", async () => {
+    const tx = {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(() => Promise.reject(new Error("connection reset"))),
+    };
+    const write = vi.fn(async () => "written");
+    expect(await runUnderDailyCap(contextWith(tx), user, write)).toEqual({ overCap: true });
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("queues the change when the lock cannot be taken", async () => {
+    const tx = {
+      $executeRaw: vi.fn(() => Promise.reject(new Error("lock timeout"))),
+      $queryRaw: vi.fn(async () => [{ count: 0 }]),
+    };
+    const write = vi.fn(async () => "written");
+    expect(await runUnderDailyCap(contextWith(tx), user, write)).toEqual({ overCap: true });
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("locks, counts and writes in the same transaction while under the cap", async () => {
+    const tx = { $executeRaw: vi.fn(async () => 1), $queryRaw: vi.fn(async () => [{ count: 1 }]) };
+    const write = vi.fn(async (t: unknown) => (t === tx ? "written in tx" : "wrong tx"));
+    expect(
+      await runUnderDailyCap(contextWith(tx, { ACCOUNT_DAILY_CAP: "2" }), user, write),
+    ).toEqual({ overCap: false, result: "written in tx" });
+    expect(tx.$executeRaw).toHaveBeenCalledBefore(tx.$queryRaw);
+  });
+
+  it("does not write at the cap", async () => {
+    const tx = { $executeRaw: vi.fn(async () => 1), $queryRaw: vi.fn(async () => [{ count: 2 }]) };
+    const write = vi.fn(async () => "written");
+    expect(
+      await runUnderDailyCap(contextWith(tx, { ACCOUNT_DAILY_CAP: "2" }), user, write),
+    ).toEqual({ overCap: true });
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("rethrows a failure of the write itself", async () => {
+    const tx = { $executeRaw: vi.fn(async () => 1), $queryRaw: vi.fn(async () => [{ count: 0 }]) };
+    const write = vi.fn(() => Promise.reject(new Error("write failed")));
+    await expect(runUnderDailyCap(contextWith(tx), user, write)).rejects.toThrow("write failed");
   });
 });

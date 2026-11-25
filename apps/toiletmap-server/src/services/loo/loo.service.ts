@@ -42,6 +42,22 @@ import {
 
 type DbClient = PrismaClientInstance | Prisma.TransactionClient;
 
+/** Result of {@link LooService.runUnderDailyCap}. */
+export type DailyCapResult<T> = { overCap: true } | { overCap: false; result: T };
+
+/** The daily-cap lock or count failed (not the guarded write). */
+export class DailyCapCountError extends Error {
+  constructor(cause: unknown) {
+    super(
+      `Could not count the account's recent removals and moves: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+      { cause },
+    );
+    this.name = "DailyCapCountError";
+  }
+}
+
 /**
  * The columns the public dataset export may publish, in the legacy export's
  * order. An allowlist on purpose: see {@link LooService.getAllForExport}.
@@ -723,10 +739,15 @@ export class LooService {
    * true to false) or changed the location of a toilet that had one. This
    * includes the account's queued changes that a moderator approved (approval
    * records the submitter's sub). Uses the partial index
-   * record_version_updated_by_sub_ts.
+   * record_version_updated_by_sub_ts. Writes that must stay under the cap use
+   * {@link runUnderDailyCap}, which counts and writes under one lock.
    */
-  async countRecentRemovalsAndMoves(sub: string, windowHours: number): Promise<number> {
-    const [row] = await this.prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+  async countRecentRemovalsAndMoves(
+    sub: string,
+    windowHours: number,
+    db: DbClient = this.prisma,
+  ): Promise<number> {
+    const [row] = await db.$queryRaw<Array<{ count: number }>>(Prisma.sql`
       SELECT count(*)::int AS count
       FROM audit.record_version rv
       WHERE rv.record ->> 'updated_by_sub' = ${sub}
@@ -742,6 +763,41 @@ export class LooService {
         )
     `);
     return row?.count ?? 0;
+  }
+
+  /**
+   * Runs `write` only while the account `sub` is under its daily cap of
+   * removals and moves, so that concurrent requests cannot all pass the
+   * check: one transaction takes a transaction-scoped advisory lock keyed on
+   * the account, counts its recent removals and moves
+   * ({@link countRecentRemovalsAndMoves}) and, when the count is below `cap`,
+   * runs `write` in that same transaction. A second request from the account
+   * waits for the lock, and its count (a fresh snapshot under READ
+   * COMMITTED) includes the first one's audit row. At the cap nothing is
+   * written and the result is `{ overCap: true }`.
+   *
+   * A failure to lock or count throws {@link DailyCapCountError}, so the
+   * caller can tell it from a failure of the write itself.
+   */
+  runUnderDailyCap<T>(
+    sub: string,
+    windowHours: number,
+    cap: number,
+    write: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<DailyCapResult<T>> {
+    return this.prisma.$transaction(async (tx) => {
+      let count: number;
+      try {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`daily-cap:${sub}`}, 0))`,
+        );
+        count = await this.countRecentRemovalsAndMoves(sub, windowHours, tx);
+      } catch (error) {
+        throw new DailyCapCountError(error);
+      }
+      if (count >= cap) return { overCap: true } as const;
+      return { overCap: false, result: await write(tx) } as const;
+    });
   }
 
   /**

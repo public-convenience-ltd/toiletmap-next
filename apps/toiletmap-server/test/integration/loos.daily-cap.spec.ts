@@ -13,12 +13,14 @@
  */
 import { randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { __adminRoleTestUtils } from "../../src/middleware/require-admin-role";
 import { __moderationAlertTestUtils } from "../../src/services/moderation-alert";
 import type { Env } from "../../src/types";
 import { getPrismaClient, getTestContext } from "./setup";
 import { cleanupManager } from "./utils/cleanup";
 import { createFixtureFactory } from "./utils/fixtures";
 import type { QueuedBody } from "./utils/response-types";
+import { sessionHeaders } from "./utils/session";
 import {
   callApi,
   createCapturingExecutionContext,
@@ -130,6 +132,64 @@ describe("per-account daily cap on removals and moves", () => {
     const options = { env: { ACCOUNT_DAILY_CAP: "0" } };
     expect((await report(headers, options)).response.status).toBe(200);
     expect((await move(headers, options)).response.status).toBe(200);
+  });
+
+  it("holds against parallel requests from one account", async () => {
+    // Count and write share a transaction under a per-account lock, so five
+    // reports sent at once at cap 2 apply exactly two.
+    const headers = bearerFor(freshSub());
+    const results = await Promise.all(Array.from({ length: 5 }, () => report(headers)));
+    const statuses = results.map(({ response }) => response.status).sort();
+    expect(statuses).toEqual([200, 200, 202, 202, 202]);
+    for (const { response } of results) {
+      if (response.status === 202) await expectCapped(response, "remove");
+    }
+    const ids = results.map(({ loo }) => loo.id);
+    const removed = await getPrismaClient().toilets.count({
+      where: { id: { in: ids }, active: false },
+    });
+    expect(removed).toBe(2);
+  });
+
+  it("holds against parallel moves and reports together", async () => {
+    const headers = bearerFor(freshSub());
+    const results = await Promise.all([
+      move(headers),
+      report(headers),
+      move(headers),
+      report(headers),
+    ]);
+    const statuses = results.map(({ response }) => response.status).sort();
+    expect(statuses).toEqual([200, 200, 202, 202]);
+    for (const { response } of results) {
+      if (response.status === 202) {
+        const body = await readJson<QueuedBody & { reason?: string }>(response);
+        cleanupManager.trackPendingChange(body.id);
+        expect(body.reason).toBe("daily_cap");
+      }
+    }
+  });
+
+  it("counts the account's queued changes once a moderator approves them", async () => {
+    const headers = bearerFor(freshSub());
+    const queued = await move(headers, { env: { ACCOUNT_DAILY_CAP: "0" } });
+    const row = await expectCapped(queued.response, "update");
+    __adminRoleTestUtils.clearPermissionCache();
+    const approval = await callApi(`/admin/pending/${row?.id}/approve`, {
+      method: "POST",
+      headers: sessionHeaders({
+        sub: "auth0|test-admin",
+        permissions: ["access:admin"],
+        profile: { email: "admin@example.com", name: "Test Admin" },
+      }),
+    });
+    expect(approval.headers.get("location")).toBe("/admin/pending?notice=approved");
+
+    // The approved move is credited to the submitter, so at cap 1 their next removal is queued.
+    await expectCapped(
+      (await report(headers, { env: { ACCOUNT_DAILY_CAP: "1" } })).response,
+      "remove",
+    );
   });
 
   it("allows 10 a day when ACCOUNT_DAILY_CAP is unset", async () => {

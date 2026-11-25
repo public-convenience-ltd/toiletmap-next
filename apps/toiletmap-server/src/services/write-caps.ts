@@ -1,6 +1,8 @@
 import type { Context } from "hono";
+import type { Prisma } from "../prisma";
 import type { AppVariables, Env, RequestUser } from "../types";
 import { logger } from "../utils/logger";
+import { DailyCapCountError, type DailyCapResult } from "./loo/loo.service";
 
 type AppContext = Context<{ Variables: AppVariables; Bindings: Env }>;
 
@@ -15,8 +17,9 @@ type AppContext = Context<{ Variables: AppVariables; Bindings: Env }>;
  *
  * Counted in the database from the audit trail by Auth0 sub (see
  * LooService.countRecentRemovalsAndMoves), so the cap holds across isolates
- * and sessions. Two requests racing past the last slot can both apply (at
- * most a request or two over; the per-user write limiter bounds it).
+ * and sessions. The count and the write run in one transaction under a
+ * per-account advisory lock (LooService.runUnderDailyCap), so parallel
+ * requests from one account cannot all slip past the last slot.
  */
 export const DEFAULT_ACCOUNT_DAILY_CAP = 10;
 
@@ -37,23 +40,26 @@ export const parseAccountDailyCap = (value: string | undefined): number => {
 };
 
 /**
- * Whether `user` has already made their allowance of removals and moves in
- * the last {@link DAILY_CAP_WINDOW_HOURS} hours, so this one must be queued.
- * When the count cannot be read, the write is queued too (logged): in doubt,
- * a moderator decides.
+ * Runs `write` (a removal or move by `user`) only if the account is under its
+ * daily cap; see LooService.runUnderDailyCap for the locking. `{ overCap:
+ * true }` means nothing was written and the caller must queue the change.
+ * When the count cannot be read, the change is queued too (logged): in
+ * doubt, a moderator decides. An error from `write` itself is rethrown.
  */
-export const isOverDailyCap = async (c: AppContext, user: RequestUser): Promise<boolean> => {
+export const runUnderDailyCap = async <T>(
+  c: AppContext,
+  user: RequestUser,
+  write: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<DailyCapResult<T>> => {
   const cap = parseAccountDailyCap(c.env.ACCOUNT_DAILY_CAP);
   try {
-    const count = await c
-      .get("looService")
-      .countRecentRemovalsAndMoves(user.sub, DAILY_CAP_WINDOW_HOURS);
-    return count >= cap;
+    return await c.get("looService").runUnderDailyCap(user.sub, DAILY_CAP_WINDOW_HOURS, cap, write);
   } catch (error) {
+    if (!(error instanceof DailyCapCountError)) throw error;
     logger.error("Could not count the account's recent removals and moves; queueing", {
       userId: user.sub,
-      errorMessage: error instanceof Error ? error.message : String(error),
+      errorMessage: error.message,
     });
-    return true;
+    return { overCap: true };
   }
 };

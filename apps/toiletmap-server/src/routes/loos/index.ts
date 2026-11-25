@@ -14,6 +14,7 @@ import {
 import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
 import { canWriteDirectly, isConfirmedAdmin } from "../../middleware/require-admin-role";
 import { writeModeGate } from "../../middleware/write-mode";
+import type { Prisma } from "../../prisma";
 import { generateLooId } from "../../services/loo";
 import {
   clearRemovalOnReactivate,
@@ -21,7 +22,11 @@ import {
   isEmptyMutation,
   isStaleBase,
 } from "../../services/loo/diff";
-import type { LooMutationBase, StateChangeResult } from "../../services/loo/loo.service";
+import type {
+  DailyCapResult,
+  LooMutationBase,
+  StateChangeResult,
+} from "../../services/loo/loo.service";
 import { toCompressedLoo } from "../../services/loo/mappers";
 import type { WriteActor } from "../../services/loo/persistence";
 import type { LooResponse } from "../../services/loo/types";
@@ -34,7 +39,7 @@ import type {
   PendingChangeType,
   PendingPayload,
 } from "../../services/pending-change/pending-change.service";
-import { isOverDailyCap, parseAccountDailyCap } from "../../services/write-caps";
+import { parseAccountDailyCap, runUnderDailyCap } from "../../services/write-caps";
 import type { AppVariables, Env, RequestUser } from "../../types";
 import { extractContributor } from "../../utils/auth-utils";
 import {
@@ -226,12 +231,18 @@ const decideWrite = async (
 };
 
 /**
- * Whether a removal or move by `user`, who could write directly, must be
- * queued instead because their account reached its daily cap. Confirmed
- * admins are exempt.
+ * Runs a removal or move by `user`, who could write directly, under their
+ * account's daily cap (services/write-caps.ts): `{ overCap: true }` means
+ * nothing was written and the change must be queued. Confirmed admins are
+ * exempt, and their write runs on its own.
  */
-const overDailyCap = async (c: AppContext, user: RequestUser | null | undefined, admin: boolean) =>
-  !!user && !admin && (await isOverDailyCap(c, user));
+const writeUnderDailyCap = async <T>(
+  c: AppContext,
+  user: RequestUser | null | undefined,
+  admin: boolean,
+  write: (tx?: Prisma.TransactionClient) => Promise<T>,
+): Promise<DailyCapResult<T>> =>
+  user && !admin ? runUnderDailyCap(c, user, write) : { overCap: false, result: await write() };
 
 /**
  * Queues a change for moderation and alerts moderators (when configured).
@@ -676,18 +687,6 @@ loosRouter.put(
               "large_move",
             );
           }
-          if (isMove(existing.location, changes.location) && (await overDailyCap(c, user, admin))) {
-            const limited = await queuedWriteRateLimitExceeded(c);
-            if (limited) return limited;
-            return queueForModeration(
-              c,
-              "update",
-              changes,
-              id,
-              baseUpdatedAt ?? existing.updatedAt,
-              "daily_cap",
-            );
-          }
         }
 
         if (isEmptyMutation(changes)) {
@@ -695,10 +694,29 @@ loosRouter.put(
         }
 
         // Guard the write with the version we diffed against so a concurrent
-        // edit between read and write is never silently overwritten.
-        const result = await looService.updateExisting(id, changes, actor, {
-          expectedUpdatedAt: existing.updatedAt,
-        });
+        // edit between read and write is never silently overwritten. A move
+        // counts toward the daily cap, so it is written under the cap's lock.
+        const update = (tx?: Prisma.TransactionClient) =>
+          looService.updateExisting(id, changes, actor, {
+            expectedUpdatedAt: existing.updatedAt,
+            tx,
+          });
+        const capped = isMove(existing.location, changes.location)
+          ? await writeUnderDailyCap(c, user, admin, update)
+          : { overCap: false as const, result: await update() };
+        if (capped.overCap) {
+          const limited = await queuedWriteRateLimitExceeded(c);
+          if (limited) return limited;
+          return queueForModeration(
+            c,
+            "update",
+            changes,
+            id,
+            baseUpdatedAt ?? existing.updatedAt,
+            "daily_cap",
+          );
+        }
+        const result = capped.result;
 
         if (result.status === "updated") {
           if (!result.loo) throw new Error(`Failed to reload loo ${id} after update`);
@@ -749,12 +767,13 @@ loosRouter.post(
       const decision = await decideWrite(c, user, isAdmin);
       let reason = decision.direct ? undefined : decision.reason;
       if (decision.direct) {
-        if (!(await overDailyCap(c, user, await isAdmin()))) {
-          const result = await looService.report(id, input, writeActor(c, user), {
-            baseUpdatedAt,
-          });
-          if (result.status === "updated") scheduleRemovalAlert(c, id);
-          return stateChangeResponse(c, result);
+        const actor = writeActor(c, user);
+        const capped = await writeUnderDailyCap(c, user, await isAdmin(), (tx) =>
+          looService.report(id, input, actor, { baseUpdatedAt, tx }),
+        );
+        if (!capped.overCap) {
+          if (capped.result.status === "updated") scheduleRemovalAlert(c, id);
+          return stateChangeResponse(c, capped.result);
         }
         reason = "daily_cap";
       }
