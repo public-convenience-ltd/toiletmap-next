@@ -65,7 +65,7 @@
       },
       // TODO(owner): the write kill switch has no KV namespace in production
       // yet, so write_mode is always `open` here. Create it once with
-      //   pnpm exec wrangler kv namespace create SETTINGS
+      //   pnpm exec wrangler kv namespace create toiletmap-server-settings
       // and add the printed id below (docs/runbooks/kill-switch.md):
       //   "kv_namespaces": [{ "binding": "SETTINGS", "id": "<id>" }],
       // Bindings are not inherited from the top level, so this env needs its own.
