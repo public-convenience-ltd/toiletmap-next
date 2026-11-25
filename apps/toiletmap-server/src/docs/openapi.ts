@@ -5,7 +5,7 @@ import type {
   ReferenceObject,
   SchemaObject,
 } from "openapi3-ts/oas31";
-import { RECENT_WINDOW_DAYS } from "../common/constants";
+import { MAX_SEARCH_OFFSET, MAX_SEARCH_PAGE, RECENT_WINDOW_DAYS } from "../common/constants";
 import { LOO_ID_LENGTH } from "../services/loo";
 import { REMOVAL_CATEGORIES } from "../services/loo/types";
 import { openApiInfo, openApiServers, openApiTags } from "./config";
@@ -796,7 +796,7 @@ const limitParamSchema = {
 const pageParamSchema = {
   type: "integer",
   minimum: 1,
-  maximum: 1000,
+  maximum: MAX_SEARCH_PAGE,
   default: 1,
 } satisfies SchemaObject;
 
@@ -903,7 +903,7 @@ const searchFilterParameters: ParameterObject[] = [
     name: "page",
     in: "query" as const,
     required: false,
-    description: "Page number (1-indexed, default 1).",
+    description: `Page number (1-indexed, default 1). \`(page - 1) * limit\` must be at most ${MAX_SEARCH_OFFSET}.`,
     schema: pageParamSchema,
   },
 ];

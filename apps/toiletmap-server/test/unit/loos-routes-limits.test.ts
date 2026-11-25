@@ -4,16 +4,22 @@
  *
  * - geohash prefixes are base32 only, 4-12 characters;
  * - every query schema is strict (an unknown parameter is a 400);
- * - `ids` is de-duplicated and capped, `page` is capped;
+ * - `ids` is de-duplicated and capped, the search offset is capped;
  * - write bodies over LOO_WRITE_BODY_MAX_BYTES are refused before parsing;
  * - edge-cache keys come from the validated parameters, not the raw URL;
- * - heavy reads take the stricter `heavy:<ip>` limit, admins excepted.
+ * - heavy reads take the stricter `heavy:<ip>` limit, confirmed admins excepted.
  */
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_IDS_PER_REQUEST, MAX_SEARCH_PAGE } from "../../src/common/constants";
+import {
+  MAX_IDS_PER_REQUEST,
+  MAX_SEARCH_OFFSET,
+  MAX_SEARCH_PAGE,
+} from "../../src/common/constants";
 import { normalisedCacheKey } from "../../src/middleware/cache";
+import { __adminRoleTestUtils } from "../../src/middleware/require-admin-role";
 import { LOO_WRITE_BODY_MAX_BYTES, loosRouter } from "../../src/routes/loos";
+import { Auth0ManagementClient } from "../../src/services/auth0/management";
 import type { LooService } from "../../src/services/loo/loo.service";
 import type { AppVariables, Env, RequestUser } from "../../src/types";
 
@@ -159,13 +165,30 @@ describe("ids and page caps", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it(`refuses a search page beyond ${MAX_SEARCH_PAGE}`, async () => {
+  it(`refuses a search offset beyond ${MAX_SEARCH_OFFSET} rows`, async () => {
     const { service, calls } = createFakeService();
     expect((await request(service, `/api/loos/search?page=${MAX_SEARCH_PAGE + 1}`)).status).toBe(
       400,
     );
-    expect((await request(service, `/api/loos/search?page=${MAX_SEARCH_PAGE}`)).status).toBe(200);
-    expect(calls).toHaveLength(1);
+    expect(
+      (await request(service, `/api/loos/search?page=${MAX_SEARCH_PAGE}&limit=1`)).status,
+    ).toBe(200);
+    // The last reachable page at 100 per page, then one past it.
+    const lastAt100 = MAX_SEARCH_OFFSET / 100 + 1;
+    expect((await request(service, `/api/loos/search?page=${lastAt100}&limit=100`)).status).toBe(
+      200,
+    );
+    expect(
+      (await request(service, `/api/loos/search?page=${lastAt100 + 1}&limit=100`)).status,
+    ).toBe(400);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("serves deep pages at the admin explorer's smallest page size", async () => {
+    // About 15k rows at 10 per page is page 1500; the old page cap (1000) refused it.
+    const { service, calls } = createFakeService();
+    expect((await request(service, "/api/loos/search?page=1500&limit=10")).status).toBe(200);
+    expect(calls[0]?.args[0]).toMatchObject({ page: 1500, limit: 10 });
   });
 });
 
@@ -270,6 +293,25 @@ describe("edge-cache keys", () => {
     ]);
   });
 
+  it("proximity: coordinates are rounded to about 1 m, so near-identical ones share one entry", async () => {
+    const { service, calls } = createFakeService();
+    await fetchCached(service, "/api/loos/proximity?lat=51.500001&lng=-0.120001");
+    await Promise.all(pending);
+    for (const path of [
+      "/api/loos/proximity?lat=51.50000001&lng=-0.12",
+      "/api/loos/proximity?lat=51.499996&lng=-0.1200049",
+    ]) {
+      expect((await fetchCached(service, path)).status, path).toBe(200);
+    }
+    const proximityCalls = calls.filter((call) => call.name === "getByProximity");
+    expect(proximityCalls).toHaveLength(1);
+    // The query uses the rounded value too, so the cached answer is the one it would give.
+    expect(proximityCalls[0]?.args.slice(0, 2)).toEqual([51.5, -0.12]);
+    expect([...store.keys()]).toEqual([
+      "https://unit.test/__cache/loos/proximity?includeInactive=false&lat=51.5&lng=-0.12&radius=1000",
+    ]);
+  });
+
   it("geohash: case and the default `active` do not mint new entries", async () => {
     const { service, calls } = createFakeService();
     // Empty results get max-age=0 and are never stored, so give the fake some rows.
@@ -328,15 +370,72 @@ describe("heavy-read limiter", () => {
     expect(limit).not.toHaveBeenCalled();
   });
 
+  const admin = { sub: "auth0|admin", permissions: ["access:admin"] } as RequestUser;
+
   it("exempts admins (the dataset explorer pages through /search and /metrics)", async () => {
     const { service } = createFakeService();
-    const { limit, env } = denying();
-    const admin = { sub: "auth0|admin", permissions: ["access:admin"] } as RequestUser;
+    const { limit, env: limiterEnv } = denying();
+    // Local development without Management credentials trusts the token's claim.
+    const env: Partial<Env> = { ...limiterEnv, ENVIRONMENT: "development" };
     expect((await request(service, "/api/loos/search", { env, user: admin })).status).toBe(200);
     expect((await request(service, "/api/loos/metrics", { env, user: admin })).status).toBe(200);
     expect(limit).not.toHaveBeenCalled();
 
     const signedIn = { sub: "auth0|someone", permissions: [] } as unknown as RequestUser;
     expect((await request(service, "/api/loos/search", { env, user: signedIn })).status).toBe(429);
+  });
+
+  describe("with the Auth0 Management API", () => {
+    const managementEnv = (limiterEnv: Partial<Env>): Partial<Env> => ({
+      ...limiterEnv,
+      ENVIRONMENT: "production",
+      AUTH0_ISSUER_BASE_URL: "https://auth.example",
+      AUTH0_MANAGEMENT_CLIENT_ID: "management-client",
+      AUTH0_MANAGEMENT_CLIENT_SECRET: "secret",
+    });
+
+    const stubManagement = (permissions: string[]) =>
+      vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue({
+        getUserPermissions: vi.fn(async () =>
+          permissions.map((permission_name) => ({ permission_name })),
+        ),
+        isUserBlocked: vi.fn(async () => false),
+      } as unknown as Auth0ManagementClient);
+
+    const resetCaches = () => {
+      __adminRoleTestUtils.clearPermissionCache();
+      __adminRoleTestUtils.clearBlockedCache();
+      __adminRoleTestUtils.clearManagementClientCache();
+    };
+
+    beforeEach(resetCaches);
+    afterEach(() => {
+      vi.restoreAllMocks();
+      resetCaches();
+    });
+
+    it("exempts an admin Auth0 confirms", async () => {
+      stubManagement(["access:admin"]);
+      const { service } = createFakeService();
+      const { limit, env } = denying();
+      const response = await request(service, "/api/loos/search", {
+        env: managementEnv(env),
+        user: admin,
+      });
+      expect(response.status).toBe(200);
+      expect(limit).not.toHaveBeenCalled();
+    });
+
+    it("limits an admin whose access:admin Auth0 has revoked, though the token claims it", async () => {
+      stubManagement([]);
+      const { service } = createFakeService();
+      const { limit, env } = denying();
+      const response = await request(service, "/api/loos/search", {
+        env: managementEnv(env),
+        user: admin,
+      });
+      expect(response.status).toBe(429);
+      expect(limit).toHaveBeenCalledWith({ key: "heavy:198.51.100.9" });
+    });
   });
 });

@@ -4,6 +4,7 @@
  * Pagination controls component
  */
 
+import { MAX_SEARCH_OFFSET } from "../../../../../common/constants";
 import { buildNavigationUrl } from "../utils/builders";
 import { formatNumber } from "../utils/formatters";
 import type { ScriptState, SearchResponse } from "../utils/types";
@@ -19,7 +20,9 @@ export function LoosPagination({ searchData, state, currentPath }: LoosPaginatio
   const currentPage = Number(searchData.page) || state.page;
   const pageSize = Number(searchData.pageSize) || state.pageSize;
   const rowsCount = Array.isArray(searchData.data) ? searchData.data.length : 0;
-  const totalPages = Math.max(1, Math.ceil(total / (pageSize || 1)));
+  // Never offer a page past the search endpoint's offset cap (it would be a 400).
+  const lastReachablePage = Math.floor(MAX_SEARCH_OFFSET / (pageSize || 1)) + 1;
+  const totalPages = Math.max(1, Math.min(lastReachablePage, Math.ceil(total / (pageSize || 1))));
   const startIndex = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endIndex = total === 0 ? 0 : startIndex + rowsCount - 1;
 

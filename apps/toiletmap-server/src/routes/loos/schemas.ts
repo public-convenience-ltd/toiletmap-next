@@ -4,8 +4,10 @@ import {
   MAX_GEOHASH_PREFIX_LENGTH,
   MAX_IDS_PER_REQUEST,
   MAX_PROXIMITY_RADIUS,
+  MAX_SEARCH_OFFSET,
   MAX_SEARCH_PAGE,
   MIN_GEOHASH_PREFIX_LENGTH,
+  PROXIMITY_COORDINATE_DECIMALS,
   RECENT_WINDOW_DAYS,
 } from "../../common/constants";
 import {
@@ -26,16 +28,24 @@ import {
   REMOVAL_CATEGORIES,
 } from "../../services/loo/types";
 
+const COORDINATE_SCALE = 10 ** PROXIMITY_COORDINATE_DECIMALS;
+
+/** Rounds to {@link PROXIMITY_COORDINATE_DECIMALS} places (about 1 m); `+ 0` turns -0 into 0. */
+const roundCoordinate = (value: number) =>
+  Math.round(value * COORDINATE_SCALE) / COORDINATE_SCALE + 0;
+
 export const proximitySchema = z
   .object({
     lat: z.coerce
       .number()
       .min(-90, "lat must be within -90 and 90")
-      .max(90, "lat must be within -90 and 90"),
+      .max(90, "lat must be within -90 and 90")
+      .transform(roundCoordinate),
     lng: z.coerce
       .number()
       .min(-180, "lng must be within -180 and 180")
-      .max(180, "lng must be within -180 and 180"),
+      .max(180, "lng must be within -180 and 180")
+      .transform(roundCoordinate),
     radius: z.coerce
       .number()
       .int()
@@ -176,7 +186,7 @@ export const restoreSchema = z
  * Every query schema below is `.strict()`: an unknown parameter is a 400, so
  * junk parameters cannot be used to vary cache keys or smuggle options.
  */
-export const searchQuerySchema = z
+const searchQueryShape = z
   .object({
     search: z.preprocess(normalizeOptionalString, optionalTrimmedFilter(200)),
     areaName: z.preprocess(normalizeOptionalString, optionalTrimmedFilter(200)),
@@ -197,7 +207,18 @@ export const searchQuerySchema = z
   })
   .strict();
 
-export const metricsQuerySchema = searchQuerySchema.extend({
+/** The search query; the offset it implies is capped at {@link MAX_SEARCH_OFFSET}. */
+export const searchQuerySchema = searchQueryShape.superRefine((value, ctx) => {
+  if ((value.page - 1) * value.limit > MAX_SEARCH_OFFSET) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["page"],
+      message: `page is too far in: (page - 1) * limit must be at most ${MAX_SEARCH_OFFSET}`,
+    });
+  }
+});
+
+export const metricsQuerySchema = searchQueryShape.extend({
   recentWindowDays: createNumberParam(1, 365, RECENT_WINDOW_DAYS),
 });
 

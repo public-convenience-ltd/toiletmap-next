@@ -3052,11 +3052,11 @@
             "name": "page",
             "in": "query",
             "required": false,
-            "description": "Page number (1-indexed, default 1).",
+            "description": "Page number (1-indexed, default 1). `(page - 1) * limit` must be at most 100000.",
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000,
+              "maximum": 100001,
               "default": 1
             }
           }
@@ -3273,11 +3273,11 @@
             "name": "page",
             "in": "query",
             "required": false,
-            "description": "Page number (1-indexed, default 1).",
+            "description": "Page number (1-indexed, default 1). `(page - 1) * limit` must be at most 100000.",
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000,
+              "maximum": 100001,
               "default": 1
             }
           },
