@@ -14,7 +14,7 @@ import {
   rawLooToToilets,
 } from "./mappers";
 import { mapMutationToPrismaData } from "./mutation";
-import { insertLoo, updateLoo } from "./persistence";
+import { insertLoo, setWriteActorSub, updateLoo, type WriteActor } from "./persistence";
 import {
   buildProximityQuery,
   buildSearchQueries,
@@ -41,6 +41,22 @@ import {
 } from "./types";
 
 type DbClient = PrismaClientInstance | Prisma.TransactionClient;
+
+/** Result of {@link LooService.runUnderDailyCap}. */
+export type DailyCapResult<T> = { overCap: true } | { overCap: false; result: T };
+
+/** The daily-cap lock or count failed (not the guarded write). */
+export class DailyCapCountError extends Error {
+  constructor(cause: unknown) {
+    super(
+      `Could not count the account's recent removals and moves: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+      { cause },
+    );
+    this.name = "DailyCapCountError";
+  }
+}
 
 /**
  * The columns the public dataset export may publish, in the legacy export's
@@ -716,6 +732,93 @@ export class LooService {
   }
 
   /**
+   * How many removals and moves the account `sub` made in the last
+   * `windowHours` (database clock), for the per-account daily cap. Counted
+   * from the audit trail: UPDATEs of toilets whose new row carries this sub
+   * in `updated_by_sub` and that either took the toilet off the map (`active`
+   * true to false) or changed the location of a toilet that had one. This
+   * includes the account's queued changes that a moderator approved (approval
+   * records the submitter's sub). Uses the partial index
+   * record_version_updated_by_sub_ts. Writes that must stay under the cap use
+   * {@link runUnderDailyCap}, which counts and writes under one lock.
+   */
+  async countRecentRemovalsAndMoves(
+    sub: string,
+    windowHours: number,
+    db: DbClient = this.prisma,
+  ): Promise<number> {
+    const [row] = await db.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+      SELECT count(*)::int AS count
+      FROM audit.record_version rv
+      WHERE rv.record ->> 'updated_by_sub' = ${sub}
+        AND rv.ts >= now() - make_interval(hours => ${windowHours}::int)
+        AND rv.op = 'UPDATE'
+        AND rv.table_name = 'toilets'
+        AND (
+          (rv.old_record ->> 'active' = 'true' AND rv.record ->> 'active' = 'false')
+          OR (
+            jsonb_typeof(rv.old_record -> 'location') = 'object'
+            AND rv.record -> 'location' IS DISTINCT FROM rv.old_record -> 'location'
+          )
+        )
+    `);
+    return row?.count ?? 0;
+  }
+
+  /**
+   * Runs `write` only while the account `sub` is under its daily cap of
+   * removals and moves, so that concurrent requests cannot all pass the
+   * check: one transaction takes a transaction-scoped advisory lock keyed on
+   * the account, counts its recent removals and moves
+   * ({@link countRecentRemovalsAndMoves}) and, when the count is below `cap`,
+   * runs `write` in that same transaction. A second request from the account
+   * waits for the lock, and its count (a fresh snapshot under READ
+   * COMMITTED) includes the first one's audit row. At the cap nothing is
+   * written and the result is `{ overCap: true }`.
+   *
+   * A failure to lock or count throws {@link DailyCapCountError}, so the
+   * caller can tell it from a failure of the write itself.
+   */
+  runUnderDailyCap<T>(
+    sub: string,
+    windowHours: number,
+    cap: number,
+    write: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<DailyCapResult<T>> {
+    return this.prisma.$transaction(async (tx) => {
+      let count: number;
+      try {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`daily-cap:${sub}`}, 0))`,
+        );
+        count = await this.countRecentRemovalsAndMoves(sub, windowHours, tx);
+      } catch (error) {
+        throw new DailyCapCountError(error);
+      }
+      if (count >= cap) return { overCap: true } as const;
+      return { overCap: false, result: await write(tx) } as const;
+    });
+  }
+
+  /**
+   * How many toilets were taken off the map (`active` true to false) in the
+   * last `windowHours`, by anyone (this app or the legacy one), for the
+   * removal alert. The `ts` range uses the BRIN index on record_version.
+   */
+  async countRecentRemovals(windowHours: number): Promise<number> {
+    const [row] = await this.prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+      SELECT count(*)::int AS count
+      FROM audit.record_version rv
+      WHERE rv.ts >= now() - make_interval(hours => ${windowHours}::int)
+        AND rv.op = 'UPDATE'
+        AND rv.table_name = 'toilets'
+        AND rv.old_record ->> 'active' = 'true'
+        AND rv.record ->> 'active' = 'false'
+    `);
+    return row?.count ?? 0;
+  }
+
+  /**
    * Search with the legacy GraphQL `loos` semantics, which differ from
    * {@link search}: `nameContains` matches the name only (case-insensitive),
    * `areaName` is an exact match, the date bounds apply to `updated_at`, and
@@ -762,12 +865,12 @@ export class LooService {
    *
    * @param id - The ID for the new loo.
    * @param mutation - The attributes to set on the loo.
-   * @param contributor - The user creating the loo (for audit trail).
+   * @param actor - Who the write is attributed to (contributor name and Auth0 sub).
    */
   async create(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
   ): Promise<LooResponse | null> {
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
@@ -779,7 +882,7 @@ export class LooService {
         id,
         data: dataForCreate,
         mutation,
-        contributor,
+        actor,
       });
     });
 
@@ -794,14 +897,14 @@ export class LooService {
     tx: Prisma.TransactionClient,
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
   ): Promise<void> {
     await insertLoo({
       tx,
       id,
       data: mapMutationToPrismaData(mutation, { forCreate: true }),
       mutation,
-      contributor,
+      actor,
     });
     this.looCache.delete(id);
   }
@@ -819,7 +922,7 @@ export class LooService {
   async updateExisting(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
     options: { expectedUpdatedAt?: string | null; tx?: Prisma.TransactionClient } = {},
   ): Promise<UpdateExistingResult> {
     const { expectedUpdatedAt, tx: outerTx } = options;
@@ -836,7 +939,7 @@ export class LooService {
         id,
         data: mapMutationToPrismaData(mutation, { forCreate: false }),
         mutation,
-        contributor,
+        actor,
         expectedUpdatedAt: expected,
       });
       this.looCache.delete(id);
@@ -870,12 +973,12 @@ export class LooService {
    *
    * @param id - The ID of the loo to upsert.
    * @param mutation - The attributes to update/set.
-   * @param contributor - The user performing the action.
+   * @param actor - Who the write is attributed to (contributor name and Auth0 sub).
    */
   async upsert(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
   ): Promise<LooResponse | null> {
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
@@ -892,7 +995,7 @@ export class LooService {
         id,
         data: dataForUpdate,
         mutation,
-        contributor,
+        actor,
       });
 
       // Invalidate cache
@@ -906,7 +1009,7 @@ export class LooService {
           id,
           data: dataForCreate,
           mutation,
-          contributor,
+          actor,
         });
       }
     });
@@ -966,7 +1069,7 @@ export class LooService {
   report(
     id: string,
     input: RemovalInput,
-    contributor: string | null,
+    actor: WriteActor,
     options: StateChangeOptions = {},
   ): Promise<StateChangeResult> {
     const mutation: LooMutationAttributes = {
@@ -982,7 +1085,7 @@ export class LooService {
       input.duplicateOf !== undefined && input.duplicateOf !== id ? input.duplicateOf : null,
       (tx) => this.checkReport(id, input, { ...options, tx }),
       mutation,
-      contributor,
+      actor,
       options,
     );
   }
@@ -1007,7 +1110,7 @@ export class LooService {
    */
   restore(
     id: string,
-    contributor: string | null,
+    actor: WriteActor,
     options: StateChangeOptions = {},
   ): Promise<StateChangeResult> {
     const mutation: LooMutationAttributes = {
@@ -1021,7 +1124,7 @@ export class LooService {
       null,
       (tx) => this.checkRestore(id, { ...options, tx }),
       mutation,
-      contributor,
+      actor,
       options,
     );
   }
@@ -1062,14 +1165,14 @@ export class LooService {
     dependsOn: string | null,
     check: (tx: Prisma.TransactionClient) => Promise<StateChangeCheck>,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
     options: StateChangeOptions,
   ): Promise<StateChangeResult> {
     const attempt = async (tx: Prisma.TransactionClient) => {
       await this.lockForStateChange(tx, id, dependsOn);
       const checked = await check(tx);
       if (checked.status !== "ok") return checked;
-      const result = await this.updateExisting(id, mutation, contributor, {
+      const result = await this.updateExisting(id, mutation, actor, {
         tx,
         expectedUpdatedAt: checked.base.updatedAt,
       });
@@ -1109,15 +1212,20 @@ export class LooService {
    * Records that someone confirmed the loo is still there: sets
    * `verified_at = now()` and nothing else (no contributor, and `updated_at`
    * is left alone so edit forms holding a base version do not conflict). The
-   * detail ETag still changes because it hashes the body.
+   * detail ETag still changes because it hashes the body. Like every write,
+   * it records the caller's Auth0 sub (`null` when anonymous) in
+   * `updated_by_sub`.
    */
-  async verify(id: string): Promise<VerifyResult> {
-    const rows = await this.prisma.$queryRaw<Array<{ verified_at: Date }>>(Prisma.sql`
-      UPDATE toilets
-      SET verified_at = now()
-      WHERE id = ${id} AND active IS TRUE
-      RETURNING verified_at
-    `);
+  async verify(id: string, actorSub: string | null): Promise<VerifyResult> {
+    const rows = await this.prisma.$transaction(async (tx) => {
+      await setWriteActorSub(tx, actorSub);
+      return tx.$queryRaw<Array<{ verified_at: Date }>>(Prisma.sql`
+        UPDATE toilets
+        SET verified_at = now()
+        WHERE id = ${id} AND active IS TRUE
+        RETURNING verified_at
+      `);
+    });
     this.looCache.delete(id);
     const [row] = rows;
     if (row) return { status: "verified", verifiedAt: new Date(row.verified_at).toISOString() };

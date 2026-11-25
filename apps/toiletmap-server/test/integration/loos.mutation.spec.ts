@@ -22,6 +22,12 @@ const authHeaders = () => {
 
 const authedJson = (method: string, body: unknown) => jsonRequest(method, body, authHeaders());
 
+/** Only admins may choose a create's id or create with PUT (see write-guards.ts). */
+const adminJson = (method: string, body: unknown) =>
+  jsonRequest(method, body, {
+    Authorization: `Bearer ${getTestContext().issueToken({ permissions: ["access:admin"] })}`,
+  });
+
 describe("Loo mutation endpoints", () => {
   describe("POST /api/loos", () => {
     it("creates a loo with a generated id when none supplied", async () => {
@@ -48,7 +54,7 @@ describe("Loo mutation endpoints", () => {
         location: { lat: 51.6, lng: -0.12 },
       };
 
-      const response = await callApi("/api/loos", authedJson("POST", payload));
+      const response = await callApi("/api/loos", adminJson("POST", payload));
       expect(response.status).toBe(409);
     });
 
@@ -94,7 +100,7 @@ describe("Loo mutation endpoints", () => {
   });
 
   describe("PUT /api/loos/:id", () => {
-    it("creates a loo when the id is new", async () => {
+    it("creates a loo when an admin PUTs a new id", async () => {
       const id = generateLooId();
       const payload = {
         name: "Created via PUT",
@@ -102,7 +108,7 @@ describe("Loo mutation endpoints", () => {
         notes: "Created through upsert endpoint",
       };
 
-      const response = await callApi(`/api/loos/${id}`, authedJson("PUT", payload));
+      const response = await callApi(`/api/loos/${id}`, adminJson("PUT", payload));
       expect(response.status).toBe(201);
       const body = await readJson<LooResponse>(response);
       expect(body.id).toBe(id);

@@ -86,6 +86,13 @@ deploy-client fail until the owner has created it once:
 `pnpm exec wrangler r2 bucket create toiletmap-exports`
 (see [the dataset export runbook](../apps/toiletmap-server/docs/operations/dataset-export.md#owner-setup-once)).
 
+The write kill switch (`write_mode`) is not a var: it lives in the server's `SETTINGS` KV
+namespace, so deploys never reset it. Production has no namespace yet (`write_mode` is
+always `open` there) until the owner creates it and adds the binding to `env.production`:
+see [the kill-switch runbook](runbooks/kill-switch.md). Other runbooks: [revert one
+account's changes](runbooks/revert-by-account.md) and [erase a
+contributor](runbooks/erase-contributor.md).
+
 Optional repository variables: `PRODUCTION_CLIENT_URL` and `PRODUCTION_SERVER_URL` override
 the smoke check's URLs (defaults: `https://toiletmap-client.gbtoiletmap.workers.dev` and
 `https://toiletmap-server.gbtoiletmap.workers.dev`), e.g. once the site moves to its own

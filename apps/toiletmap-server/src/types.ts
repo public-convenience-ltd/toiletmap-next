@@ -78,6 +78,23 @@ export interface Env {
    */
   TURNSTILE_SECRET_KEY?: string;
 
+  /**
+   * KV namespace for operational settings that must survive deploys. Key
+   * `write_mode` is the write kill switch: `open` | `queue` | `read-only`
+   * (src/services/write-mode.ts, docs/runbooks/kill-switch.md). Bound for
+   * local dev only until the owner creates the production namespace; absent
+   * means `open`.
+   */
+  SETTINGS?: KVNamespace;
+
+  /**
+   * Per-account limit on direct removals and moves in any 24 hours (default
+   * 10; a non-negative integer, `0` queues every one). Past it, the write is
+   * queued (202, `reason: "daily_cap"`). Confirmed admins are exempt. See
+   * src/services/write-caps.ts.
+   */
+  ACCOUNT_DAILY_CAP?: string;
+
   // Cloudflare Rate Limiting API bindings
   RATE_LIMIT_READ: RateLimiter;
   RATE_LIMIT_WRITE: RateLimiter;
@@ -96,6 +113,7 @@ interface RateLimiter {
 import type { FeedbackService } from "./services/feedback/feedback.service";
 import type { LooService } from "./services/loo";
 import type { PendingChangeService } from "./services/pending-change/pending-change.service";
+import type { WriteMode } from "./services/write-mode";
 
 /** Which credential authenticated the request (see `src/auth/auth-context.ts`). */
 export type AuthSource = "authorization-header" | "session-access-token";
@@ -110,4 +128,6 @@ export type AppVariables = {
   resultCount?: number;
   /** Admin pages only: pending-change count for the nav badge. */
   pendingCount?: number;
+  /** State-changing requests behind `writeModeGate` only: the write kill switch's mode. */
+  writeMode?: WriteMode;
 };

@@ -568,11 +568,12 @@ describe("POST /api/loos/:id/restore", () => {
     expect((await readJson<ConflictBody>(stale)).error).toBe("conflict");
   });
 
-  it("clears the removal category when a trusted PUT reactivates the loo", async () => {
+  it("clears the removal category when an admin PUT reactivates the loo", async () => {
+    // Only admins may send `active` in a PUT (see write-guards.ts).
     const loo = await removedLoo();
     const response = await callApi(
       `/api/loos/${loo.id}`,
-      jsonRequest("PUT", { active: true }, trustedHeaders()),
+      jsonRequest("PUT", { active: true }, adminHeaders()),
     );
     expect(response.status).toBe(200);
     const body = await readJson<SavedLooBody>(response);
@@ -584,7 +585,7 @@ describe("POST /api/loos/:id/restore", () => {
     // A later removal without a reason must not bring the old one back.
     const removedAgain = await callApi(
       `/api/loos/${loo.id}`,
-      jsonRequest("PUT", { active: false }, trustedHeaders()),
+      jsonRequest("PUT", { active: false }, adminHeaders()),
     );
     expect(removedAgain.status).toBe(200);
     expect((await readJson<SavedLooBody>(removedAgain)).removalReason).toBeNull();
@@ -766,13 +767,31 @@ describe("moderation alerts", () => {
     expect(calls[0]?.body).not.toContain(loo.id);
   });
 
-  it("posts nothing when the webhook is not configured or nothing is queued", async () => {
+  it("posts nothing when the webhook is not configured", async () => {
     const calls = interceptWebhook();
     const loo = await fixtures.loos.create();
     const { ctx, settle } = createCapturingExecutionContext();
 
-    const queued = await post(`/api/loos/${loo.id}/report`, { reason: "not_public" });
+    const queued = await callApi(
+      `/api/loos/${loo.id}/report`,
+      jsonRequest("POST", { reason: "not_public" }),
+      { ctx },
+    );
     cleanupManager.trackPendingChange((await readJson<QueuedBody>(queued)).id);
+    const direct = await callApi(
+      `/api/loos/${loo.id}/report`,
+      jsonRequest("POST", { reason: "not_public" }, trustedHeaders()),
+      { ctx },
+    );
+    expect(direct.status).toBe(200);
+    await settle();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("posts the removal alert, not the queue alert, for a direct report", async () => {
+    const calls = interceptWebhook();
+    const loo = await fixtures.loos.create();
+    const { ctx, settle } = createCapturingExecutionContext();
 
     const direct = await callApi(
       `/api/loos/${loo.id}/report`,
@@ -781,6 +800,9 @@ describe("moderation alerts", () => {
     );
     expect(direct.status).toBe(200);
     await settle();
-    expect(calls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+    const text = (JSON.parse(calls[0]?.body ?? "{}") as { text: string }).text;
+    expect(text).toContain("removed from the map");
+    expect(text).toContain(`/admin/loos/${loo.id}`);
   });
 });

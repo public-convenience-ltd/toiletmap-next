@@ -28,7 +28,8 @@ describe("Legacy dataset upsert coverage", () => {
   it("upserts representative records via the API without validation errors", async () => {
     const sampleIndexes = [0, Math.floor(toiletsDataset.length / 2), toiletsDataset.length - 1];
     const { issueToken, prisma } = getTestContext();
-    const token = issueToken();
+    // An admin: legacy records carry `active`, `removalReason` and their own ids.
+    const token = issueToken({ permissions: ["access:admin"] });
 
     for (const index of sampleIndexes) {
       const record = toiletsDataset[index];

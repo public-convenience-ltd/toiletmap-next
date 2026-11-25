@@ -14,6 +14,7 @@ import { describeIssues } from "../components/LooForm/issues";
 import { getApiUrl } from "./config";
 import { evictLooDetail, type LooDetail } from "./loos";
 import { applyLocalMutation, type CompressedLoo, isCompressedLoo } from "./mapCache";
+import { isEditingPaused } from "./writeMode";
 
 export type ReportReason =
   | "permanently_closed"
@@ -78,6 +79,8 @@ export type ChangeOutcome =
   /** 401: the session expired. */
   | { kind: "auth" }
   | { kind: "rateLimited" }
+  /** 503 `read_only`: editing is paused by the server's write kill switch. */
+  | { kind: "paused" }
   | { kind: "error"; message: string; details?: string[] };
 
 export type VerifyOutcome =
@@ -86,6 +89,8 @@ export type VerifyOutcome =
   | { kind: "removed" }
   | { kind: "notFound" }
   | { kind: "rateLimited" }
+  /** 503 `read_only`: editing is paused by the server's write kill switch. */
+  | { kind: "paused" }
   | { kind: "error"; message: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -189,6 +194,7 @@ function interpretChange(
   if (status === 404) return { kind: "notFound" };
   if (status === 401) return { kind: "auth" };
   if (status === 429) return { kind: "rateLimited" };
+  if (isEditingPaused(status, body)) return { kind: "paused" };
   if (status === 400) {
     const details = isRecord(body) ? describeIssues(body.issues) : [];
     return {
@@ -266,6 +272,7 @@ export async function verifyLoo(apiUrl: string, id: string): Promise<VerifyOutco
   if (status === 409) return { kind: "removed" };
   if (status === 404) return { kind: "notFound" };
   if (status === 429) return { kind: "rateLimited" };
+  if (isEditingPaused(status, body)) return { kind: "paused" };
   return {
     kind: "error",
     message: messageFrom(body, "We couldn't record that just now. Please try again."),

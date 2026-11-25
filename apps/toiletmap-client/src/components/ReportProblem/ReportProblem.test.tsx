@@ -518,6 +518,19 @@ describe("ReportProblem — confirm and submit", () => {
     expect(submitButton()).toBeEnabled();
   });
 
+  it("says editing is paused when the server is read-only, and keeps the report to retry", async () => {
+    onReport(503, { error: "read_only", message: "Editing the Toilet Map is paused." });
+    const user = setup({ isAuthenticated: true });
+    await choose(user, /permanently closed/);
+    await continueToConfirm(user);
+    await user.click(submitButton());
+    expect(await screen.findByRole("heading", { name: "Editing is paused" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/switched off for a short while\. Nothing was saved;/),
+    ).toBeInTheDocument();
+    expect(submitButton()).toBeEnabled();
+  });
+
   it("explains rate limits and expired sign-ins", async () => {
     onReport(429, {});
     const user = setup({ isAuthenticated: true });

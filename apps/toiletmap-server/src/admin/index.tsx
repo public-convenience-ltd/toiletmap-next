@@ -3,13 +3,14 @@ import { contextStorage } from "hono/context-storage";
 import { requireAdminAuth } from "../auth/middleware";
 import { rateLimiters } from "../middleware/cloudflare-rate-limit";
 import { requireAdminRole } from "../middleware/require-admin-role";
+import { writeModeGate } from "../middleware/write-mode";
 import type { AppVariables, Env } from "../types";
 import { callback, login, logout } from "./auth";
 import { datasetRegenerate } from "./pages/dataset";
 import { renderAccessDenied } from "./pages/errors/access-denied";
 import { feedbackDelete, feedbackDeleteConfirm, feedbackList } from "./pages/feedback";
 import { looDetail, looEdit, loosCreate, loosList } from "./pages/loos";
-import { pendingApprove, pendingList, pendingReject } from "./pages/pending";
+import { pendingApprove, pendingList, pendingReadOnly, pendingReject } from "./pages/pending";
 import { userStatistics } from "./pages/users";
 import { updateUserPermissions, userAdministration } from "./pages/users/admin";
 
@@ -52,8 +53,13 @@ admin.get("/loos/create", loosCreate);
 admin.get("/loos/:id/edit", looEdit);
 admin.get("/loos/:id", looDetail);
 admin.get("/pending", pendingList);
-admin.post("/pending/:id/approve", pendingApprove);
-admin.post("/pending/:id/reject", pendingReject);
+// The write kill switch's read-only mode freezes the moderation queue too.
+// Other admin POSTs stay available in read-only mode: permission changes and
+// feedback deletion are incident and erasure tools, and the dataset export
+// only reads the map (see docs/runbooks/kill-switch.md).
+const pendingWriteGate = writeModeGate(pendingReadOnly);
+admin.post("/pending/:id/approve", pendingWriteGate, pendingApprove);
+admin.post("/pending/:id/reject", pendingWriteGate, pendingReject);
 admin.post("/dataset/regenerate", datasetRegenerate);
 admin.get("/feedback", feedbackList);
 admin.get("/feedback/:id/delete", feedbackDeleteConfirm);

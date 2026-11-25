@@ -216,6 +216,16 @@ First-party callers (the website through its proxy, the admin explorer and the F
 - **Heavy-read limit**: `/search`, `/metrics`, `/dump?rich=true`, 4-character geohash prefixes and `/proximity` with `radius` over 5000 m share 20 requests a minute per IP (edge-cache hits count), on top of the general read limit. Confirmed admins are exempt.
 - **Proximity coordinates** are rounded to 5 decimal places (about 1 m) before the query, so `distance` can differ by up to a metre from the unrounded point.
 
+### Breaking changes for REST API writers (S2 write safety)
+
+These apply to `POST /api/loos` and `PUT /api/loos/:id` for every caller except confirmed admins (`access:admin`), unless a line says otherwise:
+
+- **Ids** (everyone, reads too): every loo id (path, `?ids=`, `exclude`, body `id`, `areaId`, `duplicateOf`) must be 24 hex characters (upper case is lower-cased); anything else is a 400. For non-admins, a `POST` with an `id` is a 400 `id_not_allowed`, and a `PUT` to an unknown id is a 404 (it no longer creates the loo).
+- **Removal fields**: `active` or `removalReason` in the body is a 400 `admin_only_fields`; use `POST /api/loos/:id/report` and `/restore`. `location: null` is a 400 `location_required`.
+- **Service area**: a new loo, or a changed location, outside lat 48.9 to 61.0 and lng -8.7 to 1.9 is a 400 `location_out_of_area`.
+- **Queued instead of applied** (202 `{queued: true, id, reason}`): a move of more than 50 m (`large_move`), an account's removals and moves past `ACCOUNT_DAILY_CAP` in 24 hours (`daily_cap`), and every write while the kill switch is in `queue` mode (`queue_mode`).
+- **Kill switch**: while `write_mode` is `read-only`, every write under `/api/loos` (admins included) is a 503 `read_only` with `Retry-After: 300`. See [docs/runbooks/kill-switch.md](../../docs/runbooks/kill-switch.md).
+
 ### Admin UI
 
 | Endpoint             | Method   | Description     |

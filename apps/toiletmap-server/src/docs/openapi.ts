@@ -92,10 +92,11 @@ const idSchemaInline: SchemaObject = {
 const schemas: Record<string, SchemaObject | ReferenceObject> = {
   Coordinates: {
     type: "object",
-    description: "Geographic coordinates (WGS84).",
+    description:
+      "Geographic coordinates (WGS84). In writes, lat must be within -90..90 and lng within -180..180; a non-admin's new or changed location must also be inside the box lat 48.9..61.0, lng -8.7..1.9 (Great Britain, Northern Ireland, the Isle of Man and the Channel Islands), or the write fails with 400 `location_out_of_area`.",
     properties: {
-      lat: { type: "number", example: 51.5074 },
-      lng: { type: "number", example: -0.1278 },
+      lat: { type: "number", minimum: -90, maximum: 90, example: 51.5074 },
+      lng: { type: "number", minimum: -180, maximum: 180, example: -0.1278 },
     },
     required: ["lat", "lng"],
   },
@@ -245,7 +246,7 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       active: {
         type: "boolean",
         description:
-          "Whether the loo is shown on the map. Must be true or false; null is rejected. Set false (with a removalReason) to remove a loo.",
+          "Admins only (anyone else gets 400 `admin_only_fields`; use `/report` and `/restore`). Whether the loo is shown on the map. Must be true or false; null is rejected.",
       },
       allGender: nullableBoolean,
       attended: nullableBoolean,
@@ -259,14 +260,18 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       notes: nullableString(2000),
       noPayment: nullableBoolean,
       paymentDetails: nullableString(2000),
-      removalReason: nullableString(2000),
+      removalReason: {
+        ...nullableString(2000),
+        description: "Admins only (anyone else gets 400 `admin_only_fields`).",
+      },
       openingTimes: {
         anyOf: [schemaRef("OpeningTimes"), { type: "null" }],
         description:
           'Opening times for each day of the week. Array has 7 elements: Monday (0) through Sunday (6). Each element is either ["HH:mm", "HH:mm"] for open days, or [] for closed days. If all opening times are unknown, the entire field is null.',
       },
       location: {
-        description: "Optional location update. Null clears an existing location.",
+        description:
+          "Optional location update. Null clears an existing location (admins only; anyone else gets 400 `location_required`). A non-admin move of more than 50 m is queued (202, `reason: large_move`).",
         anyOf: [schemaRef("Coordinates"), { type: "null" }],
       },
     },
@@ -282,6 +287,8 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
             minLength: LOO_ID_LENGTH,
             maxLength: LOO_ID_LENGTH,
             pattern: "^[a-f0-9]{24}$",
+            description:
+              "Admins only; anyone else gets 400 `id_not_allowed` (omit it and an id is generated). Upper case is accepted and lowercased.",
             example: "0123456789abcdef01234567",
           },
         },
@@ -390,6 +397,12 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       unchanged: {
         type: "boolean",
         description: "True when the submission matched the current record and nothing was queued.",
+      },
+      reason: {
+        type: "string",
+        enum: ["large_move", "daily_cap", "queue_mode"],
+        description:
+          "Why a write from a caller who could otherwise write directly was queued: `large_move` when a non-admin moves a loo more than 50 m; `daily_cap` when the account has already made its daily allowance of removals and moves (default 10 in any 24 hours; admins exempt); `queue_mode` while the write kill switch queues every non-admin write.",
       },
     },
   },
@@ -757,6 +770,14 @@ const idPathParameter: ParameterObject = {
 
 const authErrorResponse = {
   description: "Authentication required (Bearer token or session cookie).",
+  content: jsonContent("ErrorResponse"),
+};
+
+/** Every loo write while the write kill switch is read-only (src/services/write-mode.ts). */
+const readOnlyErrorResponse = {
+  description:
+    "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+  headers: { "Retry-After": { schema: { type: "integer", example: 300 } } },
   content: jsonContent("ErrorResponse"),
 };
 
@@ -1197,7 +1218,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Create a loo",
         description:
-          "Signed-in callers create the loo directly (201) unless they are blocked in Auth0. Anonymous and blocked callers have the new loo queued for moderation (202), as does anyone whose block status cannot be confirmed.",
+          "Signed-in callers create the loo directly (201) unless they are blocked in Auth0. Anonymous and blocked callers have the new loo queued for moderation (202), as does anyone whose block status cannot be confirmed. Only admins may send `id`, `active`, `removalReason` or `location: null`, or place a loo outside the GB / NI / Isle of Man / Channel Islands box; anyone else gets 400 with an `error` code (`id_not_allowed`, `admin_only_fields`, `location_required`, `location_out_of_area`).",
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: {
           required: true,
@@ -1205,12 +1226,14 @@ export const openApiDocument: OpenAPIObject = {
           content: jsonContent("CreateLooRequest"),
         },
         responses: {
+          503: readOnlyErrorResponse,
           201: {
             description: "Loo created. Includes its `compressed` map tuple.",
             content: jsonContent("SavedLooResponse"),
           },
           400: {
-            description: "Invalid request payload.",
+            description:
+              "Invalid request payload, or a field or location only an admin may set (`error` names the rule).",
             content: jsonContent("ValidationErrorResponse"),
           },
           202: {
@@ -1287,9 +1310,9 @@ export const openApiDocument: OpenAPIObject = {
       },
       put: {
         tags: ["Loos"],
-        summary: "Update (or create) a loo",
+        summary: "Update a loo (admins: or create it)",
         description:
-          "Signed-in callers write directly unless they are blocked in Auth0; an unknown id creates the loo. Anonymous and blocked callers (and anyone whose block status cannot be confirmed) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
+          "Signed-in callers write directly unless they are blocked in Auth0. Only admins may create a loo with PUT (an unknown id is a 404 for everyone else), send `active`, `removalReason` or `location: null` (400 `admin_only_fields` / `location_required`; use `/report` and `/restore`), or move a loo outside the GB / NI / Isle of Man / Channel Islands box (400 `location_out_of_area`). A non-admin move of more than 50 m is queued even for a trusted caller (202, `reason: large_move`). Anonymous and blocked callers (and anyone whose block status cannot be confirmed) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: {
@@ -1298,6 +1321,7 @@ export const openApiDocument: OpenAPIObject = {
           content: jsonContent("UpdateLooRequest"),
         },
         responses: {
+          503: readOnlyErrorResponse,
           200: {
             description:
               "Existing loo updated, or returned unchanged when nothing differed; both include the `compressed` map tuple. Anonymous or blocked callers' no-op submissions return `{ queued: false, unchanged: true }`.",
@@ -1310,21 +1334,22 @@ export const openApiDocument: OpenAPIObject = {
             },
           },
           201: {
-            description: "New loo created. Includes its `compressed` map tuple.",
+            description: "New loo created (admins only). Includes its `compressed` map tuple.",
             content: jsonContent("SavedLooResponse"),
           },
           202: {
             description:
-              "Change queued for moderation (anonymous, blocked in Auth0, or block status could not be confirmed).",
+              "Change queued for moderation (anonymous, blocked in Auth0, block status could not be confirmed, a non-admin move of more than 50 m, a move past the account's daily cap, or queue mode); see `reason`.",
             content: jsonContent("QueuedChangeResponse"),
           },
           400: {
-            description: "Invalid identifier or payload.",
+            description:
+              "Invalid identifier or payload, or a field or location only an admin may set (`error` names the rule).",
             content: jsonContent("ValidationErrorResponse"),
           },
           401: authErrorResponse,
           404: {
-            description: "Anonymous or blocked caller's change for a loo that does not exist.",
+            description: "No loo has this id (only admins create with PUT).",
             content: jsonContent("ErrorResponse"),
           },
           409: {
@@ -1343,11 +1368,12 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Report a problem (remove a loo from the map)",
         description:
-          "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller.",
+          "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller. A non-admin account that has already made its daily allowance of removals and moves (default 10 in any 24 hours) is queued too (202, `reason: daily_cap`), and while the write kill switch is in queue mode every non-admin report is (`reason: queue_mode`).",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: { required: true, content: jsonContent("ReportLooRequest") },
         responses: {
+          503: readOnlyErrorResponse,
           200: {
             description: "Removed. `compressed` is null: drop the loo from any cached map.",
             content: jsonContent("SavedLooResponse"),
@@ -1387,6 +1413,7 @@ export const openApiDocument: OpenAPIObject = {
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: { required: false, content: jsonContent("RestoreLooRequest") },
         responses: {
+          503: readOnlyErrorResponse,
           200: {
             description:
               "Restored, with its `compressed` map tuple. `detailsIgnored: true` when `details` was sent: direct restores do not store it.",
@@ -1422,6 +1449,7 @@ export const openApiDocument: OpenAPIObject = {
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         responses: {
+          503: readOnlyErrorResponse,
           200: { description: "Verified.", content: jsonContent("VerifyResponse") },
           404: { description: "Loo not found.", content: jsonContent("ErrorResponse") },
           409: {

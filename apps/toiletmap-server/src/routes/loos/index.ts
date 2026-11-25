@@ -3,11 +3,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { every } from "hono/combine";
 import { optionalAuth } from "../../auth/middleware";
-import {
-  HEAVY_PROXIMITY_RADIUS,
-  LOO_ID_LENGTH,
-  MIN_GEOHASH_PREFIX_LENGTH,
-} from "../../common/constants";
+import { HEAVY_PROXIMITY_RADIUS, MIN_GEOHASH_PREFIX_LENGTH } from "../../common/constants";
 import { validate } from "../../common/validator";
 import {
   type CacheKeyValue,
@@ -17,6 +13,8 @@ import {
 } from "../../middleware/cache";
 import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
 import { canWriteDirectly, isConfirmedAdmin } from "../../middleware/require-admin-role";
+import { writeModeGate } from "../../middleware/write-mode";
+import type { Prisma } from "../../prisma";
 import { generateLooId } from "../../services/loo";
 import {
   clearRemovalOnReactivate,
@@ -24,15 +22,25 @@ import {
   isEmptyMutation,
   isStaleBase,
 } from "../../services/loo/diff";
-import type { LooMutationBase, StateChangeResult } from "../../services/loo/loo.service";
+import type {
+  DailyCapResult,
+  LooMutationBase,
+  StateChangeResult,
+} from "../../services/loo/loo.service";
 import { toCompressedLoo } from "../../services/loo/mappers";
+import type { WriteActor } from "../../services/loo/persistence";
 import type { LooResponse } from "../../services/loo/types";
-import { scheduleModerationAlert } from "../../services/moderation-alert";
+import {
+  scheduleDailyCapAlert,
+  scheduleModerationAlert,
+  scheduleRemovalAlert,
+} from "../../services/moderation-alert";
 import type {
   PendingChangeType,
   PendingPayload,
 } from "../../services/pending-change/pending-change.service";
-import type { AppVariables, Env } from "../../types";
+import { parseAccountDailyCap, runUnderDailyCap } from "../../services/write-caps";
+import type { AppVariables, Env, RequestUser } from "../../types";
 import { extractContributor } from "../../utils/auth-utils";
 import {
   DUMP_CACHE_CONTROL,
@@ -62,8 +70,21 @@ import {
   updateMutationSchema,
   updatesQuerySchema,
 } from "./schemas";
+import {
+  checkNonAdminFields,
+  checkNonAdminLocation,
+  idNotAllowedRefusal,
+  isLargeMove,
+  isMove,
+  type WriteRefusal,
+} from "./write-guards";
 
 const loosRouter = new Hono<{ Variables: AppVariables; Bindings: Env }>();
+
+// The write kill switch (services/write-mode.ts): read-only refuses every
+// POST/PUT here with a 503, whoever sends it; queue mode is applied by each
+// write route through decideWrite. Reads never consult it.
+loosRouter.use("*", writeModeGate());
 
 /**
  * The 1/min submission limit for writes that are queued for moderation:
@@ -170,8 +191,65 @@ const savedLooResponse = (c: AppContext, loo: LooResponse, status: 200 | 201) =>
 const MAX_UPDATE_ATTEMPTS = 3;
 
 /**
+ * Who a direct write is attributed to: the caller's contributor name and
+ * Auth0 sub (stored privately in `toilets.updated_by_sub`); both null when
+ * anonymous.
+ */
+const writeActor = (c: AppContext, user: RequestUser | null | undefined): WriteActor => ({
+  contributor: user ? extractContributor(user, c.env.AUTH0_PROFILE_KEY) : null,
+  sub: user?.sub ?? null,
+});
+
+/** A non-admin write refused by a write guard (see write-guards.ts). */
+const refuseWrite = (c: AppContext, refusal: WriteRefusal) => c.json(refusal, 400);
+
+/**
+ * Why a write that the caller could otherwise have applied was queued (the
+ * 202 body's `reason`):
+ * - `large_move`: a non-admin moved a toilet more than 50 m;
+ * - `daily_cap`: the account reached its daily cap of removals and moves
+ *   (services/write-caps.ts);
+ * - `queue_mode`: the write kill switch is in queue mode (services/write-mode.ts).
+ * Writes queued because the caller is anonymous or blocked carry no reason.
+ */
+type QueueReason = "large_move" | "daily_cap" | "queue_mode";
+
+/**
+ * Whether a write goes straight to the map. In queue mode only confirmed
+ * admins write directly (`isAdmin` is only called then); otherwise the trust
+ * rule decides (canWriteDirectly).
+ */
+const decideWrite = async (
+  c: AppContext,
+  user: RequestUser | null | undefined,
+  isAdmin: () => Promise<boolean>,
+): Promise<{ direct: true } | { direct: false; reason?: QueueReason }> => {
+  if (c.get("writeMode") === "queue") {
+    return (await isAdmin()) ? { direct: true } : { direct: false, reason: "queue_mode" };
+  }
+  return (await canWriteDirectly(c, user)) ? { direct: true } : { direct: false };
+};
+
+/**
+ * Runs a removal or move by `user`, who could write directly, under their
+ * account's daily cap (services/write-caps.ts): `{ overCap: true }` means
+ * nothing was written and the change must be queued. Confirmed admins are
+ * exempt, and their write runs on its own.
+ */
+const writeUnderDailyCap = async <T>(
+  c: AppContext,
+  user: RequestUser | null | undefined,
+  admin: boolean,
+  write: (tx?: Prisma.TransactionClient) => Promise<T>,
+): Promise<DailyCapResult<T>> =>
+  user && !admin ? runUnderDailyCap(c, user, write) : { overCap: false, result: await write() };
+
+/**
  * Queues a change for moderation and alerts moderators (when configured).
- * Signed-in submitters are recorded so approval credits them.
+ * Signed-in submitters are recorded (name and Auth0 sub) so approval
+ * credits them. `reason` explains a queued write from a caller who could
+ * otherwise have written directly; a `daily_cap` one also posts the
+ * daily-cap alert.
  */
 const queueForModeration = async (
   c: AppContext,
@@ -179,16 +257,26 @@ const queueForModeration = async (
   payload: PendingPayload,
   looId: string | null,
   baseUpdatedAt: string | Date | null | undefined,
+  reason?: QueueReason,
 ) => {
   const user = c.get("user");
+  const submitter = writeActor(c, user);
   const { id } = await c.get("pendingChangeService").queue(type, payload, {
     looId,
     ip: c.req.header("cf-connecting-ip") ?? null,
     baseUpdatedAt: baseUpdatedAt ? new Date(baseUpdatedAt) : null,
-    submittedBy: user ? extractContributor(user, c.env.AUTH0_PROFILE_KEY) : null,
+    submittedBy: submitter.contributor,
+    submitterSub: submitter.sub,
   });
   scheduleModerationAlert(c);
-  return c.json({ queued: true, id }, 202);
+  if (reason === "daily_cap" && user && looId) {
+    scheduleDailyCapAlert(c, {
+      sub: user.sub,
+      looId,
+      cap: parseAccountDailyCap(c.env.ACCOUNT_DAILY_CAP),
+    });
+  }
+  return c.json(reason ? { queued: true, id, reason } : { queued: true, id }, 202);
 };
 
 /** Maps a refused or completed report/restore to its HTTP response. */
@@ -460,30 +548,34 @@ loosRouter.post(
   (c) =>
     handleRoute(c, "loos.create", async () => {
       const user = c.get("user");
+      const { id: requestedId, ...rest } = c.req.valid("json");
 
-      if (!(await canWriteDirectly(c, user))) {
-        // Anonymous, blocked, or block status unknown: queue for approval.
+      // Only confirmed admins choose ids or set the admin-only fields; the
+      // write guards apply whether the create is written or queued.
+      const admin = await isConfirmedAdmin(c, user);
+      if (!admin) {
+        if (requestedId !== undefined) return refuseWrite(c, idNotAllowedRefusal());
+        const refused = checkNonAdminFields(rest) ?? checkNonAdminLocation(rest.location);
+        if (refused) return refuseWrite(c, refused);
+      }
+
+      const decision = await decideWrite(c, user, async () => admin);
+      if (!decision.direct) {
+        // Anonymous, blocked, block status unknown, or queue mode: queue for
+        // approval. Approval generates the id.
         const limited = await queuedWriteRateLimitExceeded(c);
         if (limited) return limited;
-
-        const { id: _id, ...payload } = c.req.valid("json");
-        return queueForModeration(c, "create", payload, null, null);
+        return queueForModeration(c, "create", rest, null, null, decision.reason);
       }
 
       // Signed in and not blocked: direct write
-      const validation = c.req.valid("json");
-      const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
-      const { id: requestedId, ...rest } = validation;
       const id = requestedId ?? generateLooId();
-
-      if (id.length !== LOO_ID_LENGTH)
-        return badRequest(c, `id must be exactly ${LOO_ID_LENGTH} characters`);
 
       const looService = c.get("looService");
       const existing = await looService.getById(id);
       if (existing) return c.json({ message: `Loo with id ${id} already exists` }, 409);
 
-      const created = await looService.create(id, rest, contributor);
+      const created = await looService.create(id, rest, writeActor(c, user));
       if (!created) throw new Error(`Failed to reload loo ${id} after creation`);
       return savedLooResponse(c, created, 201);
     }),
@@ -497,6 +589,11 @@ loosRouter.post(
  * existing record is returned without writing. An optional `baseUpdatedAt`
  * (the `updatedAt` the client loaded) turns on optimistic concurrency: a
  * mismatch returns 409 with the current record.
+ *
+ * Only confirmed admins may create a toilet with PUT (an unknown id is a 404
+ * for everyone else) or use the admin-only fields; a non-admin move of more
+ * than 50 m is queued even for a trusted caller (202, `reason: "large_move"`).
+ * See write-guards.ts.
  */
 loosRouter.put(
   "/:id",
@@ -512,11 +609,17 @@ loosRouter.put(
       const { baseUpdatedAt, ...mutation } = c.req.valid("json");
       const looService = c.get("looService");
 
-      if (!(await canWriteDirectly(c, user))) {
-        // Anonymous, blocked, or block status unknown: queue the diff for approval.
-        const limited = await queuedWriteRateLimitExceeded(c);
-        if (limited) return limited;
+      const admin = await isConfirmedAdmin(c, user);
+      if (!admin) {
+        const refused = checkNonAdminFields(mutation);
+        if (refused) return refuseWrite(c, refused);
+      }
 
+      const decision = await decideWrite(c, user, async () => admin);
+      if (!decision.direct) {
+        // Anonymous, blocked, block status unknown, or queue mode: queue the
+        // diff for approval. The queued-write limit is spent only on a change
+        // that is actually queued, so a refused one can be fixed and resent.
         const existing = await looService.getMutationBase(id);
         // Untrusted callers can only suggest edits to toilets that exist.
         if (!existing) return notFound(c, "Loo not found");
@@ -525,22 +628,38 @@ loosRouter.put(
         }
 
         const changes = diffMutation(mutation, existing);
+        if (!admin) {
+          const refused = checkNonAdminLocation(changes.location);
+          if (refused) return refuseWrite(c, refused);
+        }
         if (isEmptyMutation(changes)) {
           return c.json({ queued: false, unchanged: true }, 200);
         }
 
-        return queueForModeration(c, "update", changes, id, baseUpdatedAt ?? existing.updatedAt);
+        const limited = await queuedWriteRateLimitExceeded(c);
+        if (limited) return limited;
+        return queueForModeration(
+          c,
+          "update",
+          changes,
+          id,
+          baseUpdatedAt ?? existing.updatedAt,
+          decision.reason,
+        );
       }
 
       // Signed in and not blocked: direct write
-      const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
+      const actor = writeActor(c, user);
 
       for (let attempt = 1; attempt <= MAX_UPDATE_ATTEMPTS; attempt++) {
         const existing = await looService.getMutationBase(id);
 
         if (!existing) {
-          // PUT keeps upsert semantics for authenticated callers: unknown ids are created.
-          const saved = await looService.upsert(id, mutation, contributor);
+          // Only admins may create with PUT (upsert); for everyone else an
+          // unknown id is a 404, as for queued edits. The client only PUTs
+          // to toilets it loaded and creates with POST.
+          if (!admin) return notFound(c, "Loo not found");
+          const saved = await looService.upsert(id, mutation, actor);
           if (!saved) throw new Error(`Failed to reload loo ${id} after upsert`);
           return savedLooResponse(c, saved, 201);
         }
@@ -550,18 +669,59 @@ loosRouter.put(
         }
 
         const changes = clearRemovalOnReactivate(diffMutation(mutation, existing), existing);
+
+        if (!admin) {
+          // Checked on the diff, so an unchanged location never blocks other edits.
+          const refused = checkNonAdminLocation(changes.location);
+          if (refused) return refuseWrite(c, refused);
+          if (isLargeMove(existing.location, changes.location)) {
+            // A big move goes to a moderator even from a trusted contributor.
+            const limited = await queuedWriteRateLimitExceeded(c);
+            if (limited) return limited;
+            return queueForModeration(
+              c,
+              "update",
+              changes,
+              id,
+              baseUpdatedAt ?? existing.updatedAt,
+              "large_move",
+            );
+          }
+        }
+
         if (isEmptyMutation(changes)) {
           return savedLooResponse(c, stripMutationBase(existing), 200);
         }
 
         // Guard the write with the version we diffed against so a concurrent
-        // edit between read and write is never silently overwritten.
-        const result = await looService.updateExisting(id, changes, contributor, {
-          expectedUpdatedAt: existing.updatedAt,
-        });
+        // edit between read and write is never silently overwritten. A move
+        // counts toward the daily cap, so it is written under the cap's lock.
+        const update = (tx?: Prisma.TransactionClient) =>
+          looService.updateExisting(id, changes, actor, {
+            expectedUpdatedAt: existing.updatedAt,
+            tx,
+          });
+        const capped = isMove(existing.location, changes.location)
+          ? await writeUnderDailyCap(c, user, admin, update)
+          : { overCap: false as const, result: await update() };
+        if (capped.overCap) {
+          const limited = await queuedWriteRateLimitExceeded(c);
+          if (limited) return limited;
+          return queueForModeration(
+            c,
+            "update",
+            changes,
+            id,
+            baseUpdatedAt ?? existing.updatedAt,
+            "daily_cap",
+          );
+        }
+        const result = capped.result;
 
         if (result.status === "updated") {
           if (!result.loo) throw new Error(`Failed to reload loo ${id} after update`);
+          // Only an admin can take a toilet off the map with PUT.
+          if (changes.active === false && existing.active !== false) scheduleRemovalAlert(c, id);
           return savedLooResponse(c, result.loo, 200);
         }
 
@@ -603,26 +763,40 @@ loosRouter.post(
       const { baseUpdatedAt, ...input } = c.req.valid("json");
       const looService = c.get("looService");
 
-      if (await canWriteDirectly(c, user)) {
-        const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
-        return stateChangeResponse(
-          c,
-          await looService.report(id, input, contributor, { baseUpdatedAt }),
+      const isAdmin = () => isConfirmedAdmin(c, user);
+      const decision = await decideWrite(c, user, isAdmin);
+      let reason = decision.direct ? undefined : decision.reason;
+      if (decision.direct) {
+        const actor = writeActor(c, user);
+        const capped = await writeUnderDailyCap(c, user, await isAdmin(), (tx) =>
+          looService.report(id, input, actor, { baseUpdatedAt, tx }),
         );
+        if (!capped.overCap) {
+          if (capped.result.status === "updated") scheduleRemovalAlert(c, id);
+          return stateChangeResponse(c, capped.result);
+        }
+        reason = "daily_cap";
       }
-
-      const limited = await queuedWriteRateLimitExceeded(c);
-      if (limited) return limited;
 
       const checked = await looService.checkReport(id, input, { baseUpdatedAt });
       if (checked.status !== "ok") return stateChangeResponse(c, checked);
+
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
 
       const payload = {
         reason: input.reason,
         ...(input.details ? { details: input.details } : {}),
         ...(input.duplicateOf ? { duplicateOf: input.duplicateOf } : {}),
       };
-      return queueForModeration(c, "remove", payload, id, baseUpdatedAt ?? checked.base.updatedAt);
+      return queueForModeration(
+        c,
+        "remove",
+        payload,
+        id,
+        baseUpdatedAt ?? checked.base.updatedAt,
+        reason,
+      );
     }),
 );
 
@@ -649,9 +823,9 @@ loosRouter.post(
       const { baseUpdatedAt, details } = c.req.valid("json");
       const looService = c.get("looService");
 
-      if (await canWriteDirectly(c, user)) {
-        const contributor = extractContributor(user, c.env.AUTH0_PROFILE_KEY);
-        const result = await looService.restore(id, contributor, { baseUpdatedAt });
+      const decision = await decideWrite(c, user, () => isConfirmedAdmin(c, user));
+      if (decision.direct) {
+        const result = await looService.restore(id, writeActor(c, user), { baseUpdatedAt });
         // `details` is a note for moderators; a direct restore has no
         // moderator and no field to store it in, so it is not kept. Say so
         // rather than drop it silently.
@@ -664,11 +838,11 @@ loosRouter.post(
         return stateChangeResponse(c, result);
       }
 
-      const limited = await queuedWriteRateLimitExceeded(c);
-      if (limited) return limited;
-
       const checked = await looService.checkRestore(id, { baseUpdatedAt });
       if (checked.status !== "ok") return stateChangeResponse(c, checked);
+
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
 
       return queueForModeration(
         c,
@@ -676,6 +850,7 @@ loosRouter.post(
         details ? { details } : {},
         id,
         baseUpdatedAt ?? checked.base.updatedAt,
+        decision.reason,
       );
     }),
 );
@@ -698,12 +873,14 @@ loosRouter.post(
   (c) =>
     handleRoute(c, "loos.verify", async () => {
       const { id } = c.req.valid("param");
-      if (!(await canWriteDirectly(c, c.get("user")))) {
+      const user = c.get("user");
+      // In queue mode a non-admin still verifies, but under the queued-write limit.
+      if (!(await decideWrite(c, user, () => isConfirmedAdmin(c, user))).direct) {
         const limited = await queuedWriteRateLimitExceeded(c);
         if (limited) return limited;
       }
 
-      const result = await c.get("looService").verify(id);
+      const result = await c.get("looService").verify(id, user?.sub ?? null);
       if (result.status === "not_found") return notFound(c, "Loo not found");
       if (result.status === "removed") {
         return c.json(

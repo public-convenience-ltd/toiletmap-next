@@ -22,6 +22,8 @@ export type QueueOptions = {
   baseUpdatedAt?: Date | null;
   /** Contributor name of a signed-in submitter; null when anonymous. */
   submittedBy?: string | null;
+  /** Auth0 sub of a signed-in submitter (private); null when anonymous. */
+  submitterSub?: string | null;
 };
 
 /** Default page size of the moderation queue. */
@@ -52,6 +54,12 @@ export interface PendingChangeRow {
   base_updated_at: Date | null;
   /** Contributor name of a signed-in submitter; null when anonymous. */
   submitted_by: string | null;
+  /**
+   * Auth0 sub of a signed-in submitter; null when anonymous or queued before
+   * it was recorded. Approval stores it in `toilets.updated_by_sub`. Private:
+   * never rendered.
+   */
+  submitter_sub: string | null;
 }
 
 /**
@@ -77,7 +85,7 @@ export class PendingChangeService {
   async queue(
     type: PendingChangeType,
     payload: PendingPayload,
-    { looId, ip, baseUpdatedAt = null, submittedBy = null }: QueueOptions,
+    { looId, ip, baseUpdatedAt = null, submittedBy = null, submitterSub = null }: QueueOptions,
   ): Promise<{ id: string }> {
     const result = await this.prisma.pending_change.create({
       data: {
@@ -87,6 +95,7 @@ export class PendingChangeService {
         ip,
         base_updated_at: baseUpdatedAt,
         submitted_by: submittedBy,
+        submitter_sub: submitterSub,
       },
       select: { id: true },
     });

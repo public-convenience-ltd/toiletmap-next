@@ -378,6 +378,30 @@ describe("proxyApiRequest", () => {
     expect(res.headers.get("access-control-allow-credentials")).toBeNull();
   });
 
+  it("passes the server's read-only 503 through with Retry-After (editing paused)", async () => {
+    const body = { error: "read_only", message: "Editing the Toilet Map is paused." };
+    const { binding } = makeBinding(
+      () =>
+        new Response(JSON.stringify(body), {
+          status: 503,
+          headers: { "content-type": "application/json", "retry-after": "300" },
+        }),
+    );
+
+    const res = await proxyApiRequest({
+      request: new Request(`${ORIGIN}/api/loos/abc/report`, {
+        method: "POST",
+        headers: { origin: ORIGIN, "content-type": "application/json" },
+        body: JSON.stringify({ reason: "not_public" }),
+      }),
+      env: envWith(binding),
+    });
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("300");
+    expect(await res.json()).toEqual(body);
+  });
+
   it("passes a 304 through with no body", async () => {
     const { binding } = makeBinding(
       () => new Response(null, { status: 304, headers: { etag: '"v1"' } }),

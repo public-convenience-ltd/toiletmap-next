@@ -11,6 +11,7 @@ import {
   restoreLoo,
   verifyLoo,
 } from "../../api/reports";
+import { EDITING_PAUSED_MESSAGE, EDITING_PAUSED_TITLE } from "../../api/writeMode";
 import { loginHref } from "../../utils/returnTo";
 import {
   directionsUrl,
@@ -290,6 +291,8 @@ export default function ToiletDetailsPanel({
         status: "error",
         message: "You've done that a lot in a short time. Please try again later.",
       });
+    } else if (result.kind === "paused") {
+      setVerify({ status: "error", message: `${EDITING_PAUSED_TITLE}. ${EDITING_PAUSED_MESSAGE}` });
     } else {
       setVerify({ status: "error", message: result.message });
     }
@@ -378,6 +381,8 @@ export default function ToiletDetailsPanel({
           "error",
           "You've sent a lot of requests in a short time. Please try again later.",
         );
+      case "paused":
+        return line("warning", `${EDITING_PAUSED_TITLE}. ${EDITING_PAUSED_MESSAGE}`);
       case "error":
         return line("error", r.message);
       default:

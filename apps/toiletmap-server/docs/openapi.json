@@ -59,14 +59,18 @@
     "schemas": {
       "Coordinates": {
         "type": "object",
-        "description": "Geographic coordinates (WGS84).",
+        "description": "Geographic coordinates (WGS84). In writes, lat must be within -90..90 and lng within -180..180; a non-admin's new or changed location must also be inside the box lat 48.9..61.0, lng -8.7..1.9 (Great Britain, Northern Ireland, the Isle of Man and the Channel Islands), or the write fails with 400 `location_out_of_area`.",
         "properties": {
           "lat": {
             "type": "number",
+            "minimum": -90,
+            "maximum": 90,
             "example": 51.5074
           },
           "lng": {
             "type": "number",
+            "minimum": -180,
+            "maximum": 180,
             "example": -0.1278
           }
         },
@@ -365,7 +369,7 @@
           },
           "active": {
             "type": "boolean",
-            "description": "Whether the loo is shown on the map. Must be true or false; null is rejected. Set false (with a removalReason) to remove a loo."
+            "description": "Admins only (anyone else gets 400 `admin_only_fields`; use `/report` and `/restore`). Whether the loo is shown on the map. Must be true or false; null is rejected."
           },
           "allGender": {
             "type": [
@@ -446,7 +450,8 @@
               "string",
               "null"
             ],
-            "maxLength": 2000
+            "maxLength": 2000,
+            "description": "Admins only (anyone else gets 400 `admin_only_fields`)."
           },
           "openingTimes": {
             "anyOf": [
@@ -460,7 +465,7 @@
             "description": "Opening times for each day of the week. Array has 7 elements: Monday (0) through Sunday (6). Each element is either [\"HH:mm\", \"HH:mm\"] for open days, or [] for closed days. If all opening times are unknown, the entire field is null."
           },
           "location": {
-            "description": "Optional location update. Null clears an existing location.",
+            "description": "Optional location update. Null clears an existing location (admins only; anyone else gets 400 `location_required`). A non-admin move of more than 50 m is queued (202, `reason: large_move`).",
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Coordinates"
@@ -485,6 +490,7 @@
                 "minLength": 24,
                 "maxLength": 24,
                 "pattern": "^[a-f0-9]{24}$",
+                "description": "Admins only; anyone else gets 400 `id_not_allowed` (omit it and an id is generated). Upper case is accepted and lowercased.",
                 "example": "0123456789abcdef01234567"
               }
             }
@@ -642,6 +648,15 @@
           "unchanged": {
             "type": "boolean",
             "description": "True when the submission matched the current record and nothing was queued."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "large_move",
+              "daily_cap",
+              "queue_mode"
+            ],
+            "description": "Why a write from a caller who could otherwise write directly was queued: `large_move` when a non-admin moves a loo more than 50 m; `daily_cap` when the account has already made its daily allowance of removals and moves (default 10 in any 24 hours; admins exempt); `queue_mode` while the write kill switch queues every non-admin write."
           }
         }
       },
@@ -1931,7 +1946,7 @@
           "Loos"
         ],
         "summary": "Create a loo",
-        "description": "Signed-in callers create the loo directly (201) unless they are blocked in Auth0. Anonymous and blocked callers have the new loo queued for moderation (202), as does anyone whose block status cannot be confirmed.",
+        "description": "Signed-in callers create the loo directly (201) unless they are blocked in Auth0. Anonymous and blocked callers have the new loo queued for moderation (202), as does anyone whose block status cannot be confirmed. Only admins may send `id`, `active`, `removalReason` or `location: null`, or place a loo outside the GB / NI / Isle of Man / Channel Islands box; anyone else gets 400 with an `error` code (`id_not_allowed`, `admin_only_fields`, `location_required`, `location_out_of_area`).",
         "security": [
           {
             "bearerAuth": []
@@ -1974,7 +1989,7 @@
             }
           },
           "400": {
-            "description": "Invalid request payload.",
+            "description": "Invalid request payload, or a field or location only an admin may set (`error` names the rule).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1995,6 +2010,24 @@
           },
           "409": {
             "description": "A loo with the supplied ID already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2143,8 +2176,8 @@
         "tags": [
           "Loos"
         ],
-        "summary": "Update (or create) a loo",
-        "description": "Signed-in callers write directly unless they are blocked in Auth0; an unknown id creates the loo. Anonymous and blocked callers (and anyone whose block status cannot be confirmed) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
+        "summary": "Update a loo (admins: or create it)",
+        "description": "Signed-in callers write directly unless they are blocked in Auth0. Only admins may create a loo with PUT (an unknown id is a 404 for everyone else), send `active`, `removalReason` or `location: null` (400 `admin_only_fields` / `location_required`; use `/report` and `/restore`), or move a loo outside the GB / NI / Isle of Man / Channel Islands box (400 `location_out_of_area`). A non-admin move of more than 50 m is queued even for a trusted caller (202, `reason: large_move`). Anonymous and blocked callers (and anyone whose block status cannot be confirmed) can only suggest changes to existing loos: the changed fields are queued for moderation (202). Only fields that differ from the stored record are applied or queued. Reactivating a removed loo also clears its `removalCategory` and `duplicateOf`.",
         "parameters": [
           {
             "name": "id",
@@ -2198,7 +2231,7 @@
             }
           },
           "201": {
-            "description": "New loo created. Includes its `compressed` map tuple.",
+            "description": "New loo created (admins only). Includes its `compressed` map tuple.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2208,7 +2241,7 @@
             }
           },
           "202": {
-            "description": "Change queued for moderation (anonymous, blocked in Auth0, or block status could not be confirmed).",
+            "description": "Change queued for moderation (anonymous, blocked in Auth0, block status could not be confirmed, a non-admin move of more than 50 m, a move past the account's daily cap, or queue mode); see `reason`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2218,7 +2251,7 @@
             }
           },
           "400": {
-            "description": "Invalid identifier or payload.",
+            "description": "Invalid identifier or payload, or a field or location only an admin may set (`error` names the rule).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2238,7 +2271,7 @@
             }
           },
           "404": {
-            "description": "Anonymous or blocked caller's change for a loo that does not exist.",
+            "description": "No loo has this id (only admins create with PUT).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2266,6 +2299,24 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2276,7 +2327,7 @@
           "Loos"
         ],
         "summary": "Report a problem (remove a loo from the map)",
-        "description": "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller.",
+        "description": "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller. A non-admin account that has already made its daily allowance of removals and moves (default 10 in any 24 hours) is queued too (202, `reason: daily_cap`), and while the write kill switch is in queue mode every non-admin report is (`reason: queue_mode`).",
         "parameters": [
           {
             "name": "id",
@@ -2370,6 +2421,24 @@
           },
           "429": {
             "description": "Too many writes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2488,6 +2557,24 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2555,6 +2642,24 @@
           },
           "429": {
             "description": "Too many writes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {

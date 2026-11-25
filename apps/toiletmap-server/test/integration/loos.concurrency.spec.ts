@@ -7,6 +7,8 @@ import { createFixtureFactory } from "./utils/fixtures";
 import { sessionHeaders } from "./utils/session";
 import { callApi, jsonRequest } from "./utils/test-client";
 
+const TESTER = { contributor: "tester", sub: null };
+
 const fixtures = createFixtureFactory();
 
 const service = () => new LooService(getPrismaClient());
@@ -75,7 +77,7 @@ describe("LooService.updateExisting optimistic-concurrency guard", () => {
     const before = await getRaw(loo.id);
     const auditBefore = await countAuditRows(loo.id);
 
-    const result = await service().updateExisting(loo.id, { notes: "Overwrite" }, "tester", {
+    const result = await service().updateExisting(loo.id, { notes: "Overwrite" }, TESTER, {
       expectedUpdatedAt: minuteBefore(loo.updatedAt),
     });
 
@@ -87,7 +89,7 @@ describe("LooService.updateExisting optimistic-concurrency guard", () => {
   it("updates when expectedUpdatedAt matches the row", async () => {
     const loo = await fixtures.loos.create({ notes: "Original" });
 
-    const result = await service().updateExisting(loo.id, { notes: "Guarded edit" }, "tester", {
+    const result = await service().updateExisting(loo.id, { notes: "Guarded edit" }, TESTER, {
       expectedUpdatedAt: loo.updatedAt,
     });
 
@@ -108,7 +110,7 @@ describe("LooService.updateExisting optimistic-concurrency guard", () => {
     const base = await service().getMutationBase(loo.id);
     expect(base?.updatedAt).toBe("2025-06-01T12:00:00.123Z");
 
-    const result = await service().updateExisting(loo.id, { notes: "Still matches" }, "tester", {
+    const result = await service().updateExisting(loo.id, { notes: "Still matches" }, TESTER, {
       expectedUpdatedAt: base?.updatedAt,
     });
 
@@ -121,13 +123,13 @@ describe("LooService.updateExisting optimistic-concurrency guard", () => {
     const prisma = getPrismaClient();
     await prisma.$executeRaw`UPDATE toilets SET updated_at = NULL WHERE id = ${loo.id}`;
 
-    const stale = await service().updateExisting(loo.id, { notes: "Dated guard" }, "tester", {
+    const stale = await service().updateExisting(loo.id, { notes: "Dated guard" }, TESTER, {
       expectedUpdatedAt: new Date().toISOString(),
     });
     expect(stale).toEqual({ status: "conflict" });
     expect((await getRaw(loo.id)).notes).toBe("Legacy row");
 
-    const matched = await service().updateExisting(loo.id, { notes: "Null guard" }, "tester", {
+    const matched = await service().updateExisting(loo.id, { notes: "Null guard" }, TESTER, {
       expectedUpdatedAt: null,
     });
     expect(matched.status).toBe("updated");
@@ -137,7 +139,7 @@ describe("LooService.updateExisting optimistic-concurrency guard", () => {
   it("returns not_found for a missing id and inserts nothing", async () => {
     const missingId = generateLooId();
 
-    const result = await service().updateExisting(missingId, { notes: "Ghost" }, "tester", {
+    const result = await service().updateExisting(missingId, { notes: "Ghost" }, TESTER, {
       expectedUpdatedAt: new Date().toISOString(),
     });
 

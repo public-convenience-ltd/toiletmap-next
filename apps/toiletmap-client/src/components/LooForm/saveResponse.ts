@@ -1,4 +1,5 @@
 import type { LooDetail } from "../../api/loos";
+import { isEditingPaused } from "../../api/writeMode";
 import { describeIssues } from "./issues";
 import type { LooFormMode } from "./payload";
 
@@ -16,6 +17,8 @@ export type SaveAction =
   | { kind: "auth" }
   /** 404 on edit: the toilet no longer exists. */
   | { kind: "notFound" }
+  /** 503 `{ error: "read_only" }`: the server's write kill switch has paused editing. */
+  | { kind: "paused" }
   /**
    * Anything else. For a 400, `issues` is the server's raw validation payload, so the form
    * can map it onto its fields; `details` is the same, flattened into readable lines.
@@ -71,6 +74,8 @@ export function interpretSaveResponse(
       ...(issues !== undefined ? { issues } : {}),
     };
   }
+
+  if (isEditingPaused(status, body)) return { kind: "paused" };
 
   if (status >= 500) {
     return {

@@ -15,6 +15,7 @@ import {
 import type { LooDetail } from "../../api/loos";
 import { applyLocalMutation } from "../../api/mapCache";
 import { readPendingChange, rememberPendingChange } from "../../api/reports";
+import { EDITING_PAUSED_MESSAGE, EDITING_PAUSED_TITLE } from "../../api/writeMode";
 import { useSoftKeyboardOpen } from "../../hooks/useSoftKeyboardOpen";
 import { currentPath, loginHref } from "../../utils/returnTo";
 import { type MapView, mapViewFromSearch } from "../LooMap/mapView";
@@ -84,6 +85,7 @@ type SubmitError =
   | { kind: "message"; message: string; details?: string[] }
   | { kind: "auth" }
   | { kind: "notFound" }
+  | { kind: "paused" }
   | { kind: "conflict"; current: LooDetail; fields: LooFormField[] };
 
 type Outcome = "queued" | "unchanged";
@@ -645,6 +647,7 @@ export default function LooForm({
           return;
         case "auth":
         case "notFound":
+        case "paused":
           setReviewOpen(false);
           setSubmitError({ kind: action.kind });
           focusLater(alertsRef);
@@ -1059,6 +1062,13 @@ export default function LooForm({
               Sign in again
             </a>{" "}
             — your changes are kept.
+          </Notice>
+        )}
+
+        {submitError?.kind === "paused" && (
+          // The form keeps everything entered, so it can be sent once editing is back.
+          <Notice tone="warning" title={EDITING_PAUSED_TITLE} headingLevel={2}>
+            {EDITING_PAUSED_MESSAGE} Your changes are still here.
           </Notice>
         )}
 

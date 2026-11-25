@@ -159,6 +159,7 @@ describe("reportLoo", () => {
     [404, { message: "Not found" }, { kind: "notFound" }],
     [401, { message: "Unauthorized" }, { kind: "auth" }],
     [429, { message: "Too many" }, { kind: "rateLimited" }],
+    [503, { error: "read_only", message: "Paused" }, { kind: "paused" }],
   ])("maps HTTP %i %j", async (status, body, expected) => {
     fetchMock.mockResolvedValue(jsonResponse(status, body));
     expect(await reportLoo("", ID, { reason: "other", details: "x" })).toEqual(expected);
@@ -249,8 +250,10 @@ describe("verifyLoo", () => {
     [409, { error: "removed" }, "removed"],
     [404, {}, "notFound"],
     [429, {}, "rateLimited"],
+    [503, { error: "read_only" }, "paused"],
+    [503, { message: "Upstream down" }, "error"],
     [500, {}, "error"],
-  ])("maps HTTP %i", async (status, body, kind) => {
+  ])("maps HTTP %i %j", async (status, body, kind) => {
     fetchMock.mockResolvedValue(jsonResponse(status, body));
     expect((await verifyLoo("", ID)).kind).toBe(kind);
   });
