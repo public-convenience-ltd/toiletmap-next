@@ -1,12 +1,22 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { every } from "hono/combine";
 import { optionalAuth } from "../../auth/middleware";
-import { LOO_ID_LENGTH } from "../../common/constants";
+import {
+  HEAVY_PROXIMITY_RADIUS,
+  LOO_ID_LENGTH,
+  MIN_GEOHASH_PREFIX_LENGTH,
+} from "../../common/constants";
 import { validate } from "../../common/validator";
-import { cacheResponse, edgeCache } from "../../middleware/cache";
+import {
+  type CacheKeyValue,
+  cacheResponse,
+  edgeCache,
+  normalisedCacheKey,
+} from "../../middleware/cache";
 import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
-import { canWriteDirectly, hasAdminRole } from "../../middleware/require-admin-role";
+import { canWriteDirectly, isConfirmedAdmin } from "../../middleware/require-admin-role";
 import { generateLooId } from "../../services/loo";
 import {
   clearRemovalOnReactivate,
@@ -103,6 +113,43 @@ const authenticatedWriteRateLimit: MiddlewareHandler<{
   }
   return signedInWriteLimiters(c, next);
 };
+
+/**
+ * Largest JSON body a loo write route reads. A legitimate body is at most
+ * about 26 KB (three 2000-character text fields of 4-byte characters plus the
+ * rest), so this leaves room for escaping while stopping oversized bodies
+ * before they are parsed.
+ */
+export const LOO_WRITE_BODY_MAX_BYTES = 64 * 1024;
+
+const writeBodyLimit = bodyLimit({
+  maxSize: LOO_WRITE_BODY_MAX_BYTES,
+  onError: (c) => c.json({ message: "Request body is too large", error: "payload_too_large" }, 413),
+});
+
+/**
+ * The stricter per-IP limit for heavy reads (see `rateLimiters.heavyRead`),
+ * applied when `isHeavy` says this request is one. Registered after the
+ * route's validators so `isHeavy` can read the validated parameters, and
+ * before the edge cache. Confirmed admins are exempt (the admin dataset
+ * explorer pages through /search and /metrics); only a token that claims
+ * `access:admin` costs an Auth0 Management lookup, cached per user for 60s.
+ */
+const heavyReadLimit =
+  (
+    isHeavy: (c: AppContext) => boolean,
+  ): MiddlewareHandler<{ Variables: AppVariables; Bindings: Env }> =>
+  async (c, next) => {
+    if (!isHeavy(c) || (await isConfirmedAdmin(c, c.get("user")))) {
+      await next();
+      return;
+    }
+    return rateLimiters.heavyRead(c, next);
+  };
+
+/** Validated query and path parameters of the current request (registered validators only). */
+const validated = (c: Context, target: "query" | "param"): Record<string, CacheKeyValue> =>
+  (c.req.valid as (target: "query" | "param") => Record<string, CacheKeyValue>)(target);
 
 const CONFLICT_MESSAGE = "This toilet was changed by someone else while you were editing.";
 
@@ -204,20 +251,25 @@ loosRouter.get(
   "/geohash/:geohash",
   validate("param", geohashParamSchema, "Invalid geohash path parameter"),
   validate("query", geohashQuerySchema, "Invalid geohash query parameter"),
-  cacheResponse((c) => {
-    const geohash = c.req.param("geohash");
-    const resultCount = c.get("resultCount");
+  // The shortest allowed prefixes cover the most ground.
+  heavyReadLimit((c) => String(validated(c, "param").geohash).length <= MIN_GEOHASH_PREFIX_LENGTH),
+  cacheResponse(
+    (c) => {
+      const geohash = String(validated(c, "param").geohash);
+      const resultCount = c.get("resultCount");
+      const broad = geohash.length <= MIN_GEOHASH_PREFIX_LENGTH;
 
-    if (!geohash) return 0;
+      // If we have a result count, use it to decide caching
+      if (typeof resultCount === "number") {
+        return resultCount > 100 ? (broad ? 3600 : 300) : 0;
+      }
 
-    // If we have a result count, use it to decide caching
-    if (typeof resultCount === "number") {
-      return resultCount > 100 ? (geohash.length <= 3 ? 3600 : 300) : 0;
-    }
-
-    // Fallback for cases where resultCount might not be set (shouldn't happen in this route)
-    return geohash.length <= 3 ? 3600 : 300;
-  }),
+      // Fallback for cases where resultCount might not be set (shouldn't happen in this route)
+      return broad ? 3600 : 300;
+    },
+    (c) =>
+      normalisedCacheKey(c, "loos/geohash", { ...validated(c, "param"), ...validated(c, "query") }),
+  ),
   (c) =>
     handleRoute(c, "loos.geohash", async () => {
       const { geohash } = c.req.valid("param");
@@ -256,38 +308,43 @@ loosRouter.get(
  * carries the cursor from when it was built, which is older and therefore
  * still safe (it only widens the next `/updates` window).
  */
-loosRouter.get("/dump", validate("query", dumpQuerySchema, "Invalid dump query"), (c) =>
-  handleRoute(c, "loos.dump", async () => {
-    const { rich } = c.req.valid("query");
-    const looService = c.get("looService");
+loosRouter.get(
+  "/dump",
+  validate("query", dumpQuerySchema, "Invalid dump query"),
+  heavyReadLimit((c) => validated(c, "query").rich === true),
+  (c) =>
+    handleRoute(c, "loos.dump", async () => {
+      const { rich } = c.req.valid("query");
+      const looService = c.get("looService");
 
-    // Read before the dump query: see LooService.getSyncCursor.
-    const version = await looService.getDatasetVersion();
-    const etag = dumpEtag(version, rich);
-    const headers = { "Cache-Control": DUMP_CACHE_CONTROL, ETag: etag };
+      // Read before the dump query: see LooService.getSyncCursor.
+      const version = await looService.getDatasetVersion();
+      const etag = dumpEtag(version, rich);
+      const headers = { "Cache-Control": DUMP_CACHE_CONTROL, ETag: etag };
 
-    if (etagMatches(c.req.header("If-None-Match"), etag)) {
-      return c.body(null, 304, headers);
-    }
+      if (etagMatches(c.req.header("If-None-Match"), etag)) {
+        return c.body(null, 304, headers);
+      }
 
-    const { origin } = new URL(c.req.url);
-    const key = `${origin}/api/loos/dump?rich=${rich}&v=${encodeURIComponent(etag)}`;
-    const cached = await edgeCache.match(c, key, DUMP_CACHE_CONTROL);
-    if (cached) return cached;
+      const { origin } = new URL(c.req.url);
+      const key = `${origin}/api/loos/dump?rich=${rich}&v=${encodeURIComponent(etag)}`;
+      const cached = await edgeCache.match(c, key, DUMP_CACHE_CONTROL);
+      if (cached) return cached;
 
-    const data = rich ? await looService.getAll() : await looService.getAllCompressed();
-    const response = c.json({ data, count: data.length, cursor: version.cursor }, 200, headers);
-    edgeCache.put(c, key, response, DUMP_EDGE_TTL_SECONDS);
-    return response;
-  }),
+      const data = rich ? await looService.getAll() : await looService.getAllCompressed();
+      const response = c.json({ data, count: data.length, cursor: version.cursor }, 200, headers);
+      edgeCache.put(c, key, response, DUMP_EDGE_TTL_SECONDS);
+      return response;
+    }),
 );
 
 /** GET /loos/proximity */
 loosRouter.get(
   "/proximity",
   validate("query", proximitySchema, "Invalid proximity query"),
+  heavyReadLimit((c) => Number(validated(c, "query").radius) > HEAVY_PROXIMITY_RADIUS),
   // Short TTL: the add/edit duplicate prompt should see reports and restores soon.
-  cacheResponse(60),
+  cacheResponse(60, (c) => normalisedCacheKey(c, "loos/proximity", validated(c, "query"))),
   (c) =>
     handleRoute(c, "loos.proximity", async () => {
       const { lat, lng, radius, includeInactive, exclude } = c.req.valid("query");
@@ -301,34 +358,44 @@ loosRouter.get(
 );
 
 /** GET /loos/search */
-loosRouter.get("/search", validate("query", searchQuerySchema, "Invalid search query"), (c) =>
-  handleRoute(c, "loos.search", async () => {
-    const params = c.req.valid("query");
-    const looService = c.get("looService");
-    const { data, total } = await looService.search(params);
+loosRouter.get(
+  "/search",
+  validate("query", searchQuerySchema, "Invalid search query"),
+  heavyReadLimit(() => true),
+  (c) =>
+    handleRoute(c, "loos.search", async () => {
+      const params = c.req.valid("query");
+      const looService = c.get("looService");
+      const { data, total } = await looService.search(params);
 
-    const offset = (params.page - 1) * params.limit;
-    const hasMore = offset + data.length < total;
+      const offset = (params.page - 1) * params.limit;
+      const hasMore = offset + data.length < total;
 
-    return c.json({
-      data,
-      count: data.length,
-      total,
-      page: params.page,
-      pageSize: params.limit,
-      hasMore,
-    });
-  }),
+      return c.json({
+        data,
+        count: data.length,
+        total,
+        page: params.page,
+        pageSize: params.limit,
+        hasMore,
+      });
+    }),
 );
 
 /** GET /loos/metrics */
-loosRouter.get("/metrics", validate("query", metricsQuerySchema, "Invalid metrics query"), (c) =>
-  handleRoute(c, "loos.metrics", async () => {
-    const looService = c.get("looService");
-    const { recentWindowDays, ...params } = c.req.valid("query") as MetricsQuery;
-    const metrics = await looService.getSearchMetrics(params as SearchQuery, { recentWindowDays });
-    return c.json(metrics);
-  }),
+loosRouter.get(
+  "/metrics",
+  validate("query", metricsQuerySchema, "Invalid metrics query"),
+  heavyReadLimit(() => true),
+  (c) =>
+    handleRoute(c, "loos.metrics", async () => {
+      const looService = c.get("looService");
+      const { recentWindowDays, ...params } = c.req.valid("query") as MetricsQuery;
+      const metrics = await looService.getSearchMetrics(params as SearchQuery, {
+        recentWindowDays,
+      });
+      return c.json(metrics);
+    }),
 );
 
 /** GET /loos/:id/reports */
@@ -344,7 +411,9 @@ loosRouter.get(
       const looService = c.get("looService");
       const reports = await looService.getReports(id, {
         hydrate,
-        includeContributors: hasAdminRole(c.get("user")),
+        // Auth0 must still grant access:admin (and not block the user): the
+        // token's claim alone would outlive a revocation by up to 24 h.
+        includeContributors: await isConfirmedAdmin(c, c.get("user")),
       });
       return c.json({ data: reports, count: reports.length });
     }),
@@ -386,6 +455,7 @@ loosRouter.post(
   "/",
   optionalAuth,
   authenticatedWriteRateLimit,
+  writeBodyLimit,
   validate("json", createMutationSchema, "Invalid create request body"),
   (c) =>
     handleRoute(c, "loos.create", async () => {
@@ -432,6 +502,7 @@ loosRouter.put(
   "/:id",
   optionalAuth,
   authenticatedWriteRateLimit,
+  writeBodyLimit,
   validate("param", looIdParamSchema, "Invalid id path parameter"),
   validate("json", updateMutationSchema, "Invalid upsert request body"),
   (c) =>
@@ -522,6 +593,7 @@ loosRouter.post(
   "/:id/report",
   optionalAuth,
   authenticatedWriteRateLimit,
+  writeBodyLimit,
   validate("param", looIdParamSchema, "Invalid id path parameter"),
   validate("json", reportSchema, "Invalid report request body"),
   (c) =>
@@ -567,6 +639,7 @@ loosRouter.post(
   "/:id/restore",
   optionalAuth,
   authenticatedWriteRateLimit,
+  writeBodyLimit,
   validate("param", looIdParamSchema, "Invalid id path parameter"),
   validate("json", restoreSchema, "Invalid restore request body"),
   (c) =>
@@ -611,17 +684,21 @@ loosRouter.post(
  * POST /loos/:id/verify
  *
  * "Yes, it's still here": anyone may confirm a toilet, which only sets
- * `verified_at` to now. Anonymous callers share the anonymous write limiter.
+ * `verified_at` to now. It goes through the same block check as other
+ * writes: anonymous callers, blocked users and users whose block status
+ * cannot be confirmed still verify, but share the queued-write limiter
+ * (1/min, per user when signed in), as for their other changes.
  */
 loosRouter.post(
   "/:id/verify",
   optionalAuth,
   authenticatedWriteRateLimit,
+  writeBodyLimit,
   validate("param", looIdParamSchema, "Invalid id path parameter"),
   (c) =>
     handleRoute(c, "loos.verify", async () => {
       const { id } = c.req.valid("param");
-      if (!c.get("user")) {
+      if (!(await canWriteDirectly(c, c.get("user")))) {
         const limited = await queuedWriteRateLimitExceeded(c);
         if (limited) return limited;
       }

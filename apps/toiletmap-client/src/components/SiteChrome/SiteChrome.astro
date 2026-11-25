@@ -10,6 +10,7 @@
 import { defaultFooterLinks, Footer } from "toiletmap-design-system";
 import logo from "../../assets/logo.svg?url";
 import { loginHref } from "../../utils/returnTo";
+import { hasSignedInFlag } from "../../utils/session";
 import { siteFooterLinks } from "../../utils/siteNav";
 import SiteHeader from "./SiteHeader";
 
@@ -30,7 +31,7 @@ interface Props {
 const { map = false, signInReturnTo } = Astro.props;
 
 // Prerendered pages have no visitor cookies: the header reads them in the browser instead.
-const isAuthenticated = Astro.isPrerendered ? undefined : !!Astro.cookies.get("user_info")?.value;
+const isAuthenticated = Astro.isPrerendered ? undefined : hasSignedInFlag(Astro.cookies);
 const followsPage = signInReturnTo === undefined;
 const returnTo = followsPage
   ? Astro.isPrerendered

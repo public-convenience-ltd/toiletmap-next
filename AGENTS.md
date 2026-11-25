@@ -153,21 +153,23 @@ All mutations to `toilets` records create audit entries tracking:
 
 2. **Session Cookie (Admin interface)**:
    - HTTP-only cookies set by OAuth2 flow
-   - `access_token`, `id_token`, `user_info` cookies
+   - `access_token` (the credential) and `id_token` (profile claims only, never a credential) cookies
    - Used for admin UI authentication
+   - Cookie-authenticated POST/PUT/DELETE under `/admin` and `/api` must be same-origin (`Origin`, or `Sec-Fetch-Site: same-origin`), else 403 (`src/middleware/csrf.ts`); bearer-token and cookie-less requests are not checked
 
 ### Middleware Flow
 
 **`optionalAuth`, `requireAuth`, `requireAdminAuth`** (`src/auth/middleware.ts`):
 1. Attempt to authenticate via `Authorization: Bearer` header.
-2. Fall back to session cookies (`access_token` → `id_token`).
-3. Enrich `c.user` with Auth0 userinfo (cookie payload or `/userinfo` call) so `name`, `email`, etc. are always present on the request user (and mirrored under `user.profile`).
-4. `optionalAuth` skips auth if no credentials are provided, `requireAuth` returns `401`, and `requireAdminAuth` redirects to `/admin/login`.
+2. Fall back to the `access_token` cookie (a session whose access token fails is cleared; the `id_token` is never accepted as a credential).
+3. Enrich `c.user` with `name`, `nickname`, `email` from the verified `id_token` (same `sub`) or Auth0 `/userinfo` (mirrored under `user.profile`). No browser-editable cookie feeds the profile.
+4. `optionalAuth` skips auth if no credentials are provided (and treats the caller as anonymous when Auth0's JWKS cannot be fetched), `requireAuth` returns `401`, and `requireAdminAuth` redirects to `/admin/login`.
+5. Tokens must have `exp`, the configured issuer and an `aud` that is exactly the expected audience (or contains it, as an array); an empty expected audience rejects every token. JWKS is cached for 10 min; if a refetch fails, keys fetched in the last 24 h keep verifying tokens.
 
 **`requireAdminRole` middleware** (`src/middleware/require-admin-role.ts`):
-- Checks for `access:admin` permission in JWT claims
-- Used to reveal contributor info in audit reports
-- Protects admin-only routes
+- Requires `access:admin` in the token and confirmed by the Auth0 Management API (60s cache; during an outage both the permission and the block lookups fall back to the last good answer for up to 5 min), and that the user is not blocked
+- Outside `ENVIRONMENT=development`, missing Management credentials or a failed lookup deny admin access (a confirmed revocation or block also clears the session)
+- Protects admin-only routes. On public API routes, `isConfirmedAdmin` (same Auth0 checks) decides the admin extras: contributor names in audit reports and the heavy-read limit exemption. `hasAdminRole` (token claims only) is informational (the `/` greeting) and for machine-to-machine writes
 
 ### OAuth2 Flow (Admin Interface)
 
@@ -175,7 +177,7 @@ Flow implemented in `src/admin/auth.ts`:
 1. **GET /admin/login** → Redirect to Auth0 authorize endpoint
 2. User authenticates on Auth0
 3. **GET /admin/callback** → Exchange authorization code for tokens
-4. Set HTTP-only cookies (`id_token`, `access_token`, `user_info`)
+4. Verify both tokens, then set HTTP-only cookies (`id_token`, `access_token`), each lasting no longer than its token
 5. Redirect to `/admin`
 6. **GET /admin/logout** → Clear all cookies
 
@@ -202,21 +204,25 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 ### Public Endpoints (No Auth Required)
 
-- **GET /** - Health check
-- **GET /api/docs** - Swagger UI
+- **GET /** - Health check (database status from the same cached check as `/health/ready`: at most one `SELECT 1` per isolate every 10 s, every 2 s after a failure, `src/services/health/readiness.ts`)
+- **GET /api/docs** - Swagger UI (jsDelivr assets pinned to an exact version with SRI hashes in `src/docs/swagger-ui.ts`)
 - **GET /api/docs/openapi.json** - OpenAPI spec
 - **GET /admin/login** - Initiate OAuth2 flow
 - **GET /admin/callback** - OAuth2 callback handler
 - **GET /api/areas** - List administrative areas (name and type only)
 - **GET /api/loos/:id** - Fetch single loo by ID
-- **GET /api/loos?ids=** - Batch fetch loos (comma-separated or repeated `?ids=` params)
-- **GET /api/loos/geohash/:geohash** - Search by geohash prefix (optional `?active=true/false/any`)
+- **GET /api/loos?ids=** - Batch fetch loos (comma-separated or repeated `?ids=` params; de-duplicated, at most 100, each 24 characters)
+- **GET /api/loos/geohash/:geohash** - Search by geohash prefix: 4-12 base32 geohash characters (lower-cased; anything else, LIKE wildcards included, is a 400). Optional `?active=true/false/any`
 - **GET /api/loos/proximity** - Find nearby loos, nearest first (`lat`, `lng` required; optional `radius`, `includeInactive=true|false` (default false: active only) and `exclude=<id>`). Each item carries `active` and `distance` (metres).
-- **GET /api/loos/search** - Advanced search with filters, sorting, pagination
+- **GET /api/loos/search** - Advanced search with filters, sorting, pagination (`limit` at most 200, `(page - 1) * limit` at most 100,000)
 - **GET /api/loos/metrics** - Aggregate metrics for filtered results
-- **GET /api/loos/:id/reports** - Audit history (contributors redacted unless caller has `access:admin`)
+- **GET /api/loos/:id/reports** - Audit history (contributors redacted unless the caller holds `access:admin`, confirmed with Auth0 and not blocked)
 
 Public routes still accept optional authentication so admin tokens can unlock extra data (e.g., contributor names in reports).
+
+**Input limits and caching**: every `/api/loos` query and body schema and the `/api/feedback` body are `.strict()` (an unknown parameter or field is a 400). Edge-cache keys are built from the validated, normalised parameters (`normalisedCacheKey` in `src/middleware/cache.ts`; GraphQL GETs from the re-printed operation and its declared variables, `src/routes/legacy-graphql/request-shape.ts`), never the raw URL; proximity `lat`/`lng` are rounded to 5 decimals (about 1 m) first, for the query too. Heavy public reads take a stricter per-IP limit (`rateLimiters.heavyRead`, see `apps/toiletmap-server/docs/operations/rate-limiting.md`). Loo write routes refuse bodies over 64 KiB with 413 before parsing; the client proxy refuses bodies over 128 KiB while reading them.
+
+**CORS**: `ALLOWED_ORIGINS` is a list of exact origins (wildcards and `*` are ignored), never with credentials, and `/admin/*` sends no CORS headers. Unset, it is the localhost dev origins in development and nothing elsewhere. No first-party page needs CORS (the client proxies `/api` over the service binding; the admin is same-origin); the legacy GraphQL endpoint has its own policy.
 
 - **GET/POST /api/graphql** - Legacy GraphQL compatibility endpoint (deprecated, read-only, frozen; `src/routes/legacy-graphql/`). The client worker proxies exactly `/api` and `/api/` here with no cookies or token. Do not add fields: new features go to REST. Its output is pinned byte for byte to the golden fixtures in `test/fixtures/legacy-graphql/` (contract tests: `test/integration/legacy-graphql.*.spec.ts`); see the server README.
 
@@ -225,19 +231,19 @@ Public routes still accept optional authentication so admin tokens can unlock ex
 - **POST /api/loos** - Create new loo (requires contributor info in JWT)
 - **PUT /api/loos/:id** - Upsert (create or update) loo (requires contributor info in JWT)
 
-Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). Sessions authenticated only by their `id_token` (the access token failed verification) are queued too, and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked in local dev and tests, but in production (`ENVIRONMENT=production`) missing credentials queue every signed-in change. To stop someone editing, block the user in the Auth0 dashboard (for an admin, also remove `access:admin`: blocking does not end an existing session or admin access). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
+Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). A session whose access token fails verification is anonymous (the `id_token` is never a credential), and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked only in local dev and tests (`ENVIRONMENT=development`; the integration env defaults to it); every other environment, previews included and `ENVIRONMENT` unset, queues every signed-in change when credentials are missing. To stop someone editing, block the user in the Auth0 dashboard (blocking an admin also denies `/admin` within 60s and ends their admin session, and drops their API admin extras such as contributor names in reports; still remove `access:admin` if they should not get it back when unblocked). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
 
 ### Report, restore and verify (anyone; signed-in, unblocked callers apply directly)
 
 - **POST /api/loos/:id/report** - `{reason: permanently_closed|does_not_exist|not_public|duplicate|other, details?, duplicateOf?, baseUpdatedAt?}`. Trusted: `active=false`, `removal_category`, `removal_reason`, `duplicate_of`; 200 with the loo and `compressed: null`. Others: 202, pending type `remove`. 409 `already_removed` / stale `conflict`; `details` required for `other`, `duplicateOf` required for (and only allowed with) `duplicate`.
 - **POST /api/loos/:id/restore** - `{details?, baseUpdatedAt?}`. Trusted: `active=true`, clears category and duplicate link; 200 with `compressed`. Others: 202, pending type `restore`. 409 `not_removed`.
-- **POST /api/loos/:id/verify** - no body; anyone (anonymous rate-limited). Sets only `verified_at`; 200 `{id, verifiedAt}`. 409 `removed` for an inactive loo.
+- **POST /api/loos/:id/verify** - no body; anyone. Callers who cannot write directly (anonymous, blocked, block status unknown) use the 1/min queued-write limiter. Sets only `verified_at`; 200 `{id, verifiedAt}`. 409 `removed` for an inactive loo.
 
 `LooResponse` includes `removalCategory` and `duplicateOf`. Optional secret `MODERATION_SLACK_WEBHOOK` (off when unset) posts a counts-only "N changes awaiting review" message when something is queued.
 
 ### Feedback (public, unauthenticated)
 
-- **POST /api/feedback** - `{text, email?, route?}` as JSON or a URL-encoded form (`src/routes/feedback/index.ts`). Stored in `public.feedback`; 200 `{ok: true, message}` (200, not 201: the Flutter app treats only 200 as success). Legacy-compatible: the Flutter app posts a form with `email: ""` and no Origin header; the legacy website posted the same fields as JSON. 400 for empty/over-5000-character text or an invalid email; `route` is truncated to 255. Rate limited per IP on the write binding (`feedback:<ip>`). When `MODERATION_SLACK_WEBHOOK` is set, an escaped 500-character excerpt plus the route goes to Slack via `waitUntil`; the email and IP are never sent to Slack or logged. Optional secret `TURNSTILE_SECRET_KEY` (off when unset) requires a `turnstileToken`/`cf-turnstile-response`; enabling it rejects the legacy Flutter app, which cannot send one, and the website's own /feedback form, which has no Turnstile widget yet (add one, with a public site key, before setting the secret). The client worker proxies it (`PUBLIC_POST_PATHS` in `apps/toiletmap-client/src/utils/api.ts`), allowing a missing Origin and never attaching the access token.
+- **POST /api/feedback** - `{text, email?, route?}` as JSON or a URL-encoded form (`src/routes/feedback/index.ts`). Stored in `public.feedback`; 200 `{ok: true, message}` (200, not 201: the Flutter app treats only 200 as success). Legacy-compatible: the Flutter app posts a form with `email: ""` and no Origin header; the legacy website posted the same fields as JSON. 400 for empty/over-5000-character text or an invalid email; `route` is truncated to 255. Rate limited per IP on the write binding (`feedback:<ip>`). Unknown fields are a 400 (none of the callers sends any). When `MODERATION_SLACK_WEBHOOK` is set, a counts-only "N feedback messages in the last 24 hours" message goes to Slack via `waitUntil`, throttled like the moderation alert (when the count reaches 1, 5, 10, 25, ..., else at most once per isolate every 10 minutes); the text, route, email and IP are never sent to Slack, and the email and IP are never logged. Optional secret `TURNSTILE_SECRET_KEY` (off when unset) requires a `turnstileToken`/`cf-turnstile-response`; enabling it rejects the legacy Flutter app, which cannot send one, and the website's own /feedback form, which has no Turnstile widget yet (add one, with a public site key, before setting the secret). The client worker proxies it (`PUBLIC_POST_PATHS` in `apps/toiletmap-client/src/utils/api.ts`), allowing a missing Origin and never attaching the access token.
 - **GET /admin/feedback** (newest first, 25 a page), **GET /admin/feedback/:id/delete** (confirmation), **POST /admin/feedback/:id/delete** (needs `confirm=delete`). Deleting needs migration `20261118001500_feedback_admin_delete.sql` (DELETE grant and policy for `toiletmap_web`).
 
 ### Geocoding (public, unauthenticated)
@@ -657,7 +663,7 @@ const contributor = contributorPath.split('.').reduce(
 
 1. **Database Migrations**: Use Supabase migrations (NOT `prisma migrate`) - Prisma doesn't fully support this project's PostgreSQL/PostGIS features
 2. **Opening Hours Format**: `["00:00", "00:00"]` is valid and means "24 hours" (not a validation error)
-3. **Geohash Queries**: Prefix matching is case-sensitive and uses `LIKE 'prefix%'` pattern
+3. **Geohash Queries**: Prefix matching uses `LIKE 'prefix%'`. The REST route lower-cases and only accepts 4-12 base32 characters; the service returns `[]` for any non-base32 prefix, so a wildcard never reaches the `LIKE`
 4. **Auth Profile Key**: If using nested Auth0 profile fields, set `AUTH0_PROFILE_KEY` to the namespaced claim URL or path (e.g., `app_metadata.contributor_name`)
 5. **Prisma Client Location**: Always import from `src/generated/prisma/client` in app code, `test/integration/generated/client` in tests
 6. **Test Database**: The test suite never starts Supabase; run `pnpm supabase:start` first. A reused stack may need `pnpm exec supabase migration up --local` (non-destructive) after new migrations land

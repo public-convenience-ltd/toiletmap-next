@@ -3,6 +3,7 @@
  * Safe to import from both the worker and browser islands.
  */
 import { defaultFooterLinks, type FooterLink, type NavLink } from "toiletmap-design-system";
+import { SIGNED_IN_COOKIE_NAMES } from "./session";
 
 export interface SiteNavOptions {
   isAuthenticated: boolean;
@@ -41,14 +42,15 @@ export function siteFooterLinks(): FooterLink[] {
 }
 
 /**
- * Whether a `document.cookie` string holds a signed-in session: the non-httpOnly
- * `user_info` cookie set at sign-in (src/pages/auth/callback.ts) with a value. Only for
- * the header's Sign in / Sign out link on prerendered pages; it decides nothing else.
+ * Whether a `document.cookie` string holds a signed-in session: the value-less, non-httpOnly
+ * `signed_in` flag set at sign-in, or a pre-flag session's `user_info` cookie (presence only;
+ * see SIGNED_IN_COOKIE_NAMES in src/utils/session.ts). Only for the header's Sign in /
+ * Sign out link on prerendered pages; it decides nothing else.
  */
 export function hasSessionCookie(cookieString: string | null | undefined): boolean {
   if (!cookieString) return false;
   return cookieString.split(";").some((part) => {
     const [name, ...rest] = part.trim().split("=");
-    return name === "user_info" && rest.join("=").trim().length > 0;
+    return SIGNED_IN_COOKIE_NAMES.includes(name ?? "") && rest.join("=").trim().length > 0;
   });
 }

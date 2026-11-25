@@ -53,6 +53,11 @@ export class FeedbackService {
     return this.prisma.feedback.count();
   }
 
+  /** Messages received since `since` (legacy rows without `created_at` never count). */
+  countSince(since: Date): Promise<number> {
+    return this.prisma.feedback.count({ where: { created_at: { gte: since } } });
+  }
+
   /** Newest first. Out-of-range pages are clamped to the last page. */
   async list(options: { page?: number; pageSize?: number } = {}): Promise<FeedbackPage> {
     const pageSize = Math.max(1, Math.min(options.pageSize ?? FEEDBACK_PAGE_SIZE, 200));

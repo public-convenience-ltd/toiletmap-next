@@ -62,8 +62,8 @@ Each `<case>.json` is one request/response pair:
 returns them) for **every toilet id that appears in any fixture**: 46 toilets, 10 of them removed.
 Each record lists the fixtures it appears in under `appearsIn`. Use it to seed equivalent rows in
 the local test DB. The legacy API never exposes `contributors`, so seed rows need an invented
-contributor value. A system location report needs its last contributor to end in `-location`
-(see the reports notes below).
+contributor value. A system location report needs its last contributor to be the one before it
+plus `-location`, as legacy `setLooLocation` writes it (see the reports notes below).
 
 ## Trimming and volatility
 
@@ -123,7 +123,9 @@ for byte from `seed-toilets.json`.
   - When there is no meta, the segment is empty and the string ends in `|`.
 - **Reports:** `reportsForLoo` returns every `record_version` row for the id, including system
   location rows, where `isSystemReport` is true when the record's last contributor ends with
-  `-location`. Rows are sorted by `createdAt` ascending, and a user report comes before a system
+  `-location`. The compatibility endpoint narrows this to the exact row legacy `setLooLocation`
+  writes (the last contributor is the one before it plus `-location`), so an ordinary handle that
+  ends in `-location` is not hidden. Rows are sorted by `createdAt` ascending, and a user report comes before a system
   report with the same timestamp. `contributor` is always `"Anonymous"`. `previous`, `loo` and
   `area` are always `null`. Report ids are numeric strings.
 - **Loo quirks:** `reports` is always `[]`. `area` is `[{name,type}]` (`[null]` when there is no

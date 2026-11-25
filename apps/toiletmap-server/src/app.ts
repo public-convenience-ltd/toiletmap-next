@@ -1,12 +1,13 @@
-import { swaggerUI } from "@hono/swagger-ui";
 import { Hono } from "hono";
 import { admin } from "./admin";
 import { optionalAuth } from "./auth/middleware";
 import { openApiDocument } from "./docs/openapi";
+import { swaggerUiPage } from "./docs/swagger-ui";
 import { rateLimiters } from "./middleware/cloudflare-rate-limit";
+import { requireSameOriginForCookieAuth } from "./middleware/csrf";
 import { requestLogger } from "./middleware/request-logger";
 import { hasAdminRole } from "./middleware/require-admin-role";
-import { securityHeaders } from "./middleware/security-headers";
+import { parseAllowedOrigins, securityHeaders } from "./middleware/security-headers";
 import { services } from "./middleware/services";
 import { areasRouter } from "./routes/areas";
 import { feedbackRouter } from "./routes/feedback";
@@ -19,6 +20,7 @@ import {
   legacyGraphqlRouter,
 } from "./routes/legacy-graphql";
 import { loosRouter } from "./routes/loos";
+import { getDatabaseReadiness } from "./services/health/readiness";
 import type { AppVariables, Env } from "./types";
 import { isPublicEnvironment } from "./utils/environment";
 import { createLogger } from "./utils/logger";
@@ -33,12 +35,13 @@ export const createApp = (env: Env) => {
   // Create logger for error handling
   const logger = createLogger(environment);
 
-  // Configure allowed CORS origins
-  const allowedOrigins = env.ALLOWED_ORIGINS
-    ? env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-    : isPublic
-      ? [] // No origins allowed by default in public environments (must be configured)
-      : ["*"]; // Allow all in development
+  // CORS: exact origins only, never with credentials. No first-party page
+  // needs it (the client reaches the API through its same-origin proxy and
+  // the admin is same-origin); it only lets listed sites read public data.
+  const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS, {
+    isPublic,
+    warn: (message, details) => logger.warn(message, details),
+  });
 
   // Apply request logging globally (except for health checks)
   // The legacy GraphQL endpoint logs no IP or user agent (see its README section).
@@ -52,30 +55,36 @@ export const createApp = (env: Env) => {
     return requestLoggingMiddleware(c, next);
   });
 
-  // Inject services
-  app.use("*", services);
+  // Inject services (not for /health, which needs none and must stay cheap)
+  app.use("*", (c, next) => (c.req.path.startsWith("/health") ? next() : services(c, next)));
 
   // The legacy GraphQL endpoint has its own CORS policy (no credentials; see
   // routes/legacy-graphql). It runs first so it also answers preflights.
   app.use(LEGACY_GRAPHQL_PATH, legacyGraphqlCors);
 
-  // Apply security headers globally (without the site CORS policy on the
-  // legacy GraphQL path)
+  // Apply security headers globally. The site CORS policy is left off the
+  // legacy GraphQL path (it has its own) and off the admin, which is
+  // same-origin only and sends no CORS headers at all.
   const siteSecurityHeaders = securityHeaders({
     corsOrigins: allowedOrigins,
-    corsCredentials: true,
+    corsCredentials: false,
     enableHSTS: isPublic,
   });
-  const legacyGraphqlSecurityHeaders = securityHeaders({
+  const noCorsSecurityHeaders = securityHeaders({
     corsOrigins: [],
     corsCredentials: false,
     enableHSTS: isPublic,
   });
+  const isAdminPath = (path: string) => path === "/admin" || path.startsWith("/admin/");
   app.use("*", (c, next) =>
-    isLegacyGraphqlPath(c.req.path)
-      ? legacyGraphqlSecurityHeaders(c, next)
+    isLegacyGraphqlPath(c.req.path) || isAdminPath(c.req.path)
+      ? noCorsSecurityHeaders(c, next)
       : siteSecurityHeaders(c, next),
   );
+
+  // CSRF: cookie-authenticated changes under /admin and /api must come from
+  // this origin (bearer-token and anonymous requests are not affected).
+  app.use("*", requireSameOriginForCookieAuth);
 
   // Apply rate limiting to admin routes
   app.use("/admin/*", rateLimiters.admin);
@@ -88,14 +97,12 @@ export const createApp = (env: Env) => {
     const user = c.get("user");
     const isAdmin = hasAdminRole(user);
 
-    // Check database health to determine overall status
-    let dbHealthy = true;
-    try {
-      const looService = c.get("looService");
-      // Quick health check - just verify the service can access the database
-      await looService.healthCheck();
-    } catch (error) {
-      dbHealthy = false;
+    // Overall status from the same cached database check as /health/ready
+    // (at most one query per isolate every few seconds, not one per request).
+    const database = await getDatabaseReadiness(c.env);
+    const dbHealthy = database.ok;
+    if (!database.ok) {
+      const { error } = database;
       logger.warn("Database health check failed on root endpoint", {
         error:
           error instanceof Error
@@ -134,7 +141,7 @@ export const createApp = (env: Env) => {
 
   // Documentation - Public
   app.get("/api/docs/openapi.json", (c) => c.json(openApiDocument));
-  app.get("/api/docs", swaggerUI({ url: "/api/docs/openapi.json" }));
+  app.get("/api/docs", swaggerUiPage("/api/docs/openapi.json"));
 
   // Apply rate limiting to API routes
   app.use("/api/*", rateLimiters.read);

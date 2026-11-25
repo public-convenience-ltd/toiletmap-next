@@ -35,15 +35,20 @@ same-origin requests to `/api/*` on this worker, handled by the proxy in
   browser starts calling a new endpoint, add its prefix to `ALLOWED_API_PREFIXES`
   in [src/utils/api.ts](src/utils/api.ts).
 - Upstream is the `API` service binding when configured (production), otherwise
-  `PUBLIC_API_URL` (local dev, per-branch previews — preview client hosts are mapped
-  to the matching `<branch>-toiletmap-server` host).
+  `PUBLIC_API_URL` (local dev, per-branch previews — a host that is exactly
+  `<branch>-toiletmap-client.gbtoiletmap.workers.dev` is mapped to the matching
+  `<branch>-toiletmap-server` host; any other host uses `PUBLIC_API_URL`).
 - Forwards method, body, query string and `accept`/`content-type`/`if-none-match`/
   `if-match` etc. The browser `Cookie` header is never forwarded.
 - State-changing methods (anything but GET/HEAD/OPTIONS) must send an `Origin`
   equal to the site origin (CSRF protection, otherwise 403) and get
   `Authorization: Bearer <access_token>` attached from the httpOnly cookie.
   The access token is never rendered into HTML or exposed to page JS.
-- Client IP is forwarded as `cf-connecting-ip` / `x-forwarded-for` for rate limiting.
+- Request bodies are capped at 128 KiB (`PROXY_MAX_BODY_BYTES`) while they are read,
+  chunked bodies included; a bigger one gets a 413 without contacting upstream.
+- Client IP is forwarded as `cf-connecting-ip` / `x-forwarded-for` (both overwritten
+  with the visitor's `cf-connecting-ip`). The server keys its rate limits on
+  `cf-connecting-ip` only and never falls back to `X-Forwarded-For`.
 - Upstream status, body and cache headers are returned; `set-cookie`,
   `access-control-*` and upstream `content-security-policy` are stripped. Every
   proxy response carries `content-security-policy: default-src 'none'; frame-ancestors 'none'`

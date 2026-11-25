@@ -5,7 +5,7 @@ import type { AppVariables, Env } from "../types";
  * Security headers configuration
  */
 interface SecurityHeadersConfig {
-  /** Allowed CORS origins (use ['*'] for public APIs, but specify origins for production) */
+  /** Allowed CORS origins, matched exactly (no wildcards) */
   corsOrigins?: string[];
   /** Allow credentials in CORS requests */
   corsCredentials?: boolean;
@@ -29,7 +29,7 @@ const openStreetMapHost = "https://www.openstreetmap.org";
 
 const defaultConfig: Required<SecurityHeadersConfig> = {
   corsOrigins: [], // Empty array = no CORS allowed by default (must be explicitly configured)
-  corsCredentials: true, // Allow credentials for authenticated requests
+  corsCredentials: false, // Browsers never send the session cookies cross-origin
   contentSecurityPolicy: [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${swaggerCdnHost}`,
@@ -44,22 +44,48 @@ const defaultConfig: Required<SecurityHeadersConfig> = {
 };
 
 /**
- * Check if origin is allowed based on CORS configuration
+ * Whether `origin` is one of `allowedOrigins`, compared exactly. There is no
+ * wildcard: `*` and `https://*.example` entries never match (see
+ * {@link parseAllowedOrigins}, which drops them).
  */
 export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
   if (!origin) return false;
-  if (allowedOrigins.includes("*")) return true;
-  return allowedOrigins.some((allowed) => {
-    // Support wildcards
-    if (allowed.includes("*")) {
-      const parts = allowed.split("*");
-      // Only support single wildcard for now
-      if (parts.length === 2) {
-        const [prefix, suffix] = parts;
-        return origin.startsWith(prefix) && origin.endsWith(suffix);
+  return allowedOrigins.some((allowed) => !allowed.includes("*") && origin === allowed);
+}
+
+/** Origins of the local dev stack (server, client): the fallback when ALLOWED_ORIGINS is unset in development. */
+export const DEVELOPMENT_CORS_ORIGINS = ["http://localhost:8787", "http://localhost:4321"];
+
+/**
+ * The exact CORS origins in a comma-separated `ALLOWED_ORIGINS`. Entries that
+ * are not a bare origin (`https://host[:port]`), including any wildcard, are
+ * dropped with a warning. Unset or empty: none in public environments, the
+ * local dev origins in development.
+ */
+export function parseAllowedOrigins(
+  value: string | undefined,
+  options: {
+    isPublic: boolean;
+    warn?: (message: string, details: Record<string, unknown>) => void;
+  },
+): string[] {
+  const entries = (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (entries.length === 0) return options.isPublic ? [] : [...DEVELOPMENT_CORS_ORIGINS];
+  return entries.filter((entry) => {
+    let valid = false;
+    if (!entry.includes("*")) {
+      try {
+        valid = new URL(entry).origin === entry;
+      } catch {
+        valid = false;
       }
     }
-    return origin === allowed;
+    if (!valid)
+      options.warn?.("Ignoring an ALLOWED_ORIGINS entry that is not an exact origin", { entry });
+    return valid;
   });
 }
 
@@ -77,16 +103,9 @@ export function isOriginAllowed(origin: string | undefined, allowedOrigins: stri
  *
  * @example
  * ```ts
- * // Production configuration with specific origins
  * app.use('*', securityHeaders({
- *   corsOrigins: ['https://www.toiletmap.org', 'https://toiletmap.org'],
- *   corsCredentials: true,
- * }));
- *
- * // Development configuration (allow all origins)
- * app.use('*', securityHeaders({
- *   corsOrigins: ['*'],
- *   enableHSTS: false, // Don't force HTTPS in development
+ *   corsOrigins: ['https://www.toiletmap.org.uk'],
+ *   corsCredentials: false,
  * }));
  * ```
  */

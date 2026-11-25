@@ -10,13 +10,15 @@ Only write endpoints (`POST /api/loos`, `PUT /api/loos/:id`) and privileged data
 - `requireAuth` – enforces authentication for API routes and responds with `401` when missing/invalid.
 - `requireAdminAuth` – same as `requireAuth` but redirects browsers to `/admin/login`.
 
-Read endpoints such as `/api/loos/:id/reports` use `optionalAuth` so anonymous users can access the data while admins who provide tokens gain additional fields (e.g., contributor names).
+Read endpoints such as `/api/loos/:id/reports` use `optionalAuth` so anonymous users can access the data while admins who provide tokens gain additional fields (e.g., contributor names). The token must claim `access:admin` and the Auth0 Management API must confirm it and that the user is not blocked (`isConfirmedAdmin`), so a revocation takes effect within a minute.
 
 Each middleware relies on `src/auth/auth-context.ts` which:
 
-1. Looks for an `Authorization: Bearer` header before falling back to `access_token`/`id_token` cookies.
-2. Verifies JWTs via the cached Auth0 JWKS client (`src/auth/verify.ts`).
-3. Fetches Auth0 `/userinfo` (or uses the `user_info` cookie) so fields such as `name`, `email`, and `nickname` are always present on `c.get('user')` and mirrored under `user.profile`.
+1. Looks for an `Authorization: Bearer` header before falling back to the `access_token` cookie (the `id_token` cookie is never a credential).
+2. Verifies JWTs via the cached Auth0 JWKS (`src/auth/verify.ts`). If the JWKS cannot be fetched, `optionalAuth` continues as anonymous.
+3. Takes `name`, `email` and `nickname` from the verified `id_token` cookie (same `sub`) or Auth0 `/userinfo`, so they are present on `c.get('user')` and mirrored under `user.profile`.
+
+Cookie-authenticated state-changing requests must be same-origin (see `src/middleware/csrf.ts`); send a Bearer token from scripts and other clients.
 
 ## Authentication Methods
 

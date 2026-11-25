@@ -3,6 +3,7 @@ import { createMiddleware } from "hono/factory";
 import type { AppVariables, Env } from "../types";
 import { logger } from "../utils/logger";
 import { type AuthOptions, type AuthResult, authenticateRequest } from "./auth-context";
+import { JwksUnavailableError } from "./verify";
 
 type HonoBindings = { Bindings: Env; Variables: AppVariables };
 
@@ -26,6 +27,17 @@ const createAuthMiddleware = (mode: "optional" | "required", options?: AuthMiddl
     try {
       result = await authenticateRequest(c, options);
     } catch (error) {
+      // Auth0's signing keys could not be fetched, so the credential can be
+      // neither accepted nor refused. Optional-auth routes carry on as
+      // anonymous (writes are then queued, never applied directly).
+      if (mode === "optional" && error instanceof JwksUnavailableError) {
+        logger.error("Auth0 signing keys unavailable; treating the request as anonymous", {
+          path: c.req.path,
+          method: c.req.method,
+          errorMessage: error.message,
+        });
+        return next();
+      }
       if (error instanceof Error) {
         logger.logError(error, {
           path: c.req.path,

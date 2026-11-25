@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { Auth0ManagementClient, Auth0ManagementError } from "../../src/services/auth0/management";
+import {
+  Auth0ManagementClient,
+  Auth0ManagementError,
+  buildSearchQuery,
+} from "../../src/services/auth0/management";
 
 /** A client whose Management API answers `GET /users/:id` with `user` (or `status`). */
 const clientAnswering = (user: unknown, status = 200) => {
@@ -42,5 +46,40 @@ describe("Auth0ManagementClient.isUserBlocked", () => {
       clientAnswering({ message: "Not found" }, 404).client.isUserBlocked("auth0|gone"),
     ).rejects.toBeInstanceOf(Auth0ManagementError);
     await expect(clientAnswering({}).client.isUserBlocked("")).rejects.toThrow();
+  });
+});
+
+describe("buildSearchQuery (Auth0 user search)", () => {
+  it("matches plain text by wildcard and the user_id exactly", () => {
+    expect(buildSearchQuery("  jane   doe ")).toBe(
+      'email:(*jane* *doe*) OR name:(*jane* *doe*) OR nickname:(*jane* *doe*) OR user_id:"jane doe"',
+    );
+    expect(buildSearchQuery("auth0|abc")).toBe(
+      'email:(*auth0\\|abc*) OR name:(*auth0\\|abc*) OR nickname:(*auth0\\|abc*) OR user_id:"auth0|abc"',
+    );
+  });
+
+  it("escapes query syntax so admin text can only be matched, never parsed", () => {
+    const query = buildSearchQuery('x) OR app_metadata.role:admin OR (y "a\\b" <z>');
+    // Field names, groups and quotes from the text arrive escaped.
+    expect(query).toContain("*app_metadata.role\\:admin*");
+    expect(query).toContain("*x\\)*");
+    expect(query).toContain("*\\(y*");
+    expect(query).toContain('*\\"a\\\\b\\"*');
+    const [wildcards, exactId] = query.split(" OR user_id:");
+    // `<` and `>` cannot be escaped in a bare term, so they are dropped there.
+    expect(wildcards).not.toMatch(/[<>]/);
+    // No unescaped `:` other than the three field prefixes.
+    expect(wildcards.match(/(?<!\\):/g)).toHaveLength(3);
+    // Inside the quoted phrase only `"` and `\` need escaping.
+    expect(exactId).toBe('"x) OR app_metadata.role:admin OR (y \\"a\\\\b\\" <z>"');
+  });
+
+  it("is empty for blank text and falls back to user_id when nothing searchable is left", () => {
+    expect(buildSearchQuery("   ")).toBe("");
+    expect(buildSearchQuery("<>")).toBe('user_id:"<>"');
+    expect(buildSearchQuery("a\u0000b\nc")).toBe(
+      'email:(*a* *b* *c*) OR name:(*a* *b* *c*) OR nickname:(*a* *b* *c*) OR user_id:"a b c"',
+    );
   });
 });

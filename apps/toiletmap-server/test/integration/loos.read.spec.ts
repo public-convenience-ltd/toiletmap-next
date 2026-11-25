@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getTestContext } from "./setup";
+import { BLOCKED_SUB, REVOKED_ADMIN_SUB, useAuth0ManagementStub } from "./utils/auth0-management";
 import { createFixtureFactory } from "./utils/fixtures";
 import type {
   CompressedLoo,
@@ -148,6 +149,36 @@ describe("Loo read endpoints", () => {
       expect(latestHydrated.contributor).toBe("reports-test");
     });
 
+    describe("with the Auth0 Management API configured", () => {
+      useAuth0ManagementStub();
+
+      const reportsAs = async (sub: string) => {
+        const loo = await fixtures.loos.create({ notes: "Original notes" });
+        await fixtures.loos.upsert(loo.id, { notes: "Updated notes" }, "reports-test");
+        const { issueToken } = getTestContext();
+        const response = await callApi(`/api/loos/${loo.id}/reports`, {
+          headers: {
+            Authorization: `Bearer ${issueToken({ sub, permissions: ["access:admin"] })}`,
+          },
+        });
+        expect(response.status).toBe(200);
+        const body = await readJson<ListBody<ReportSummaryResponse>>(response);
+        return body.data[body.data.length - 1];
+      };
+
+      it("shows contributors to an admin Auth0 confirms", async () => {
+        expect((await reportsAs("auth0|confirmed-admin")).contributor).toBe("reports-test");
+      });
+
+      it("redacts contributors when Auth0 has revoked access:admin, though the token claims it", async () => {
+        expect((await reportsAs(REVOKED_ADMIN_SUB)).contributor).toBeNull();
+      });
+
+      it("redacts contributors for a blocked admin", async () => {
+        expect((await reportsAs(BLOCKED_SUB)).contributor).toBeNull();
+      });
+    });
+
     it("returns reports in chronological ascending order with correct timestamps", async () => {
       // Create initial loo
       const loo = await fixtures.loos.create({
@@ -264,6 +295,32 @@ describe("Loo read endpoints", () => {
       });
     });
 
+    it("hides only the exact legacy location marker, not any handle ending in -location", async () => {
+      const { prisma } = getTestContext();
+      const loo = await fixtures.loos.create({ notes: "Baseline" });
+      // An ordinary edit by someone whose handle ends in "-location" stays visible.
+      await fixtures.loos.upsert(loo.id, { notes: "Moved it" }, "eve-location");
+      await fixtures.loos.upsert(loo.id, { notes: "Real edit" }, "alice");
+      // The legacy app's setLooLocation: a separate row whose last contributor
+      // is the previous one plus "-location".
+      await prisma.$executeRaw`
+        UPDATE toilets SET
+          geography = ST_SetSRID(ST_MakePoint(-0.1, 51.5), 4326)::geography,
+          contributors = array_append(contributors, concat(contributors[array_upper(contributors, 1)], '-location'))
+        WHERE id = ${loo.id}
+      `;
+
+      const response = await callApi(`/api/loos/${loo.id}/reports?hydrate=true`, {
+        headers: adminHeaders(),
+      });
+      expect(response.status).toBe(200);
+      const body = await readJson<ListBody<ReportResponse>>(response);
+      const contributors = body.data.map((report) => report.contributor);
+      expect(contributors).toContain("eve-location");
+      expect(contributors).toContain("alice");
+      expect(contributors).not.toContain("alice-location");
+    });
+
     it("ensures summary reports also don't include isSystemReport", async () => {
       const loo = await fixtures.loos.create({ notes: "Test" });
       await fixtures.loos.upsert(loo.id, { radar: true }, "test-user");
@@ -364,7 +421,7 @@ describe("Loo read endpoints", () => {
         ),
       );
       const loo = loos[0];
-      const shortPrefix = loo.geohash?.slice(0, 3);
+      const shortPrefix = loo.geohash?.slice(0, 4);
       if (!shortPrefix) throw new Error("Fixture geohash was not generated");
 
       const response = await callApi(`/api/loos/geohash/${shortPrefix}`, {
@@ -372,6 +429,19 @@ describe("Loo read endpoints", () => {
       });
       expect(response.status).toBe(200);
       expect(response.headers.get("Cache-Control")).toContain("public, max-age=3600");
+    });
+
+    it("refuses LIKE wildcards, non-base32 characters, short prefixes and unknown parameters", async () => {
+      for (const path of [
+        "/api/loos/geohash/gcp%25",
+        "/api/loos/geohash/gcp_",
+        "/api/loos/geohash/%25%25%25%25",
+        "/api/loos/geohash/gcp",
+        "/api/loos/geohash/gcpa",
+        "/api/loos/geohash/gcpv?cachebust=1",
+      ]) {
+        expect((await callApi(path)).status, path).toBe(400);
+      }
     });
 
     it("does not cache responses with few results", async () => {

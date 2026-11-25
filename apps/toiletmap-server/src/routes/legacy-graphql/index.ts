@@ -25,6 +25,7 @@ import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { edgeCache } from "../../middleware/cache";
+import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
 import { createPrismaClient, type PrismaClientInstance } from "../../prisma";
 import type { AppVariables, Env } from "../../types";
 import {
@@ -35,6 +36,7 @@ import {
 import { logger } from "../../utils/logger";
 import { getLegacySchema } from "./executable-schema";
 import { LEGACY_GRAPHQL_LIMITS, validateLegacyDocument } from "./limits";
+import { isWideLegacyQuery, legacyGraphqlCacheKey } from "./request-shape";
 import { type LegacyGraphqlContext, queryResolvers } from "./resolvers";
 
 type AppContext = Context<{ Bindings: Env; Variables: AppVariables }>;
@@ -322,7 +324,28 @@ const handleLegacyGraphql = async (c: AppContext): Promise<Response> => {
     });
   }
 
-  const cacheKey = isGet && !wantsGraphqlResponse ? c.req.url : null;
+  const variableValues = (variables as Record<string, unknown> | null | undefined) ?? undefined;
+
+  // Wide reads take the stricter per-IP limit (cache hits included).
+  if (isWideLegacyQuery(document, operationName, variableValues)) {
+    const limited = await rateLimiters.heavyRead(c, async () => {
+      // Allowed: carry on below.
+    });
+    if (limited) {
+      return requestError(429, "Too many large requests, please try again in a minute.");
+    }
+  }
+
+  // Keyed by the parsed request, never the raw URL (see legacyGraphqlCacheKey).
+  const cacheKey =
+    isGet && !wantsGraphqlResponse
+      ? await legacyGraphqlCacheKey(
+          new URL(c.req.url).origin,
+          document,
+          operationName,
+          variableValues,
+        )
+      : null;
   if (cacheKey) {
     const hit = await edgeCache.match(c, cacheKey);
     if (hit) {
@@ -356,7 +379,7 @@ const handleLegacyGraphql = async (c: AppContext): Promise<Response> => {
     document,
     rootValue: queryResolvers,
     contextValue,
-    variableValues: (variables as Record<string, unknown> | null | undefined) ?? undefined,
+    variableValues,
     operationName,
   });
 

@@ -87,22 +87,57 @@ export const edgeCache = {
   },
 };
 
+/** A validated, normalised request parameter as it goes into a cache key. */
+export type CacheKeyValue = string | number | boolean | null | undefined;
+
 /**
- * Middleware to cache responses using Cloudflare Workers Cache API, keyed by
- * the request URL, and to send `Cache-Control: public, max-age=<ttl>`.
+ * Builds an edge-cache key from a route name and its *validated* parameters,
+ * never from the raw URL: parameters are sorted, `undefined` ones are
+ * dropped and the values are the normalised ones the handler uses (defaults
+ * applied, case folded). So `?b=1&a=2`, `?a=2&b=1` and `?a=2&b=1&b=1` share one
+ * entry, and junk parameters (rejected by the `.strict()` schemas) can never
+ * mint a new one.
+ *
+ * The key is a URL under a reserved `/__cache/` path of this origin, since
+ * the Cache API needs one; it is never fetched.
+ */
+export const normalisedCacheKey = (
+  c: Context,
+  route: string,
+  params: Record<string, CacheKeyValue>,
+): string => {
+  const search = new URLSearchParams();
+  for (const name of Object.keys(params).sort()) {
+    const value = params[name];
+    if (value === undefined) continue;
+    search.append(name, value === null ? "null" : String(value));
+  }
+  const query = search.toString();
+  return `${new URL(c.req.url).origin}/__cache/${route}${query ? `?${query}` : ""}`;
+};
+
+/**
+ * Middleware to cache responses using the Cloudflare Workers Cache API and to
+ * send `Cache-Control: public, max-age=<ttl>`.
+ *
+ * The cache key comes from `key`, which should be built with
+ * {@link normalisedCacheKey} from the validated parameters (so register this
+ * after the route's validators). Never the raw URL: that would let anyone
+ * bypass the cache by adding or reordering query parameters.
  *
  * Only suitable for responses that are identical for every caller (no auth or
  * per-user data) and where up to `ttl` seconds of staleness is acceptable,
  * because nothing purges these entries.
  *
  * @param ttl Seconds to cache the response. Can be a number or a function returning a number.
+ * @param key Builds the cache key for this request.
  */
-export const cacheResponse = (ttl: TtlResolver): MiddlewareHandler => {
+export const cacheResponse = (ttl: TtlResolver, key: (c: Context) => string): MiddlewareHandler => {
   return async (c, next) => {
-    const key = c.req.url;
+    const cacheKey = key(c);
     // The entry was stored with `public, max-age=<ttl>`, which is also what
     // browsers should get, so the stored Cache-Control is replayed as-is.
-    const hit = await edgeCache.match(c, key);
+    const hit = await edgeCache.match(c, cacheKey);
     if (hit) return hit;
 
     await next();
@@ -112,7 +147,7 @@ export const cacheResponse = (ttl: TtlResolver): MiddlewareHandler => {
 
       if (maxAge >= 0) {
         c.res.headers.set("Cache-Control", `public, max-age=${maxAge}`);
-        edgeCache.put(c, key, c.res, maxAge);
+        edgeCache.put(c, cacheKey, c.res, maxAge);
       }
     }
   };

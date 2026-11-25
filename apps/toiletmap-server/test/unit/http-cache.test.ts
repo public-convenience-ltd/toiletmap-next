@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cacheResponse, edgeCache } from "../../src/middleware/cache";
+import { cacheResponse, edgeCache, normalisedCacheKey } from "../../src/middleware/cache";
 import { securityHeaders } from "../../src/middleware/security-headers";
 import { toCompressedLoo } from "../../src/services/loo/mappers";
 import { dumpEtag, etagMatches, fnv1a32, looEtag } from "../../src/utils/http-cache";
@@ -136,12 +136,16 @@ describe("edge cache middleware", () => {
     let calls = 0;
     const app = new Hono();
     app.use("*", securityHeaders({ corsOrigins: ["https://a.example", "https://b.example"] }));
-    app.get("/cached", cacheResponse(300), (c) => {
-      calls += 1;
-      c.header("Set-Cookie", "session=secret");
-      c.header("X-RateLimit-Remaining", "9");
-      return c.json({ calls });
-    });
+    app.get(
+      "/cached",
+      cacheResponse(300, (c) => normalisedCacheKey(c, "cached", {})),
+      (c) => {
+        calls += 1;
+        c.header("Set-Cookie", "session=secret");
+        c.header("X-RateLimit-Remaining", "9");
+        return c.json({ calls });
+      },
+    );
     app.get("/keyed", async (c) => {
       const hit = await edgeCache.match(c, "https://edge/keyed?v=1", "public, max-age=60");
       if (hit) return hit;
@@ -163,7 +167,7 @@ describe("edge cache middleware", () => {
     expect(first.headers.get("Access-Control-Allow-Origin")).toBe("https://a.example");
     await Promise.all(pending);
 
-    const stored = store.get("https://api.test/cached");
+    const stored = store.get("https://api.test/__cache/cached");
     expect(stored).toBeDefined();
     for (const name of stored?.headers.keys() ?? []) {
       expect(name).not.toMatch(/^access-control-|^vary$|^set-cookie$|^x-ratelimit-/);

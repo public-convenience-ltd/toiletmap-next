@@ -150,7 +150,7 @@ curl https://your-worker.workers.dev/health/live
 
 **Endpoint**: `GET /health/ready`
 
-Checks if the worker can serve traffic (database connectivity, dependencies).
+Checks if the worker can serve traffic (database connectivity, dependencies). The database result is reused for 10 s per isolate (and shared with `GET /`), so frequent polling costs at most one `SELECT 1` per isolate per window; a recovery or outage can take up to 10 s to show.
 
 ```bash
 curl https://your-worker.workers.dev/health/ready

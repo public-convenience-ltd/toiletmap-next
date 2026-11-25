@@ -5,7 +5,7 @@ import type {
   ReferenceObject,
   SchemaObject,
 } from "openapi3-ts/oas31";
-import { RECENT_WINDOW_DAYS } from "../common/constants";
+import { MAX_SEARCH_OFFSET, MAX_SEARCH_PAGE, RECENT_WINDOW_DAYS } from "../common/constants";
 import { LOO_ID_LENGTH } from "../services/loo";
 import { REMOVAL_CATEGORIES } from "../services/loo/types";
 import { openApiInfo, openApiServers, openApiTags } from "./config";
@@ -796,6 +796,7 @@ const limitParamSchema = {
 const pageParamSchema = {
   type: "integer",
   minimum: 1,
+  maximum: MAX_SEARCH_PAGE,
   default: 1,
 } satisfies SchemaObject;
 
@@ -902,7 +903,7 @@ const searchFilterParameters: ParameterObject[] = [
     name: "page",
     in: "query" as const,
     required: false,
-    description: "Page number (1-indexed, default 1).",
+    description: `Page number (1-indexed, default 1). \`(page - 1) * limit\` must be at most ${MAX_SEARCH_OFFSET}.`,
     schema: pageParamSchema,
   },
 ];
@@ -1155,7 +1156,8 @@ export const openApiDocument: OpenAPIObject = {
             name: "ids",
             in: "query",
             required: true,
-            description: "Comma separated IDs (?ids=a,b) or repeat the parameter (?ids=a&ids=b).",
+            description:
+              "Comma separated IDs (?ids=a,b) or repeat the parameter (?ids=a&ids=b). Duplicates are ignored; at most 100 distinct ids, each 24 characters.",
             schema: {
               oneOf: [
                 {
@@ -1416,7 +1418,7 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Confirm a loo is still there",
         description:
-          "Anyone may verify; anonymous callers are rate limited. Sets `verifiedAt` to now and changes nothing else (`updatedAt` is unchanged). No request body.",
+          "Anyone may verify. Anonymous callers, and signed-in callers who are blocked or whose block status cannot be confirmed, share the 1/min queued-write limit. Sets `verifiedAt` to now and changes nothing else (`updatedAt` is unchanged). No request body.",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         responses: {
@@ -1514,8 +1516,15 @@ export const openApiDocument: OpenAPIObject = {
             name: "geohash",
             in: "path",
             required: true,
-            description: "Geohash prefix to match.",
-            schema: { type: "string", minLength: 1, example: "gcpvj" },
+            description:
+              "Geohash prefix to match: 4-12 geohash (base32) characters, case-insensitive. Prefixes of exactly 4 characters take the stricter heavy-read rate limit.",
+            schema: {
+              type: "string",
+              minLength: 4,
+              maxLength: 12,
+              pattern: "^[0-9bcdefghjkmnpqrstuvwxyzBCDEFGHJKMNPQRSTUVWXYZ]{4,12}$",
+              example: "gcpvj",
+            },
           },
           {
             name: "active",

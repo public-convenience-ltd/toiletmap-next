@@ -129,10 +129,13 @@ export function currentPath(fallback: string): string {
   return fallback;
 }
 
+/** base64url to text, decoding the bytes as UTF-8 (claims such as `name` may be any script). */
 const decodeBase64Url = (segment: string): string => {
   const base64 = segment.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  return atob(padded);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 };
 
 /**

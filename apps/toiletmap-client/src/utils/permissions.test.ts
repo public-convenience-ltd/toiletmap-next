@@ -48,20 +48,27 @@ describe("sessionCanWriteDirectly", () => {
   const live = token({ exp: NOW_S + 3600 });
 
   it("is true for a signed-in session with an unexpired access token", () => {
-    expect(sessionCanWriteDirectly(cookies({ user_info: "x", access_token: live }), NOW_MS)).toBe(
+    expect(sessionCanWriteDirectly(cookies({ signed_in: "x", access_token: live }), NOW_MS)).toBe(
       true,
     );
   });
 
+  it("counts a pre-flag session's legacy user_info cookie as signed in", () => {
+    expect(
+      sessionCanWriteDirectly(cookies({ user_info: "%7B%7D", access_token: live }), NOW_MS),
+    ).toBe(true);
+    expect(sessionCanWriteDirectly(cookies({ user_info: "%7B%7D" }), NOW_MS)).toBe(false);
+  });
+
   it("is false when not signed in, or the access token is missing or expired", () => {
     expect(sessionCanWriteDirectly(cookies({ access_token: live }), NOW_MS)).toBe(false);
-    expect(sessionCanWriteDirectly(cookies({ user_info: "", access_token: live }), NOW_MS)).toBe(
+    expect(sessionCanWriteDirectly(cookies({ signed_in: "", access_token: live }), NOW_MS)).toBe(
       false,
     );
-    expect(sessionCanWriteDirectly(cookies({ user_info: "x" }), NOW_MS)).toBe(false);
+    expect(sessionCanWriteDirectly(cookies({ signed_in: "x" }), NOW_MS)).toBe(false);
     expect(
       sessionCanWriteDirectly(
-        cookies({ user_info: "x", access_token: token({ exp: NOW_S - 60 }) }),
+        cookies({ signed_in: "x", access_token: token({ exp: NOW_S - 60 }) }),
         NOW_MS,
       ),
     ).toBe(false);

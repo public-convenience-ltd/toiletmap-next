@@ -60,25 +60,52 @@ export class Auth0ManagementError extends Error {
   }
 }
 
-const sanitizeSearchTerm = (term: string) => term.replace(/["']/g, "").replace(/\s+/g, " ").trim();
+/** Collapses whitespace and drops control characters; the result is still raw text. */
+const sanitizeSearchTerm = (term: string) =>
+  Array.from(term, (char) => (char.charCodeAt(0) < 0x20 || char === "\u007f" ? " " : char))
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
 
-const buildWildcard = (term: string) => {
-  if (!term) return "";
-  return term
-    .split(" ")
-    .filter(Boolean)
-    .map((segment) => `*${segment}*`)
-    .join(" ");
-};
+/**
+ * The query-string syntax characters (Lucene's, plus Elasticsearch's `=`),
+ * each escaped with a backslash in a bare term. `<` and `>` cannot be escaped
+ * there, so they are dropped.
+ */
+const LUCENE_SPECIAL = /[+\-=&|!(){}[\]^"~*?:\\/]/g;
 
-const buildSearchQuery = (term: string) => {
+const escapeLuceneTerm = (term: string) =>
+  term.replace(/[<>]/g, "").replace(LUCENE_SPECIAL, "\\$&");
+
+/** A Lucene phrase: only `"` and `\` need escaping inside the quotes. */
+const quoteLucenePhrase = (term: string) => `"${term.replace(/["\\]/g, "\\$&")}"`;
+
+/**
+ * The Auth0 user search (Lucene, search engine v3) for `term`: a wildcard
+ * match on email, name and nickname, or an exact user_id. Every character of
+ * the admin's text is escaped, so it can only ever be matched, never parsed
+ * as query syntax (field names, operators, ranges or groups).
+ */
+export const buildSearchQuery = (term: string) => {
   const sanitized = sanitizeSearchTerm(term);
   if (!sanitized) {
     return "";
   }
-  const wildcard = buildWildcard(sanitized);
-  const exactId = sanitized.includes("|") ? `user_id:"${sanitized}"` : `user_id:${sanitized}`;
-  return [`email:${wildcard}`, `name:${wildcard}`, `nickname:${wildcard}`, exactId].join(" OR ");
+  const wildcard = sanitized
+    .split(" ")
+    .filter(Boolean)
+    .map(escapeLuceneTerm)
+    .filter(Boolean)
+    .map((segment) => `*${segment}*`)
+    .join(" ");
+  const exactId = `user_id:${quoteLucenePhrase(sanitized)}`;
+  if (!wildcard) {
+    return exactId;
+  }
+  return [`email:(${wildcard})`, `name:(${wildcard})`, `nickname:(${wildcard})`, exactId].join(
+    " OR ",
+  );
 };
 
 const defaultFetch: typeof fetch = (input, init) => fetch(input, init);

@@ -147,14 +147,15 @@ and reuses the cookies.
   "Continue as Test User" → `/auth/callback`.
 - WebKit refuses `Secure` cookies on `http://localhost`, so the real flow cannot
   finish there: the `auth_state` cookie is dropped and the callback returns 400.
-  Instead, the WebKit projects inject the same `access_token` (httpOnly) and
-  `user_info` cookies, built from a token issued by the mock server, without
-  `Secure`.
+  Instead, the WebKit projects inject the same cookies without `Secure`: an
+  `access_token` (httpOnly) issued by the mock server and the value-less
+  `signed_in` flag.
 
 **Who writes directly.** The server applies a write (edit, add, report, restore)
 straight away for anyone signed in, unless they are blocked in Auth0; anonymous
-writes are queued as a `pending_change` (202). The e2e server has no Auth0
-Management API, so nobody counts as blocked (blocked users are covered by the
+writes are queued as a `pending_change` (202). The e2e server runs with
+`ENVIRONMENT=development` and no Auth0 Management API, so nobody counts as blocked
+(any other environment would queue every signed-in write) (blocked users are covered by the
 server's integration tests). The mock "Test User" (`access:admin`) backs
 `authedTest` and the `loos` fixture. `contributorTest` signs in as `CONTRIBUTOR`
 (`support/api.ts`, no permissions) by injecting its cookies, and still writes

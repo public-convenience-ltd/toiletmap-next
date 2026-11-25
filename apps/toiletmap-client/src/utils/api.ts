@@ -17,17 +17,22 @@ export interface ApiEnv {
 }
 
 /**
+ * A preview deployment of the client: `<branch or version>-toiletmap-client`
+ * on the project's workers.dev subdomain, matched as the whole host.
+ */
+const PREVIEW_CLIENT_HOST =
+  /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)-toiletmap-client\.gbtoiletmap\.workers\.dev$/;
+
+/**
  * Returns the absolute base URL of the upstream API. If it's a preview
  * deployment of the client, it points to the matching preview deployment of
- * the server.
+ * the server. Only an exact preview host counts: any other host, including
+ * one that merely contains `-toiletmap-client`, uses `PUBLIC_API_URL`.
  */
 export function getUpstreamApiUrl(env: Pick<ApiEnv, "PUBLIC_API_URL">, requestUrl: URL): string {
-  const host = requestUrl.host;
-
-  // Cloudflare preview deployments have the format `<branch>-<worker_name>...`
-  // so if the host contains `-toiletmap-client`, point at `-toiletmap-server` on the same branch.
-  if (host.includes("-toiletmap-client")) {
-    return `https://${host.replace("-toiletmap-client", "-toiletmap-server")}`;
+  const preview = requestUrl.protocol === "https:" && PREVIEW_CLIENT_HOST.exec(requestUrl.host);
+  if (preview) {
+    return `https://${preview[1]}-toiletmap-server.gbtoiletmap.workers.dev`;
   }
 
   // For production or local development, use the configured environment variable
@@ -191,6 +196,13 @@ const passesOriginCheck = (request: Request, url: URL, method: string): boolean 
   return fetchSite === null || fetchSite === "same-origin" || fetchSite === "none";
 };
 
+/**
+ * Largest body the `/api/*` proxy reads (refused with 413 while reading, so
+ * nothing bigger is ever buffered). Upstream allows 128 KiB for feedback and
+ * 64 KiB for loo writes and enforces those itself.
+ */
+export const PROXY_MAX_BODY_BYTES = 128 * 1024;
+
 export interface ProxyOptions {
   /** Browser request hitting `/api/*` on the client worker. */
   request: Request;
@@ -207,6 +219,7 @@ export interface ProxyOptions {
  * - Only allow-listed paths (see `isAllowedApiPath`) are forwarded; anything
  *   else gets a 404 JSON response without contacting upstream.
  * - Forwards method, body, query string and a small allow-list of headers.
+ *   Bodies over {@link PROXY_MAX_BODY_BYTES} get a 413 while being read.
  * - Never forwards the browser's Cookie header.
  * - State-changing methods require `Origin` to equal the client's own origin
  *   (CSRF protection) and get `Authorization: Bearer <access_token>` attached
@@ -259,7 +272,16 @@ export async function proxyApiRequest({
   }
 
   const hasBody = method !== "GET" && method !== "HEAD";
-  const body = hasBody ? await request.arrayBuffer() : undefined;
+  let body: ArrayBuffer | undefined;
+  if (hasBody) {
+    const tooLarge = () => jsonResponse(413, { message: "Request body is too large" });
+    const declared = Number(request.headers.get("content-length") ?? 0);
+    if (declared > PROXY_MAX_BODY_BYTES) return tooLarge();
+    // Content-Length may be missing (chunked) or wrong: count while reading.
+    const read = await readBodyWithLimit(request, PROXY_MAX_BODY_BYTES);
+    if (!read) return tooLarge();
+    body = read;
+  }
 
   return forwardUpstream({ env, url, upstreamPath: url.pathname, method, headers, body });
 }

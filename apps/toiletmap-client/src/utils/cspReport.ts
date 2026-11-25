@@ -93,3 +93,60 @@ export function formatCspViolation(v: CspViolation): string {
   const sample = v.sample ? ` sample=${JSON.stringify(v.sample)}` : "";
   return `[csp] ${v.disposition || "?"} ${v.directive || "?"} blocked=${v.blocked || "?"} on ${v.document || "?"}${where}${sample}`;
 }
+
+/** The window the log budget below is counted over. */
+export const CSP_LOG_WINDOW_MS = 60_000;
+/** Distinct violations logged in full at the start of each window... */
+export const CSP_LOG_FULL_PER_WINDOW = 20;
+/** ...then one in this many... */
+export const CSP_LOG_SAMPLE_EVERY = 10;
+/** ...up to this many lines per window in all. */
+export const CSP_LOG_MAX_PER_WINDOW = 50;
+
+/**
+ * A per-isolate log budget, so the report endpoint (public, unauthenticated, and with no
+ * rate-limit binding on this worker) can't be used to flood the worker's logs:
+ * - a line identical to one already logged in this window is skipped;
+ * - the first {@link CSP_LOG_FULL_PER_WINDOW} distinct lines are logged, then one in
+ *   {@link CSP_LOG_SAMPLE_EVERY}, up to {@link CSP_LOG_MAX_PER_WINDOW};
+ * - the first line of a new window is preceded by a count of what the last one skipped.
+ * Workers run many isolates, so the bound is per isolate, not global.
+ */
+export function createCspLogBudget(now: () => number = Date.now) {
+  let windowStart = Number.NEGATIVE_INFINITY;
+  let distinct = 0;
+  let skipped = 0;
+  const logged = new Set<string>();
+
+  return {
+    /** The lines to log for this violation line: none, the line, or a summary and the line. */
+    take(line: string): string[] {
+      const out: string[] = [];
+      const at = now();
+      if (at - windowStart >= CSP_LOG_WINDOW_MS) {
+        if (skipped > 0) {
+          out.push(`[csp] ${skipped} more reports were not logged in the previous minute`);
+        }
+        windowStart = at;
+        distinct = 0;
+        skipped = 0;
+        logged.clear();
+      }
+      if (logged.has(line)) {
+        skipped += 1;
+        return out;
+      }
+      distinct += 1;
+      const sampled =
+        distinct <= CSP_LOG_FULL_PER_WINDOW ||
+        (distinct - CSP_LOG_FULL_PER_WINDOW) % CSP_LOG_SAMPLE_EVERY === 0;
+      if (!sampled || logged.size >= CSP_LOG_MAX_PER_WINDOW) {
+        skipped += 1;
+        return out;
+      }
+      logged.add(line);
+      out.push(line);
+      return out;
+    },
+  };
+}

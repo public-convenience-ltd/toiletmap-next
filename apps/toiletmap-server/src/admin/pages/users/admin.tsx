@@ -8,12 +8,12 @@ import {
 } from "../../../common/permissions";
 import {
   Auth0ManagementClient,
-  Auth0ManagementError,
   type Auth0ManagementUser,
   type Auth0PermissionRecord,
 } from "../../../services/auth0/management";
 import type { AppVariables, Env } from "../../../types";
 import { logger } from "../../../utils/logger";
+import { safeAdminRedirect } from "../../../utils/safe-redirect";
 import { Badge, Button, CollapsibleCard } from "../../components/DesignSystem";
 import { Layout } from "../../components/Layout";
 
@@ -40,13 +40,35 @@ const formatDate = (value?: string | null) => (value ? dateFormatter.format(new 
 const formatDateTime = (value?: string | null) =>
   value ? dateTimeFormatter.format(new Date(value)) : "—";
 
+/** The label of a known permission; anything else (such as query text) is "Permission". */
 const formatPermissionLabel = (permission: string | null) => {
-  if (!permission) return "Permission";
-  if ((PERMISSION_LABELS as Record<string, string>)[permission]) {
+  if (permission && Object.hasOwn(PERMISSION_LABELS, permission)) {
     return PERMISSION_LABELS[permission as KnownPermission];
   }
-  return permission;
+  return "Permission";
 };
+
+/**
+ * Why a permission change failed, as a code in the redirect's `permissionError`.
+ * The page shows only these fixed messages, never text taken from the URL, and
+ * raw Auth0 errors are logged server-side only.
+ */
+const PERMISSION_ERROR_MESSAGES = {
+  not_configured:
+    "Auth0 management credentials are not configured. Ask an engineer to set AUTH0_MANAGEMENT_CLIENT_ID and AUTH0_MANAGEMENT_CLIENT_SECRET.",
+  missing_user: "Missing Auth0 user ID.",
+  missing_permission: "Missing permission name.",
+  unsupported_permission: "Unsupported permission toggle.",
+  unsupported_action: "Unsupported action.",
+  update_failed: "Auth0 did not accept the change. Try again, or check the logs.",
+} as const;
+
+type PermissionErrorCode = keyof typeof PERMISSION_ERROR_MESSAGES;
+
+const permissionErrorMessage = (code: string): string | null =>
+  Object.hasOwn(PERMISSION_ERROR_MESSAGES, code)
+    ? PERMISSION_ERROR_MESSAGES[code as PermissionErrorCode]
+    : null;
 
 const buildManageLink = (userId: string, searchTerm: string) => {
   const url = new URL("/admin/users/admin", "http://localhost");
@@ -62,16 +84,15 @@ const summarizeUser = (user: Auth0ManagementUser | null): string => {
   return user.name || user.nickname || user.email || user.user_id || "user";
 };
 
+/**
+ * Where to go after a permission change: `input` when it is a safe path under
+ * `/admin` (see `safeAdminRedirect`), else this page for `fallbackUser`.
+ * Only the path and query of the result are used.
+ */
 const buildRedirectUrl = (input: string | null, fallbackUser?: string) => {
-  try {
-    if (input) {
-      const candidate = new URL(input, "http://localhost");
-      if (candidate.origin === "http://localhost") {
-        return candidate;
-      }
-    }
-  } catch {
-    // Ignore invalid redirect target
+  const safe = safeAdminRedirect(input);
+  if (safe) {
+    return safe;
   }
   const fallback = new URL("/admin/users/admin", "http://localhost");
   if (fallbackUser) {
@@ -86,7 +107,7 @@ export const userAdministration = async (c: AdminContext) => {
   const selectedUserId = (c.req.query("user") ?? "").trim();
   const permissionStatus = (c.req.query("permissionStatus") ?? "").trim();
   const permissionCode = (c.req.query("permission") ?? "").trim();
-  const permissionErrorMsg = (c.req.query("permissionError") ?? "").trim();
+  const permissionErrorMsg = permissionErrorMessage((c.req.query("permissionError") ?? "").trim());
 
   const state: {
     managementConfigured: boolean;
@@ -116,8 +137,7 @@ export const userAdministration = async (c: AdminContext) => {
           errorMessage: String(error),
         });
       }
-      state.searchError =
-        error instanceof Auth0ManagementError ? error.message : "Unable to search Auth0 users.";
+      state.searchError = "Unable to search Auth0 users.";
     }
   }
 
@@ -140,10 +160,7 @@ export const userAdministration = async (c: AdminContext) => {
           errorMessage: String(error),
         });
       }
-      state.selectedUserError =
-        error instanceof Auth0ManagementError
-          ? error.message
-          : "Unable to load Auth0 user profile.";
+      state.selectedUserError = "Unable to load Auth0 user profile.";
     }
   } else if (!managementClient && (searchTerm || selectedUserId)) {
     state.selectedUserError =
@@ -159,23 +176,20 @@ export const userAdministration = async (c: AdminContext) => {
     selectedUserPermissions.map((permission) => permission.permission_name),
   );
 
-  const permissionNotice =
-    permissionErrorMsg && permissionCode
+  const permissionNotice = permissionErrorMsg
+    ? {
+        variant: "error" as const,
+        message: `Unable to update ${formatPermissionLabel(permissionCode)}: ${permissionErrorMsg}`,
+      }
+    : (permissionStatus === "grant" || permissionStatus === "revoke") && permissionCode
       ? {
-          variant: "error" as const,
-          message: `Unable to update ${formatPermissionLabel(
-            permissionCode,
-          )}: ${permissionErrorMsg}`,
+          variant: "success" as const,
+          message:
+            permissionStatus === "revoke"
+              ? `${formatPermissionLabel(permissionCode)} removed for ${selectedUserName}.`
+              : `${formatPermissionLabel(permissionCode)} granted for ${selectedUserName}.`,
         }
-      : permissionStatus && permissionCode
-        ? {
-            variant: "success" as const,
-            message:
-              permissionStatus === "revoke"
-                ? `${formatPermissionLabel(permissionCode)} removed for ${selectedUserName}.`
-                : `${formatPermissionLabel(permissionCode)} granted for ${selectedUserName}.`,
-          }
-        : null;
+      : null;
 
   return c.html(
     <Layout title="User administration">
@@ -517,7 +531,7 @@ export const userAdministration = async (c: AdminContext) => {
                     ? "This user is blocked in Auth0, so their changes are queued for moderation."
                     : "Anyone signed in can edit loos. To stop someone editing, block the user in the Auth0 dashboard."}
                   {permissionsByName.has(ADMIN_PERMISSION)
-                    ? " Blocking does not remove Admin access, so remove that below too."
+                    ? " Blocking also stops their Admin access within a minute; remove Admin below too if they should not get it back when unblocked."
                     : null}
                 </p>
               </div>
@@ -576,8 +590,8 @@ export const updateUserPermissions = async (c: AdminContext) => {
   redirectUrl.searchParams.delete("permissionError");
   redirectUrl.searchParams.delete("permission");
 
-  const addError = (message: string) => {
-    redirectUrl.searchParams.set("permissionError", message);
+  const addError = (code: PermissionErrorCode) => {
+    redirectUrl.searchParams.set("permissionError", code);
     if (permission) {
       redirectUrl.searchParams.set("permission", permission);
     }
@@ -585,25 +599,23 @@ export const updateUserPermissions = async (c: AdminContext) => {
   };
 
   if (!managementClient) {
-    return addError(
-      "Auth0 management credentials are not configured. Ask an engineer to set AUTH0_MANAGEMENT_CLIENT_ID and AUTH0_MANAGEMENT_CLIENT_SECRET.",
-    );
+    return addError("not_configured");
   }
 
   if (!userId) {
-    return addError("Missing Auth0 user ID.");
+    return addError("missing_user");
   }
 
   if (!permission) {
-    return addError("Missing permission name.");
+    return addError("missing_permission");
   }
 
   if (!(KNOWN_PERMISSIONS as readonly string[]).includes(permission)) {
-    return addError("Unsupported permission toggle.");
+    return addError("unsupported_permission");
   }
 
   if (intent !== "grant" && intent !== "revoke") {
-    return addError("Unsupported action.");
+    return addError("unsupported_action");
   }
 
   try {
@@ -617,7 +629,16 @@ export const updateUserPermissions = async (c: AdminContext) => {
     redirectUrl.searchParams.delete("permissionError");
     return c.redirect(`${redirectUrl.pathname}${redirectUrl.search}`, 303);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update permission.";
-    return addError(message);
+    if (error instanceof Error) {
+      logger.logError(error, { userId, permission, intent });
+    } else {
+      logger.error("Failed to update Auth0 permission", {
+        userId,
+        permission,
+        intent,
+        errorMessage: String(error),
+      });
+    }
+    return addError("update_failed");
   }
 };

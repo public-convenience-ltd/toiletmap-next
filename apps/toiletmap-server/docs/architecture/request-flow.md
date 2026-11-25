@@ -50,7 +50,7 @@ sequenceDiagram
 
 ## Cached Read Request
 
-Flow for cached API requests (e.g., `GET /api/loos/dump` or `GET /api/loos/geohash/:geohash`):
+Flow for cached API requests (e.g., `GET /api/loos/dump` or `GET /api/loos/geohash/:geohash`). The cache key is never the raw request URL: `cacheResponse` takes a key built from the validated, normalised parameters (`normalisedCacheKey`), and the dump keys on its dataset version:
 
 ```mermaid
 sequenceDiagram
@@ -63,7 +63,7 @@ sequenceDiagram
 
     Client->>CF: GET /api/loos/dump
     CF->>Worker: Route request
-    Worker->>Cache: cache.match(request)
+    Worker->>Cache: cache.match(normalised key)
     alt Cache Hit
         Cache-->>Worker: Return cached Response
         Worker-->>CF: Return cached Response
@@ -76,7 +76,7 @@ sequenceDiagram
         Worker->>Worker: Create Response
         alt Large Result Set (>100)
             Worker->>Worker: Set Cache-Control (300s/3600s)
-            Worker->>Cache: ctx.waitUntil(cache.put(request, response))
+            Worker->>Cache: ctx.waitUntil(cache.put(normalised key, response))
         else Small Result Set
             Worker->>Worker: Set Cache-Control (max-age=0)
             Note over Worker: Do not cache small results<br/>for faster updates

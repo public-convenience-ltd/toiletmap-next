@@ -38,7 +38,8 @@ export const requestLogger = (
         ? {}
         : {
             userAgent: c.req.header("user-agent"),
-            ip: c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for"),
+            // Never X-Forwarded-For, which the caller controls.
+            ip: c.req.header("cf-connecting-ip"),
           }),
     });
 

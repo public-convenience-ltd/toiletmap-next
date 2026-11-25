@@ -1,7 +1,6 @@
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { clearSessionCookies, setSessionCookies } from "../auth/session";
-import { fetchUserInfo } from "../auth/userinfo";
 import { authenticateToken } from "../auth/verify";
 import type { Env } from "../types";
 import { logger } from "../utils/logger";
@@ -153,21 +152,34 @@ export const callback = async (c: Context<{ Bindings: Env }>) => {
       return c.text("Invalid authentication nonce", 401);
     }
 
-    // Get user info from Auth0
-    const userInfo = await fetchUserInfo(tokenData.access_token, c.env.AUTH0_ISSUER_BASE_URL);
+    // The access token is the session's credential: verify it (and read its
+    // expiry) before anything is stored.
+    let accessTokenUser: Awaited<ReturnType<typeof authenticateToken>>;
+    try {
+      accessTokenUser = await authenticateToken(
+        tokenData.access_token,
+        c.env,
+        c.env.AUTH0_AUDIENCE,
+      );
+    } catch (error) {
+      logger.error("Auth0 access token verification failed", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return c.text("Authentication failed", 401);
+    }
+    if (accessTokenUser.sub !== idTokenUser.sub) {
+      logger.error("Auth0 access token and id_token name different users");
+      return c.text("Authentication failed", 401);
+    }
 
-    const sessionUser = userInfo ?? {
-      sub: idTokenUser.sub,
-      email: idTokenUser.email,
-      name: idTokenUser.name,
-      nickname: idTokenUser.nickname,
-    };
-
-    // Set session cookies with Auth0 tokens
+    // Every step that can fail is done: only now write the session, so a
+    // failure never leaves a half-session behind. The profile is not stored;
+    // it is read from the verified id_token on each request.
     setSessionCookies(c, {
-      idToken: tokenData.id_token,
       accessToken: tokenData.access_token,
-      user: sessionUser,
+      accessTokenExp: accessTokenUser.exp as number,
+      idToken: tokenData.id_token,
+      idTokenExp: idTokenUser.exp as number,
     });
 
     return c.redirect("/admin");

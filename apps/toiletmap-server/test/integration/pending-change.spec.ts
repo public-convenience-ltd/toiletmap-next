@@ -4,26 +4,19 @@ import { __adminRoleTestUtils } from "../../src/middleware/require-admin-role";
 import { getPrismaClient, getTestContext } from "./setup";
 import { cleanupManager } from "./utils/cleanup";
 import { createFixtureFactory } from "./utils/fixtures";
+import { sessionHeaders } from "./utils/session";
 import { callApi, jsonRequest } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
 
-const buildAdminCookie = () => {
-  const { issueToken } = getTestContext();
-  const sub = "auth0|test-admin";
-
-  // access_token: verified against AUTH0_AUDIENCE — must carry the admin permission
-  const accessToken = issueToken({ sub, permissions: ["access:admin"] });
-  // id_token: verified against AUTH0_CLIENT_ID (fallback if access_token check fails)
-  const idToken = issueToken({ sub, aud: process.env.AUTH0_CLIENT_ID });
-
-  const user = { sub, email: "admin@example.com", name: "Test Admin" };
-  const encodedUser = Buffer.from(JSON.stringify(user)).toString("base64");
-
-  return `id_token=${idToken}; access_token=${accessToken}; user_info=${encodedUser}`;
-};
-
-const adminHeaders = () => ({ Cookie: buildAdminCookie() });
+// access_token: verified against AUTH0_AUDIENCE, carries the admin permission;
+// id_token: verified against AUTH0_CLIENT_ID, supplies only the profile.
+const adminHeaders = () =>
+  sessionHeaders({
+    sub: "auth0|test-admin",
+    permissions: ["access:admin"],
+    profile: { email: "admin@example.com", name: "Test Admin" },
+  });
 
 const seedPendingCreate = async (payload = {}) => {
   const prisma = getPrismaClient();

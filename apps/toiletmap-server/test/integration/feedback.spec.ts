@@ -8,7 +8,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FEEDBACK_SLACK_EXCERPT_LENGTH } from "../../src/services/feedback/notify";
+import { __feedbackAlertTestUtils } from "../../src/services/feedback/notify";
 import { TURNSTILE_SITEVERIFY_URL } from "../../src/services/feedback/turnstile";
 import type { Env } from "../../src/types";
 import { getPrismaClient } from "./setup";
@@ -86,6 +86,7 @@ const interceptFetch = (responses: Record<string, () => Response | Promise<Respo
 afterEach(() => {
   globalThis.fetch = realFetch;
   vi.restoreAllMocks();
+  __feedbackAlertTestUtils.reset();
 });
 
 describe("POST /api/feedback: storage", () => {
@@ -120,12 +121,21 @@ describe("POST /api/feedback: storage", () => {
     }
   });
 
-  it("truncates a long route instead of rejecting it, and ignores unknown fields", async () => {
+  it("truncates a long route instead of rejecting it", async () => {
     const tag = marker();
-    const response = await postJson({ text: tag, route: `/${"r".repeat(400)}`, extra: { a: 1 } });
+    const response = await postJson({ text: tag, route: `/${"r".repeat(400)}` });
     expect(response.status).toBe(200);
     const [row] = await storedWith(tag);
     expect(row?.route).toHaveLength(255);
+  });
+
+  it("refuses unknown fields, in JSON and in the Flutter form encoding", async () => {
+    const tag = marker();
+    expect((await postJson({ text: tag, extra: { a: 1 } })).status).toBe(400);
+    expect((await postLegacyForm({ text: tag, email: "", route: "app", extra: "1" })).status).toBe(
+      400,
+    );
+    expect(await storedWith(tag)).toHaveLength(0);
   });
 
   it("accepts text of exactly 5000 characters", async () => {
@@ -273,14 +283,14 @@ describe("POST /api/feedback: Slack", () => {
     await storedWith(tag);
   });
 
-  it("posts an escaped, truncated excerpt and the route, never the email or IP", async () => {
+  it("posts only a count of recent feedback: never the text, route, email or IP", async () => {
     const calls = interceptFetch({ [WEBHOOK]: () => new Response("ok") });
     const { ctx, settle } = createCapturingExecutionContext();
     const tag = marker();
-    const text = `<!channel> & <https://evil.example|click> ${tag} ${"long ".repeat(300)}`;
+    const text = `<!channel> <https://evil.example|click> ${tag}`;
 
     const response = await postJson(
-      { text, email: EMAIL, route: "/loos/<x>" },
+      { text, email: EMAIL, route: "/loos/spam-route" },
       { env: { MODERATION_SLACK_WEBHOOK: WEBHOOK }, ctx },
     );
     expect(response.status).toBe(200);
@@ -288,18 +298,41 @@ describe("POST /api/feedback: Slack", () => {
 
     expect(calls).toHaveLength(1);
     const message = (JSON.parse(calls[0]?.body ?? "{}") as { text: string }).text;
-    expect(message).toContain(tag);
-    expect(message).toContain("&lt;!channel&gt; &amp; &lt;https://evil.example|click&gt;");
-    expect(message).not.toContain("<!channel>");
-    expect(message).toContain("From: /loos/&lt;x&gt;");
-    expect(message).toContain("…");
-    expect(message.length).toBeLessThan(FEEDBACK_SLACK_EXCERPT_LENGTH * 2);
-    expect(calls[0]?.body).not.toContain(EMAIL);
-    expect(calls[0]?.body).not.toContain(IP);
+    expect(message).toMatch(
+      /^\d+ feedback messages? in the last 24 hours \(see \/admin\/feedback\)$/,
+    );
+    for (const secret of [tag, "<!channel>", "evil.example", "spam-route", EMAIL, IP]) {
+      expect(calls[0]?.body).not.toContain(secret);
+    }
 
     // The database keeps the full text.
     const [row] = await storedWith(tag);
     expect(row?.feedback_text).toBe(text.trim());
+  });
+
+  it("batches a burst into one post instead of one per message", async () => {
+    const calls = interceptFetch({ [WEBHOOK]: () => new Response("ok") });
+    const { ctx, settle } = createCapturingExecutionContext();
+    const tags = [marker(), marker(), marker()];
+    for (const tag of tags) {
+      const response = await postJson(
+        { text: tag },
+        { env: { MODERATION_SLACK_WEBHOOK: WEBHOOK }, ctx },
+      );
+      expect(response.status).toBe(200);
+      await settle();
+      await storedWith(tag);
+    }
+    // The first post claims the 10-minute window; the next two only post if
+    // the 24-hour count happens to land on a threshold (1, 5, 10, 25, ...).
+    const counts = calls.map((call) =>
+      Number((JSON.parse(call.body) as { text: string }).text.split(" ")[0]),
+    );
+    expect(calls.length).toBeGreaterThanOrEqual(1);
+    expect(calls.length).toBeLessThan(tags.length);
+    for (const count of counts.slice(1)) {
+      expect([5, 10, 25, 50, 100, 250, 500, 1000]).toContain(count);
+    }
   });
 
   it("still answers 200 when the webhook fails", async () => {
@@ -406,7 +439,7 @@ describe("POST /api/feedback: logging", () => {
         new Response(JSON.stringify({ success: false }), { status: 200 }),
     });
     const { ctx, settle } = createCapturingExecutionContext();
-    const headers = { "x-forwarded-for": IP, "user-agent": "Dart/3.5 (dart:io)" };
+    const headers = { "cf-connecting-ip": IP, "user-agent": "Dart/3.5 (dart:io)" };
 
     const ok = await postJson(
       { text: marker(), email: EMAIL },

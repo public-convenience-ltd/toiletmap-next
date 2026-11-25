@@ -1,6 +1,7 @@
 import { MAX_SEARCH_LIMIT, MIN_SEARCH_LIMIT, RECENT_WINDOW_DAYS } from "../../common/constants";
 import { Prisma, type PrismaClientInstance } from "../../prisma";
 import { isStaleBase, type LooDiffBase } from "./diff";
+import { isLegacyLocationSnapshot } from "./legacy-location-report";
 import {
   areaSelection,
   buildAreaFromJoin,
@@ -156,6 +157,17 @@ export const DEFAULT_REMOVAL_REASONS: Record<RemovalCategory, string> = {
 /** A loo counts as removed unless it is explicitly active (null is off the map too). */
 const isRemoved = (loo: { active: boolean | null }) => loo.active !== true;
 
+/**
+ * Whether `value` uses only the geohash alphabet (lowercase base32 without a,
+ * i, l and o). Stored geohashes never contain anything else, so any other
+ * prefix (including the LIKE wildcards `%` and `_`, or `\`) matches nothing:
+ * the geohash lookups return [] for it instead of passing it to the
+ * `startsWith` (LIKE) match. The REST route validates this too; the legacy
+ * GraphQL resolvers rely on this check.
+ */
+export const isGeohashPrefix = (value: string): boolean =>
+  /^[0-9bcdefghjkmnpqrstuvwxyz]*$/.test(value);
+
 const stripAreaId = ({ areaId: _areaId, ...loo }: LooMutationBase): LooResponse => loo;
 
 /** Bounded retries when a concurrent write lands between our read and our update. */
@@ -182,14 +194,6 @@ export class LooService {
   private readonly MAX_CACHE_SIZE = 100;
 
   constructor(private readonly prisma: PrismaClientInstance) {}
-
-  /**
-   * Performs a database health check.
-   * @returns Promise that resolves if database is healthy, rejects otherwise.
-   */
-  async healthCheck(): Promise<void> {
-    await this.prisma.$queryRaw`SELECT 1 as health_check`;
-  }
 
   // ===========================================================================
   // READ OPERATIONS
@@ -409,6 +413,7 @@ export class LooService {
    * Useful for map-based tiling or broad area searches.
    */
   async getWithinGeohash(geohash: string, active?: boolean | null): Promise<LooResponse[]> {
+    if (!isGeohashPrefix(geohash)) return [];
     const where = {
       geohash: { startsWith: geohash },
       ...(typeof active === "boolean" ? { active: { equals: active } } : {}),
@@ -429,6 +434,7 @@ export class LooService {
     geohash: string,
     active?: boolean | null,
   ): Promise<CompressedLoo[]> {
+    if (!isGeohashPrefix(geohash)) return [];
     const where = {
       geohash: { startsWith: geohash },
       ...(typeof active === "boolean" ? { active: { equals: active } } : {}),
@@ -447,6 +453,7 @@ export class LooService {
    * Includes more details than compressed but less than full.
    */
   async getWithinGeohashSummary(geohash: string, active?: boolean | null): Promise<LooResponse[]> {
+    if (!isGeohashPrefix(geohash)) return [];
     const where = {
       geohash: { startsWith: geohash },
       ...(typeof active === "boolean" ? { active: { equals: active } } : {}),
@@ -660,12 +667,12 @@ export class LooService {
       orderBy: { ts: "asc" },
     });
 
-    // We filter out system location updates as they are not user-contributed
-    // and are left over from our old system where we recorded a separate
-    // location report for each loo.
+    // Legacy system location rows are not user-contributed: the legacy app
+    // records each location change as a separate row (see
+    // isLegacyLocationSnapshot for the exact marker).
     const mapped = reportRecords
-      .map((entry: Parameters<typeof mapAuditRecordToReport>[0]) => mapAuditRecordToReport(entry))
-      .filter((report: ReportResponse) => !report.contributor?.endsWith("-location"));
+      .filter((entry: { record: unknown }) => !isLegacyLocationSnapshot(entry.record))
+      .map((entry: Parameters<typeof mapAuditRecordToReport>[0]) => mapAuditRecordToReport(entry));
 
     const sortedReports = [...mapped].sort((a, b) => {
       const timeA = Date.parse(a.createdAt);

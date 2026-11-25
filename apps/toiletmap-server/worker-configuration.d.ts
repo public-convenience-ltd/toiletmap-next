@@ -21,7 +21,7 @@ declare namespace Cloudflare {
 		AUTH0_PROFILE_KEY: "https://toiletmap.org.uk/profile";
 		AUTH0_PERMISSIONS_KEY: "https://toiletmap.org.uk/permissions";
 		AUTH0_SCOPE: "openid profile email offline_access roles";
-		ALLOWED_ORIGINS: "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev";
+		ALLOWED_ORIGINS: "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev";
 	}
 	interface PreviewEnv {
 		HYPERDRIVE: Hyperdrive;
@@ -38,7 +38,7 @@ declare namespace Cloudflare {
 		AUTH0_PROFILE_KEY: "https://toiletmap.org.uk/profile";
 		AUTH0_PERMISSIONS_KEY: "https://toiletmap.org.uk/permissions";
 		AUTH0_SCOPE: "openid profile email offline_access roles";
-		ALLOWED_ORIGINS: "https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev";
+		ALLOWED_ORIGINS: "https://toiletmap-client.gbtoiletmap.workers.dev";
 	}
 	interface Env {
 		EXPORTS?: R2Bucket;
@@ -56,7 +56,7 @@ declare namespace Cloudflare {
 		AUTH0_PROFILE_KEY: "https://toiletmap.org.uk/profile" | "name";
 		AUTH0_PERMISSIONS_KEY: "https://toiletmap.org.uk/permissions";
 		AUTH0_SCOPE: "openid profile email offline_access roles";
-		ALLOWED_ORIGINS: "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev" | "https://toiletmap-client.gbtoiletmap.workers.dev,https://*.gbtoiletmap.workers.dev" | "http://localhost:8787,http://localhost:4321";
+		ALLOWED_ORIGINS: "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev" | "https://toiletmap-client.gbtoiletmap.workers.dev" | "http://localhost:8787,http://localhost:4321";
 		AUTH0_CLIENT_ID?: string;
 		AUTH0_CLIENT_SECRET?: string;
 		TEST_HYPERDRIVE?: Hyperdrive;

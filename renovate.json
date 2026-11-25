@@ -170,6 +170,13 @@
         "major"
       ],
       "enabled": false
+    },
+    {
+      "description": "Hold astro below 7.4.9: 7.4.9 and later drop the astro/runtime/*.prebuilt.js files apps/toiletmap-client/src/utils/inlineScripts.ts imports for its CSP hashes, so the client build fails. Remove once inlineScripts.ts is ported (the client pins astro exactly until then).",
+      "matchPackageNames": [
+        "astro"
+      ],
+      "allowedVersions": "<7.4.9"
     }
   ]
 }

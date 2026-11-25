@@ -4,6 +4,7 @@
  * test/unit/legacy-graphql-mappers.test.ts); the quirks reproduced here are
  * documented in test/fixtures/legacy-graphql/README.md.
  */
+import { isLegacyLocationSnapshot } from "../../services/loo/legacy-location-report";
 import { genLooFilterBitmask } from "../../services/loo/mappers";
 import type { AdminGeo, LooResponse } from "../../services/loo/types";
 
@@ -258,15 +259,13 @@ export const toLegacyReport = ({ id, record }: AuditSnapshot): LegacyReport => {
     record && typeof record === "object" && !Array.isArray(record)
       ? (record as Record<string, unknown>)
       : {};
-  const contributors = Array.isArray(snapshot.contributors) ? snapshot.contributors : [];
-  const lastContributor = contributors[contributors.length - 1];
 
   return {
     id,
     contributor: "Anonymous",
     createdAt: field(snapshot, "updated_at") ?? field(snapshot, "created_at"),
     verifiedAt: field(snapshot, "verified_at"),
-    isSystemReport: typeof lastContributor === "string" && lastContributor.endsWith("-location"),
+    isSystemReport: isLegacyLocationSnapshot(snapshot),
     active: field(snapshot, "active"),
     location: toLegacyLocation(snapshot.location),
     name: field(snapshot, "name"),

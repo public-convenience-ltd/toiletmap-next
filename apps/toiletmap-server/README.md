@@ -205,6 +205,17 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 | `/api/loos/:id`              | PUT      | Update loo (auth required)             |
 | `/api/graphql`               | GET/POST | Legacy GraphQL (deprecated, read-only) |
 
+### Breaking changes for REST API consumers (S1 hardening)
+
+First-party callers (the website through its proxy, the admin explorer and the Flutter app) are unaffected; third-party integrators should be told before launch:
+
+- **Unknown query parameters are a 400** on every `GET /api/loos*` route, so a cache-buster such as `?_=123` or `?v=2` is refused (send none: responses already carry `Cache-Control`). `POST /api/feedback` with an unknown body field is a 400 too.
+- **Geohash prefixes** (`/api/loos/geohash/:geohash`) must be 4-12 base32 characters; 1-3 characters used to work.
+- **`ids`** (`GET /api/loos?ids=`): at most 100 distinct ids, each exactly 24 characters.
+- **Search paging**: `limit` at most 200 and `(page - 1) * limit` at most 100,000.
+- **Heavy-read limit**: `/search`, `/metrics`, `/dump?rich=true`, 4-character geohash prefixes and `/proximity` with `radius` over 5000 m share 20 requests a minute per IP (edge-cache hits count), on top of the general read limit. Confirmed admins are exempt.
+- **Proximity coordinates** are rounded to 5 decimal places (about 1 m) before the query, so `distance` can differ by up to a metre from the unrounded point.
+
 ### Admin UI
 
 | Endpoint             | Method   | Description     |
@@ -225,8 +236,8 @@ See [API Documentation](docs/openapi.json) for OpenAPI spec.
 
 - **Frozen contract.** The schema is the legacy SDL minus the three mutations (and the types and `@auth` directive only they used). No new fields: new capabilities go to REST. Apart from the deliberate deviations listed below, output matches the legacy API byte for byte: field names and nullability, `OpeningTimes` (`null` or 7 days of `[]` / `["HH:MM","HH:MM"]`; the current API's `24:00` is sent as `00:00`), `DateTime` (graphql-iso-date rules), the compressed `loosByGeohash` / `fullLoosByGeohash` strings, status codes, and `"Unexpected error."` masking. Legacy quirks are kept on purpose (for example an unknown `loo` id is an error, `loosByProximity` includes removed loos, `contributors` is ignored). `graphql` is pinned to 16.10.0, the version the legacy API ran, so error messages and introspection match too.
 - **Read-only.** Any `mutation` or `subscription` fails validation with `This API is read-only; use the REST API.`
-- **Limits.** Depth 8, 250 fields after fragment expansion (`__typename` and introspection fields included), 15 aliases, a per-request cost budget (`statistics` 10, `loos` and `fullLoosByGeohash` 5, ...), 1,000 tokens, 10,000-character queries, 32 KiB bodies, `loos` pages of at most 100, at most 100 `looNamesByIds` ids (and a list is required), `maxDistance` at most 50,000 m, no empty geohash prefix, and at most one `loosByGeohash` / `fullLoosByGeohash` with a prefix shorter than 4 characters per request. The read-only and limit checks run before graphql-js's own validation rules and stop the request on failure, so a document over the limits never reaches the (quadratic) field-overlap check. Requests share the read rate limiter, introspection included. Constants: `src/routes/legacy-graphql/limits.ts`.
-- **Headers.** `Deprecation: true` and `Link: <.../api/docs>; rel="deprecation"` on every response; `Sunset` only when `GRAPHQL_SUNSET` (an HTTP-date) is set. Successful `GET ?query=` responses are `public, max-age=60` (like REST proximity) and edge-cached for 60 s; POSTs and errors are `no-store`. Every response carries `Vary: Accept`, because the content type follows `Accept`. CORS: `Access-Control-Allow-Origin: *` on GET/POST, preflights answered only for the legacy allow-list (`explorer.toiletmap.org.uk` and friends), never credentials.
+- **Limits.** Depth 8, 250 fields after fragment expansion (`__typename` and introspection fields included), 15 aliases, a per-request cost budget (`statistics` 10, `loos` and `fullLoosByGeohash` 5, ...), 1,000 tokens, 10,000-character queries, 32 KiB bodies, `loos` pages of at most 100, at most 100 `looNamesByIds` ids (and a list is required), `maxDistance` at most 50,000 m, no empty geohash prefix, and at most one `loosByGeohash` / `fullLoosByGeohash` with a prefix shorter than 4 characters per request. The read-only and limit checks run before graphql-js's own validation rules and stop the request on failure, so a document over the limits never reaches the (quadratic) field-overlap check. Requests share the read rate limiter, introspection included; wide reads (`loos`, `statistics`, `fullLoosByGeohash`, a geohash prefix under 4 characters, `loosByProximity` beyond 5000 m) also take the stricter heavy-read limit (20/min per IP, 429 with a GraphQL error). Constants: `src/routes/legacy-graphql/limits.ts`.
+- **Headers.** `Deprecation: true` and `Link: <.../api/docs>; rel="deprecation"` on every response; `Sunset` only when `GRAPHQL_SUNSET` (an HTTP-date) is set. Successful `GET ?query=` responses are `public, max-age=60` (like REST proximity) and edge-cached for 60 s, keyed by the re-printed operation plus the variables it declares (not the raw URL, so extra parameters or reformatting cannot bust the cache); POSTs and errors are `no-store`. Every response carries `Vary: Accept`, because the content type follows `Accept`. CORS: `Access-Control-Allow-Origin: *` on GET/POST, preflights answered only for the legacy allow-list (`explorer.toiletmap.org.uk` and friends), never credentials.
 - **Usage logging.** One info log per request with the operation name, root fields, a hash of the query shape (literals stripped) and the `Origin`. No IP, user agent or variables are logged for this path anywhere: the global request logger leaves out its `ip` and `userAgent` fields here, and the read rate limiter's "Rate limit exceeded" warning leaves out its IP-based key.
 - **Deliberate deviations from the legacy API** (tell third parties before cutover):
   - Read-only: the three mutations are gone (see above).
@@ -305,7 +316,7 @@ pnpm deploy
 Deployment checklist:
 
 - [ ] Set `ENVIRONMENT=production` in Cloudflare Workers environment
-- [ ] Configure `ALLOWED_ORIGINS` for CORS
+- [ ] Configure `ALLOWED_ORIGINS` for CORS (exact origins only; never with credentials, never on `/admin`)
 - [ ] Set up Auth0 production tenant
 - [ ] Configure Cloudflare Rate Limiting bindings
 - [ ] Configure `HYPERDRIVE` binding to point to production database (Supabase)
@@ -318,7 +329,7 @@ Required in Cloudflare Workers dashboard. The worker now derives the Auth0 redir
 
 ```bash
 ENVIRONMENT=production
-ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://admin.toiletmap.org.uk
+ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://toiletmap.org.uk
 AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com/
 AUTH0_AUDIENCE=https://www.toiletmap.org.uk/api
 AUTH0_CLIENT_ID=production_client_id

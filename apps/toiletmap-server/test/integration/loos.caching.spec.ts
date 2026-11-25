@@ -23,6 +23,7 @@ import type {
   SavedLooBody as SavedBody,
   UpdatesBody,
 } from "./utils/response-types";
+import { sessionHeaders } from "./utils/session";
 import { callApi, jsonRequest, readJson } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
@@ -302,16 +303,13 @@ describe("GET /api/loos/updates freshness", () => {
     });
     cleanupManager.trackPendingChange(change.id);
 
-    const { issueToken } = getTestContext();
-    const sub = "auth0|test-admin";
-    const cookie = [
-      `id_token=${issueToken({ sub, aud: process.env.AUTH0_CLIENT_ID })}`,
-      `access_token=${issueToken({ sub, permissions: ["access:admin"] })}`,
-      `user_info=${Buffer.from(JSON.stringify({ sub, name: "Test Admin" })).toString("base64")}`,
-    ].join("; ");
     const approve = await callApi(`/admin/pending/${change.id}/approve`, {
       method: "POST",
-      headers: { Cookie: cookie },
+      headers: sessionHeaders({
+        sub: "auth0|test-admin",
+        permissions: ["access:admin"],
+        profile: { name: "Test Admin" },
+      }),
     });
     expect(approve.headers.get("location")).toBe("/admin/pending?notice=approved");
 
