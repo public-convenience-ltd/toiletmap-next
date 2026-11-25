@@ -28,7 +28,8 @@ const runbookSql = (name: string) =>
 
 /**
  * The file as psql would send it with `-v` variables: meta-commands dropped,
- * the closing `\if :{?apply} COMMIT \else ROLLBACK \endif` resolved.
+ * the closing `\if :apply COMMIT \else ROLLBACK \endif` resolved (see the
+ * guard test below for that block itself).
  */
 const asPlainSql = (sql: string, vars: Record<string, string>, apply: boolean): string => {
   const kept: string[] = [];
@@ -101,6 +102,7 @@ describe("runbook: revert-by-account.sql", () => {
     const moved = await fixtures.loos.create({ location: placed });
     const removed = await fixtures.loos.create();
     const fixedByOther = await fixtures.loos.create({ notes: "Original" });
+    const verifiedAfter = await fixtures.loos.create({ notes: "Original" });
 
     expect((await put(edited.id, { name: "Vandal", notes: "Vandal" }, bearer(vandal))).status).toBe(
       200,
@@ -125,6 +127,12 @@ describe("runbook: revert-by-account.sql", () => {
     ).toBe(200);
     expect((await put(fixedByOther.id, { notes: "Vandal" }, bearer(vandal))).status).toBe(200);
     expect((await put(fixedByOther.id, { notes: "Fixed" }, bearer(other))).status).toBe(200);
+    // A verify after the account's edit, by someone else or anonymously, is not an edit.
+    expect((await put(verifiedAfter.id, { notes: "Vandal" }, bearer(vandal))).status).toBe(200);
+    const verifyBy = (headers: Record<string, string>) =>
+      callApi(`/api/loos/${verifiedAfter.id}/verify`, { method: "POST", headers });
+    expect((await verifyBy({})).status).toBe(200);
+    expect((await verifyBy(bearer(other))).status).toBe(200);
 
     const created = await callApi(
       "/api/loos",
@@ -168,6 +176,7 @@ describe("runbook: revert-by-account.sql", () => {
     expect(removedNow?.removal_category).toBeNull();
 
     expect((await toilet(fixedByOther.id))?.notes).toBe("Fixed");
+    expect((await toilet(verifiedAfter.id))?.notes).toBe("Original");
 
     const createdNow = await toilet(createdId);
     expect(createdNow?.active).toBe(false);
@@ -250,5 +259,29 @@ describe("runbook: erase-contributor.sql", () => {
         false,
       ),
     ).rejects.toThrow(/pseudonym/);
+  });
+});
+
+describe("runbooks commit only when apply is true", () => {
+  // psql's `\if :{?apply}` is true whenever apply is set, so `-v apply=0`
+  // would COMMIT; the scripts default apply to 0 and test its value instead
+  // (checked with psql 15: unset, 0, false, off and unreadable values roll
+  // back; 1, true, yes and on commit). No psql here, so check the block.
+  const GUARD = [
+    "\\if :{?apply}",
+    "\\else",
+    "\\set apply 0",
+    "\\endif",
+    "\\if :apply",
+    "COMMIT;",
+    "\\else",
+    "ROLLBACK;",
+  ].join("\n");
+
+  it.each(["revert-by-account.sql", "erase-contributor.sql"])("%s", (name) => {
+    const sql = runbookSql(name);
+    expect(sql).toContain(GUARD);
+    expect(sql.match(/^COMMIT;$/gm)).toHaveLength(1);
+    expect(sql).not.toMatch(/\\if :\{\?apply\}\nCOMMIT;/);
   });
 });

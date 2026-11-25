@@ -11,9 +11,10 @@
 -- - edited: restored to the row as it was just before the account's first
 --   change in the window (all user-editable columns, location included);
 -- - added by the account: taken off the map (category `other`), never deleted;
--- - changed by anyone else (another account, an anonymous verify, the legacy
---   app or an operator) after the account's first change: SKIPPED, listed
---   with edited_by_others = true for a moderator to fix by hand.
+-- - changed by anyone else (another account, the legacy app or an operator)
+--   after the account's first change: SKIPPED, listed with
+--   edited_by_others = true for a moderator to fix by hand. A verify (it
+--   sets only verified_at) by anyone does not count as a change here.
 -- The account's pending changes are rejected. Every write here bumps
 -- updated_at, so map clients pick the reverts up through /api/loos/updates,
 -- and is attributed to `ops:revert-by-account` in updated_by_sub.
@@ -46,6 +47,9 @@ later_by_others AS (
    AND rv.ts >= :'since'::timestamptz - interval '1 hour'
    AND rv.table_name = 'toilets'
   WHERE rv.record ->> 'updated_by_sub' IS DISTINCT FROM :'sub'
+    -- Not a verify: something besides verified_at (and the writer) changed.
+    AND (rv.record - 'verified_at' - 'updated_by_sub')
+        IS DISTINCT FROM (rv.old_record - 'verified_at' - 'updated_by_sub')
 )
 SELECT f.loo_id, f.first_version_id, f.first_op, f.restore_to,
        (o.loo_id IS NOT NULL) AS edited_by_others
@@ -120,7 +124,13 @@ SET status = 'rejected',
 WHERE submitter_sub = :'sub'
   AND status = 'pending';
 
+-- COMMIT only when apply is set to a true value (1, true, yes, on): unset,
+-- 0, false, off or anything psql cannot read as a boolean rolls back.
 \if :{?apply}
+\else
+\set apply 0
+\endif
+\if :apply
 COMMIT;
 \else
 ROLLBACK;

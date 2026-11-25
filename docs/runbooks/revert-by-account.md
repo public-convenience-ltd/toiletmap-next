@@ -17,7 +17,7 @@ For each toilet the account changed at or after `T`:
 | --- | --- |
 | Edited, moved, removed or restored by the account | Every user-editable column (name, notes, facilities, opening times, location, `active`, removal category, reason and duplicate link, `verified_at`) goes back to the row **just before the account's first change since `T`**. |
 | Added by the account | Taken off the map (`active=false`, category `other`); never deleted, so it can be restored. |
-| Changed by **anyone else** after the account's first change (another account, an anonymous "still here", the legacy app, an operator) | **Skipped** and listed with `edited_by_others = t`. Fix these by hand in `/admin/loos/<id>`: the history there shows each version. |
+| Changed by **anyone else** after the account's first change (another account, the legacy app, an operator) | **Skipped** and listed with `edited_by_others = t`. Fix these by hand in `/admin/loos/<id>`: the history there shows each version. A verify ("Yes, it's still here", which sets only `verified_at`) by anyone does not count, so the toilet is still reverted. |
 
 It also rejects the account's pending changes (`pending_change.submitter_sub`). Every revert
 bumps `updated_at` (map clients pick it up through `/api/loos/updates`) and is attributed to

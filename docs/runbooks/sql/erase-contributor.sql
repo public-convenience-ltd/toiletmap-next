@@ -141,7 +141,13 @@ SELECT 'pending_change', count(*)
 FROM public.pending_change
 WHERE submitted_by = :'handle' OR (:'sub' <> '' AND submitter_sub = :'sub');
 
+-- COMMIT only when apply is set to a true value (1, true, yes, on): unset,
+-- 0, false, off or anything psql cannot read as a boolean rolls back.
 \if :{?apply}
+\else
+\set apply 0
+\endif
+\if :apply
 COMMIT;
 \else
 ROLLBACK;
