@@ -205,6 +205,17 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 | `/api/loos/:id`              | PUT      | Update loo (auth required)             |
 | `/api/graphql`               | GET/POST | Legacy GraphQL (deprecated, read-only) |
 
+### Breaking changes for REST API consumers (S1 hardening)
+
+First-party callers (the website through its proxy, the admin explorer and the Flutter app) are unaffected; third-party integrators should be told before launch:
+
+- **Unknown query parameters are a 400** on every `GET /api/loos*` route, so a cache-buster such as `?_=123` or `?v=2` is refused (send none: responses already carry `Cache-Control`). `POST /api/feedback` with an unknown body field is a 400 too.
+- **Geohash prefixes** (`/api/loos/geohash/:geohash`) must be 4-12 base32 characters; 1-3 characters used to work.
+- **`ids`** (`GET /api/loos?ids=`): at most 100 distinct ids, each exactly 24 characters.
+- **Search paging**: `limit` at most 200 and `(page - 1) * limit` at most 100,000.
+- **Heavy-read limit**: `/search`, `/metrics`, `/dump?rich=true`, 4-character geohash prefixes and `/proximity` with `radius` over 5000 m share 20 requests a minute per IP (edge-cache hits count), on top of the general read limit. Confirmed admins are exempt.
+- **Proximity coordinates** are rounded to 5 decimal places (about 1 m) before the query, so `distance` can differ by up to a metre from the unrounded point.
+
 ### Admin UI
 
 | Endpoint             | Method   | Description     |

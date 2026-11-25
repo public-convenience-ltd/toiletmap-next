@@ -22,7 +22,7 @@ Cloudflare Workers handle zero-downtime deployments automatically. New versions 
   ```bash
   ALLOWED_ORIGINS=https://www.toiletmap.org.uk,https://toiletmap.org.uk
   ```
-- [ ] Set the Auth0 Management credentials (`AUTH0_MANAGEMENT_CLIENT_ID` / `_SECRET`). Outside `ENVIRONMENT=development`, without them every signed-in write is queued and admin access is denied.
+- [ ] Set the Auth0 Management credentials (`AUTH0_MANAGEMENT_CLIENT_ID` / `_SECRET`) as worker secrets. Outside `ENVIRONMENT=development`, without them every signed-in write is queued and admin access is denied. The production deploy workflow checks both names with `wrangler secret list` and refuses to deploy the server when either is missing.
 - [ ] Verify all Auth0 environment variables:
   - `AUTH0_ISSUER_BASE_URL`
   - `AUTH0_AUDIENCE`
@@ -284,6 +284,8 @@ Set in `wrangler.jsonc` under `env.preview.vars`:
 ENVIRONMENT=preview  # Treats preview as production for error sanitization
 # Same Auth0 and other config as production
 ```
+
+Preview workers get only `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` (deploy-preview.yml), not the Auth0 Management credentials. So on a preview `/admin` denies everyone and every signed-in write is queued (`202`) rather than going live. Testing approve/reject, feedback delete, user admin or the client's "goes live straight away" flow needs a local stack or production until previews get their own least-privilege Management app.
 
 ### Environment Variable Effects
 

@@ -164,12 +164,12 @@ All mutations to `toilets` records create audit entries tracking:
 2. Fall back to the `access_token` cookie (a session whose access token fails is cleared; the `id_token` is never accepted as a credential).
 3. Enrich `c.user` with `name`, `nickname`, `email` from the verified `id_token` (same `sub`) or Auth0 `/userinfo` (mirrored under `user.profile`). No browser-editable cookie feeds the profile.
 4. `optionalAuth` skips auth if no credentials are provided (and treats the caller as anonymous when Auth0's JWKS cannot be fetched), `requireAuth` returns `401`, and `requireAdminAuth` redirects to `/admin/login`.
-5. Tokens must have `exp`, the configured issuer and an `aud` that is exactly the expected audience (or contains it, as an array); an empty expected audience rejects every token. JWKS is cached for 10 min.
+5. Tokens must have `exp`, the configured issuer and an `aud` that is exactly the expected audience (or contains it, as an array); an empty expected audience rejects every token. JWKS is cached for 10 min; if a refetch fails, keys fetched in the last 24 h keep verifying tokens.
 
 **`requireAdminRole` middleware** (`src/middleware/require-admin-role.ts`):
-- Requires `access:admin` in the token and confirmed by the Auth0 Management API (60s cache; 5 min grace from the last good answer during an outage), and that the user is not blocked
+- Requires `access:admin` in the token and confirmed by the Auth0 Management API (60s cache; during an outage both the permission and the block lookups fall back to the last good answer for up to 5 min), and that the user is not blocked
 - Outside `ENVIRONMENT=development`, missing Management credentials or a failed lookup deny admin access (a confirmed revocation or block also clears the session)
-- Protects admin-only routes (`hasAdminRole`, claims only, reveals contributor info in audit reports)
+- Protects admin-only routes. On public API routes, `isConfirmedAdmin` (same Auth0 checks) decides the admin extras: contributor names in audit reports and the heavy-read limit exemption. `hasAdminRole` (token claims only) is informational (the `/` greeting) and for machine-to-machine writes
 
 ### OAuth2 Flow (Admin Interface)
 
@@ -204,7 +204,7 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 
 ### Public Endpoints (No Auth Required)
 
-- **GET /** - Health check (database status from the same cached check as `/health/ready`: at most one `SELECT 1` per isolate every 10 s, `src/services/health/readiness.ts`)
+- **GET /** - Health check (database status from the same cached check as `/health/ready`: at most one `SELECT 1` per isolate every 10 s, every 2 s after a failure, `src/services/health/readiness.ts`)
 - **GET /api/docs** - Swagger UI (jsDelivr assets pinned to an exact version with SRI hashes in `src/docs/swagger-ui.ts`)
 - **GET /api/docs/openapi.json** - OpenAPI spec
 - **GET /admin/login** - Initiate OAuth2 flow
@@ -214,13 +214,13 @@ AUTH0_SCOPE=openid profile email offline_access roles access:admin
 - **GET /api/loos?ids=** - Batch fetch loos (comma-separated or repeated `?ids=` params; de-duplicated, at most 100, each 24 characters)
 - **GET /api/loos/geohash/:geohash** - Search by geohash prefix: 4-12 base32 geohash characters (lower-cased; anything else, LIKE wildcards included, is a 400). Optional `?active=true/false/any`
 - **GET /api/loos/proximity** - Find nearby loos, nearest first (`lat`, `lng` required; optional `radius`, `includeInactive=true|false` (default false: active only) and `exclude=<id>`). Each item carries `active` and `distance` (metres).
-- **GET /api/loos/search** - Advanced search with filters, sorting, pagination (`page` at most 1000, `limit` at most 200)
+- **GET /api/loos/search** - Advanced search with filters, sorting, pagination (`limit` at most 200, `(page - 1) * limit` at most 100,000)
 - **GET /api/loos/metrics** - Aggregate metrics for filtered results
-- **GET /api/loos/:id/reports** - Audit history (contributors redacted unless caller has `access:admin`)
+- **GET /api/loos/:id/reports** - Audit history (contributors redacted unless the caller holds `access:admin`, confirmed with Auth0 and not blocked)
 
 Public routes still accept optional authentication so admin tokens can unlock extra data (e.g., contributor names in reports).
 
-**Input limits and caching**: every `/api/loos` query and body schema and the `/api/feedback` body are `.strict()` (an unknown parameter or field is a 400). Edge-cache keys are built from the validated, normalised parameters (`normalisedCacheKey` in `src/middleware/cache.ts`; GraphQL GETs from the re-printed operation and its declared variables, `src/routes/legacy-graphql/request-shape.ts`), never the raw URL. Heavy public reads take a stricter per-IP limit (`rateLimiters.heavyRead`, see `apps/toiletmap-server/docs/operations/rate-limiting.md`). Loo write routes refuse bodies over 64 KiB with 413 before parsing; the client proxy refuses bodies over 128 KiB while reading them.
+**Input limits and caching**: every `/api/loos` query and body schema and the `/api/feedback` body are `.strict()` (an unknown parameter or field is a 400). Edge-cache keys are built from the validated, normalised parameters (`normalisedCacheKey` in `src/middleware/cache.ts`; GraphQL GETs from the re-printed operation and its declared variables, `src/routes/legacy-graphql/request-shape.ts`), never the raw URL; proximity `lat`/`lng` are rounded to 5 decimals (about 1 m) first, for the query too. Heavy public reads take a stricter per-IP limit (`rateLimiters.heavyRead`, see `apps/toiletmap-server/docs/operations/rate-limiting.md`). Loo write routes refuse bodies over 64 KiB with 413 before parsing; the client proxy refuses bodies over 128 KiB while reading them.
 
 **CORS**: `ALLOWED_ORIGINS` is a list of exact origins (wildcards and `*` are ignored), never with credentials, and `/admin/*` sends no CORS headers. Unset, it is the localhost dev origins in development and nothing elsewhere. No first-party page needs CORS (the client proxies `/api` over the service binding; the admin is same-origin); the legacy GraphQL endpoint has its own policy.
 
@@ -231,7 +231,7 @@ Public routes still accept optional authentication so admin tokens can unlock ex
 - **POST /api/loos** - Create new loo (requires contributor info in JWT)
 - **PUT /api/loos/:id** - Upsert (create or update) loo (requires contributor info in JWT)
 
-Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). A session whose access token fails verification is anonymous (the `id_token` is never a credential), and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked only in local dev and tests (`ENVIRONMENT=development`; the integration env defaults to it); every other environment, previews included and `ENVIRONMENT` unset, queues every signed-in change when credentials are missing. To stop someone editing, block the user in the Auth0 dashboard (for an admin, also remove `access:admin`: blocking does not end an existing session or admin access). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
+Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). A session whose access token fails verification is anonymous (the `id_token` is never a credential), and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked only in local dev and tests (`ENVIRONMENT=development`; the integration env defaults to it); every other environment, previews included and `ENVIRONMENT` unset, queues every signed-in change when credentials are missing. To stop someone editing, block the user in the Auth0 dashboard (blocking an admin also denies `/admin` within 60s and ends their admin session, and drops their API admin extras such as contributor names in reports; still remove `access:admin` if they should not get it back when unblocked). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
 
 ### Report, restore and verify (anyone; signed-in, unblocked callers apply directly)
 
