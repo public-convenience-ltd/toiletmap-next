@@ -170,6 +170,55 @@ describe("authenticateToken", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps verifying with earlier keys when a refetch fails after the cache expires", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await authenticateToken(sign(validClaims()), env);
+      vi.setSystemTime(Date.now() + 11 * 60 * 1000);
+      fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+      const user = await authenticateToken(sign(validClaims()), env);
+      expect(user.sub).toBe("auth0|abc");
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalled();
+
+      // No refetch on every request during the outage: at most one per 30 s.
+      await authenticateToken(sign(validClaims()), env);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      vi.setSystemTime(Date.now() + 31 * 1000);
+      await authenticateToken(sign(validClaims()), env);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+
+      // Keys older than a day are not trusted any more.
+      vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000);
+      await expect(authenticateToken(sign(validClaims()), env)).rejects.toBeInstanceOf(
+        JwksUnavailableError,
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("retries once itself when a shared fetch it joined fails", async () => {
+    let calls = 0;
+    fetchMock.mockImplementation(() => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.reject(new TypeError("the request that started it was cancelled"));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ keys: [primary.jwk] })));
+    });
+    const [first, second] = await Promise.allSettled([
+      authenticateToken(sign(validClaims()), env),
+      authenticateToken(sign(validClaims()), env),
+    ]);
+    // The starter sees its own failure; the request that joined it retries and succeeds.
+    expect(first.status).toBe("rejected");
+    expect(second.status).toBe("fulfilled");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("throws JwksUnavailableError when the keys cannot be fetched", async () => {
     fetchMock.mockRejectedValue(new TypeError("fetch failed"));
     await expect(authenticateToken(sign(validClaims()), env)).rejects.toBeInstanceOf(

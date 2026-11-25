@@ -36,7 +36,7 @@ healthRouter.get("/live", (c) => {
  * Indicates whether the application is ready to accept traffic.
  * Checks critical dependencies like database connectivity.
  * Used by load balancers to determine if the instance should receive traffic.
- * The database result is reused for up to READINESS_CACHE_MS (10 s) per
+ * The database result is reused for up to READINESS_CACHE_MS (10 s; a failure 2 s) per
  * isolate, so polling this endpoint does not put a query on every request.
  */
 healthRouter.get("/ready", async (c) => {

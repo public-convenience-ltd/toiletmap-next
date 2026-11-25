@@ -26,7 +26,20 @@ const JWKS_TTL_MS = 10 * 60 * 1000;
  */
 const JWKS_REFETCH_COOLDOWN_MS = 30 * 1000;
 
-type JwksCacheEntry = { keys: Jwk[]; fetchedAt: number };
+/**
+ * How long fetched keys may still be used when a refetch fails (an Auth0
+ * outage): signed-in users stay signed in rather than all becoming anonymous
+ * ten minutes in. A key Auth0 has revoked meanwhile is honoured for at most
+ * this long, and only while the JWKS endpoint is unreachable.
+ */
+const JWKS_STALE_MAX_MS = 24 * 60 * 60 * 1000;
+
+type JwksCacheEntry = {
+  keys: Jwk[];
+  fetchedAt: number;
+  /** When a refetch last failed; stale keys are reused without refetching for the cooldown. */
+  failedAt?: number;
+};
 
 const jwksCache = new Map<string, JwksCacheEntry>();
 const inflight = new Map<string, Promise<Jwk[]>>();
@@ -54,8 +67,8 @@ const fetchJwks = async (uri: string): Promise<Jwk[]> => {
   return keys as Jwk[];
 };
 
-/** Fetches the JWKS once even when several verifications ask at the same time. */
-const refreshJwks = (uri: string): Promise<Jwk[]> => {
+/** Starts a fetch, or joins the one already in flight for `uri`. */
+const sharedFetch = (uri: string): Promise<Jwk[]> => {
   const pending = inflight.get(uri);
   if (pending) return pending;
   const request = fetchJwks(uri)
@@ -69,8 +82,32 @@ const refreshJwks = (uri: string): Promise<Jwk[]> => {
 };
 
 /**
+ * Fetches the JWKS once even when several verifications ask at the same time.
+ * Sharing is best effort: on Workers the fetch belongs to the request that
+ * started it, and is cancelled with it. So a request that joined someone
+ * else's fetch and saw it fail tries once more (joining a newer attempt if
+ * one has started), rather than failing because another client disconnected.
+ */
+const refreshJwks = async (uri: string): Promise<Jwk[]> => {
+  const pending = inflight.get(uri);
+  if (!pending) return sharedFetch(uri);
+  try {
+    return await pending;
+  } catch {
+    return sharedFetch(uri);
+  }
+};
+
+/** Cached keys still young enough to fall back on when a refetch fails. */
+const usableStale = (entry: JwksCacheEntry | undefined, now: number): entry is JwksCacheEntry =>
+  !!entry && now - entry.fetchedAt < JWKS_STALE_MAX_MS;
+
+/**
  * The issuer's signing keys, cached for {@link JWKS_TTL_MS}. Refetched early
  * when `kid` is not among them (at most once per {@link JWKS_REFETCH_COOLDOWN_MS}).
+ * When a refetch fails, keys fetched within {@link JWKS_STALE_MAX_MS} are used
+ * instead (retrying at most once per cooldown); {@link JwksUnavailableError}
+ * only when there are none.
  */
 const getSigningKeys = async (uri: string, kid: string | undefined): Promise<Jwk[]> => {
   const cached = jwksCache.get(uri);
@@ -79,7 +116,27 @@ const getSigningKeys = async (uri: string, kid: string | undefined): Promise<Jwk
     const known = !kid || cached.keys.some((key) => key.kid === kid);
     if (known || now - cached.fetchedAt < JWKS_REFETCH_COOLDOWN_MS) return cached.keys;
   }
-  return refreshJwks(uri);
+  if (
+    usableStale(cached, now) &&
+    cached.failedAt !== undefined &&
+    now - cached.failedAt < JWKS_REFETCH_COOLDOWN_MS
+  ) {
+    return cached.keys;
+  }
+  try {
+    return await refreshJwks(uri);
+  } catch (error) {
+    const stale = jwksCache.get(uri);
+    const failedAt = Date.now();
+    if (!(error instanceof JwksUnavailableError) || !usableStale(stale, failedAt)) throw error;
+    stale.failedAt = failedAt;
+    console.warn("JWKS refetch failed; using keys fetched earlier", {
+      uri,
+      ageMs: failedAt - stale.fetchedAt,
+      errorMessage: error.message,
+    });
+    return stale.keys;
+  }
 };
 
 /**

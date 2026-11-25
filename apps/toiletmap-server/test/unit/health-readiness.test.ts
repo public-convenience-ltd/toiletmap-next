@@ -7,6 +7,7 @@ import {
   __readinessTestUtils,
   getDatabaseReadiness,
   READINESS_CACHE_MS,
+  READINESS_FAILURE_CACHE_MS,
 } from "../../src/services/health/readiness";
 import type { Env } from "../../src/types";
 
@@ -48,13 +49,23 @@ describe("getDatabaseReadiness", () => {
     expect(probe).toHaveBeenCalledTimes(1);
   });
 
-  it("caches failures too, and keeps databases apart", async () => {
+  it(`caches failures for only ${READINESS_FAILURE_CACHE_MS} ms, and keeps databases apart`, async () => {
+    let clock = 1_000;
+    const now = () => clock;
     const failing = vi.fn(() => Promise.reject(new Error("connection refused")));
     const down = envFor("postgres://down");
-    const first = await getDatabaseReadiness(down, { probe: failing });
+    const first = await getDatabaseReadiness(down, { now, probe: failing });
     expect(first.ok).toBe(false);
-    expect((await getDatabaseReadiness(down, { probe: failing })).ok).toBe(false);
+    clock += READINESS_FAILURE_CACHE_MS - 1;
+    expect((await getDatabaseReadiness(down, { now, probe: failing })).ok).toBe(false);
     expect(failing).toHaveBeenCalledTimes(1);
+
+    // A failure (perhaps a shared check cancelled with the request that ran it)
+    // is retried well before a success would be.
+    clock += 1;
+    const recovered = vi.fn(async () => undefined);
+    expect((await getDatabaseReadiness(down, { now, probe: recovered })).ok).toBe(true);
+    expect(recovered).toHaveBeenCalledTimes(1);
 
     const healthy = vi.fn(async () => undefined);
     expect((await getDatabaseReadiness(envFor("postgres://up"), { probe: healthy })).ok).toBe(true);
