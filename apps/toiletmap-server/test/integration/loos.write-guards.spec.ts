@@ -14,7 +14,7 @@
  * enough to count as an admin; the last block checks a revoked admin against
  * the stubbed Management API.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { generateLooId } from "../../src/services/loo";
 import type { LooResponse } from "../../src/services/loo/types";
 import { getPrismaClient, getTestContext } from "./setup";
@@ -179,6 +179,24 @@ describe("locations must be inside GB, NI, the Isle of Man and the Channel Islan
     await expectRefused(await put(loo.id, { location: PARIS }, trusted()), "location_out_of_area");
     await expectRefused(await put(loo.id, { location: PARIS }, anonymous), "location_out_of_area");
     expect(await pendingCount(loo.id)).toBe(0);
+  });
+
+  it("does not spend the queued-write limit on a refused PUT, so the fix can be sent at once", async () => {
+    // One queued change a minute: the out-of-area attempt and an unchanged
+    // edit must not use it up.
+    let calls = 0;
+    const limiter = { limit: vi.fn(async () => ({ success: ++calls <= 1 })) };
+    const options = { env: { RATE_LIMIT_ANON_WRITE: limiter } };
+    const loo = await fixtures.loos.create({ location: LONDON, notes: "Same" });
+    const send = (body: unknown) =>
+      callApi(`/api/loos/${loo.id}`, jsonRequest("PUT", body, anonymous), options);
+
+    await expectRefused(await send({ location: PARIS }), "location_out_of_area", "location");
+    expect((await send({ notes: "Same" })).status).toBe(200);
+    const fixed = await send({ location: north(LONDON, 20) });
+    expect(fixed.status).toBe(202);
+    cleanupManager.trackPendingChange((await readJson<QueuedBody>(fixed)).id);
+    expect(limiter.limit).toHaveBeenCalledTimes(1);
   });
 
   it("does not block other edits to a toilet already outside the area", async () => {

@@ -618,10 +618,8 @@ loosRouter.put(
       const decision = await decideWrite(c, user, async () => admin);
       if (!decision.direct) {
         // Anonymous, blocked, block status unknown, or queue mode: queue the
-        // diff for approval.
-        const limited = await queuedWriteRateLimitExceeded(c);
-        if (limited) return limited;
-
+        // diff for approval. The queued-write limit is spent only on a change
+        // that is actually queued, so a refused one can be fixed and resent.
         const existing = await looService.getMutationBase(id);
         // Untrusted callers can only suggest edits to toilets that exist.
         if (!existing) return notFound(c, "Loo not found");
@@ -638,6 +636,8 @@ loosRouter.put(
           return c.json({ queued: false, unchanged: true }, 200);
         }
 
+        const limited = await queuedWriteRateLimitExceeded(c);
+        if (limited) return limited;
         return queueForModeration(
           c,
           "update",
@@ -778,11 +778,11 @@ loosRouter.post(
         reason = "daily_cap";
       }
 
-      const limited = await queuedWriteRateLimitExceeded(c);
-      if (limited) return limited;
-
       const checked = await looService.checkReport(id, input, { baseUpdatedAt });
       if (checked.status !== "ok") return stateChangeResponse(c, checked);
+
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
 
       const payload = {
         reason: input.reason,
@@ -838,11 +838,11 @@ loosRouter.post(
         return stateChangeResponse(c, result);
       }
 
-      const limited = await queuedWriteRateLimitExceeded(c);
-      if (limited) return limited;
-
       const checked = await looService.checkRestore(id, { baseUpdatedAt });
       if (checked.status !== "ok") return stateChangeResponse(c, checked);
+
+      const limited = await queuedWriteRateLimitExceeded(c);
+      if (limited) return limited;
 
       return queueForModeration(
         c,
