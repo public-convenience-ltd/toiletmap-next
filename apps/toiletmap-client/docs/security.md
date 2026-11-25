@@ -216,7 +216,9 @@ Check the table against a deployment with curl:
   failure shows the error page and leaves no half-session. `access_token` and `id_token` are
   httpOnly; the only readable cookie is the value-less `signed_in=1` flag (src/utils/session.ts),
   so page JavaScript never sees a name, email or sub. The pre-2026-11 `user_info` cookie is
-  deleted at sign-in and sign-out.
+  deleted at sign-in and sign-out; until then its presence (never its contents) counts as
+  signed in for the header and the "goes live" copy, so a session from before the flag is not
+  shown "Sign in" while the proxy still sends its token. Drop that fallback a day after launch.
 - **`safeReturnTo` accepts only a same-origin path.** It rejects:
   - absolute and protocol-relative URLs (`//host`);
   - backslashes (`/\host`);

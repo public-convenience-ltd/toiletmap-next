@@ -42,12 +42,13 @@ describe("siteNavLinks", () => {
 });
 
 describe("hasSessionCookie", () => {
-  it("looks for a non-empty signed_in flag", () => {
+  it("looks for a non-empty signed_in flag (or a legacy user_info cookie)", () => {
     expect(hasSessionCookie("a=1; signed_in=1; b=2")).toBe(true);
     expect(hasSessionCookie("signed_in=")).toBe(false);
     expect(hasSessionCookie("not_signed_in=1")).toBe(false);
-    // The old profile cookie no longer counts.
-    expect(hasSessionCookie("user_info=%7B%7D")).toBe(false);
+    // A session from before the flag: its profile cookie's presence counts (never parsed).
+    expect(hasSessionCookie("user_info=%7B%7D")).toBe(true);
+    expect(hasSessionCookie("user_info=")).toBe(false);
     expect(hasSessionCookie("")).toBe(false);
     expect(hasSessionCookie(undefined)).toBe(false);
   });

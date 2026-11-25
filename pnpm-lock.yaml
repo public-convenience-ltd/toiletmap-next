@@ -46,7 +46,7 @@ importers:
         specifier: ^1.9.22
         version: 1.9.22
       astro:
-        specifier: ^7.4.7
+        specifier: 7.4.7
         version: 7.4.7(@types/node@26.6.6)(esbuild@0.28.2)(idb-keyval@6.3.0)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
       hono:
         specifier: ^4.13.16

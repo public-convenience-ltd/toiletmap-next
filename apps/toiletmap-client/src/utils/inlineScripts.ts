@@ -18,6 +18,8 @@
  * - The blog post's Share button script (src/utils/shareButtonScript.ts).
  */
 
+// astro 7.4.9 and later no longer ship these prebuilt files, so package.json pins astro to
+// 7.4.7 exactly (and renovate.json holds it below 7.4.9) until this module is ported.
 import idleDirective from "astro/runtime/client/idle.prebuilt.js";
 import loadDirective from "astro/runtime/client/load.prebuilt.js";
 import mediaDirective from "astro/runtime/client/media.prebuilt.js";

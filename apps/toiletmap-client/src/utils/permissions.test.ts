@@ -53,6 +53,13 @@ describe("sessionCanWriteDirectly", () => {
     );
   });
 
+  it("counts a pre-flag session's legacy user_info cookie as signed in", () => {
+    expect(
+      sessionCanWriteDirectly(cookies({ user_info: "%7B%7D", access_token: live }), NOW_MS),
+    ).toBe(true);
+    expect(sessionCanWriteDirectly(cookies({ user_info: "%7B%7D" }), NOW_MS)).toBe(false);
+  });
+
   it("is false when not signed in, or the access token is missing or expired", () => {
     expect(sessionCanWriteDirectly(cookies({ access_token: live }), NOW_MS)).toBe(false);
     expect(sessionCanWriteDirectly(cookies({ signed_in: "", access_token: live }), NOW_MS)).toBe(
