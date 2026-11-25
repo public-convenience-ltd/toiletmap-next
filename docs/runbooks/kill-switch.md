@@ -1,8 +1,10 @@
 # Runbook: the write kill switch (`write_mode`)
 
-Stops or holds every change to the map in about a minute, without a deploy. Use it when an
-account or a script is damaging the map faster than moderators can undo it, during a
-database incident, or to freeze the data for a migration or the cutover.
+Stops or holds every change made **through this API** (the new site, the app and admins) in
+about a minute, without a deploy. Use it when an account or a script is damaging the map
+faster than moderators can undo it, during a database incident, or, together with the steps
+under [What it does not stop](#what-it-does-not-stop), to freeze the data for a migration or
+the cutover.
 
 Code: `apps/toiletmap-server/src/services/write-mode.ts` (the setting) and
 `src/middleware/write-mode.ts` (where it is enforced).
@@ -25,6 +27,23 @@ In every mode:
   regenerating the dataset export.
 - The website shows "Editing is paused" on the add/edit form (keeping what was typed), the
   report flow, restore and "Yes, it's still here" when the server answers `read_only`.
+
+## What it does not stop
+
+The switch lives in this worker, so it only holds writes that reach this worker:
+
+- **The legacy Next.js app, until the cutover.** It writes to the same production tables
+  (as the `toiletmap_web` role, through its own GraphQL mutations) and never reads
+  `write_mode`, so edits, removals and feedback from www.toiletmap.org.uk keep landing in
+  every mode. To freeze the data, stop writes there too, with the legacy app's own controls
+  (for example by taking its mutations offline or putting it into maintenance). Do **not**
+  revoke grants from `toiletmap_web`: both apps use that role, so this worker would stop
+  reading as well.
+- **Direct SQL** (Supabase SQL editor, psql, the runbooks in this folder) and the
+  scheduled dataset export, which only reads.
+
+Check with `SELECT max(ts) FROM audit.record_version WHERE table_name = 'toilets'` that no
+new audit rows arrive once everything is frozen.
 
 Spellings accepted: `open`, `queue`, `read-only` (also `readonly`, `read_only`), any case.
 **Any other value is treated as `read-only`** (fails closed) and logged as an error, so a
@@ -61,7 +80,7 @@ local development store.
 # Hold every non-admin change for review
 pnpm exec wrangler kv key put --binding SETTINGS --env production --remote write_mode queue
 
-# Stop all changes
+# Stop all changes made through this API (not the legacy app: see above)
 pnpm exec wrangler kv key put --binding SETTINGS --env production --remote write_mode read-only
 
 # Back to normal

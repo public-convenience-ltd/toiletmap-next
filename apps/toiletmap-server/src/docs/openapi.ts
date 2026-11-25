@@ -288,7 +288,7 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
             maxLength: LOO_ID_LENGTH,
             pattern: "^[a-f0-9]{24}$",
             description:
-              "Admins only: anyone else gets 400 `id_not_allowed` and a generated id is used. Upper case is accepted and lowercased.",
+              "Admins only; anyone else gets 400 `id_not_allowed` (omit it and an id is generated). Upper case is accepted and lowercased.",
             example: "0123456789abcdef01234567",
           },
         },

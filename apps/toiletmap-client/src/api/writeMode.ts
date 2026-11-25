@@ -16,4 +16,4 @@ export const isEditingPaused = (status: number, body: unknown): boolean =>
 export const EDITING_PAUSED_TITLE = "Editing is paused";
 
 export const EDITING_PAUSED_MESSAGE =
-  "Changes to the Toilet Map are switched off for a short while. Nothing was sent; please try again later.";
+  "Changes to the Toilet Map are switched off for a short while. Nothing was saved; please try again later.";

@@ -525,7 +525,9 @@ describe("ReportProblem — confirm and submit", () => {
     await continueToConfirm(user);
     await user.click(submitButton());
     expect(await screen.findByRole("heading", { name: "Editing is paused" })).toBeInTheDocument();
-    expect(screen.getByText(/switched off for a short while/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/switched off for a short while\. Nothing was saved;/),
+    ).toBeInTheDocument();
     expect(submitButton()).toBeEnabled();
   });
 
