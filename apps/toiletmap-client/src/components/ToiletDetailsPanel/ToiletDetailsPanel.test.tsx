@@ -781,6 +781,15 @@ describe("ToiletDetailsPanel", () => {
         expect(screen.getByRole("button", { name: "Yes, it's still here" })).toBeEnabled();
       });
 
+      it("says editing is paused when the server is read-only, and keeps the button", async () => {
+        const user = userEvent.setup();
+        fetchMock.mockResolvedValue(jsonResponse(503, { error: "read_only" }));
+        renderExpanded();
+        await user.click(screen.getByRole("button", { name: "Yes, it's still here" }));
+        expect(await screen.findByText(/^Editing is paused\./)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Yes, it's still here" })).toBeEnabled();
+      });
+
       it("says when the toilet has been removed meanwhile", async () => {
         const user = userEvent.setup();
         fetchMock.mockResolvedValue(jsonResponse(409, { error: "removed" }));

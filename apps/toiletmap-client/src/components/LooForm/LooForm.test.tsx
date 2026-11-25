@@ -864,6 +864,22 @@ describe("LooForm (edit)", () => {
     expect(draft?.form?.name).toBe("Needs auth");
   });
 
+  it("on 503 read_only says editing is paused and keeps the changes", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(
+      jsonResponse(503, { error: "read_only", message: "Editing the Toilet Map is paused." }),
+    );
+    renderEdit();
+
+    await changeName(user, "While paused");
+    await saveAndConfirm(user);
+
+    expect(await screen.findByRole("heading", { name: "Editing is paused" })).toBeInTheDocument();
+    expect(screen.getByText(/Your changes are still here/)).toBeInTheDocument();
+    expect(locationStub.href).toBe(START_HREF);
+    expect(nameInput()).toHaveValue("While paused");
+  });
+
   it("blocks submit and links the error summary to the opening hours", async () => {
     const user = userEvent.setup();
     renderEdit();

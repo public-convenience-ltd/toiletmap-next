@@ -98,6 +98,12 @@ describe("interpretSaveResponse", () => {
     });
   });
 
+  it("503 read_only → paused (the server's write kill switch), on add and edit", () => {
+    const body = { error: "read_only", message: "Editing the Toilet Map is paused." };
+    expect(interpretSaveResponse(503, body, "add")).toEqual({ kind: "paused" });
+    expect(interpretSaveResponse(503, body, "edit")).toEqual({ kind: "paused" });
+  });
+
   it("other 4xx (e.g. 429) → error with the server message", () => {
     expect(interpretSaveResponse(429, { message: "Too many requests" }, "edit")).toEqual({
       kind: "error",

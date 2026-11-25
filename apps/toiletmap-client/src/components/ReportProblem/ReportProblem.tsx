@@ -14,6 +14,7 @@ import {
   reportLoo,
   restoreLoo,
 } from "../../api/reports";
+import { EDITING_PAUSED_MESSAGE, EDITING_PAUSED_TITLE } from "../../api/writeMode";
 import { currentPath, loginHref } from "../../utils/returnTo";
 import { compassDirection } from "../ReviewChanges/describeChanges";
 import styles from "./ReportProblem.module.css";
@@ -232,7 +233,12 @@ export default function ReportProblem({
       baseUpdatedAt: loo.updatedAt,
     });
     setSubmitting(false);
-    if (result.kind === "error" || result.kind === "rateLimited" || result.kind === "auth") {
+    if (
+      result.kind === "error" ||
+      result.kind === "rateLimited" ||
+      result.kind === "auth" ||
+      result.kind === "paused"
+    ) {
       setSubmitError(result);
       return;
     }
@@ -303,6 +309,9 @@ export default function ReportProblem({
       );
     } else if (r.kind === "queued") {
       message = "A moderator will review your request to put it back.";
+    } else if (r.kind === "paused") {
+      variant = "error";
+      message = `${EDITING_PAUSED_TITLE}, so we couldn't undo that yet. Please try again later.`;
     } else {
       variant = "error";
       message =
@@ -494,7 +503,13 @@ export default function ReportProblem({
         </div>
         {submitError && (
           <div ref={submitErrorRef} tabIndex={-1} className={styles.submitError}>
-            <Notice tone="error">{renderSubmitError(submitError)}</Notice>
+            {submitError.kind === "paused" ? (
+              <Notice tone="warning" title={EDITING_PAUSED_TITLE} headingLevel={2}>
+                {EDITING_PAUSED_MESSAGE}
+              </Notice>
+            ) : (
+              <Notice tone="error">{renderSubmitError(submitError)}</Notice>
+            )}
           </div>
         )}
         {/* Primary first, as on every outcome screen and the form's own Continue. */}
