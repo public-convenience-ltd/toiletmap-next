@@ -400,9 +400,9 @@ const schemas: Record<string, SchemaObject | ReferenceObject> = {
       },
       reason: {
         type: "string",
-        enum: ["large_move"],
+        enum: ["large_move", "daily_cap", "queue_mode"],
         description:
-          "Why a write from a trusted (signed-in, unblocked) caller was queued: `large_move` when a non-admin moves a loo more than 50 m.",
+          "Why a write from a caller who could otherwise write directly was queued: `large_move` when a non-admin moves a loo more than 50 m; `daily_cap` when the account has already made its daily allowance of removals and moves (default 10 in any 24 hours; admins exempt); `queue_mode` while the write kill switch queues every non-admin write.",
       },
     },
   },
@@ -770,6 +770,14 @@ const idPathParameter: ParameterObject = {
 
 const authErrorResponse = {
   description: "Authentication required (Bearer token or session cookie).",
+  content: jsonContent("ErrorResponse"),
+};
+
+/** Every loo write while the write kill switch is read-only (src/services/write-mode.ts). */
+const readOnlyErrorResponse = {
+  description:
+    "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+  headers: { "Retry-After": { schema: { type: "integer", example: 300 } } },
   content: jsonContent("ErrorResponse"),
 };
 
@@ -1218,6 +1226,7 @@ export const openApiDocument: OpenAPIObject = {
           content: jsonContent("CreateLooRequest"),
         },
         responses: {
+          503: readOnlyErrorResponse,
           201: {
             description: "Loo created. Includes its `compressed` map tuple.",
             content: jsonContent("SavedLooResponse"),
@@ -1312,6 +1321,7 @@ export const openApiDocument: OpenAPIObject = {
           content: jsonContent("UpdateLooRequest"),
         },
         responses: {
+          503: readOnlyErrorResponse,
           200: {
             description:
               "Existing loo updated, or returned unchanged when nothing differed; both include the `compressed` map tuple. Anonymous or blocked callers' no-op submissions return `{ queued: false, unchanged: true }`.",
@@ -1329,7 +1339,7 @@ export const openApiDocument: OpenAPIObject = {
           },
           202: {
             description:
-              "Change queued for moderation (anonymous, blocked in Auth0, block status could not be confirmed, or a non-admin move of more than 50 m).",
+              "Change queued for moderation (anonymous, blocked in Auth0, block status could not be confirmed, a non-admin move of more than 50 m, a move past the account's daily cap, or queue mode); see `reason`.",
             content: jsonContent("QueuedChangeResponse"),
           },
           400: {
@@ -1358,11 +1368,12 @@ export const openApiDocument: OpenAPIObject = {
         tags: ["Loos"],
         summary: "Report a problem (remove a loo from the map)",
         description:
-          "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller.",
+          "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller. A non-admin account that has already made its daily allowance of removals and moves (default 10 in any 24 hours) is queued too (202, `reason: daily_cap`), and while the write kill switch is in queue mode every non-admin report is (`reason: queue_mode`).",
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: { required: true, content: jsonContent("ReportLooRequest") },
         responses: {
+          503: readOnlyErrorResponse,
           200: {
             description: "Removed. `compressed` is null: drop the loo from any cached map.",
             content: jsonContent("SavedLooResponse"),
@@ -1402,6 +1413,7 @@ export const openApiDocument: OpenAPIObject = {
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         requestBody: { required: false, content: jsonContent("RestoreLooRequest") },
         responses: {
+          503: readOnlyErrorResponse,
           200: {
             description:
               "Restored, with its `compressed` map tuple. `detailsIgnored: true` when `details` was sent: direct restores do not store it.",
@@ -1437,6 +1449,7 @@ export const openApiDocument: OpenAPIObject = {
         parameters: [idPathParameter],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         responses: {
+          503: readOnlyErrorResponse,
           200: { description: "Verified.", content: jsonContent("VerifyResponse") },
           404: { description: "Loo not found.", content: jsonContent("ErrorResponse") },
           409: {

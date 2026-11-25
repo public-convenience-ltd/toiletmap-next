@@ -374,12 +374,19 @@ const NOTICES = {
     text: "The toilet this one duplicates no longer exists or has been removed. Nothing was applied; reject the request or ask for another duplicate.",
   },
   malformed: { tone: "warning", text: "The change was malformed, so it was rejected." },
+  "read-only": {
+    tone: "warning",
+    text: "Editing is paused (write_mode is read-only), so nothing was approved or rejected. See docs/runbooks/kill-switch.md.",
+  },
 } as const;
 
 type NoticeCode = keyof typeof NOTICES;
 
 const redirectWithNotice = (c: AdminContext, notice: NoticeCode) =>
   c.redirect(`/admin/pending?notice=${notice}`);
+
+/** Approve and reject while the write kill switch is read-only: nothing changes. */
+export const pendingReadOnly = (c: AdminContext) => redirectWithNotice(c, "read-only");
 
 const NoticeBanner = (code: string | undefined) => {
   if (!code || !Object.hasOwn(NOTICES, code)) return "";

@@ -767,13 +767,31 @@ describe("moderation alerts", () => {
     expect(calls[0]?.body).not.toContain(loo.id);
   });
 
-  it("posts nothing when the webhook is not configured or nothing is queued", async () => {
+  it("posts nothing when the webhook is not configured", async () => {
     const calls = interceptWebhook();
     const loo = await fixtures.loos.create();
     const { ctx, settle } = createCapturingExecutionContext();
 
-    const queued = await post(`/api/loos/${loo.id}/report`, { reason: "not_public" });
+    const queued = await callApi(
+      `/api/loos/${loo.id}/report`,
+      jsonRequest("POST", { reason: "not_public" }),
+      { ctx },
+    );
     cleanupManager.trackPendingChange((await readJson<QueuedBody>(queued)).id);
+    const direct = await callApi(
+      `/api/loos/${loo.id}/report`,
+      jsonRequest("POST", { reason: "not_public" }, trustedHeaders()),
+      { ctx },
+    );
+    expect(direct.status).toBe(200);
+    await settle();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("posts the removal alert, not the queue alert, for a direct report", async () => {
+    const calls = interceptWebhook();
+    const loo = await fixtures.loos.create();
+    const { ctx, settle } = createCapturingExecutionContext();
 
     const direct = await callApi(
       `/api/loos/${loo.id}/report`,
@@ -782,6 +800,9 @@ describe("moderation alerts", () => {
     );
     expect(direct.status).toBe(200);
     await settle();
-    expect(calls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+    const text = (JSON.parse(calls[0]?.body ?? "{}") as { text: string }).text;
+    expect(text).toContain("removed from the map");
+    expect(text).toContain(`/admin/loos/${loo.id}`);
   });
 });

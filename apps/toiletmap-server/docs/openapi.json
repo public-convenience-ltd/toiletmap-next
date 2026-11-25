@@ -652,9 +652,11 @@
           "reason": {
             "type": "string",
             "enum": [
-              "large_move"
+              "large_move",
+              "daily_cap",
+              "queue_mode"
             ],
-            "description": "Why a write from a trusted (signed-in, unblocked) caller was queued: `large_move` when a non-admin moves a loo more than 50 m."
+            "description": "Why a write from a caller who could otherwise write directly was queued: `large_move` when a non-admin moves a loo more than 50 m; `daily_cap` when the account has already made its daily allowance of removals and moves (default 10 in any 24 hours; admins exempt); `queue_mode` while the write kill switch queues every non-admin write."
           }
         }
       },
@@ -2015,6 +2017,24 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2221,7 +2241,7 @@
             }
           },
           "202": {
-            "description": "Change queued for moderation (anonymous, blocked in Auth0, block status could not be confirmed, or a non-admin move of more than 50 m).",
+            "description": "Change queued for moderation (anonymous, blocked in Auth0, block status could not be confirmed, a non-admin move of more than 50 m, a move past the account's daily cap, or queue mode); see `reason`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2279,6 +2299,24 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2289,7 +2327,7 @@
           "Loos"
         ],
         "summary": "Report a problem (remove a loo from the map)",
-        "description": "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller.",
+        "description": "Signed-in callers who are not blocked in Auth0 remove the loo immediately: `active=false`, `removalCategory=reason`, `removalReason=details` (or a default sentence) and, for duplicates, `duplicateOf`. Everyone else queues a `remove` change for moderation, limited to one queued change a minute per caller. A non-admin account that has already made its daily allowance of removals and moves (default 10 in any 24 hours) is queued too (202, `reason: daily_cap`), and while the write kill switch is in queue mode every non-admin report is (`reason: queue_mode`).",
         "parameters": [
           {
             "name": "id",
@@ -2383,6 +2421,24 @@
           },
           "429": {
             "description": "Too many writes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2501,6 +2557,24 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2568,6 +2642,24 @@
           },
           "429": {
             "description": "Too many writes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Editing is paused: the write kill switch is `read-only`, for every caller including admins. `error` is `read_only`; retry after the `Retry-After` header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "example": 300
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {

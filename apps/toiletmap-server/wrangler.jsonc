@@ -32,8 +32,21 @@
     "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
     "AUTH0_SCOPE": "openid profile email offline_access roles",
     "ENVIRONMENT": "development",
-    "ALLOWED_ORIGINS": "http://localhost:8787,http://localhost:4321"
+    "ALLOWED_ORIGINS": "http://localhost:8787,http://localhost:4321",
+    "ACCOUNT_DAILY_CAP": "10"
   },
+  // Operational settings that must survive deploys (src/services/write-mode.ts):
+  // key `write_mode` = open | queue | read-only. Local dev only: `wrangler dev`
+  // keeps it in its local (Miniflare) store, and the id is a placeholder that
+  // is never deployed. Toggle it with
+  //   pnpm exec wrangler kv key put --binding SETTINGS --local write_mode read-only
+  // See docs/runbooks/kill-switch.md.
+  "kv_namespaces": [
+    {
+      "binding": "SETTINGS",
+      "id": "local-settings"
+    }
+  ],
   "env": {
     "production": {
       "name": "toiletmap-server",
@@ -46,8 +59,16 @@
         "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
         "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
         "AUTH0_SCOPE": "openid profile email offline_access roles",
-        "ALLOWED_ORIGINS": "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev"
+        "ALLOWED_ORIGINS": "https://www.toiletmap.org.uk,https://toiletmap.org.uk,https://toiletmap-client.gbtoiletmap.workers.dev",
+        // Per-account daily cap on direct removals and moves (src/services/write-caps.ts).
+        "ACCOUNT_DAILY_CAP": "10"
       },
+      // TODO(owner): the write kill switch has no KV namespace in production
+      // yet, so write_mode is always `open` here. Create it once with
+      //   pnpm exec wrangler kv namespace create SETTINGS
+      // and add the printed id below (docs/runbooks/kill-switch.md):
+      //   "kv_namespaces": [{ "binding": "SETTINGS", "id": "<id>" }],
+      // Bindings are not inherited from the top level, so this env needs its own.
       // Production runtime database connection via Hyperdrive
       // Provides connection pooling, caching, and optimized database access
       "hyperdrive": [
@@ -114,8 +135,12 @@
         "AUTH0_PROFILE_KEY": "https://toiletmap.org.uk/profile",
         "AUTH0_PERMISSIONS_KEY": "https://toiletmap.org.uk/permissions",
         "AUTH0_SCOPE": "openid profile email offline_access roles",
-        "ALLOWED_ORIGINS": "https://toiletmap-client.gbtoiletmap.workers.dev"
+        "ALLOWED_ORIGINS": "https://toiletmap-client.gbtoiletmap.workers.dev",
+        "ACCOUNT_DAILY_CAP": "10"
       },
+      // No SETTINGS KV namespace for preview workers (write_mode is `open`).
+      // TODO(owner): to rehearse the kill switch on previews, create a
+      // separate namespace (never production's) and bind it here as SETTINGS.
       // Preview runtime database connection via Hyperdrive
       "hyperdrive": [
         {

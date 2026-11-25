@@ -108,3 +108,13 @@ export const isLargeMove = (
   from: Coordinates | null | undefined,
   to: Coordinates | null | undefined,
 ): boolean => !!from && !!to && haversineDistanceMetres(from, to) > MAX_DIRECT_MOVE_METRES;
+
+/**
+ * Whether changing a toilet's location from `from` to `to` is a move, by any
+ * distance: what the per-account daily cap counts alongside removals (see
+ * services/write-caps.ts). Placing a toilet that had no location is not.
+ */
+export const isMove = (
+  from: Coordinates | null | undefined,
+  to: Coordinates | null | undefined,
+): boolean => !!from && !!to && (from.lat !== to.lat || from.lng !== to.lng);

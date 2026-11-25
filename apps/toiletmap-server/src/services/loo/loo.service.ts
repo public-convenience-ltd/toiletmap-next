@@ -716,6 +716,53 @@ export class LooService {
   }
 
   /**
+   * How many removals and moves the account `sub` made in the last
+   * `windowHours` (database clock), for the per-account daily cap. Counted
+   * from the audit trail: UPDATEs of toilets whose new row carries this sub
+   * in `updated_by_sub` and that either took the toilet off the map (`active`
+   * true to false) or changed the location of a toilet that had one. This
+   * includes the account's queued changes that a moderator approved (approval
+   * records the submitter's sub). Uses the partial index
+   * record_version_updated_by_sub_ts.
+   */
+  async countRecentRemovalsAndMoves(sub: string, windowHours: number): Promise<number> {
+    const [row] = await this.prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+      SELECT count(*)::int AS count
+      FROM audit.record_version rv
+      WHERE rv.record ->> 'updated_by_sub' = ${sub}
+        AND rv.ts >= now() - make_interval(hours => ${windowHours}::int)
+        AND rv.op = 'UPDATE'
+        AND rv.table_name = 'toilets'
+        AND (
+          (rv.old_record ->> 'active' = 'true' AND rv.record ->> 'active' = 'false')
+          OR (
+            jsonb_typeof(rv.old_record -> 'location') = 'object'
+            AND rv.record -> 'location' IS DISTINCT FROM rv.old_record -> 'location'
+          )
+        )
+    `);
+    return row?.count ?? 0;
+  }
+
+  /**
+   * How many toilets were taken off the map (`active` true to false) in the
+   * last `windowHours`, by anyone (this app or the legacy one), for the
+   * removal alert. The `ts` range uses the BRIN index on record_version.
+   */
+  async countRecentRemovals(windowHours: number): Promise<number> {
+    const [row] = await this.prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+      SELECT count(*)::int AS count
+      FROM audit.record_version rv
+      WHERE rv.ts >= now() - make_interval(hours => ${windowHours}::int)
+        AND rv.op = 'UPDATE'
+        AND rv.table_name = 'toilets'
+        AND rv.old_record ->> 'active' = 'true'
+        AND rv.record ->> 'active' = 'false'
+    `);
+    return row?.count ?? 0;
+  }
+
+  /**
    * Search with the legacy GraphQL `loos` semantics, which differ from
    * {@link search}: `nameContains` matches the name only (case-insensitive),
    * `areaName` is an exact match, the date bounds apply to `updated_at`, and

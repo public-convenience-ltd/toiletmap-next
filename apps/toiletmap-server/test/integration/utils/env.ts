@@ -88,6 +88,11 @@ export const buildTestEnv = (overrides: Partial<Env> = {}): Env => ({
   RATE_LIMIT_ADMIN: allowAllRateLimiter,
   RATE_LIMIT_AUTH: allowAllRateLimiter,
   RATE_LIMIT_ANON_WRITE: allowAllRateLimiter,
+  // The daily cap counts audit history by sub, which outlives each run's
+  // cleanup, and most suites reuse a few fixed subs: keep it out of their way.
+  // loos.daily-cap.spec.ts sets its own cap with fresh subs. No SETTINGS KV
+  // by default, so write_mode is `open` (loos.write-mode.spec.ts passes one).
+  ACCOUNT_DAILY_CAP: testProcessEnv.ACCOUNT_DAILY_CAP ?? "1000000",
   ...overrides,
 });
 
