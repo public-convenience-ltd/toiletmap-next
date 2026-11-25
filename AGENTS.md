@@ -118,7 +118,7 @@ Key fields:
 - **Identity**: `id` (24-char hex), `geohash` (geospatial indexing, auto-generated)
 - **Location**: `geography` (PostGIS Point), `location` (GeoJSON, auto-generated), `area_id` (FK to areas)
 - **Features**: `accessible`, `no_payment`, `baby_change`, `radar`, `attended`, `automatic`, `urinal_only`, `all_gender`, `children`, `men`, `women`
-- **Metadata**: `created_at`, `updated_at`, `verified_at`, `active` (soft delete flag), `contributors` (text array)
+- **Metadata**: `created_at`, `updated_at`, `verified_at`, `active` (soft delete flag), `contributors` (text array), `updated_by_sub` (private: the Auth0 sub behind the latest write, set by the trigger `toilets_set_updated_by_sub` from the transaction setting `toiletmap.actor_sub` that `persistence.ts` sets; NULL for anonymous and legacy-app writes; not in the Prisma model and never in a public response)
 - **Opening Hours**: 7-element JSON array `[Monday, ..., Sunday]`
   - Each day: `["HH:mm", "HH:mm"]` (open/close times)
   - Empty array `[]`: closed or unknown
@@ -229,7 +229,9 @@ Public routes still accept optional authentication so admin tokens can unlock ex
 ### Protected API Endpoints (JWT or Session Required)
 
 - **POST /api/loos** - Create new loo (requires contributor info in JWT)
-- **PUT /api/loos/:id** - Upsert (create or update) loo (requires contributor info in JWT)
+- **PUT /api/loos/:id** - Update a loo; only admins may create one with PUT (an unknown id is a 404 for anyone else)
+
+**Write guards** (`src/routes/loos/write-guards.ts`, everyone except confirmed admins, queued or not): no `active`, `removalReason` or `location: null` in POST/PUT (400 `admin_only_fields` / `location_required`: use report/restore); a new or changed location must be inside lat 48.9..61.0, lng -8.7..1.9 (GB, NI, Isle of Man, Channel Islands; 400 `location_out_of_area`); no `id` on POST (400 `id_not_allowed`); a move of more than 50 m is queued even for a trusted caller (202, `reason: "large_move"`). Every loo id (path, `?ids=`, `exclude`, body `id`, `areaId`, `duplicateOf`) is 24 hex characters, lowercased. Each write stores the caller's Auth0 sub in `toilets.updated_by_sub` (queued: `pending_change.submitter_sub`, which approval stores, never the moderator's).
 
 Writes go live for anyone signed in unless they are blocked in Auth0 (`canWriteDirectly` in `src/middleware/require-admin-role.ts`; no permission is needed). Anonymous callers, blocked users, and users whose block status cannot be confirmed (Management API lookup failed) are queued as a `pending_change` and get `202 {queued: true, id}` (a queued PUT cannot create a new id). A session whose access token fails verification is anonymous (the `id_token` is never a credential), and machine-to-machine (client-credentials) tokens write directly only with `access:admin`. The block status comes from the Auth0 Management API (`blocked` on the user, cached per user for 60s; a failed lookup is remembered for 10s); without Management credentials nobody counts as blocked only in local dev and tests (`ENVIRONMENT=development`; the integration env defaults to it); every other environment, previews included and `ENVIRONMENT` unset, queues every signed-in change when credentials are missing. To stop someone editing, block the user in the Auth0 dashboard (blocking an admin also denies `/admin` within 60s and ends their admin session, and drops their API admin extras such as contributor names in reports; still remove `access:admin` if they should not get it back when unblocked). Every queued write uses the 1/min anon write limiter (keyed by IP, or by user for signed-in callers); signed-in writes also use the write limiter per user and per IP.
 
