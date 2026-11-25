@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { __adminRoleTestUtils, canWriteDirectly } from "../../src/middleware/require-admin-role";
+import {
+  __adminRoleTestUtils,
+  canWriteDirectly,
+  isConfirmedAdmin,
+} from "../../src/middleware/require-admin-role";
 import { reportSchema, restoreSchema } from "../../src/routes/loos/schemas";
 import { Auth0ManagementClient } from "../../src/services/auth0/management";
 import { clearRemovalOnReactivate } from "../../src/services/loo/diff";
@@ -212,6 +216,23 @@ describe("canWriteDirectly", () => {
     }
   });
 
+  it("never uses an earlier good answer when a later lookup fails (writes fail closed)", async () => {
+    vi.useFakeTimers();
+    try {
+      let failing = false;
+      stubManagement(() =>
+        failing ? Promise.reject(new Error("auth0 down")) : Promise.resolve(false),
+      );
+      expect(await check({ sub: "outage" }, managementEnv)).toBe(true);
+      failing = true;
+      vi.advanceTimersByTime(61_000);
+      // Admin access has a grace period for this; whether a write goes live does not.
+      expect(await check({ sub: "outage" }, managementEnv)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("queues machine-to-machine tokens without a lookup, unless they carry access:admin", async () => {
     const lookup = stubManagement(async () => false);
     expect(await check({ sub: "app@clients", gty: "client-credentials" }, managementEnv)).toBe(
@@ -246,6 +267,84 @@ describe("canWriteDirectly", () => {
     expect(await check({ sub: "preview-user" }, { ENVIRONMENT: "preview" })).toBe(false);
     expect(await check({ sub: "unset-user" }, { ENVIRONMENT: undefined })).toBe(false);
     expect(fromEnv).not.toHaveBeenCalled();
+  });
+});
+
+describe("isConfirmedAdmin", () => {
+  const managementEnv: Partial<Env> = {
+    ENVIRONMENT: "production",
+    AUTH0_ISSUER_BASE_URL: "https://auth.example",
+    AUTH0_MANAGEMENT_CLIENT_ID: "management-client",
+    AUTH0_MANAGEMENT_CLIENT_SECRET: "secret",
+  };
+
+  const check = async (user: RequestUser | undefined, env: Partial<Env> = managementEnv) => {
+    const app = new Hono<{ Variables: AppVariables; Bindings: Env }>();
+    let result: boolean | undefined;
+    app.get("/", async (c) => {
+      result = await isConfirmedAdmin(c, user);
+      return c.text("ok");
+    });
+    await app.request("/", {}, env as Env);
+    return result;
+  };
+
+  const stubManagement = ({
+    permissions = ["access:admin"],
+    blocked = false,
+  }: {
+    permissions?: string[];
+    blocked?: boolean;
+  }) => {
+    __adminRoleTestUtils.clearManagementClientCache();
+    const getUserPermissions = vi.fn(async () =>
+      permissions.map((permission_name) => ({ permission_name })),
+    );
+    const isUserBlocked = vi.fn(async () => blocked);
+    vi.spyOn(Auth0ManagementClient, "fromEnv").mockReturnValue({
+      getUserPermissions,
+      isUserBlocked,
+    } as unknown as Auth0ManagementClient);
+    return { getUserPermissions, isUserBlocked };
+  };
+
+  const admin = { sub: "auth0|admin", permissions: ["access:admin"] };
+
+  beforeEach(() => {
+    __adminRoleTestUtils.clearPermissionCache();
+    __adminRoleTestUtils.clearBlockedCache();
+    __adminRoleTestUtils.clearManagementClientCache();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is true for a token claiming access:admin that Auth0 still grants to an unblocked user", async () => {
+    stubManagement({});
+    expect(await check(admin)).toBe(true);
+  });
+
+  it("is false when Auth0 has revoked access:admin, though the token still claims it", async () => {
+    stubManagement({ permissions: [] });
+    expect(await check(admin)).toBe(false);
+  });
+
+  it("is false for a blocked admin", async () => {
+    stubManagement({ blocked: true });
+    expect(await check(admin)).toBe(false);
+  });
+
+  it("asks Auth0 nothing for anonymous callers or tokens without the claim", async () => {
+    const { getUserPermissions, isUserBlocked } = stubManagement({});
+    expect(await check(undefined)).toBe(false);
+    expect(await check({ sub: "auth0|plain", permissions: [] })).toBe(false);
+    expect(getUserPermissions).not.toHaveBeenCalled();
+    expect(isUserBlocked).not.toHaveBeenCalled();
+  });
+
+  it("trusts the claim in development without Management credentials", async () => {
+    expect(await check(admin, { ENVIRONMENT: "development" })).toBe(true);
   });
 });
 

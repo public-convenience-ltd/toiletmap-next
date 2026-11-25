@@ -531,7 +531,7 @@ export const userAdministration = async (c: AdminContext) => {
                     ? "This user is blocked in Auth0, so their changes are queued for moderation."
                     : "Anyone signed in can edit loos. To stop someone editing, block the user in the Auth0 dashboard."}
                   {permissionsByName.has(ADMIN_PERMISSION)
-                    ? " Blocking does not remove Admin access, so remove that below too."
+                    ? " Blocking also stops their Admin access within a minute; remove Admin below too if they should not get it back when unblocked."
                     : null}
                 </p>
               </div>

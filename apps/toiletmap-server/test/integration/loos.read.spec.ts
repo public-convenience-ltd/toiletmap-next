@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getTestContext } from "./setup";
+import { BLOCKED_SUB, REVOKED_ADMIN_SUB, useAuth0ManagementStub } from "./utils/auth0-management";
 import { createFixtureFactory } from "./utils/fixtures";
 import type {
   CompressedLoo,
@@ -146,6 +147,36 @@ describe("Loo read endpoints", () => {
       const hydrated = await readJson<ListBody<ReportResponse>>(hydratedResponse);
       const latestHydrated = hydrated.data[hydrated.data.length - 1];
       expect(latestHydrated.contributor).toBe("reports-test");
+    });
+
+    describe("with the Auth0 Management API configured", () => {
+      useAuth0ManagementStub();
+
+      const reportsAs = async (sub: string) => {
+        const loo = await fixtures.loos.create({ notes: "Original notes" });
+        await fixtures.loos.upsert(loo.id, { notes: "Updated notes" }, "reports-test");
+        const { issueToken } = getTestContext();
+        const response = await callApi(`/api/loos/${loo.id}/reports`, {
+          headers: {
+            Authorization: `Bearer ${issueToken({ sub, permissions: ["access:admin"] })}`,
+          },
+        });
+        expect(response.status).toBe(200);
+        const body = await readJson<ListBody<ReportSummaryResponse>>(response);
+        return body.data[body.data.length - 1];
+      };
+
+      it("shows contributors to an admin Auth0 confirms", async () => {
+        expect((await reportsAs("auth0|confirmed-admin")).contributor).toBe("reports-test");
+      });
+
+      it("redacts contributors when Auth0 has revoked access:admin, though the token claims it", async () => {
+        expect((await reportsAs(REVOKED_ADMIN_SUB)).contributor).toBeNull();
+      });
+
+      it("redacts contributors for a blocked admin", async () => {
+        expect((await reportsAs(BLOCKED_SUB)).contributor).toBeNull();
+      });
     });
 
     it("returns reports in chronological ascending order with correct timestamps", async () => {

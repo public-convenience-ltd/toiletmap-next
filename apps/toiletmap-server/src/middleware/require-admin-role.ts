@@ -89,6 +89,13 @@ const PERMISSION_GRACE_MS = 5 * 60 * 1000; // 5 minutes
 const lastGoodPermissions = new Map<string, CacheEntry<ReadonlySet<string>>>();
 
 /**
+ * The last block status Auth0 confirmed for each user, kept for the same
+ * grace period. Only admin access uses it (see {@link checkAdminAccess}):
+ * whether a write goes live never does, so writes keep failing closed.
+ */
+const lastGoodBlocked = new Map<string, CacheEntry<boolean>>();
+
+/**
  * Whether the Auth0 Management API may be skipped: only in local development
  * (`ENVIRONMENT=development`) without Management credentials. Every other
  * environment, previews included, fails closed: missing credentials or a
@@ -191,8 +198,21 @@ const currentPermissions = async (
  * when the answer cannot be confirmed, including any other environment
  * (production, preview, or ENVIRONMENT unset) missing its Management API
  * secrets.
+ *
+ * With `withGrace`, a failed lookup falls back to the last answer Auth0 gave
+ * within {@link PERMISSION_GRACE_MS} (admin access only).
  */
-const isBlocked = async (env: Env, userId: string): Promise<boolean | null> => {
+const isBlocked = async (
+  env: Env,
+  userId: string,
+  { withGrace = false }: { withGrace?: boolean } = {},
+): Promise<boolean | null> => {
+  const blocked = await lookUpBlocked(env, userId);
+  if (blocked !== null || !withGrace) return blocked;
+  return readCache(lastGoodBlocked, userId) ?? null;
+};
+
+const lookUpBlocked = async (env: Env, userId: string): Promise<boolean | null> => {
   if (managementOptional(env)) return false;
   const cached = readCache(blockedCache, userId);
   if (cached !== undefined) return cached;
@@ -206,6 +226,7 @@ const isBlocked = async (env: Env, userId: string): Promise<boolean | null> => {
   try {
     const blocked = await client.isUserBlocked(userId);
     writeCache(blockedCache, userId, blocked);
+    writeCache(lastGoodBlocked, userId, blocked, PERMISSION_GRACE_MS);
     return blocked;
   } catch (error) {
     writeCache(blockedCache, userId, null, FAILED_LOOKUP_CACHE_TTL_MS);
@@ -237,6 +258,56 @@ export const canWriteDirectly = async (
   return (await isBlocked(c.env, user.sub)) === false;
 };
 
+type AdminAccess = {
+  allowed: boolean;
+  /** Auth0 confirmed the user is not an admin, or is blocked (not merely unreachable). */
+  confirmedDenied: boolean;
+};
+
+/**
+ * Whether `user` is an admin right now: the token claims `access:admin`,
+ * Auth0 still grants it (see {@link currentPermissions}) and Auth0 does not
+ * report the user as blocked. Both lookups are cached per user for 60s, and
+ * during an Auth0 outage both fall back to the last good answer for up to
+ * {@link PERMISSION_GRACE_MS}; after that, access is denied.
+ */
+const checkAdminAccess = async (
+  c: Context<{ Variables: AppVariables; Bindings: Env }>,
+  user: RequestUser,
+): Promise<AdminAccess> => {
+  const { granted, unconfirmed } = await currentPermissions(c, user, [ADMIN_PERMISSION]);
+  if (!granted.has(ADMIN_PERMISSION)) {
+    return { allowed: false, confirmedDenied: !unconfirmed };
+  }
+  if (isClientCredentialsToken(user)) return { allowed: true, confirmedDenied: false };
+
+  const blocked = await isBlocked(c.env, user.sub, { withGrace: true });
+  if (blocked !== false) {
+    logger.warn("Admin access denied: user is blocked or their block status is unknown", {
+      userId: user.sub,
+      blocked,
+    });
+    return { allowed: false, confirmedDenied: blocked === true };
+  }
+  return { allowed: true, confirmedDenied: false };
+};
+
+/**
+ * Whether the caller is a confirmed admin (see {@link checkAdminAccess}),
+ * for admin-only extras on public API routes such as contributor names in
+ * reports. Unlike {@link hasAdminRole} it does not trust the token alone, so
+ * a revoked or blocked admin loses them within a minute rather than when
+ * their token expires. Only a token that claims `access:admin` costs a
+ * Management API lookup.
+ */
+export const isConfirmedAdmin = async (
+  c: Context<{ Variables: AppVariables; Bindings: Env }>,
+  user: RequestUser | null | undefined,
+): Promise<boolean> => {
+  if (!user || !hasAdminRole(user)) return false;
+  return (await checkAdminAccess(c, user)).allowed;
+};
+
 type UnauthorizedHandler = (
   c: Context<{ Variables: AppVariables; Bindings: Env }>,
 ) => Response | Promise<Response>;
@@ -253,8 +324,8 @@ interface AdminRoleOptions {
  * {@link currentPermissions}) and must not be blocked in Auth0, so a blocked
  * admin can no longer approve or reject queued changes. When Auth0 confirms
  * the user is not an admin, or is blocked, the session is cleared; when it
- * cannot answer (an outage, or no Management credentials outside
- * development), access is denied but the session is kept.
+ * cannot answer (an outage past the grace period, or no Management
+ * credentials outside development), access is denied but the session is kept.
  */
 export const requireAdminRole = (options?: AdminRoleOptions) =>
   createMiddleware<{ Variables: AppVariables; Bindings: Env }>(async (c, next) => {
@@ -264,21 +335,7 @@ export const requireAdminRole = (options?: AdminRoleOptions) =>
       return c.json({ message: "Unauthorized" }, 401);
     }
 
-    const { granted, unconfirmed } = await currentPermissions(c, user, [ADMIN_PERMISSION]);
-    let allowed = granted.has(ADMIN_PERMISSION);
-    let confirmedDenied = !allowed && !unconfirmed;
-
-    if (allowed && !isClientCredentialsToken(user)) {
-      const blocked = await isBlocked(c.env, user.sub);
-      if (blocked !== false) {
-        allowed = false;
-        confirmedDenied = blocked === true;
-        logger.warn("Admin access denied: user is blocked or their block status is unknown", {
-          userId: user.sub,
-          blocked,
-        });
-      }
-    }
+    const { allowed, confirmedDenied } = await checkAdminAccess(c, user);
 
     if (!allowed) {
       permissionCache.delete(user.sub);
@@ -299,6 +356,9 @@ export const __adminRoleTestUtils = {
     permissionCache.clear();
     lastGoodPermissions.clear();
   },
-  clearBlockedCache: () => blockedCache.clear(),
+  clearBlockedCache: () => {
+    blockedCache.clear();
+    lastGoodBlocked.clear();
+  },
   clearManagementClientCache: () => managementClientCache.clear(),
 };

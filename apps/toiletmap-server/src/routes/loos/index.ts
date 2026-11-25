@@ -16,7 +16,7 @@ import {
   normalisedCacheKey,
 } from "../../middleware/cache";
 import { rateLimiters } from "../../middleware/cloudflare-rate-limit";
-import { canWriteDirectly, hasAdminRole } from "../../middleware/require-admin-role";
+import { canWriteDirectly, isConfirmedAdmin } from "../../middleware/require-admin-role";
 import { generateLooId } from "../../services/loo";
 import {
   clearRemovalOnReactivate,
@@ -131,14 +131,16 @@ const writeBodyLimit = bodyLimit({
  * The stricter per-IP limit for heavy reads (see `rateLimiters.heavyRead`),
  * applied when `isHeavy` says this request is one. Registered after the
  * route's validators so `isHeavy` can read the validated parameters, and
- * before the edge cache. Admins are exempt.
+ * before the edge cache. Confirmed admins are exempt (the admin dataset
+ * explorer pages through /search and /metrics); only a token that claims
+ * `access:admin` costs an Auth0 Management lookup, cached per user for 60s.
  */
 const heavyReadLimit =
   (
     isHeavy: (c: AppContext) => boolean,
   ): MiddlewareHandler<{ Variables: AppVariables; Bindings: Env }> =>
   async (c, next) => {
-    if (!isHeavy(c) || hasAdminRole(c.get("user"))) {
+    if (!isHeavy(c) || (await isConfirmedAdmin(c, c.get("user")))) {
       await next();
       return;
     }
@@ -409,7 +411,9 @@ loosRouter.get(
       const looService = c.get("looService");
       const reports = await looService.getReports(id, {
         hydrate,
-        includeContributors: hasAdminRole(c.get("user")),
+        // Auth0 must still grant access:admin (and not block the user): the
+        // token's claim alone would outlive a revocation by up to 24 h.
+        includeContributors: await isConfirmedAdmin(c, c.get("user")),
       });
       return c.json({ data: reports, count: reports.length });
     }),

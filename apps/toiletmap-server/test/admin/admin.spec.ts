@@ -726,7 +726,8 @@ describe("Admin Routes", () => {
     });
   });
 
-  const ADMIN_HINT = "Blocking does not remove Admin access, so remove that below too.";
+  const ADMIN_HINT =
+    "Blocking also stops their Admin access within a minute; remove Admin below too if they should not get it back when unblocked.";
 
   it.each([
     [false, false, "To stop someone editing, block the user in the Auth0 dashboard."],
@@ -799,22 +800,26 @@ describe("Admin Routes", () => {
       await expectDeniedKeepingSession(res);
     });
 
-    it("keeps using the last good answer for a short while when a later lookup fails", async () => {
+    it("keeps using the last good answers for a short while when later lookups fail", async () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       try {
         const first = await app.request("/admin", { headers: authenticatedHeaders() }, env);
         expect(first.status).toBe(200);
 
-        // Past the 60 s cache, inside the 5 min grace period.
+        // Past the 60 s cache, inside the 5 min grace period. In an outage both
+        // the permission and the block lookups fail.
         vi.setSystemTime(Date.now() + 2 * 60 * 1000);
         mockGetUserPermissions.mockRejectedValue(new Error("Auth0 Management API unavailable"));
+        mockIsUserBlocked.mockRejectedValue(new Error("Auth0 Management API unavailable"));
         const second = await app.request("/admin", { headers: authenticatedHeaders() }, env);
         expect(second.status).toBe(200);
 
-        // Past the grace period: denied.
+        expect(mockIsUserBlocked).toHaveBeenCalledTimes(2);
+
+        // Past the grace period: denied, but the session is kept.
         vi.setSystemTime(Date.now() + 10 * 60 * 1000);
         const third = await app.request("/admin", { headers: authenticatedHeaders() }, env);
-        expect(third.status).toBe(403);
+        await expectDeniedKeepingSession(third);
       } finally {
         vi.useRealTimers();
       }
