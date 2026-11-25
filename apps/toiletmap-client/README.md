@@ -260,10 +260,15 @@ binding, and production would silently fall back to public `fetch` against
 # Production: builds with CLOUDFLARE_ENV=production (includes the API service
 # binding and env.production vars), then deploys.
 pnpm run deploy
-
-# Preview: builds with CLOUDFLARE_ENV=preview, then uploads a new version.
-pnpm run deploy:preview
 ```
+
+There is no `deploy:preview` script: `wrangler versions upload --env preview`
+would upload a version to the production worker's name (`env.preview` is also
+named `toiletmap-client`). Previews come only from the workflow below, each
+under its own `<branch>-toiletmap-client` name. `env.production` sets
+`preview_urls: false`, which turns off per-version preview URLs on the
+production worker; its `workers.dev` URL stays on until the custom-domain
+cutover.
 
 `pnpm build:production` / `pnpm build:preview` run just the build step. The
 `--env` passed to wrangler must match the build's environment: wrangler refuses
@@ -281,8 +286,10 @@ and check the output lists `env.API (toiletmap-server)` and `env.EXPORTS (toilet
 
 Per-branch previews (`.github/workflows/deploy-preview.yml`) use
 `pnpm build:preview` and `wrangler deploy --env preview --name <branch>-toiletmap-client`
-with `--var` overrides (the preview env has no service binding either; previews
-reach their branch server over `PUBLIC_API_URL`). It has to be the preview build,
+with `--var` overrides for the plain vars (the preview env has no service binding
+either; previews reach their branch server over `PUBLIC_API_URL`).
+`AUTH0_CLIENT_ID` and `AUTH0_CLIENT_SECRET` are set afterwards with
+`wrangler secret put` from stdin, never `--var`. It has to be the preview build,
 not a plain `pnpm build`: prerendered pages (about, privacy, posts, ...) take
 `ENVIRONMENT` at build time, and only `env.preview` sets it to `preview`, which
 makes them `noindex`. The `--var` flags reach server-rendered pages only. The

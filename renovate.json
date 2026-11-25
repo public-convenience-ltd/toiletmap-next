@@ -16,11 +16,11 @@
   ],
   "packageRules": [
     {
-      "description": "Keep GitHub Actions on version tags rather than pinned digests.",
+      "description": "Pin GitHub Actions to full commit SHAs (with the version in a comment); Renovate updates both.",
       "matchManagers": [
         "github-actions"
       ],
-      "pinDigests": false
+      "pinDigests": true
     },
     {
       "description": "One PR per workspace for minor and patch updates; majors get their own PRs.",

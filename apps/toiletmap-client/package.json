@@ -10,7 +10,6 @@
     "check:assets": "node scripts/check-build-assets.mjs",
     "preview": "astro preview",
     "deploy": "pnpm build:production && wrangler deploy --env production",
-    "deploy:preview": "pnpm build:preview && wrangler versions upload --env preview",
     "cf-typegen": "wrangler types",
     "astro": "astro",
     "test": "vitest run",

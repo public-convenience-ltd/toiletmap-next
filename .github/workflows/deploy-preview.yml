@@ -2,32 +2,42 @@ name: Deploy Preview
 
 on:
   push:
+    # Dependency-update branches get CI but no preview: the deploy job installs their
+    # packages (lifecycle scripts) in the same job that holds the Cloudflare token.
     branches-ignore:
       - main
       - postgres-staging
+      - "renovate/**"
+      - "dependabot/**"
 
-permissions:
-  contents: read
-  pull-requests: write
+# Read-only by default; each job asks for what it needs.
+permissions: {}
+
+# One preview run per branch at a time; a newer push cancels the older run (the newer
+# one redeploys everything). teardown-preview.yml uses the same group, so a teardown
+# never races a deploy of the same branch.
+concurrency:
+  group: preview-${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   deploy-server:
     name: Deploy Server Preview
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: apps/toiletmap-server
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
@@ -41,30 +51,38 @@ jobs:
       - name: Build admin UI
         run: pnpm build:client
 
+      # Secrets only in this step. `--env=""` on `secret put` stops wrangler appending
+      # "-preview" to the --name.
       - name: Deploy server preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
         run: |
+          set -euo pipefail
           BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
           pnpm exec wrangler deploy --env preview --name "${BRANCH}-toiletmap-server"
-          echo "$AUTH0_CLIENT_ID" | pnpm exec wrangler secret put AUTH0_CLIENT_ID --env="" --name "${BRANCH}-toiletmap-server" || exit 1
-          echo "$AUTH0_CLIENT_SECRET" | pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --env="" --name "${BRANCH}-toiletmap-server" || exit 1
+          printf '%s' "$AUTH0_CLIENT_ID" | pnpm exec wrangler secret put AUTH0_CLIENT_ID --env="" --name "${BRANCH}-toiletmap-server"
+          printf '%s' "$AUTH0_CLIENT_SECRET" | pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --env="" --name "${BRANCH}-toiletmap-server"
 
   deploy-client:
     name: Deploy Client Preview
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: apps/toiletmap-client
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
@@ -87,27 +105,40 @@ jobs:
             fi
           done
 
+      # AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET are worker secrets (`wrangler secret put`
+      # from stdin), never --var: a --var is a plain-text binding anyone with dashboard
+      # read access can see. The deploy drops any plain-text copy an older preview run
+      # left behind, so the secret put that follows can create the binding.
       - name: Deploy client preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
         run: |
+          set -euo pipefail
           BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
           pnpm exec wrangler deploy --env preview --name "${BRANCH}-toiletmap-client" \
             --var "ENVIRONMENT:preview" \
             --var "PUBLIC_API_URL:https://${BRANCH}-toiletmap-server.gbtoiletmap.workers.dev" \
             --var "AUTH0_ISSUER_BASE_URL:https://gbptm.eu.auth0.com/" \
             --var "AUTH0_SCOPE:openid profile email" \
-            --var "AUTH0_AUDIENCE:https://www.toiletmap.org.uk/api" \
-            --var "AUTH0_CLIENT_ID:${AUTH0_CLIENT_ID}" \
-            --var "AUTH0_CLIENT_SECRET:${AUTH0_CLIENT_SECRET}"
+            --var "AUTH0_AUDIENCE:https://www.toiletmap.org.uk/api"
+          printf '%s' "$AUTH0_CLIENT_ID" | pnpm exec wrangler secret put AUTH0_CLIENT_ID --env="" --name "${BRANCH}-toiletmap-client"
+          printf '%s' "$AUTH0_CLIENT_SECRET" | pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --env="" --name "${BRANCH}-toiletmap-client"
 
   comment-preview-urls:
     name: Comment Preview URLs on PR
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [deploy-server, deploy-client]
+    # The only job that writes to the repository (the PR comment).
+    permissions:
+      pull-requests: write
     steps:
       - name: Post Deploy Preview Links
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const refName = process.env.GITHUB_REF_NAME || '';
             const branch = refName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
@@ -163,4 +194,3 @@ jobs:
                 });
               }
             }
-

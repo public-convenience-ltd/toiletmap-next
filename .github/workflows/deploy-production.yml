@@ -43,7 +43,7 @@ jobs:
       client: ${{ steps.filter.outputs.client }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -97,6 +97,10 @@ jobs:
 
   migrate:
     name: Migrate production database
+    # Only from main. workflow_dispatch can be started from any branch; the production
+    # environment's main-only deployment rule is the hard control, this is the second.
+    # deploy-server and deploy-client need migrate, so they are skipped with it.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
@@ -107,12 +111,12 @@ jobs:
         working-directory: apps/toiletmap-server
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
           version: 2.122.1
 
@@ -129,7 +133,7 @@ jobs:
   deploy-server:
     name: Deploy server
     needs: [changes, migrate]
-    if: needs.changes.outputs.server == 'true'
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -140,15 +144,15 @@ jobs:
         working-directory: apps/toiletmap-server
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: 'pnpm'
@@ -179,6 +183,7 @@ jobs:
     # after a failed migration or server deploy.
     if: >-
       ${{ !cancelled()
+      && github.ref == 'refs/heads/main'
       && needs.changes.outputs.client == 'true'
       && needs.migrate.result == 'success'
       && (needs.deploy-server.result == 'success' || needs.deploy-server.result == 'skipped') }}
@@ -192,15 +197,15 @@ jobs:
         working-directory: apps/toiletmap-client
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: 'pnpm'
@@ -232,33 +237,55 @@ jobs:
       ${{ !cancelled()
       && (needs.deploy-server.result == 'success' || needs.deploy-client.result == 'success') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment: production
+    timeout-minutes: 10
+    # No environment: this job reads public URLs and uses no secrets, so it needs no
+    # environment approval or environment secrets.
     permissions: {}
     steps:
       # Both workers, whichever was deployed: the client's pages and API proxy depend on
-      # the server. The URLs can be overridden with repository variables.
-      - name: Client home page and server health return 200
+      # the server. The URLs can be overridden with repository variables. The API checks
+      # go through the client, as browsers and the Flutter app do (client /api proxy, then
+      # the service binding to the server).
+      - name: Client pages, server health, proximity API and legacy GraphQL
         env:
           CLIENT_URL: ${{ vars.PRODUCTION_CLIENT_URL || 'https://toiletmap-client.gbtoiletmap.workers.dev' }}
           SERVER_URL: ${{ vars.PRODUCTION_SERVER_URL || 'https://toiletmap-server.gbtoiletmap.workers.dev' }}
         run: |
           set -uo pipefail
+          body="$(mktemp)"
+          # check <url> [jq filter]: retries until the URL returns 200 and, when a filter
+          # is given, the JSON body satisfies it (jq -e: false, null or a parse error fail).
           check() {
-            local url="$1" status
+            local url="$1" filter="${2:-}" status
             for attempt in 1 2 3 4 5 6; do
-              status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url" || true)"
+              status="$(curl -sS -o "$body" -w '%{http_code}' --max-time 20 "$url" || true)"
               if [ "$status" = "200" ]; then
-                echo "OK ${url}"
-                return 0
+                if [ -z "$filter" ] || jq -e "$filter" "$body" >/dev/null 2>&1; then
+                  echo "OK ${url}"
+                  return 0
+                fi
+                echo "Attempt ${attempt}: ${url} returned 200 but an unexpected body:"
+                head -c 500 "$body"; echo
+              else
+                echo "Attempt ${attempt}: ${url} returned ${status:-nothing}"
               fi
-              echo "Attempt ${attempt}: ${url} returned ${status:-nothing}; retrying in 10 s"
+              echo "Retrying in 10 s"
               sleep 10
             done
-            echo "::error::${url} did not return 200"
+            echo "::error::${url} failed the smoke check"
             return 1
           }
+          client="${CLIENT_URL%/}"
           failed=0
-          check "${CLIENT_URL%/}/" || failed=1
+          check "${client}/" || failed=1
           check "${SERVER_URL%/}/health/ready" || failed=1
+          # The add/edit forms' nearby-loos lookup.
+          check "${client}/api/loos/proximity?lat=51.5072&lng=-0.1276" \
+            '(.data | type == "array") and (.count | type == "number")' || failed=1
+          # The exact URL shape the Flutter app sends (legacy GraphQL over GET on /api/).
+          # Any GraphQL error fails, even with a 200.
+          query='{loosByProximity(from:{lat:51.5072,lng:-0.1276,maxDistance:500}){id name}}'
+          encoded="$(jq -rn --arg q "$query" '$q | @uri')"
+          check "${client}/api/?query=${encoded}" \
+            '(has("errors") | not) and (.data.loosByProximity | type == "array")' || failed=1
           exit "$failed"

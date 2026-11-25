@@ -36,6 +36,11 @@
     },
     "production": {
       "name": "toiletmap-client",
+      // No per-version preview URLs on production (they would serve any uploaded
+      // version). toiletmap-client.gbtoiletmap.workers.dev stays on until the
+      // custom-domain cutover: the deploy smoke check and Flutter testing use it.
+      "preview_urls": false,
+      "workers_dev": true,
       // Service binding used by the same-origin /api/* proxy and SSR fetches.
       // Preview has no binding (server names are per-branch) and falls back to PUBLIC_API_URL.
       "services": [{ "binding": "API", "service": "toiletmap-server" }],

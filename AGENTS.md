@@ -371,6 +371,7 @@ The project uses **Supabase migration tooling** (NOT Prisma migrations) because 
    - Test locally before deploying to production
    - Keep migrations small and focused on one change
    - Always run integration tests after applying migrations
+   - Grant new tables to `toiletmap_web` explicitly (only what the worker needs). Since `20261124000000_harden_grants_and_functions.sql`, tables and sequences that `postgres` (i.e. a migration) creates in `public` are no longer granted to `anon` and `authenticated` (unused Data API roles) by default; functions still get `EXECUTE` for everyone, so `REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated` on any new `SECURITY DEFINER` function. Only `postgres` can run the `audit` schema functions, and the migration fails itself if that end state does not hold. Give new functions an explicit `SET search_path = pg_catalog, public, extensions, pg_temp` (PostGIS lives in `extensions`; never `''`). `test/integration/db-grants.spec.ts` checks these grants
 
 **Production Deployment**:
 Production migrations are applied by the `migrate` job of `.github/workflows/deploy-production.yml` on every push to `main`, before either worker deploys (see `docs/deployment.md`). Coordinate timing with the team for migrations that may impact performance (e.g., creating indexes on large tables).
@@ -408,7 +409,8 @@ pnpm --filter toiletmap-server test:e2e         # needs local Supabase on :54322
 
 - **TypeScript versions**: the root uses TypeScript 7 (native compiler). The client pins `typescript` 6.0.3 because `@astrojs/check` needs the TypeScript JS language-service API, which TS 7 does not ship. This still holds for `@astrojs/check` 0.9.12 (peer `typescript ^5 || ^6`), and `astro check` reports TS 7 as unsupported.
 - **Playwright prerequisites**: local Supabase running (`pnpm --filter toiletmap-server supabase:start`), `pnpm --filter toiletmap-server prisma:generate`, and browsers (`pnpm exec playwright install chromium webkit` in `apps/toiletmap-client`). Playwright starts the server and client itself. A reused local stack may be missing newer migrations: run `npx -y supabase@2.122.1 migration up --local` in `apps/toiletmap-server`.
-- **CI jobs** (`.github/workflows/ci.yml`): `Biome (Lint & Format)`, `Type Check` (server typecheck + typecheck:test) and `Integration Tests` (server `test:e2e`) are **required** by the branch ruleset. `Client Checks` (design-system tests + typecheck, client typecheck, build, client tests), `E2E (Playwright)`, `Mobile App (Flutter)` and `Cloudflare Build Check` also run on every PR but are not required.
+- **CI jobs** (`.github/workflows/ci.yml`): `Biome (Lint & Format)`, `Type Check` (server typecheck + typecheck:test) and `Integration Tests` (server `test:e2e`) are **required** by the branch ruleset. `Workflow Lint` (actionlint + zizmor on `.github/workflows`), `Client Checks` (design-system tests + typecheck, client typecheck, build, client tests), `E2E (Playwright)`, `Mobile App (Flutter)` and `Cloudflare Build Check` also run on every PR but are not required.
+- **Workflows**: pin every action to a full commit SHA with a `# vX.Y.Z` comment, keep secrets in step `env`, and give each job only the permissions it needs; `test/unit/deploy-workflows.test.ts` and `test/unit/wrangler-config.test.ts` (server) guard the deploy rules (main-only production jobs, preview secrets via `wrangler secret put`, separate preview rate-limit namespaces, `preview_urls: false` in production). See `docs/deployment.md`.
 
 ## Admin Interface Architecture
 
