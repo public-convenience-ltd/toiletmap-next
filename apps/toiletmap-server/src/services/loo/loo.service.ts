@@ -14,7 +14,7 @@ import {
   rawLooToToilets,
 } from "./mappers";
 import { mapMutationToPrismaData } from "./mutation";
-import { insertLoo, updateLoo } from "./persistence";
+import { insertLoo, setWriteActorSub, updateLoo, type WriteActor } from "./persistence";
 import {
   buildProximityQuery,
   buildSearchQueries,
@@ -762,12 +762,12 @@ export class LooService {
    *
    * @param id - The ID for the new loo.
    * @param mutation - The attributes to set on the loo.
-   * @param contributor - The user creating the loo (for audit trail).
+   * @param actor - Who the write is attributed to (contributor name and Auth0 sub).
    */
   async create(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
   ): Promise<LooResponse | null> {
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
@@ -779,7 +779,7 @@ export class LooService {
         id,
         data: dataForCreate,
         mutation,
-        contributor,
+        actor,
       });
     });
 
@@ -794,14 +794,14 @@ export class LooService {
     tx: Prisma.TransactionClient,
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
   ): Promise<void> {
     await insertLoo({
       tx,
       id,
       data: mapMutationToPrismaData(mutation, { forCreate: true }),
       mutation,
-      contributor,
+      actor,
     });
     this.looCache.delete(id);
   }
@@ -819,7 +819,7 @@ export class LooService {
   async updateExisting(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
     options: { expectedUpdatedAt?: string | null; tx?: Prisma.TransactionClient } = {},
   ): Promise<UpdateExistingResult> {
     const { expectedUpdatedAt, tx: outerTx } = options;
@@ -836,7 +836,7 @@ export class LooService {
         id,
         data: mapMutationToPrismaData(mutation, { forCreate: false }),
         mutation,
-        contributor,
+        actor,
         expectedUpdatedAt: expected,
       });
       this.looCache.delete(id);
@@ -870,12 +870,12 @@ export class LooService {
    *
    * @param id - The ID of the loo to upsert.
    * @param mutation - The attributes to update/set.
-   * @param contributor - The user performing the action.
+   * @param actor - Who the write is attributed to (contributor name and Auth0 sub).
    */
   async upsert(
     id: string,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
   ): Promise<LooResponse | null> {
     const dataForCreate = mapMutationToPrismaData(mutation, {
       forCreate: true,
@@ -892,7 +892,7 @@ export class LooService {
         id,
         data: dataForUpdate,
         mutation,
-        contributor,
+        actor,
       });
 
       // Invalidate cache
@@ -906,7 +906,7 @@ export class LooService {
           id,
           data: dataForCreate,
           mutation,
-          contributor,
+          actor,
         });
       }
     });
@@ -966,7 +966,7 @@ export class LooService {
   report(
     id: string,
     input: RemovalInput,
-    contributor: string | null,
+    actor: WriteActor,
     options: StateChangeOptions = {},
   ): Promise<StateChangeResult> {
     const mutation: LooMutationAttributes = {
@@ -982,7 +982,7 @@ export class LooService {
       input.duplicateOf !== undefined && input.duplicateOf !== id ? input.duplicateOf : null,
       (tx) => this.checkReport(id, input, { ...options, tx }),
       mutation,
-      contributor,
+      actor,
       options,
     );
   }
@@ -1007,7 +1007,7 @@ export class LooService {
    */
   restore(
     id: string,
-    contributor: string | null,
+    actor: WriteActor,
     options: StateChangeOptions = {},
   ): Promise<StateChangeResult> {
     const mutation: LooMutationAttributes = {
@@ -1021,7 +1021,7 @@ export class LooService {
       null,
       (tx) => this.checkRestore(id, { ...options, tx }),
       mutation,
-      contributor,
+      actor,
       options,
     );
   }
@@ -1062,14 +1062,14 @@ export class LooService {
     dependsOn: string | null,
     check: (tx: Prisma.TransactionClient) => Promise<StateChangeCheck>,
     mutation: LooMutationAttributes,
-    contributor: string | null,
+    actor: WriteActor,
     options: StateChangeOptions,
   ): Promise<StateChangeResult> {
     const attempt = async (tx: Prisma.TransactionClient) => {
       await this.lockForStateChange(tx, id, dependsOn);
       const checked = await check(tx);
       if (checked.status !== "ok") return checked;
-      const result = await this.updateExisting(id, mutation, contributor, {
+      const result = await this.updateExisting(id, mutation, actor, {
         tx,
         expectedUpdatedAt: checked.base.updatedAt,
       });
@@ -1109,15 +1109,20 @@ export class LooService {
    * Records that someone confirmed the loo is still there: sets
    * `verified_at = now()` and nothing else (no contributor, and `updated_at`
    * is left alone so edit forms holding a base version do not conflict). The
-   * detail ETag still changes because it hashes the body.
+   * detail ETag still changes because it hashes the body. Like every write,
+   * it records the caller's Auth0 sub (`null` when anonymous) in
+   * `updated_by_sub`.
    */
-  async verify(id: string): Promise<VerifyResult> {
-    const rows = await this.prisma.$queryRaw<Array<{ verified_at: Date }>>(Prisma.sql`
-      UPDATE toilets
-      SET verified_at = now()
-      WHERE id = ${id} AND active IS TRUE
-      RETURNING verified_at
-    `);
+  async verify(id: string, actorSub: string | null): Promise<VerifyResult> {
+    const rows = await this.prisma.$transaction(async (tx) => {
+      await setWriteActorSub(tx, actorSub);
+      return tx.$queryRaw<Array<{ verified_at: Date }>>(Prisma.sql`
+        UPDATE toilets
+        SET verified_at = now()
+        WHERE id = ${id} AND active IS TRUE
+        RETURNING verified_at
+      `);
+    });
     this.looCache.delete(id);
     const [row] = rows;
     if (row) return { status: "verified", verifiedAt: new Date(row.verified_at).toISOString() };

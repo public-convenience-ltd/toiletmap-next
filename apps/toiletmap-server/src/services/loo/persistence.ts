@@ -73,12 +73,40 @@ const toColumnValueSql = (column: string, value: unknown) => {
   return Prisma.sql`${value}`;
 };
 
+/**
+ * Who a write is attributed to: the contributor name appended to
+ * `contributors` (public, shown as a count) and the Auth0 `sub` stored
+ * privately in `toilets.updated_by_sub`. Both are null for an anonymous
+ * change (for an approved queued change: its submitter, not the moderator).
+ */
+export type WriteActor = {
+  contributor: string | null;
+  sub: string | null;
+};
+
+/**
+ * Names the Auth0 account behind the next write in this transaction.
+ *
+ * The trigger `toilets_set_updated_by_sub` (migration
+ * 20261125000000_write_attribution.sql) copies the transaction-local setting
+ * `toiletmap.actor_sub` into `toilets.updated_by_sub` on every INSERT and
+ * UPDATE, so a write that does not set it, such as any legacy-app write,
+ * stores NULL rather than inheriting the previous writer's sub. `''` clears
+ * it (an anonymous change). Must run inside the same transaction as the write.
+ */
+export const setWriteActorSub = async (tx: Prisma.TransactionClient, sub: string | null) => {
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma 7.8.0 / TS 6.0.3 type gap (see insertLoo)
+  await (tx as any).$queryRaw(
+    Prisma.sql`SELECT set_config('toiletmap.actor_sub', ${sub ?? ""}, true)`,
+  );
+};
+
 type InsertArgs = {
   tx: Prisma.TransactionClient;
   id: string;
   data: Prisma.toiletsUncheckedCreateInput;
   mutation: LooMutationAttributes;
-  contributor: string | null;
+  actor: WriteActor;
 };
 
 /**
@@ -86,7 +114,7 @@ type InsertArgs = {
  * Raw SQL is used to handle PostGIS geography types and array operations
  * that are cumbersome or impossible with standard Prisma create.
  */
-export const insertLoo = async ({ tx, id, data, mutation, contributor }: InsertArgs) => {
+export const insertLoo = async ({ tx, id, data, mutation, actor }: InsertArgs) => {
   const keys = Object.keys(data);
   const columns = [
     Prisma.raw("id"),
@@ -100,7 +128,7 @@ export const insertLoo = async ({ tx, id, data, mutation, contributor }: InsertA
     Prisma.sql`${id}`,
     dbNow,
     dbNow,
-    buildContributorsInsertValue(contributor),
+    buildContributorsInsertValue(actor.contributor),
     ...keys.map((k) => toColumnValueSql(k, data[k as keyof typeof data])),
   ];
 
@@ -115,6 +143,7 @@ export const insertLoo = async ({ tx, id, data, mutation, contributor }: InsertA
     VALUES (${Prisma.join(values)})
   `;
 
+  await setWriteActorSub(tx, actor.sub);
   // Prisma.TransactionClient omits $executeRaw in TS 6.0.3 due to over-eager
   // ITXClientDenyList resolution; the method is present at runtime.
   // biome-ignore lint/suspicious/noExplicitAny: Prisma 7.8.0 / TS 6.0.3 type gap
@@ -126,7 +155,7 @@ type UpdateArgs = {
   id: string;
   data: Prisma.toiletsUncheckedUpdateInput;
   mutation: LooMutationAttributes;
-  contributor: string | null;
+  actor: WriteActor;
   /**
    * Optimistic-concurrency guard. When provided, the row is only updated if its
    * `updated_at` still equals this value (to millisecond precision); `null`
@@ -145,7 +174,7 @@ export const updateLoo = async ({
   id,
   data,
   mutation,
-  contributor,
+  actor,
   expectedUpdatedAt,
 }: UpdateArgs) => {
   const assignments: Prisma.Sql[] = [Prisma.sql`updated_at = ${dbNow}`];
@@ -159,7 +188,7 @@ export const updateLoo = async ({
     assignments.push(Prisma.sql`geography = ${geographySql}`);
   }
 
-  const contributorSql = buildContributorsUpdateClause(contributor);
+  const contributorSql = buildContributorsUpdateClause(actor.contributor);
   if (contributorSql) assignments.push(contributorSql);
 
   // JS Dates carry millisecond precision while timestamptz stores microseconds,
@@ -179,6 +208,7 @@ export const updateLoo = async ({
     ${versionGuard}
   `;
 
+  await setWriteActorSub(tx, actor.sub);
   // biome-ignore lint/suspicious/noExplicitAny: Prisma 7.8.0 / TS 6.0.3 type gap
   const result = await (tx as any).$executeRaw(updateSql);
   return Number(result);

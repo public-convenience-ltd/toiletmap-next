@@ -9,6 +9,7 @@ import {
   isStaleBase,
 } from "../../../services/loo/diff";
 import type { StateChangeResult } from "../../../services/loo/loo.service";
+import type { WriteActor } from "../../../services/loo/persistence";
 import {
   type LooMutationAttributes,
   type LooResponse,
@@ -597,15 +598,19 @@ export const pendingApprove = async (c: AdminContext) => {
       user?.sub ?? "admin",
       async (tx, change) => {
         // Credit the signed-in submitter when known; anonymous changes are
-        // credited to the approving moderator.
-        const contributorName = change.submitted_by ?? moderatorName;
+        // credited to the approving moderator by name. The account (sub) is
+        // always the submitter's (null when anonymous), never the moderator's.
+        const actor: WriteActor = {
+          contributor: change.submitted_by ?? moderatorName,
+          sub: change.submitter_sub ?? null,
+        };
 
         if (change.type === "create") {
           const { active, ...rest } = asPayload(change.payload);
           // Changes queued before `active` became boolean-only may carry null,
           // which would hide the toilet without a decision. Never apply it.
           const payload: LooMutationAttributes = active === null ? rest : { ...rest, active };
-          await looService.createInTransaction(tx, generateLooId(), payload, contributorName);
+          await looService.createInTransaction(tx, generateLooId(), payload, actor);
           return { status: "approved", detail: "approved" };
         }
 
@@ -628,16 +633,12 @@ export const pendingApprove = async (c: AdminContext) => {
           const removal = parseRemovePayload(change.payload);
           if (!removal) return { status: "rejected", detail: "malformed" };
           if (current.active !== true) return { status: "approved", detail: "approved-noop" };
-          return stateChangeOutcome(
-            await looService.report(change.loo_id, removal, contributorName, { tx }),
-          );
+          return stateChangeOutcome(await looService.report(change.loo_id, removal, actor, { tx }));
         }
 
         if (change.type === "restore") {
           if (current.active === true) return { status: "approved", detail: "approved-noop" };
-          return stateChangeOutcome(
-            await looService.restore(change.loo_id, contributorName, { tx }),
-          );
+          return stateChangeOutcome(await looService.restore(change.loo_id, actor, { tx }));
         }
 
         const { active, ...rest } = asPayload(change.payload);
@@ -649,7 +650,7 @@ export const pendingApprove = async (c: AdminContext) => {
         if (isEmptyMutation(changes)) return { status: "approved", detail: "approved-noop" };
 
         // Strict update: never inserts, and only applies to the version we diffed.
-        const updated = await looService.updateExisting(change.loo_id, changes, contributorName, {
+        const updated = await looService.updateExisting(change.loo_id, changes, actor, {
           tx,
           expectedUpdatedAt: current.updatedAt,
         });

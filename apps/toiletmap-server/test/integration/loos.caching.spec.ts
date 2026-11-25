@@ -28,7 +28,13 @@ import { callApi, jsonRequest, readJson } from "./utils/test-client";
 
 const fixtures = createFixtureFactory();
 
-const authHeaders = () => ({ Authorization: `Bearer ${getTestContext().issueToken()}` });
+/**
+ * An admin: these tests deactivate loos and create them with PUT, which only
+ * admins may do (see write-guards.ts).
+ */
+const authHeaders = () => ({
+  Authorization: `Bearer ${getTestContext().issueToken({ permissions: ["access:admin"] })}`,
+});
 
 const authPut = (id: string, body: Record<string, unknown>) =>
   callApi(`/api/loos/${id}`, jsonRequest("PUT", body, authHeaders()));

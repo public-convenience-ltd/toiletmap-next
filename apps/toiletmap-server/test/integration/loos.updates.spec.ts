@@ -66,7 +66,8 @@ test("GET /loos/updates lists a deactivated loo under deleted", async () => {
     jsonRequest(
       "PUT",
       { active: false, removalReason: "Closed permanently" },
-      { Authorization: `Bearer ${issueToken()}` },
+      // Only admins may deactivate with a PUT; everyone else reports.
+      { Authorization: `Bearer ${issueToken({ permissions: ["access:admin"] })}` },
     ),
   );
   expect(deactivate.status).toBe(200);

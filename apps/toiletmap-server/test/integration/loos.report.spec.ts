@@ -568,11 +568,12 @@ describe("POST /api/loos/:id/restore", () => {
     expect((await readJson<ConflictBody>(stale)).error).toBe("conflict");
   });
 
-  it("clears the removal category when a trusted PUT reactivates the loo", async () => {
+  it("clears the removal category when an admin PUT reactivates the loo", async () => {
+    // Only admins may send `active` in a PUT (see write-guards.ts).
     const loo = await removedLoo();
     const response = await callApi(
       `/api/loos/${loo.id}`,
-      jsonRequest("PUT", { active: true }, trustedHeaders()),
+      jsonRequest("PUT", { active: true }, adminHeaders()),
     );
     expect(response.status).toBe(200);
     const body = await readJson<SavedLooBody>(response);
@@ -584,7 +585,7 @@ describe("POST /api/loos/:id/restore", () => {
     // A later removal without a reason must not bring the old one back.
     const removedAgain = await callApi(
       `/api/loos/${loo.id}`,
-      jsonRequest("PUT", { active: false }, trustedHeaders()),
+      jsonRequest("PUT", { active: false }, adminHeaders()),
     );
     expect(removedAgain.status).toBe(200);
     expect((await readJson<SavedLooBody>(removedAgain)).removalReason).toBeNull();

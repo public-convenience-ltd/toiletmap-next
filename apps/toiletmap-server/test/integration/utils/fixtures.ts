@@ -107,7 +107,7 @@ class LooFixtures {
   async create(overrides: LooFixtureOverrides = {}): Promise<LooResponse> {
     const { id, contributor, mutation } = this.withDefaults(overrides);
     const service = this.getService();
-    await service.create(id, mutation, contributor);
+    await service.create(id, mutation, { contributor, sub: null });
     const record = await service.getById(id);
     if (!record) {
       throw new Error("Failed to load loo fixture after creation");
@@ -118,7 +118,7 @@ class LooFixtures {
 
   async upsert(id: string, data: LooMutationAttributes, contributor: string): Promise<LooResponse> {
     const service = this.getService();
-    await service.upsert(id, data, contributor);
+    await service.upsert(id, data, { contributor, sub: null });
     const record = await service.getById(id);
     if (!record) {
       throw new Error("Failed to load loo fixture after upsert");

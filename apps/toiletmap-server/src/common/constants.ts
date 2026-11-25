@@ -61,3 +61,33 @@ export const HEAVY_PROXIMITY_RADIUS = 5000;
  * cache entry instead of each minting a new one.
  */
 export const PROXIMITY_COORDINATE_DECIMALS = 5;
+
+/**
+ * Loo ids: 24 lowercase hexadecimal characters (12 random bytes, the format
+ * of the legacy MongoDB ObjectIds and of `generateLooId`). Inputs are
+ * lowercased before they are checked.
+ */
+export const LOO_ID_PATTERN = /^[0-9a-f]{24}$/;
+
+/**
+ * The box a non-admin may place a toilet in (WGS84 degrees). It covers Great
+ * Britain (St Kilda at 8.6°W, Muckle Flugga at 60.86°N, Lowestoft at
+ * 1.76°E, the Isles of Scilly), Northern Ireland (to 8.18°W), the Isle of Man
+ * and the Channel Islands (Les Minquiers at 48.97°N). A box is deliberately
+ * coarse: it also takes in Ireland and the north coast of France, and only
+ * stops gross mistakes such as swapped lat/lng, 0,0 or another continent.
+ * Admins may write any valid coordinate.
+ */
+export const SERVICE_AREA_BOUNDS = {
+  minLat: 48.9,
+  maxLat: 61.0,
+  minLng: -8.7,
+  maxLng: 1.9,
+} as const;
+
+/**
+ * Furthest (metres) a non-admin may move an existing toilet directly. A
+ * bigger move is queued for moderation even for a trusted contributor
+ * (matches the client's "big move" warning).
+ */
+export const MAX_DIRECT_MOVE_METRES = 50;

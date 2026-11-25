@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   DEFAULT_PROXIMITY_RADIUS,
+  LOO_ID_PATTERN,
   MAX_GEOHASH_PREFIX_LENGTH,
   MAX_IDS_PER_REQUEST,
   MAX_PROXIMITY_RADIUS,
@@ -22,11 +23,17 @@ import {
   triStateFilterSchema,
 } from "../../common/schemas";
 import { LOO_ID_LENGTH } from "../../services/loo";
-import {
-  CoordinatesSchema,
-  LooSearchSortOptions,
-  REMOVAL_CATEGORIES,
-} from "../../services/loo/types";
+import { LooSearchSortOptions, REMOVAL_CATEGORIES } from "../../services/loo/types";
+
+const LOO_ID_MESSAGE = `must be a ${LOO_ID_LENGTH} character hexadecimal id`;
+
+/**
+ * The one loo id schema, for path parameters, `?ids=`, `exclude`, body ids,
+ * `areaId` and `duplicateOf`: trimmed and lowercased, then exactly
+ * {@link LOO_ID_PATTERN} (24 hex characters). Anything else is a 400 before
+ * it reaches a query.
+ */
+export const looIdSchema = z.string().trim().toLowerCase().regex(LOO_ID_PATTERN, LOO_ID_MESSAGE);
 
 const COORDINATE_SCALE = 10 ** PROXIMITY_COORDINATE_DECIMALS;
 
@@ -60,24 +67,39 @@ export const proximitySchema = z
       )
       .transform((value) => value === "true"),
     /** A loo id to leave out of the results (the loo being edited). */
-    exclude: z
-      .string()
-      .trim()
-      .length(LOO_ID_LENGTH, `exclude must be exactly ${LOO_ID_LENGTH} characters`)
-      .optional(),
+    exclude: looIdSchema.optional(),
   })
   .strict();
 
+/**
+ * A location in a write: finite WGS84 degrees. Non-admin writes must also
+ * fall inside `SERVICE_AREA_BOUNDS`, checked by the route (see write-guards.ts).
+ */
+const mutationCoordinatesSchema = z
+  .object({
+    lat: z
+      .number()
+      .finite()
+      .min(-90, "lat must be within -90 and 90")
+      .max(90, "lat must be within -90 and 90"),
+    lng: z
+      .number()
+      .finite()
+      .min(-180, "lng must be within -180 and 180")
+      .max(180, "lng must be within -180 and 180"),
+  })
+  .strict();
+
+/**
+ * Fields every caller may send in POST/PUT bodies. Non-admins may not send
+ * `active` or `removalReason`, nor `location: null` (see write-guards.ts):
+ * they report and restore instead. `removalCategory` and `duplicateOf` are
+ * set only by report/restore, so no body may carry them.
+ */
 export const baseMutationSchema = z
   .object({
     name: nullableTrimmed(200),
-    areaId: z
-      .string()
-      .trim()
-      .length(LOO_ID_LENGTH)
-      .transform((s) => (s.length ? s : null))
-      .nullable()
-      .optional(),
+    areaId: looIdSchema.nullable().optional(),
     accessible: booleanField,
     // `active` is a soft-delete flag: it must be an explicit true/false. A null
     // would silently hide the toilet from the map with no recorded reason.
@@ -96,13 +118,14 @@ export const baseMutationSchema = z
     paymentDetails: nullableTrimmed(2000),
     removalReason: nullableTrimmed(2000),
     openingTimes: openingTimesSchema.optional(),
-    // allow clearing with null and omit with undefined
-    location: CoordinatesSchema.nullable().optional(),
+    // allow clearing with null (admins only) and omit with undefined
+    location: mutationCoordinatesSchema.nullable().optional(),
   })
   .strict();
 
+/** POST body. Only admins may choose the `id`; everyone else gets a generated one. */
 export const createMutationSchema = baseMutationSchema.extend({
-  id: z.string().trim().length(LOO_ID_LENGTH).optional(),
+  id: looIdSchema.optional(),
 });
 
 /**
@@ -120,12 +143,6 @@ const optionalBaseUpdatedAt = z.iso
   .datetime({ offset: true, message: "baseUpdatedAt must be an ISO-8601 datetime" })
   .optional();
 
-const looIdString = z
-  .string()
-  .trim()
-  .regex(/^[0-9a-f]{24}$/i, `must be a ${LOO_ID_LENGTH} character hexadecimal id`)
-  .transform((value) => value.toLowerCase());
-
 /**
  * POST /loos/:id/report. `details` is required for `other`, `duplicateOf` for
  * `duplicate` (and only allowed there).
@@ -141,7 +158,7 @@ export const reportSchema = z
       .max(2000, "details must be at most 2000 characters")
       .optional()
       .transform((value) => (value ? value : undefined)),
-    duplicateOf: looIdString.optional(),
+    duplicateOf: looIdSchema.optional(),
     baseUpdatedAt: optionalBaseUpdatedAt,
   })
   .strict()
@@ -225,7 +242,7 @@ export const metricsQuerySchema = searchQueryShape.extend({
 // Path parameter validation schemas
 export const looIdParamSchema = z
   .object({
-    id: z.string().length(LOO_ID_LENGTH, `id must be exactly ${LOO_ID_LENGTH} characters`),
+    id: looIdSchema,
   })
   .strict();
 
@@ -312,7 +329,7 @@ export const idsQuerySchema = z
         const rawIds = Array.isArray(value) ? value : [value];
         const ids = rawIds
           .flatMap((v) => v.split(","))
-          .map((v) => v.trim())
+          .map((v) => v.trim().toLowerCase())
           .filter((v) => v.length > 0);
         // Duplicates add nothing; the first occurrence keeps its place in the order.
         return [...new Set(ids)];
@@ -323,8 +340,8 @@ export const idsQuerySchema = z
       .refine((ids) => ids.length <= MAX_IDS_PER_REQUEST, {
         message: `At most ${MAX_IDS_PER_REQUEST} ids per request`,
       })
-      .refine((ids) => ids.every((id) => id.length === LOO_ID_LENGTH), {
-        message: `Each id must be exactly ${LOO_ID_LENGTH} characters`,
+      .refine((ids) => ids.every((id) => LOO_ID_PATTERN.test(id)), {
+        message: `Each id ${LOO_ID_MESSAGE}`,
       }),
   })
   .strict();

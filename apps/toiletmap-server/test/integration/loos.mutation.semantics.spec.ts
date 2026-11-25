@@ -49,6 +49,17 @@ const fullyPopulated: LooMutationAttributes = {
 
 const seedFullLoo = () => fixtures.loos.create({ ...fullyPopulated });
 
+/** `fullyPopulated` without the admin-only fields, as a non-admin may send it. */
+const { active: _active, removalReason: _removalReason, ...contributorFields } = fullyPopulated;
+
+const adminPut = (id: string, body: unknown) =>
+  callApi(
+    `/api/loos/${id}`,
+    jsonRequest("PUT", body, {
+      Authorization: `Bearer ${getTestContext().issueToken({ permissions: ["access:admin"] })}`,
+    }),
+  );
+
 const getRaw = async (id: string): Promise<toilets> => {
   const row = await fixtures.loos.getRawById(id);
   if (!row) throw new Error(`Loo ${id} not found`);
@@ -105,7 +116,7 @@ describe("PUT /api/loos/:id mutation semantics (authenticated)", () => {
     const auditBefore = await countAuditRows(loo.id);
 
     const response = await authedPut(loo.id, {
-      ...fullyPopulated,
+      ...contributorFields,
       location: loo.location,
     });
     expect(response.status).toBe(200);
@@ -191,9 +202,9 @@ describe("PUT /api/loos/:id mutation semantics (authenticated)", () => {
     expect((await getRaw(loo.id)).active).toBe(true);
   });
 
-  it("still creates a loo for an unknown id (upsert)", async () => {
+  it("still creates a loo for an unknown id when the caller is an admin (upsert)", async () => {
     const id = generateLooId();
-    const response = await authedPut(id, {
+    const response = await adminPut(id, {
       name: "Upserted with base",
       location: { lat: 51.51, lng: -0.11 },
       baseUpdatedAt: new Date().toISOString(),
@@ -231,7 +242,7 @@ describe("PUT /api/loos/:id mutation semantics (anonymous)", () => {
     const loo = await seedFullLoo();
 
     const response = await anonPut(loo.id, {
-      ...fullyPopulated,
+      ...contributorFields,
       location: loo.location,
       notes: "Anonymous correction",
       babyChange: false,
